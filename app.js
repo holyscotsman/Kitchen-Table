@@ -55,6 +55,13 @@
     recipes: "kt.recipes"
   };
 
+  /* Easy Read never drops the reader below this step. The A−/A+ stepper still
+     works above it — the mode is additive, not a replacement. */
+  var EASY_MIN_FS = 2;
+
+  var CORS_PROXY = "https://api.allorigins.win/raw?url=";
+  var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+
   function load(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
@@ -160,8 +167,19 @@
       var v = load(K.fs, DEFAULT_FS);
       return typeof v === "number" && v >= 0 && v < FS.length ? v : DEFAULT_FS;
     })(),
+    easyRead: load(K.easyRead, false) === true,
 
     route: { name: "main", id: "" },
+
+    textOpen: false,
+
+    /* Add / Import flow */
+    addStep: "choose",   // choose | link | photo | review
+    addBusy: "",
+    addError: "",
+    addDraft: null,
+    addUrl: "",
+    addPhoto: null,
 
     mainQ: "",
 
@@ -194,6 +212,24 @@
     }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", S.theme === "light" ? "#F3F6F3" : "#0E1712");
+    applyEasy();
+  }
+
+  function applyEasy() {
+    if (S.easyRead) document.documentElement.setAttribute("data-easy", "on");
+    else document.documentElement.removeAttribute("data-easy");
+  }
+
+  /* The step actually used for reading — Easy Read raises the floor. */
+  function effectiveFs() {
+    return S.easyRead ? Math.max(EASY_MIN_FS, S.fsIndex) : S.fsIndex;
+  }
+
+  function toggleEasy() {
+    S.easyRead = !S.easyRead;
+    save(K.easyRead, S.easyRead);
+    applyEasy();
+    render();
   }
 
   function toggleTheme() {
@@ -204,7 +240,8 @@
   }
 
   function stepFs(delta) {
-    var next = Math.min(FS.length - 1, Math.max(0, S.fsIndex + delta));
+    var floor = S.easyRead ? EASY_MIN_FS : 0;
+    var next = Math.min(FS.length - 1, Math.max(floor, effectiveFs() + delta));
     if (next === S.fsIndex) return;
     S.fsIndex = next;
     save(K.fs, next);
@@ -483,8 +520,10 @@
          '" data-act="toggle-search" aria-pressed="' + S.searchOpen +
          '" aria-label="Search recipes">' + I.search() + "</button>" +
          themeBtn() +
-         '<button type="button" class="iconbtn press" data-act="cycle-fs" ' +
-         'aria-label="Text size, currently ' + FS[S.fsIndex] + ' pixels">Aa</button>' +
+         '<button type="button" class="iconbtn press' + (S.easyRead ? " is-on" : "") +
+         '" data-act="open-text" aria-haspopup="dialog" ' +
+         'aria-label="Text size, currently ' + FS[effectiveFs()] +
+         ' pixels">Aa</button>' +
          "</div></div>";
 
     if (S.searchOpen) {
@@ -543,10 +582,11 @@
     }
     h += "</div>";
 
-    h += '<div class="addbar"><a class="addpill press" href="#menu" ' +
-         'data-act="add-recipe">' + I.plus(20) + "Add recipe</a></div>";
+    h += '<div class="addbar"><a class="addpill press" href="#add">' +
+         I.plus(20) + "Add recipe</a></div>";
 
     if (S.filterOpen) h += filterSheetHtml();
+    if (S.textOpen) h += textSheetHtml();
     return h;
   }
 
@@ -567,7 +607,79 @@
 
   /* ======================================================================
      10. Sheets
+
+     Every sheet traps focus while open, closes on Escape, and returns focus to
+     whatever opened it. Without the restore, dismissing a sheet drops the
+     caret back at the top of the document, which is disorienting on a screen
+     reader and on a keyboard alike.
      ====================================================================== */
+
+  var FOCUSABLE =
+    'a[href], button:not([disabled]), input:not([disabled]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  var sheetReturn = null;   // selector of the trigger to restore focus to
+  var openSheetId = null;   // which sheet element currently holds focus
+
+  function openSheet(flag, trigger) {
+    sheetReturn = trigger ? '[data-act="' + trigger.getAttribute("data-act") + '"]' : null;
+    S.filterOpen = false;
+    S.textOpen = false;
+    S.dlOpen = false;
+    S.sortOpen = false;
+    S[flag] = true;
+    openSheetId = null;
+    render();
+  }
+
+  function closeSheet(flag) {
+    S[flag] = false;
+    openSheetId = null;
+    render();
+    if (sheetReturn) {
+      var back = document.querySelector(sheetReturn);
+      if (back) back.focus();
+      sheetReturn = null;
+    }
+  }
+
+  function activeSheet() {
+    return document.querySelector('.sheet[role="dialog"]');
+  }
+
+  /* Called after every render: move focus into a sheet the first time it
+     appears, and leave it alone on subsequent re-renders. */
+  function syncSheetFocus() {
+    var sheet = activeSheet();
+    if (!sheet) { openSheetId = null; return; }
+    if (openSheetId === sheet.id) return;
+    openSheetId = sheet.id;
+    var first = sheet.querySelector(FOCUSABLE);
+    if (first) first.focus();
+  }
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Tab") return;
+    var sheet = activeSheet();
+    if (!sheet) return;
+    var items = Array.prototype.filter.call(
+      sheet.querySelectorAll(FOCUSABLE),
+      function (el) { return el.offsetParent !== null; }
+    );
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    if (ev.shiftKey && document.activeElement === first) {
+      ev.preventDefault();
+      last.focus();
+    } else if (!ev.shiftKey && document.activeElement === last) {
+      ev.preventDefault();
+      first.focus();
+    } else if (items.indexOf(document.activeElement) === -1) {
+      ev.preventDefault();
+      first.focus();
+    }
+  });
 
   function filterSheetHtml() {
     /* Counts are cross-filtered: course counts reflect the selected people
@@ -614,6 +726,40 @@
     );
   }
 
+  /* The Menu's "Aa" button opens this rather than silently cycling sizes, so
+     the stepper and Easy Read live together in one place with a live sample. */
+  function textSheetHtml() {
+    var px = FS[effectiveFs()];
+    return (
+      '<button type="button" class="scrim" data-act="close-text" ' +
+      'aria-label="Close text size"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-label="Text size" ' +
+      'id="text-sheet"><div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title">Text size</h2>' +
+      '<button type="button" class="donebtn press" data-act="close-text">Done</button>' +
+      "</div>" +
+      '<div class="fsrow">' +
+      '<button type="button" class="fsbig press" data-act="fs-" ' +
+      'aria-label="Smaller text"' + (effectiveFs() === 0 ? " disabled" : "") +
+      ">A−</button>" +
+      '<span class="fsrow__value">' + px + "px</span>" +
+      '<button type="button" class="fsbig press" data-act="fs+" ' +
+      'aria-label="Larger text"' +
+      (effectiveFs() === FS.length - 1 ? " disabled" : "") + ">A+</button>" +
+      "</div>" +
+      '<p class="fssample" style="font-size:' + px + 'px">' +
+      "Bake for 25 minutes until golden.</p>" +
+      '<button type="button" class="wakerow press" role="switch" ' +
+      'aria-checked="' + S.easyRead + '" data-act="toggle-easy" ' +
+      'style="font-size:18px; margin-top:18px">' +
+      '<span class="wakerow__label">Easy Read<span class="fssub">' +
+      "Bigger text, no faded grey, one wide column</span></span>" +
+      '<span class="switch" aria-hidden="true"' +
+      (S.easyRead ? ' aria-checked="true"' : "") + "></span></button>" +
+      "</div></div>"
+    );
+  }
+
   function downloadSheetHtml(r) {
     return (
       '<button type="button" class="scrim" data-act="close-dl" ' +
@@ -645,9 +791,9 @@
          '<div class="rhead__tools">' + themeBtn() +
          '<div class="fsgroup">' +
          '<button type="button" data-act="fs-" aria-label="Smaller text"' +
-         (S.fsIndex === 0 ? " disabled" : "") + ">A−</button>" +
+         (effectiveFs() === 0 ? " disabled" : "") + ">A−</button>" +
          '<button type="button" data-act="fs+" aria-label="Larger text"' +
-         (S.fsIndex === FS.length - 1 ? " disabled" : "") + ">A+</button>" +
+         (effectiveFs() === FS.length - 1 ? " disabled" : "") + ">A+</button>" +
          "</div></div></div></header>";
 
     h += '<div class="modestrip"><div class="modestrip__inner">' +
@@ -659,7 +805,8 @@
          S.editing + '" data-act="toggle-edit" aria-label="Edit mode"></button>' +
          "</div></div>";
 
-    h += '<div class="recipe" id="main-content" style="font-size:' + FS[S.fsIndex] + 'px">';
+    h += '<div class="recipe" id="main-content" style="font-size:' +
+         FS[effectiveFs()] + 'px">';
 
     if (S.editing) {
       h += editBody(r);
@@ -855,6 +1002,484 @@
   }
 
   /* ======================================================================
+     10b. Add / Import
+
+     Three ways in — typed, from a link, from a photo — and all three land on
+     the same review screen before anything is saved. Nothing is ever added
+     silently: whatever the parser had to guess goes into `flagged`, which the
+     recipe page then shows in Viewer mode too.
+     ====================================================================== */
+
+  function blankDraft() {
+    return {
+      title: "", category: "Dinner", contributor: WHO[0], servings: 4,
+      prepTime: "", cookTime: "", ingredients: [""], steps: [""],
+      notes: "", flagged: [], source: ""
+    };
+  }
+
+  function viewAdd() {
+    var h = "";
+    h += '<header class="rhead"><div class="rhead__inner">' +
+         '<a class="backlink press" href="#menu">' + I.chevL() + "Menu</a>" +
+         '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
+
+    h += '<div class="addscreen" id="main-content">';
+    h += '<h1 class="addscreen__h1">Add a recipe</h1>';
+
+    if (S.addError) {
+      h += '<p class="notice notice--bad" role="alert">' + esc(S.addError) + "</p>";
+    }
+    if (S.addBusy) {
+      h += '<p class="notice" role="status">' + esc(S.addBusy) + "</p>";
+    }
+
+    if (S.addStep === "choose") {
+      h += '<p class="addscreen__lead">Three ways to get a recipe in. However it ' +
+           "starts, you get to check it over before it’s saved.</p>";
+      h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
+           'data-key="review"><span class="pathbtn__t">Type it in</span>' +
+           '<span class="pathbtn__s">A blank recipe you fill out yourself</span></button>';
+      h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
+           'data-key="link"><span class="pathbtn__t">From a link</span>' +
+           '<span class="pathbtn__s">Paste a recipe page address and pull it in</span></button>';
+      h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
+           'data-key="photo"><span class="pathbtn__t">From a photo</span>' +
+           '<span class="pathbtn__s">Read the text out of a picture of a recipe</span></button>';
+      h += "</div>";
+      return h;
+    }
+
+    if (S.addStep === "link") {
+      h += '<div class="field"><label class="field__label" for="a-url">' +
+           "Recipe address</label>" +
+           '<input class="input" id="a-url" type="url" placeholder="https://…" ' +
+           'data-act="a-url" value="' + esc(S.addUrl || "") + '" /></div>';
+      h += '<p class="addscreen__note">Most recipe sites block other sites from ' +
+           "reading their pages directly, so the page is fetched through a free " +
+           "public relay (allorigins.win). The address you paste is sent to that " +
+           "relay. Nothing else about you is.</p>";
+      h += '<button type="button" class="savebtn press" data-act="add-fetch"' +
+           (S.addBusy ? " disabled" : "") + ">Fetch the recipe</button>";
+      h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
+      h += "</div>";
+      return h;
+    }
+
+    if (S.addStep === "photo") {
+      h += '<div class="field"><label class="field__label" for="a-photo">' +
+           "Photo of the recipe</label>" +
+           '<input class="input" id="a-photo" type="file" accept="image/*" ' +
+           'data-act="a-photo" /></div>';
+      h += '<p class="addscreen__note">The text is read on this phone — the ' +
+           "picture is never uploaded anywhere. It works best on flat, well-lit, " +
+           "printed text, and it will get some things wrong; anything it isn’t " +
+           "sure about gets flagged for you on the next screen.</p>";
+      h += '<button type="button" class="savebtn press" data-act="add-ocr"' +
+           (S.addBusy || !S.addPhoto ? " disabled" : "") + ">Read the photo</button>";
+      h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
+      h += "</div>";
+      return h;
+    }
+
+    /* Review — the same field set as Edit mode, bound to the add draft. */
+    var d = S.addDraft;
+    h += '<p class="addscreen__lead">Check this over, then save it.</p>';
+
+    if (d.flagged && d.flagged.length) {
+      h += '<div class="panel panel--flag" style="margin-bottom:16px">' +
+           "<h2>Worth double-checking</h2><ul>" +
+           d.flagged.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") +
+           "</ul></div>";
+    }
+
+    h += '<div class="field"><label class="field__label" for="a-title">Title</label>' +
+         '<input class="input" id="a-title" data-act="ad" data-k="title" value="' +
+         esc(d.title) + '" /></div>';
+
+    h += '<div class="fieldrow">' +
+         '<div class="field"><label class="field__label" for="a-cat">Course</label>' +
+         '<select class="input" id="a-cat" data-act="ad" data-k="category">' +
+         CATS.map(function (c) {
+           return '<option' + (c === d.category ? " selected" : "") + ">" + esc(c) + "</option>";
+         }).join("") + "</select></div>" +
+         '<div class="field"><label class="field__label" for="a-from">From</label>' +
+         '<input class="input" id="a-from" data-act="ad" data-k="contributor" list="who-list" value="' +
+         esc(d.contributor) + '" />' +
+         '<datalist id="who-list">' +
+         WHO.map(function (w) { return '<option value="' + esc(w) + '"></option>'; }).join("") +
+         "</datalist></div></div>";
+
+    h += '<div class="fieldrow">' +
+         '<div class="field"><label class="field__label" for="a-serves">Serves</label>' +
+         '<input class="input" id="a-serves" type="number" min="1" max="40" ' +
+         'data-act="ad" data-k="servings" value="' + esc(d.servings) + '" /></div>' +
+         '<div class="field"><label class="field__label" for="a-prep">Prep time</label>' +
+         '<input class="input" id="a-prep" data-act="ad" data-k="prepTime" value="' +
+         esc(d.prepTime) + '" /></div>' +
+         '<div class="field"><label class="field__label" for="a-cook">Cook time</label>' +
+         '<input class="input" id="a-cook" data-act="ad" data-k="cookTime" value="' +
+         esc(d.cookTime) + '" /></div></div>';
+
+    h += '<h2 class="r-h2" style="margin-top:22px">Ingredients</h2>';
+    h += d.ingredients.map(function (line, i) {
+      return '<div class="editline">' +
+             '<label class="vh" for="a-ing-' + i + '">Ingredient ' + (i + 1) + "</label>" +
+             '<textarea class="textarea" id="a-ing-' + i + '" rows="2" ' +
+             'data-act="adl" data-k="ingredients" data-i="' + i + '">' +
+             esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="adel" ' +
+             'data-key="ingredients" data-i="' + i + '" aria-label="Remove ingredient ' +
+             (i + 1) + '">' + I.x() + "</button></div>";
+    }).join("");
+    h += '<button type="button" class="addline press" data-act="aadd" ' +
+         'data-key="ingredients">+ Add ingredient</button>';
+
+    h += '<h2 class="r-h2" style="margin-top:22px">Instructions</h2>';
+    h += d.steps.map(function (line, i) {
+      return '<div class="editline">' +
+             '<label class="vh" for="a-step-' + i + '">Step ' + (i + 1) + "</label>" +
+             '<textarea class="textarea" id="a-step-' + i + '" rows="3" ' +
+             'data-act="adl" data-k="steps" data-i="' + i + '">' +
+             esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="adel" ' +
+             'data-key="steps" data-i="' + i + '" aria-label="Remove step ' +
+             (i + 1) + '">' + I.x() + "</button></div>";
+    }).join("");
+    h += '<button type="button" class="addline press" data-act="aadd" ' +
+         'data-key="steps">+ Add step</button>';
+
+    h += '<div class="field" style="margin-top:22px">' +
+         '<label class="field__label" for="a-notes">Notes</label>' +
+         '<textarea class="textarea" id="a-notes" rows="4" data-act="ad" ' +
+         'data-k="notes">' + esc(d.notes || "") + "</textarea></div>";
+
+    h += '<button type="button" class="savebtn press" data-act="add-save">' +
+         "Save to my recipes</button>";
+    h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
+         "Start over</button>";
+    h += "</div>";
+    return h;
+  }
+
+  function saveNewRecipe() {
+    var d = S.addDraft;
+    var title = (d.title || "").trim();
+    if (!title) {
+      S.addError = "Give the recipe a title before saving.";
+      render();
+      var f = document.getElementById("a-title");
+      if (f) f.focus();
+      return;
+    }
+
+    var base = slugify(title) || "recipe";
+    var id = base;
+    var n = 2;
+    while (byId(id)) id = base + "-" + n++;
+
+    var recipe = {
+      id: id,
+      title: title,
+      category: CATS.indexOf(d.category) > -1 ? d.category : "Dinner",
+      contributor: (d.contributor || "").trim() || WHO[0],
+      servings: Math.min(40, Math.max(1, parseInt(d.servings, 10) || 4)),
+      ingredients: d.ingredients.filter(function (x) { return x.trim(); }),
+      steps: d.steps.filter(function (x) { return x.trim(); })
+    };
+    if ((d.prepTime || "").trim()) recipe.prepTime = d.prepTime.trim();
+    if ((d.cookTime || "").trim()) recipe.cookTime = d.cookTime.trim();
+    if ((d.notes || "").trim()) recipe.notes = d.notes.trim();
+    if (d.flagged && d.flagged.length) recipe.flagged = d.flagged.slice();
+    if ((d.source || "").trim()) recipe.source = d.source.trim();
+
+    S.recipes = S.recipes.concat([recipe]);
+    persistRecipes();
+    S.addDraft = null;
+    S.addStep = "choose";
+    S.addError = "";
+    S.addUrl = "";
+    S.addPhoto = null;
+    location.hash = "#" + id;
+  }
+
+  function slugify(text) {
+    return String(text || "").toLowerCase()
+      .replace(/['’]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+  }
+
+  /* ---- from a link: schema.org/Recipe JSON-LD via a public relay ---- */
+
+  function importFromLink() {
+    var url = (S.addUrl || "").trim();
+    S.addError = "";
+    if (!/^https?:\/\//i.test(url)) {
+      S.addError = "That doesn’t look like a web address. It should start with https://";
+      render();
+      return;
+    }
+    S.addBusy = "Fetching the page…";
+    render();
+
+    fetch(CORS_PROXY + encodeURIComponent(url))
+      .then(function (res) {
+        if (!res.ok) throw new Error("The relay couldn’t fetch that page (" + res.status + ").");
+        return res.text();
+      })
+      .then(function (html) {
+        var draft = recipeFromHtml(html);
+        if (!draft) {
+          throw new Error(
+            "That page loaded, but it doesn’t publish recipe data this site can " +
+            "read. Try the photo option, or type it in."
+          );
+        }
+        draft.source = url;
+        draft.flagged.push("Imported from a link — check it against the original.");
+        S.addDraft = draft;
+        S.addStep = "review";
+        S.addBusy = "";
+        render();
+      })
+      .catch(function (err) {
+        S.addBusy = "";
+        S.addError = /Failed to fetch|NetworkError|Load failed/i.test(err.message)
+          ? "Couldn’t reach the relay. Check the connection and try again, or type the recipe in."
+          : err.message;
+        render();
+      });
+  }
+
+  function recipeFromHtml(html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var blocks = doc.querySelectorAll('script[type="application/ld+json"]');
+    for (var i = 0; i < blocks.length; i++) {
+      var data;
+      try { data = JSON.parse(blocks[i].textContent); } catch (e) { continue; }
+      var node = findRecipeNode(data);
+      if (node) return draftFromJsonLd(node);
+    }
+    return null;
+  }
+
+  function findRecipeNode(node) {
+    if (!node || typeof node !== "object") return null;
+    if (Array.isArray(node)) {
+      for (var i = 0; i < node.length; i++) {
+        var hit = findRecipeNode(node[i]);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    var t = node["@type"];
+    if (t === "Recipe" || (Array.isArray(t) && t.indexOf("Recipe") > -1)) return node;
+    if (node["@graph"]) return findRecipeNode(node["@graph"]);
+    return null;
+  }
+
+  function draftFromJsonLd(node) {
+    function text(v) {
+      if (!v) return "";
+      if (typeof v === "string") return v.trim();
+      if (Array.isArray(v)) return text(v[0]);
+      if (v.text) return String(v.text).trim();
+      if (v.name) return String(v.name).trim();
+      return "";
+    }
+    function list(v) {
+      if (!v) return [];
+      if (typeof v === "string") {
+        return v.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      if (!Array.isArray(v)) return [text(v)].filter(Boolean);
+      var out = [];
+      v.forEach(function (item) {
+        if (item && item["@type"] === "HowToSection" && item.itemListElement) {
+          out = out.concat(list(item.itemListElement));
+        } else {
+          var s = text(item);
+          if (s) out.push(s);
+        }
+      });
+      return out;
+    }
+    /* ISO 8601 durations rendered readable; anything else passes through. */
+    function dur(v) {
+      var raw = text(v);
+      var m = /^P(?:\d+D)?T?(?:(\d+)H)?(?:(\d+)M)?/.exec(raw);
+      if (!m || (!m[1] && !m[2])) return /^P/.test(raw) ? "" : raw;
+      var parts = [];
+      if (m[1]) parts.push(m[1] + " hr");
+      if (m[2]) parts.push(m[2] + " min");
+      return parts.join(" ");
+    }
+
+    var d = blankDraft();
+    d.flagged = [];
+    d.title = text(node.name);
+    if (!d.title) d.flagged.push("No title was found on the page — add one.");
+
+    d.ingredients = list(node.recipeIngredient || node.ingredients);
+    if (!d.ingredients.length) {
+      d.ingredients = [""];
+      d.flagged.push("No ingredients were found — check the original page.");
+    }
+
+    d.steps = list(node.recipeInstructions);
+    if (!d.steps.length) {
+      d.steps = [""];
+      d.flagged.push("No steps were found — check the original page.");
+    }
+
+    var y = text(node.recipeYield);
+    var yn = parseInt((y.match(/\d+/) || [])[0], 10);
+    if (yn) d.servings = Math.min(40, Math.max(1, yn));
+    else d.flagged.push("No serving count was found — 4 was assumed.");
+
+    d.prepTime = dur(node.prepTime);
+    d.cookTime = dur(node.cookTime || node.totalTime);
+    d.category = guessCategory(text(node.recipeCategory));
+    d.notes = text(node.description);
+    return d;
+  }
+
+  function guessCategory(raw) {
+    var v = String(raw || "").toLowerCase();
+    for (var i = 0; i < CATS.length; i++) {
+      if (v.indexOf(CATS[i].toLowerCase()) > -1) return CATS[i];
+    }
+    if (/appetizer|salad|soup|bread|starter/.test(v)) return "Side";
+    if (/cake|cookie|pudding|sweet/.test(v)) return "Dessert";
+    return "Dinner";
+  }
+
+  /* ---- from a photo: in-browser OCR, lazily loaded ---- */
+
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var s = document.createElement("script");
+      s.src = TESSERACT_CDN;
+      s.async = true;
+      s.onload = function () {
+        done = true;
+        if (window.Tesseract) resolve(window.Tesseract);
+        else reject(new Error("The text-recognition library loaded but didn’t start."));
+      };
+      s.onerror = function () {
+        done = true;
+        reject(new Error(
+          "The text-recognition library couldn’t be downloaded. It needs a " +
+          "connection the first time. You can still type the recipe in."
+        ));
+      };
+      document.head.appendChild(s);
+      setTimeout(function () {
+        if (!done) reject(new Error("Reading the photo took too long. Try a smaller picture, or type it in."));
+      }, 45000);
+    });
+  }
+
+  function importFromPhoto() {
+    if (!S.addPhoto) return;
+    S.addError = "";
+    S.addBusy = "Getting ready…";
+    render();
+
+    loadTesseract()
+      .then(function (T) {
+        S.addBusy = "Reading the photo… this can take a minute.";
+        render();
+        return T.recognize(S.addPhoto, "eng", {
+          logger: function (m) {
+            if (m.status === "recognizing text" && typeof m.progress === "number") {
+              S.addBusy = "Reading the photo… " + Math.round(m.progress * 100) + "%";
+              var n = document.querySelector(".notice");
+              if (n) n.textContent = S.addBusy;
+            }
+          }
+        });
+      })
+      .then(function (res) {
+        var text = (res && res.data && res.data.text) || "";
+        if (!text.trim()) {
+          throw new Error("No readable text was found in that picture. Try a clearer, flatter photo.");
+        }
+        var draft = draftFromText(text);
+        draft.flagged.push("Read from a photo — the text will have mistakes. Check every line.");
+        S.addDraft = draft;
+        S.addStep = "review";
+        S.addBusy = "";
+        render();
+      })
+      .catch(function (err) {
+        S.addBusy = "";
+        S.addError = err.message;
+        render();
+      });
+  }
+
+  var HEADINGS = {
+    ingredients: /^(ingredients?|what you(’|')?ll need|you will need)\s*:?\s*$/i,
+    steps: /^(instructions?|directions?|steps?|method|preparation)\s*:?\s*$/i,
+    notes: /^(notes?|tips?)\s*:?\s*$/i
+  };
+  var QTY_START = /^(\d|½|⅓|¼|¾|⅔|⅛|a |an |one |two |three |four |half )/i;
+  var MEASURE = /\b(cups?|tbsp|tsp|tablespoons?|teaspoons?|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|litres?|liters?|cloves?|cans?|packets?|packages?|pinch|dash|sticks?|slices?|quarts?|pints?)\b/i;
+
+  function draftFromText(raw) {
+    var lines = raw.split(/\r?\n/)
+      .map(function (l) {
+        return l.replace(/^[\s•\-*–—]+/, "").replace(/^\d+[.)]\s*/, "").trim();
+      })
+      .filter(Boolean);
+
+    var d = blankDraft();
+    d.flagged = [];
+    d.ingredients = [];
+    d.steps = [];
+    var notes = [];
+    var section = null;
+    var sawHeadings = false;
+
+    lines.forEach(function (line, index) {
+      var matched = null;
+      Object.keys(HEADINGS).forEach(function (k) {
+        if (HEADINGS[k].test(line)) matched = k;
+      });
+      if (matched) { section = matched; sawHeadings = true; return; }
+      if (!d.title && index === 0) { d.title = line; return; }
+      if (section === "ingredients") d.ingredients.push(line);
+      else if (section === "steps") d.steps.push(line);
+      else if (section === "notes") notes.push(line);
+      else if ((QTY_START.test(line) || MEASURE.test(line)) && line.length < 90) {
+        d.ingredients.push(line);
+      } else if (line.length > 40) d.steps.push(line);
+      else d.ingredients.push(line);
+    });
+
+    if (!d.title) {
+      d.title = "";
+      d.flagged.push("No title was obvious — add one.");
+    }
+    if (!sawHeadings) {
+      d.flagged.push(
+        "There were no “Ingredients” / “Instructions” headings, so the split " +
+        "between the two lists was guessed. Check both."
+      );
+    }
+    if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("No ingredients were picked up."); }
+    if (!d.steps.length) { d.steps = [""]; d.flagged.push("No steps were picked up."); }
+    d.notes = notes.join(" ");
+    d.source = "Read from a photo";
+    return d;
+  }
+
+  /* ======================================================================
      11. Share / download / wake lock
      ====================================================================== */
 
@@ -959,6 +1584,7 @@
   function parseHash() {
     var raw = (location.hash || "#").slice(1);
     if (!raw || raw === "main") return { name: "main", id: "" };
+    if (raw === "add") return { name: "add", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
       var who = [], cats = [];
@@ -979,6 +1605,17 @@
     if (next.name === "menu" && (next.who.length || next.cats.length)) {
       S.who = next.who;
       S.cats = next.cats;
+    }
+
+    /* Arriving at Add from elsewhere starts a fresh one. Staying on it keeps
+       the draft, so "Start over" is the only thing that discards work. */
+    if (next.name === "add" && S.route.name !== "add") {
+      S.addStep = "choose";
+      S.addDraft = null;
+      S.addError = "";
+      S.addBusy = "";
+      S.addUrl = "";
+      S.addPhoto = null;
     }
 
     if (changedRecipe) {
@@ -1026,6 +1663,8 @@
       html = '<p class="boot">Loading recipes…</p>';
     } else if (S.route.name === "menu") {
       html = viewMenu();
+    } else if (S.route.name === "add") {
+      html = viewAdd();
     } else if (S.route.name === "recipe") {
       var r = byId(S.route.id);
       html = r
@@ -1046,6 +1685,8 @@
         }
       }
     }
+
+    syncSheetFocus();
   }
 
   /* One delegated listener for every action in the app. */
@@ -1058,13 +1699,9 @@
     var r = S.route.name === "recipe" ? byId(S.route.id) : null;
 
     if (act === "theme") { toggleTheme(); return; }
-    if (act === "cycle-fs") {
-      S.fsIndex = (S.fsIndex + 1) % FS.length;
-      save(K.fs, S.fsIndex);
-      S.notice = "Text size " + FS[S.fsIndex] + "px — applies when reading a recipe.";
-      render();
-      return;
-    }
+    if (act === "open-text") { openSheet("textOpen", el); return; }
+    if (act === "close-text") { closeSheet("textOpen"); return; }
+    if (act === "toggle-easy") { toggleEasy(); return; }
     if (act === "fs-") { stepFs(-1); return; }
     if (act === "fs+") { stepFs(1); return; }
 
@@ -1078,8 +1715,8 @@
       }
       return;
     }
-    if (act === "open-filter") { S.filterOpen = true; S.sortOpen = false; render(); return; }
-    if (act === "close-filter") { S.filterOpen = false; render(); return; }
+    if (act === "open-filter") { openSheet("filterOpen", el); return; }
+    if (act === "close-filter") { closeSheet("filterOpen"); return; }
     if (act === "toggle-sort") { S.sortOpen = !S.sortOpen; render(); return; }
     if (act === "sort") { S.sort = key; S.sortOpen = false; render(); return; }
     if (act === "fw") {
@@ -1107,12 +1744,26 @@
       }
       return;
     }
-    if (act === "add-recipe") {
-      ev.preventDefault();
-      S.notice = "Adding a recipe by hand isn’t built yet — it wasn’t part of this design round.";
+    /* ---- Add / Import ---- */
+    if (act === "add-path") {
+      S.addStep = key;
+      S.addError = "";
+      if (key === "review") S.addDraft = blankDraft();
       render();
       return;
     }
+    if (act === "add-back") {
+      S.addStep = "choose";
+      S.addError = "";
+      S.addBusy = "";
+      render();
+      return;
+    }
+    if (act === "add-fetch") { importFromLink(); return; }
+    if (act === "add-ocr") { importFromPhoto(); return; }
+    if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
+    if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
+    if (act === "add-save") { saveNewRecipe(); return; }
 
     if (!r) return;
 
@@ -1122,8 +1773,8 @@
     if (act === "chk-s") { S.checkedStep[idx] = !S.checkedStep[idx]; render(); return; }
     if (act === "toggle-wake") { toggleWake(); return; }
     if (act === "share") { shareRecipe(r); return; }
-    if (act === "open-dl") { S.dlOpen = true; render(); return; }
-    if (act === "close-dl") { S.dlOpen = false; render(); return; }
+    if (act === "open-dl") { openSheet("dlOpen", el); return; }
+    if (act === "close-dl") { closeSheet("dlOpen"); return; }
     if (act === "dl-txt") {
       downloadBlob(recipeText(r), r.id + ".txt", "text/plain;charset=utf-8");
       S.dlOpen = false; render(); return;
@@ -1171,6 +1822,21 @@
 
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
+    if (act === "a-url") { S.addUrl = el.value; return; }
+    if (act === "a-photo") {
+      S.addPhoto = (el.files && el.files[0]) || null;
+      S.addError = "";
+      render();
+      return;
+    }
+    if (act === "ad") {
+      S.addDraft[el.getAttribute("data-k")] = el.value;
+      return;
+    }
+    if (act === "adl") {
+      S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
+      return;
+    }
     if (act === "d") {
       S.draft[el.getAttribute("data-k")] = el.value;
       S.saved = false;
@@ -1187,10 +1853,19 @@
 
   document.addEventListener("keydown", function (ev) {
     if (ev.key !== "Escape") return;
-    if (S.filterOpen) { S.filterOpen = false; render(); }
-    else if (S.dlOpen) { S.dlOpen = false; render(); }
+    if (S.filterOpen) closeSheet("filterOpen");
+    else if (S.textOpen) closeSheet("textOpen");
+    else if (S.dlOpen) closeSheet("dlOpen");
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
+
+  /* The sort menu is a popup, not a sheet — a tap anywhere else dismisses it. */
+  document.addEventListener("click", function (ev) {
+    if (!S.sortOpen) return;
+    if (ev.target.closest && ev.target.closest('.sortmenu, [data-act="toggle-sort"]')) return;
+    S.sortOpen = false;
+    render();
+  }, true);
 
   window.addEventListener("hashchange", onRoute);
 

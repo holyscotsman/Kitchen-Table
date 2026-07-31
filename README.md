@@ -41,6 +41,10 @@ not a stylistic one.
 
 Dark is the default theme; the sun/moon button switches to light and remembers it.
 
+**Easy Read** (the "Aa" button on the Menu) adds to the stepper rather than
+replacing it: a larger floor, one wide column at every width, thicker borders,
+and no faded grey text anywhere. A−/A+ keeps working inside it.
+
 **Servings** rescales the recipe. Pick how many people you're feeding and every
 ingredient *and* instruction quantity adjusts with it — "Bake 2 cups of…" scales
 in the steps too. Lines with no leading number are left alone, which is correct.
@@ -85,7 +89,26 @@ python3 -m http.server 8000
 
 Then open <http://localhost:8000>.
 
-## Adding a recipe by hand
+## Adding a recipe
+
+The **Add recipe** pill on the Menu opens three ways in:
+
+- **Type it in** — a blank form.
+- **From a link** — paste a recipe page address. The page is fetched through a
+  free public relay (`api.allorigins.win`, disclosed in the UI because the
+  address is sent there) and read for `schema.org/Recipe` data, which most
+  recipe sites publish. Plenty of pages won't have it; the failure says so and
+  points you elsewhere.
+- **From a photo** — reads the text out of a picture on the device itself. The
+  picture is never uploaded. It will get things wrong.
+
+All three land on the same review screen before anything is saved, and anything
+a parser had to guess is written into `flagged` so the recipe page shows it.
+
+Like every other edit, a new recipe lives in `localStorage` until you press
+**Download updated recipes.json** and commit the file.
+
+## Adding a recipe by editing the file
 
 Append an object to `recipes.json` and push. Field order matters for diffs:
 
