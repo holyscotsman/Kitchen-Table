@@ -1404,6 +1404,7 @@ input[type="file"].input {
 }
 
 .outlinebtn {
+  display: block;
   width: 100%;
   min-height: 58px;
   border: var(--bw) solid var(--line);
@@ -1413,6 +1414,17 @@ input[type="file"].input {
   font-size: 0.85em;
   font-weight: 700;
   margin-top: 10px;
+}
+
+.outlinebtn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Route headings take focus on navigation; they should not draw a ring for a
+   mouse user who never asked for one. */
+#app h1:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* ================================================================= sheets */

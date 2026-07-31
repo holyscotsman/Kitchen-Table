@@ -337,23 +337,20 @@
     );
   }
 
-  /* Applies the localStorage overlay over the shipped file. */
+  /* kt.recipes holds "the full edited recipe set", so when it exists it is
+     authoritative — including about what is *absent*.
+
+     An earlier version merged it over the shipped file id by id, which meant a
+     removed recipe reappeared on the next load: it was missing from the
+     overlay, so the lookup fell through to the published copy. Treating the
+     overlay as the complete list is what makes Remove actually stick.
+
+     The trade-off: once a device has local changes, recipes added to the
+     published recipes.json won't appear there until those changes are
+     downloaded and committed, or undone with "Undo all my changes". */
   function applyOverlay() {
     var overlay = load(K.recipes, null);
-    if (!Array.isArray(overlay)) {
-      S.recipes = S.base.slice();
-      return;
-    }
-    var byKey = {};
-    overlay.forEach(function (r) { if (r && r.id) byKey[r.id] = r; });
-    S.recipes = S.base.map(function (r) { return byKey[r.id] || r; });
-    /* Anything in the overlay that isn't in the shipped file is a locally
-       added recipe — keep it at the end. */
-    overlay.forEach(function (r) {
-      if (r && r.id && !S.base.some(function (b) { return b.id === r.id; })) {
-        S.recipes.push(r);
-      }
-    });
+    S.recipes = Array.isArray(overlay) ? overlay.slice() : S.base.slice();
   }
 
   function persistRecipes() {
@@ -567,7 +564,16 @@
       h += '<div class="emptystate"><p>No recipes match. Try a different word, ' +
            "or clear the filters.</p>" +
            '<button type="button" class="bigbtn press" data-act="show-all">' +
-           "Show all recipes</button></div>";
+           "Show all recipes</button>" +
+           /* Recovery path: if the list is empty because recipes were removed
+              on this phone, Edit mode is unreachable, so the reset lives here
+              too. */
+           (hasLocalChanges() && !S.who.length && !S.cats.length && !S.menuQ
+             ? '<button type="button" class="outlinebtn outlinebtn--danger press" ' +
+               'data-act="reset-local" style="max-width:420px;margin:12px auto 0">' +
+               "Undo all my changes on this phone</button>"
+             : "") +
+           "</div>";
     } else if (S.removing) {
       h += '<div class="cardgrid">' + list.map(function (r) {
         return '<button type="button" class="rrow press" data-act="remove" ' +
@@ -901,6 +907,11 @@
          '<button type="button" class="actbtn actbtn--primary press" data-act="open-dl">' +
          I.download() + "Download</button></div>";
 
+    if (S.notice) {
+      h += '<p class="notice" role="status" style="margin-top:16px">' +
+           esc(S.notice) + "</p>";
+    }
+
     if (r.source) {
       h += '<p class="sourceline">From Mom’s screenshots · ' + esc(r.source) + "</p>";
     }
@@ -967,7 +978,34 @@
          (S.saved ? "Saved ✓" : "Save changes") + "</button>";
     h += '<button type="button" class="outlinebtn press" data-act="dl-json">' +
          "Download updated recipes.json</button>";
+    if (hasLocalChanges()) {
+      h += '<button type="button" class="outlinebtn outlinebtn--danger press" ' +
+           'data-act="reset-local">Undo all my changes on this phone</button>';
+    }
     return h;
+  }
+
+  function hasLocalChanges() {
+    try { return localStorage.getItem(K.recipes) !== null; } catch (e) { return false; }
+  }
+
+  /* Everything Edit mode writes lives in one localStorage key, and there is no
+     other undo — a removed recipe is otherwise gone from this device for good.
+     This puts it all back to the published file. */
+  function resetLocal() {
+    if (!window.confirm(
+      "Put every recipe back the way it is on the website?\n\n" +
+      "This undoes everything changed, added, or removed on this phone. " +
+      "Anything already downloaded and committed is unaffected."
+    )) return;
+    try { localStorage.removeItem(K.recipes); } catch (e) {}
+    applyOverlay();
+    S.editing = false;
+    S.draft = null;
+    S.saved = false;
+    var still = byId(S.route.id);
+    if (S.route.name === "recipe" && !still) location.hash = "#menu";
+    else { render(); announce("Local changes undone."); }
   }
 
   function startDraft(r) {
@@ -1533,8 +1571,7 @@
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        S.notice = "Recipe copied to the clipboard.";
-        render();
+        setNotice("Recipe copied to the clipboard.");
       }).catch(function () {
         downloadBlob(text, r.id + ".txt", "text/plain;charset=utf-8");
       });
@@ -1544,13 +1581,30 @@
   }
 
   var wakeSentinel = null;
+  var wakeWanted = false;   // the user's intent, kept across backgrounding
 
-  function releaseWake() {
+  function dropWake() {
     if (wakeSentinel) {
       try { wakeSentinel.release(); } catch (e) {}
       wakeSentinel = null;
     }
     S.awake = false;
+  }
+
+  function releaseWake() {
+    wakeWanted = false;
+    dropWake();
+  }
+
+  function requestWake() {
+    return navigator.wakeLock.request("screen").then(function (s) {
+      wakeSentinel = s;
+      S.awake = true;
+      s.addEventListener("release", function () {
+        wakeSentinel = null;
+        S.awake = false;
+      });
+    });
   }
 
   function toggleWake() {
@@ -1559,22 +1613,27 @@
       render();
       return;
     }
-    navigator.wakeLock.request("screen").then(function (s) {
-      wakeSentinel = s;
-      S.awake = true;
-      s.addEventListener("release", function () {
-        wakeSentinel = null;
-        S.awake = false;
-      });
-      render();
-    }).catch(function () {
-      S.notice = "This browser wouldn’t keep the screen on.";
-      render();
+    wakeWanted = true;
+    requestWake().then(render).catch(function () {
+      wakeWanted = false;
+      setNotice("This browser wouldn’t keep the screen on.");
     });
   }
 
+  /* iOS drops the lock whenever the tab is backgrounded and does not restore
+     it. Without re-requesting, the switch silently stops working the first
+     time someone answers a text mid-recipe. */
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") releaseWake();
+    if (document.visibilityState === "hidden") {
+      dropWake();
+      return;
+    }
+    if (wakeWanted && S.route.name === "recipe" && "wakeLock" in navigator) {
+      requestWake().then(render).catch(function () {
+        wakeWanted = false;
+        render();
+      });
+    }
   });
 
   /* ======================================================================
@@ -1598,9 +1657,52 @@
     return { name: "recipe", id: decodeURIComponent(raw) };
   }
 
+  /* Scroll position per route. Coming back to the Menu from a recipe should
+     land where you left off — with 48 cards, jumping to the top every time is
+     a real cost. */
+  var scrollPos = {};
+  var scrollTick = null;
+
+  function routeKey(route) {
+    return route.name + ":" + (route.id || "");
+  }
+
+  window.addEventListener("scroll", function () {
+    if (scrollTick) return;
+    scrollTick = setTimeout(function () {
+      scrollTick = null;
+      scrollPos[routeKey(S.route)] = window.scrollY;
+    }, 120);
+  }, { passive: true });
+
+  function screenTitle() {
+    if (S.route.name === "menu") return "Menu — Kitchen Table";
+    if (S.route.name === "add") return "Add a recipe — Kitchen Table";
+    if (S.route.name === "recipe") {
+      var r = byId(S.route.id);
+      return (r ? r.title + " — " : "") + "Kitchen Table";
+    }
+    return "Kitchen Table";
+  }
+
+  function announce(text) {
+    var live = document.getElementById("route-live");
+    if (live) live.textContent = text;
+  }
+
+  /* Sets the one transient message slot and speaks it. Both callers live on
+     the Recipe screen, so the message has to render there — not only on the
+     Menu, where it used to be the sole thing that displayed it. */
+  function setNotice(text) {
+    S.notice = text;
+    render();
+    announce(text);
+  }
+
   function onRoute() {
     var next = parseHash();
     var changedRecipe = next.name !== "recipe" || next.id !== S.route.id;
+    var changedRoute = routeKey(next) !== routeKey(S.route);
 
     if (next.name === "menu" && (next.who.length || next.cats.length)) {
       S.who = next.who;
@@ -1637,8 +1739,21 @@
       if (r && changedRecipe) S.serves = r.servings || 4;
     }
 
-    window.scrollTo(0, 0);
     render();
+
+    document.title = screenTitle();
+
+    if (changedRoute) {
+      window.scrollTo(0, scrollPos[routeKey(next)] || 0);
+      /* Move focus to the new screen's heading so a screen reader and a
+         keyboard both land somewhere sensible after navigating. */
+      var head = document.querySelector("#app h1");
+      if (head) {
+        head.setAttribute("tabindex", "-1");
+        head.focus({ preventScroll: true });
+      }
+      announce(document.title);
+    }
   }
 
   function render() {
@@ -1735,6 +1850,7 @@
       S.who = []; S.cats = []; S.menuQ = ""; S.searchOpen = false; render(); return;
     }
     if (act === "toggle-remove") { S.removing = !S.removing; render(); return; }
+    if (act === "reset-local") { resetLocal(); return; }
     if (act === "remove") {
       var victim = byId(el.getAttribute("data-id"));
       if (victim && window.confirm('Remove "' + victim.title + '" from the collection?')) {

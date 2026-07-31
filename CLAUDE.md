@@ -143,6 +143,28 @@ existing component vocabulary — no new colours, type sizes, or patterns.
   the Main screen's "Whose recipe?" tiles cover contributor browsing, which is
   what the handoff says they are for.
 
+### The overlay is authoritative
+
+`kt.recipes` holds "the full edited recipe set", so when it exists it replaces
+the shipped list entirely — including deciding what is *absent*. An earlier
+version merged it id by id over `recipes.json`, which meant a removed recipe
+came back on the next load: it was missing from the overlay, so the lookup fell
+through to the published copy. Treating the overlay as the complete list is what
+makes Remove stick.
+
+The consequence, worth stating: once a device has local changes, recipes added
+to the published `recipes.json` will not appear there until those changes are
+downloaded and committed, or discarded with "Undo all my changes on this phone".
+
+### Undo
+
+Edit mode writes only to `kt.recipes`, and there is no other undo — a removed
+recipe is otherwise gone from that device for good. "Undo all my changes on this
+phone" clears that one key and falls back to the published file. It appears in
+the Edit-mode footer once local changes exist, and also in the Menu's empty
+state, since removing everything would otherwise leave no recipe to open Edit
+mode from.
+
 ### Known limits
 
 - **OCR quality is untested against real photographs.** The pipeline is

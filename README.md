@@ -76,8 +76,19 @@ git add recipes.json && git commit -m "Update recipes" && git push
 
 GitHub Pages redeploys within a minute or two.
 
+Once a device has local changes, `kt.recipes` holds the whole recipe set for
+that device — including which recipes have been removed. Two consequences worth
+knowing:
+
+- Recipes added to the published `recipes.json` by someone else won't show up on
+  that device until its own changes are committed or discarded.
+- **"Undo all my changes on this phone"** puts everything back to the published
+  file. It's in the Edit-mode footer once local changes exist, and in the Menu's
+  empty state — because removing every recipe would otherwise leave you with no
+  recipe to open Edit mode from, and no way back.
+
 `localStorage` keys are namespaced under `kt.` — `kt.theme`, `kt.fsIndex`,
-`kt.easyRead`, `kt.recipes`.
+`kt.easyRead`, `kt.recipes`. Nothing else is touched.
 
 ## Local preview
 
