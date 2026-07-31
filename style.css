@@ -13,21 +13,26 @@
   --fs: 1;
   --rb: 1;
 
-  --bg: #fbf9f6;
+  /* Forest green is the brand colour and carries the buttons. Every value
+     here is picked to clear WCAG AA against the surface it sits on — the
+     obvious mid-greens (#228B22 and friends) only reach about 3.4:1 on an
+     off-white background, which is a fail for body text. */
+  --bg: #f7f9f5;
   --surface: #ffffff;
-  --surface-sunk: #f4f0ea;
-  --text: #1c1a17;
-  --text-soft: #55504a;
-  --accent: #9a3a12;
+  --surface-sunk: #edf1e9;
+  --text: #16201a;
+  --text-soft: #48524b;
+  --accent: #1d5632;
   --accent-ink: #ffffff;
-  --accent-wash: #f7ebe4;
-  --border: #e3ddd4;
-  --border-strong: #cdc4b7;
+  --accent-wash: #e4ede5;
+  --border: #dde4d9;
+  --border-strong: #b7c4b5;
   --focus: #0b5cad;
   --danger: #9c1f14;
-  --ok: #1f6b3a;
+  --ok: #14663a;
+  --amber: #8a5a00;
   --warn-bg: #fdf4e0;
-  --warn-border: #e0c37a;
+  --warn-border: #d9b463;
 
   --radius: 12px;
   /* Scales up with the text, but never drops below 48px even at the smallest
@@ -37,10 +42,12 @@
   --measure: 40rem;
   --chrome: 18px; /* site header sizing, deliberately independent of --fs */
 
-  --shadow: 0 1px 2px rgba(28, 26, 23, 0.06), 0 4px 12px rgba(28, 26, 23, 0.05);
+  --shadow: 0 1px 2px rgba(22, 32, 26, 0.06), 0 4px 12px rgba(22, 32, 26, 0.05);
 }
 
-/* Reader mode: maximum contrast, no soft grays, wider single column. */
+/* Reader mode: maximum contrast, no soft grays, wider single column. The
+   green darkens further so it still reads as green without giving up
+   contrast against white. */
 html.reader {
   --rb: 1.45;
   --bg: #ffffff;
@@ -48,8 +55,8 @@ html.reader {
   --surface-sunk: #f2f2f2;
   --text: #000000;
   --text-soft: #000000;
-  --accent: #7d2c0a;
-  --accent-wash: #f6ece6;
+  --accent: #123c22;
+  --accent-wash: #e8efe9;
   --border: #000000;
   --border-strong: #000000;
   --shadow: none;
@@ -1005,8 +1012,10 @@ html.reader .toast {
 .staged-badge--added {
   color: var(--ok);
 }
+/* Amber, not the brand green — otherwise "added" and "edited" read as the
+   same colour and the badge stops carrying information. */
 .staged-badge--edited {
-  color: var(--accent);
+  color: var(--amber);
 }
 .staged-badge--deleted {
   color: var(--danger);
