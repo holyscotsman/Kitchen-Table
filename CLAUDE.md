@@ -108,17 +108,73 @@ Printed output must be black on white regardless of the active theme, and
 `tokens.css` defines no print palette. Every other colour in the file is a
 `var(--*)`.
 
-### Not built
+### Built after the first pass
 
-- **Add a recipe by hand** — the Add-recipe pill is present per the design but
-  explains that the flow isn't built. The README lists it as not yet designed.
-- **Import from a link or a photo** — not yet designed, out of scope for this
-  handoff. The agreed approach (CORS proxy + JSON-LD, Tesseract.js OCR, always
-  landing on a review screen) is recorded in `DESIGN.md`.
-- **Easy Read mode** — `kt.easyRead` is reserved but the mode is not built. The
-  A−/A+ stepper is, and covers the immediate need.
+These were listed as "not yet designed" in the handoff. They were built from the
+technical approach `DESIGN.md` already commits to, composed entirely from the
+existing component vocabulary — no new colours, type sizes, or patterns.
+
+- **Add / Import** — route `#add`, reached from the Menu's Add-recipe pill.
+  Three entry points (type it in / from a link / from a photo), all converging
+  on one review screen that reuses the Edit-mode field set. Nothing is saved
+  until Save is pressed, and whatever a parser had to guess is written into
+  `flagged`, which the recipe page then shows in Viewer mode.
+  - **From a link** fetches through a free public CORS relay
+    (`api.allorigins.win`) and reads `schema.org/Recipe` JSON-LD. The relay is
+    disclosed in the UI, since the pasted address is sent to a third party.
+  - **From a photo** lazily loads Tesseract.js from a CDN on first use only.
+    The OCR runs on the device; the picture is never uploaded.
+- **Easy Read mode** — `kt.easyRead`, additive to the stepper exactly as the
+  README requires. It raises the font floor to index 2, forces one wide column
+  everywhere, thickens borders, and promotes `--dim`/`--card-dim` to full
+  strength ink so no faded tier survives. It introduces **no new colours** —
+  the token palette already clears AA by a wide margin.
+  Reached from the Menu's "Aa" button, which now opens a Text size sheet
+  holding both the A−/A+ stepper and the Easy Read switch.
+- **Sheet focus management** — every sheet traps Tab, closes on Escape, and
+  returns focus to the control that opened it. The sort menu also dismisses on
+  an outside tap.
 - **A confirm step on Remove** was flagged as an open question in the README and
   never resolved. A `confirm()` was added, since removal is otherwise undoable.
+
+### Still not built
+
+- **A dedicated contributor section view.** The Menu's contributor filter and
+  the Main screen's "Whose recipe?" tiles cover contributor browsing, which is
+  what the handoff says they are for.
+
+### The overlay is authoritative
+
+`kt.recipes` holds "the full edited recipe set", so when it exists it replaces
+the shipped list entirely — including deciding what is *absent*. An earlier
+version merged it id by id over `recipes.json`, which meant a removed recipe
+came back on the next load: it was missing from the overlay, so the lookup fell
+through to the published copy. Treating the overlay as the complete list is what
+makes Remove stick.
+
+The consequence, worth stating: once a device has local changes, recipes added
+to the published `recipes.json` will not appear there until those changes are
+downloaded and committed, or discarded with "Undo all my changes on this phone".
+
+### Undo
+
+Edit mode writes only to `kt.recipes`, and there is no other undo — a removed
+recipe is otherwise gone from that device for good. "Undo all my changes on this
+phone" clears that one key and falls back to the published file. It appears in
+the Edit-mode footer once local changes exist, and also in the Menu's empty
+state, since removing everything would otherwise leave no recipe to open Edit
+mode from.
+
+### Known limits
+
+- **OCR quality is untested against real photographs.** The pipeline is
+  verified end to end against a stubbed recogniser, and the parser is tested,
+  but the sandbox this was built in cannot reach the Tesseract CDN. Accuracy on
+  real pages will be imperfect — the handoff accepts that, and every OCR import
+  is flagged for line-by-line checking.
+- **`api.allorigins.win` is a third-party dependency** for link import only.
+  When it is down, that one path fails with a plain message; nothing else in
+  the app touches the network after load.
 
 ### Verified
 

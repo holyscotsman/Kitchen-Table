@@ -166,6 +166,104 @@ img {
   }
 }
 
+/* ============================================================== Easy Read
+
+   Additive to the A−/A+ stepper, never a replacement — the stepper keeps
+   working inside it, with a raised floor handled in app.js.
+
+   "High contrast" here means removing the faded secondary tier rather than
+   introducing new colours: --dim and --card-dim are promoted to full-strength
+   ink, so there is no grey-on-dark text left anywhere. The token palette is
+   already ~16:1 for --ink on --bg, so no new hex is needed to clear AA. */
+
+[data-easy="on"] {
+  --dim: var(--ink);
+  --card-dim: var(--card-ink);
+}
+
+/* One wide column everywhere, at every width. */
+[data-easy="on"] .who-grid,
+[data-easy="on"] .cat-grid,
+[data-easy="on"] .cardgrid,
+[data-easy="on"] .topgrid,
+[data-easy="on"] .bodygrid,
+[data-easy="on"] .form-grid {
+  grid-template-columns: 1fr !important;
+}
+
+[data-easy="on"] .bodygrid__ing {
+  position: static !important;
+}
+
+[data-easy="on"] .main,
+[data-easy="on"] .recipe {
+  max-width: 46rem;
+}
+
+/* Borders carry more of the structure once the grey tier is gone. */
+[data-easy="on"] .checkrow,
+[data-easy="on"] .cat-row,
+[data-easy="on"] .statcard,
+[data-easy="on"] .panel,
+[data-easy="on"] .chip,
+[data-easy="on"] .toolbtn {
+  border-width: 2px;
+}
+
+[data-easy="on"] .hint,
+[data-easy="on"] .rcard__meta,
+[data-easy="on"] .main__sub {
+  font-weight: 700;
+}
+
+/* Text-size sheet */
+.fsrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fsbig {
+  width: 88px;
+  min-height: 68px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surf);
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.fsbig:disabled {
+  color: var(--dim);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fsrow__value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.fssample {
+  margin: 16px 0 0;
+  padding: 16px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surf);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.fssub {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
 /* ============================================================ Main screen */
 
 .main {
@@ -1130,6 +1228,91 @@ img {
   color: var(--dim);
 }
 
+/* ==================================================== Add / Import screen */
+
+.addscreen {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 22px var(--pad) 60px;
+}
+
+.addscreen__h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+
+.addscreen__lead {
+  color: var(--dim);
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 0 0 22px;
+  text-wrap: pretty;
+}
+
+.addscreen__note {
+  color: var(--dim);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  text-wrap: pretty;
+}
+
+/* The three entry points. Deliberately large and stacked — this is a
+   low-frequency, high-consequence choice, not a toolbar. */
+.pathbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 88px;
+  padding: 18px;
+  margin-bottom: 12px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surf);
+  color: var(--ink);
+  text-align: left;
+}
+
+.pathbtn__t {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.pathbtn__s {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--dim);
+  text-wrap: pretty;
+}
+
+.notice {
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surf);
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 700;
+  text-wrap: pretty;
+}
+
+.notice--bad {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* File inputs never accept min-height cleanly across browsers; give the
+   control room to breathe instead. */
+input[type="file"].input {
+  padding: 16px;
+  line-height: 1.4;
+}
+
 /* ------------------------------------------------------------- edit mode */
 
 .field {
@@ -1221,6 +1404,7 @@ img {
 }
 
 .outlinebtn {
+  display: block;
   width: 100%;
   min-height: 58px;
   border: var(--bw) solid var(--line);
@@ -1230,6 +1414,17 @@ img {
   font-size: 0.85em;
   font-weight: 700;
   margin-top: 10px;
+}
+
+.outlinebtn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Route headings take focus on navigation; they should not draw a ring for a
+   mouse user who never asked for one. */
+#app h1:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* ================================================================= sheets */
@@ -1426,8 +1621,20 @@ img {
     break-inside: avoid;
   }
 
+  /* These carry --dim / --card-dim, which are near-white on the dark theme and
+     so vanish entirely on paper. */
+  .minilabel,
+  .r-eyebrow,
+  .sourceline,
+  .scalednote,
+  .servcard__value,
+  .statcard__value {
+    color: #000 !important;
+  }
+
   .checkbox,
-  .servbtn {
+  .servbtn,
+  .screen-only {
     display: none !important;
   }
 
