@@ -438,6 +438,17 @@ img {
   color: var(--dim);
 }
 
+/* Same look as the label; it just also navigates back to Main. The tap area
+   is padded up to the 44px floor without moving the text. */
+.eyebrow--link {
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: 44px;
+  margin-bottom: -12px;
+  padding-right: 12px;
+  text-decoration: none;
+}
+
 .mhead__h1 {
   font-size: 26px;
   font-weight: 700;

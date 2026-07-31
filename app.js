@@ -471,8 +471,12 @@
     var h = "";
 
     h += '<header class="mhead"><div class="mhead__inner">';
+    /* The eyebrow doubles as the way back to Main. The design draws it as a
+       plain label, but without this the Menu is a dead end — the only route
+       back to the dashboard would be the browser's back button. Same position,
+       same type, no visual change. */
     h += '<div class="mhead__row"><div>' +
-         '<p class="eyebrow">Kitchen Table</p>' +
+         '<a class="eyebrow eyebrow--link" href="#">Kitchen Table</a>' +
          '<h1 class="mhead__h1">Menu</h1></div>' +
          '<div class="mhead__tools">' +
          '<button type="button" class="iconbtn press' + (S.searchOpen ? " is-on" : "") +
