@@ -1,0 +1,126 @@
+/* Kitchen Table — design tokens. COPY THIS FILE AS-IS. Do not re-derive these values.
+   Every color in the app is one of these. There are no other colors.
+   Dark is the DEFAULT theme. Light is opt-in via [data-theme="light"]. */
+
+:root,
+[data-theme="dark"] {
+  /* Surfaces — deep forest green */
+  --bg:        #0E1712;   /* page background */
+  --surf:      #182620;   /* cards, inputs, secondary buttons */
+  --strip:     #13201A;   /* mode strip under the Recipe header */
+  --line:      #31483D;   /* all borders + dividers (used at 1.5px) */
+
+  /* Text */
+  --ink:       #F1F5F2;   /* primary text */
+  --dim:       #A9BDB1;   /* secondary text, labels, placeholders */
+
+  /* Accent — mint green on dark */
+  --acc:       #8FD3AC;   /* primary buttons, links, active/selected states */
+  --acc-ink:   #08120D;   /* text + icons ON --acc */
+  --tag-bg:    rgba(143, 211, 172, 0.15);
+  --tag-ink:   #9BDCB6;
+
+  /* Recipe cards + tiles — the solid green surface that carries titles */
+  --card:      #1D4234;
+  --card-ink:  #FFFFFF;
+  --card-dim:  rgba(255, 255, 255, 0.74);
+
+  /* Controls */
+  --track:     #31483D;   /* switch track, off */
+  --knob:      #8A9E92;   /* switch knob, off */
+
+  /* Status + depth */
+  --danger:    #F0846E;   /* remove / delete */
+  --scrim:     rgba(0, 0, 0, 0.62);
+  --shadow:    rgba(0, 0, 0, 0.55);
+}
+
+[data-theme="light"] {
+  --bg:        #F3F6F3;
+  --surf:      #FFFFFF;
+  --strip:     #E8EEE9;
+  --line:      #CFDBD2;
+
+  --ink:       #0D1C15;
+  --dim:       #485C51;
+
+  --acc:       #1B4F39;   /* deep forest green */
+  --acc-ink:   #FFFFFF;
+  --tag-bg:    rgba(27, 79, 57, 0.10);
+  --tag-ink:   #1B4F39;
+
+  --card:      #1B4F39;
+  --card-ink:  #FFFFFF;
+  --card-dim:  rgba(255, 255, 255, 0.78);
+
+  --track:     #CFDBD2;
+  --knob:      #FFFFFF;
+
+  --danger:    #A8331F;
+  --scrim:     rgba(13, 28, 21, 0.45);
+  --shadow:    rgba(13, 28, 21, 0.22);
+}
+
+/* ---- Non-color primitives ---------------------------------------------- */
+
+:root {
+  --font: 'Atkinson Hyperlegible', system-ui, sans-serif;   /* the ONLY family */
+
+  /* Radii */
+  --r-check:  8px;
+  --r-input:  12px;   /* inputs, icon buttons, small buttons */
+  --r-row:    14px;   /* list rows, secondary buttons */
+  --r-card:   16px;   /* cards, tiles */
+  --r-hero:   20px;   /* hero card, bottom sheets (top corners only) */
+  --r-pill:   999px;  /* chips, switches, the Add-recipe pill */
+
+  /* Borders */
+  --bw:       1.5px;  /* standard */
+  --bw-field: 2px;    /* form fields + checkbox only */
+
+  /* Shadows */
+  --sh-hero:  0 12px 30px var(--shadow);
+  --sh-pill:  0 10px 26px var(--shadow);
+  --sh-menu:  0 18px 40px var(--shadow);
+  --sh-sheet: 0 -18px 50px var(--shadow);
+  --hi-card:  inset 0 1px 0 rgba(255, 255, 255, 0.09);  /* top highlight on accent cards */
+
+  /* Edge padding — responsive, derive once */
+  --pad: 16px;
+
+  /* Recipe font-size scale (A- / A+ steps through these; index 1 = default) */
+  --fs-0: 20px;
+  --fs-1: 24px;
+  --fs-2: 29px;
+  --fs-3: 34px;
+  --fs-4: 40px;
+}
+
+@media (min-width: 640px)  { :root { --pad: 28px; } }
+@media (min-width: 900px)  { :root { --pad: 40px; } }
+
+/* ---- Base --------------------------------------------------------------- */
+
+html { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--acc); }
+a:hover { color: var(--acc); }
+
+/* Nothing interactive is ever under 44px. */
+button, a[role="button"], input, select, textarea { font-family: var(--font); }
+button { min-height: 44px; }
+
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; transform: none !important; }
+}

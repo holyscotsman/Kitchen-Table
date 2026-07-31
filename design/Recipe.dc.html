@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"><style>
+.kt a{color:var(--acc)}
+.kt textarea,.kt input{font-family:'Atkinson Hyperlegible',system-ui,sans-serif}
+</style></helmet>
+
+<div class="kt" ref="{{ rootRef }}" style="{{ themeVars }}">
+<div style="min-height:100%;background:var(--bg);display:flex;flex-direction:column;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <header style="position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)">
+    <div style="{{ statusPad }}"></div>
+    <div style="{{ barStyle }}">
+      <a href="#menu" style="display:flex;align-items:center;gap:6px;min-height:48px;padding:0 12px 0 6px;border-radius:12px;text-decoration:none;color:var(--acc);font-size:18px;font-weight:700">
+        <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M11 2 2 11l9 9"></path></svg>
+        Menu
+      </a>
+      <span style="flex:1"></span>
+      <button type="button" onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="width:48px;height:48px;flex:none;border-radius:12px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ true }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6"></circle><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"></path></svg></sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"></path></svg></sc-if>
+      </button>
+      <div style="display:flex;flex:none;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surf)">
+        <button type="button" onClick="{{ smaller }}" aria-label="Smaller text" style="width:48px;height:48px;border:0;background:none;color:var(--ink);font-size:16px;font-weight:700;cursor:pointer;padding:0">A&minus;</button>
+        <button type="button" onClick="{{ bigger }}" aria-label="Larger text" style="width:48px;height:48px;border:0;border-left:1.5px solid var(--line);background:none;color:var(--ink);font-size:21px;font-weight:700;cursor:pointer;padding:0">A+</button>
+      </div>
+    </div>
+    <div style="{{ stripStyle }}">
+      <span style="flex:1;font-size:15px;line-height:1.25;color:var(--dim)">{{ modeNote }}</span>
+      <span style="font-size:16px;font-weight:700;color:var(--ink)">Edit</span>
+      <button type="button" role="switch" aria-checked="{{ editing }}" aria-label="Edit mode" onClick="{{ toggleEdit }}" style="{{ switchStyle }}">
+        <span style="{{ knobStyle }}"></span>
+      </button>
+    </div>
+  </header>
+
+  <main style="{{ mainStyle }}">
+    <sc-if value="{{ viewing }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <p style="margin:26px 0 8px;font-size:.66em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)">{{ eyebrow }}</p>
+        <h1 style="{{ h1Style }}">{{ title }}</h1>
+
+        <div style="{{ topGrid }}">
+          <div style="background:var(--card);border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px">
+            <div style="flex:1;min-width:0">
+              <p style="margin:0 0 3px;font-size:.62em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cardDim)">Servings</p>
+              <p style="margin:0;font-size:1.15em;font-weight:700;line-height:1.15;color:var(--cardInk)">{{ servesLabel }}</p>
+            </div>
+            <button type="button" onClick="{{ servesDown }}" aria-label="Fewer servings" style="{{ stepBtn }}">&minus;</button>
+            <button type="button" onClick="{{ servesUp }}" aria-label="More servings" style="{{ stepBtn }}">+</button>
+          </div>
+          <sc-for list="{{ stats }}" as="st" hint-placeholder-count="2">
+            <div style="background:var(--surf);border:1.5px solid var(--line);border-radius:16px;padding:14px 18px;display:flex;flex-direction:column;justify-content:center">
+              <p style="margin:0 0 4px;font-size:.62em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">{{ st.label }}</p>
+              <p style="margin:0;font-size:.86em;font-weight:700;line-height:1.3;color:var(--ink)">{{ st.value }}</p>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ scaled }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0 0 18px;font-size:.78em;line-height:1.4;color:var(--acc);font-weight:700">{{ scaledNote }}</p>
+        </sc-if>
+
+        <button type="button" onClick="{{ toggleAwake }}" role="switch" aria-checked="{{ awake }}" style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;background:var(--surf);border:1.5px solid var(--line);border-radius:14px;padding:13px 16px;margin-bottom:32px;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="flex:1;font-size:.85em;font-weight:700;color:var(--ink)">Keep screen on while cooking</span>
+          <span style="{{ awakeTrack }}"><span style="{{ awakeKnob }}"></span></span>
+        </button>
+
+        <div style="{{ bodyGrid }}">
+          <section style="{{ ingCol }}">
+            <h2 style="margin:0 0 4px;font-size:1.2em;font-weight:700;color:var(--ink)">Ingredients</h2>
+            <p style="margin:0 0 14px;font-size:.72em;color:var(--dim)">Tap to check off as you go</p>
+            <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ ingredients }}" as="ing" hint-placeholder-count="6">
+                <li>
+                  <button type="button" onClick="{{ ing.onClick }}" aria-pressed="{{ ing.done }}" style="{{ ing.rowStyle }}">
+                    <span style="{{ ing.boxStyle }}">
+                      <sc-if value="{{ ing.done }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accInk)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></sc-if>
+                    </span>
+                    <span style="{{ ing.textStyle }}">{{ ing.text }}</span>
+                  </button>
+                </li>
+              </sc-for>
+            </ul>
+          </section>
+
+          <section>
+            <h2 style="margin:0 0 14px;font-size:1.2em;font-weight:700;color:var(--ink)">Instructions</h2>
+            <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px">
+              <sc-for list="{{ steps }}" as="stp" hint-placeholder-count="4">
+                <li>
+                  <button type="button" onClick="{{ stp.onClick }}" aria-pressed="{{ stp.done }}" style="{{ stp.rowStyle }}">
+                    <span style="{{ stp.numStyle }}">{{ stp.n }}</span>
+                    <span style="{{ stp.textStyle }}">{{ stp.text }}</span>
+                  </button>
+                </li>
+              </sc-for>
+            </ol>
+          </section>
+        </div>
+
+        <sc-if value="{{ hasNotes }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:32px 0 0">
+            <h2 style="margin:0 0 12px;font-size:1.2em;font-weight:700;color:var(--ink)">Notes</h2>
+            <p style="margin:0;background:var(--surf);border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;font-size:.92em;line-height:1.6;color:var(--ink);text-wrap:pretty">{{ notes }}</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasFlags }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:24px 0 0;border:1.5px solid var(--danger);border-radius:14px;padding:16px 18px">
+            <h2 style="margin:0 0 10px;font-size:.95em;font-weight:700;color:var(--danger)">Worth double-checking</h2>
+            <ul style="margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ flags }}" as="fl" hint-placeholder-count="1">
+                <li style="font-size:.85em;line-height:1.5;color:var(--ink)">{{ fl }}</li>
+              </sc-for>
+            </ul>
+          </div>
+        </sc-if>
+
+        <div style="{{ actionRow }}">
+          <button type="button" style="{{ shareBtn }}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"></path></svg>
+            Share
+          </button>
+          <button type="button" onClick="{{ toggleDl }}" aria-expanded="{{ dlOpen }}" style="{{ dlBtn }}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>
+            Download
+          </button>
+        </div>
+
+        <p style="margin:22px 0 0;font-size:.72em;line-height:1.5;color:var(--dim)">{{ sourceLine }}</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <label for="kt-title" style="display:block;margin:26px 0 8px;font-size:.68em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">Title</label>
+        <input id="kt-title" value="{{ dTitle }}" onInput="{{ onTitle }}" style="{{ fieldStyle }}">
+
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <div style="flex:1 1 120px">
+            <label for="kt-serv" style="display:block;margin:0 0 8px;font-size:.68em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">Serves</label>
+            <input id="kt-serv" type="number" value="{{ dServings }}" onInput="{{ onServings }}" style="{{ fieldStyle }}">
+          </div>
+          <div style="flex:1 1 120px">
+            <label for="kt-who" style="display:block;margin:0 0 8px;font-size:.68em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">From</label>
+            <input id="kt-who" value="{{ dWho }}" onInput="{{ onWho }}" style="{{ fieldStyle }}">
+          </div>
+        </div>
+
+        <h2 style="margin:30px 0 12px;font-size:1.15em;font-weight:700;color:var(--ink)">Ingredients</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ eIngredients }}" as="row" hint-placeholder-count="4">
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <textarea value="{{ row.text }}" onInput="{{ row.onInput }}" aria-label="{{ row.aria }}" rows="2" style="{{ areaStyle }}"></textarea>
+              <button type="button" onClick="{{ row.onDelete }}" aria-label="{{ row.del }}" style="{{ delBtn }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+            </div>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ addIngredient }}" style="{{ addBtn }}">+ Add ingredient</button>
+
+        <h2 style="margin:30px 0 12px;font-size:1.15em;font-weight:700;color:var(--ink)">Instructions</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ eSteps }}" as="row" hint-placeholder-count="3">
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <textarea value="{{ row.text }}" onInput="{{ row.onInput }}" aria-label="{{ row.aria }}" rows="3" style="{{ areaStyle }}"></textarea>
+              <button type="button" onClick="{{ row.onDelete }}" aria-label="{{ row.del }}" style="{{ delBtn }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+            </div>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ addStep }}" style="{{ addBtn }}">+ Add step</button>
+
+        <label for="kt-notes" style="display:block;margin:30px 0 8px;font-size:.68em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">Notes</label>
+        <textarea id="kt-notes" value="{{ dNotes }}" onInput="{{ onNotes }}" rows="4" style="{{ areaStyle }}"></textarea>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:26px">
+          <button type="button" onClick="{{ save }}" style="min-height:60px;border-radius:14px;border:0;background:var(--acc);color:var(--accInk);font-family:inherit;font-size:1em;font-weight:700;cursor:pointer">{{ saveLabel }}</button>
+          <button type="button" style="min-height:60px;border-radius:14px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);font-family:inherit;font-size:1em;font-weight:700;cursor:pointer">Download updated recipes.json</button>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{ dlOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end">
+      <button type="button" aria-label="Close" onClick="{{ toggleDl }}" style="position:absolute;inset:0;border:0;padding:0;background:var(--scrim);cursor:pointer"></button>
+      <div role="dialog" aria-modal="true" aria-label="Download this recipe" style="position:relative;background:var(--bg);border-top:1.5px solid var(--line);border-radius:20px 20px 0 0;padding:20px 18px 32px">
+        <h2 style="margin:0 0 18px;font-size:23px;font-weight:700;color:var(--ink)">Download this recipe</h2>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto">
+          <button type="button" style="display:flex;align-items:center;min-height:64px;padding:0 20px;border-radius:14px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);font-family:inherit;font-size:19px;font-weight:700;cursor:pointer;text-align:left">PDF &mdash; printable page</button>
+          <button type="button" style="display:flex;align-items:center;min-height:64px;padding:0 20px;border-radius:14px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);font-family:inherit;font-size:19px;font-weight:700;cursor:pointer;text-align:left">Plain text (.txt)</button>
+          <button type="button" onClick="{{ toggleDl }}" style="min-height:58px;border-radius:14px;border:0;background:var(--acc);color:var(--accInk);font-family:inherit;font-size:19px;font-weight:700;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:874},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;},&quot;recipeId&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;bacon-ranch-chicken-casserole&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const THEMES = {
+  dark: {
+    '--bg': '#0E1712', '--surf': '#182620', '--strip': '#13201A', '--line': '#31483D',
+    '--ink': '#F1F5F2', '--dim': '#A9BDB1', '--acc': '#8FD3AC', '--accInk': '#08120D',
+    '--tagBg': 'rgba(143,211,172,.15)', '--tagInk': '#9BDCB6', '--track': '#31483D',
+    '--knob': '#8A9E92', '--scrim': 'rgba(0,0,0,.62)', '--shadow': 'rgba(0,0,0,.55)',
+    '--card': '#1D4234', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.74)',
+    '--danger': '#F0846E',
+  },
+  light: {
+    '--bg': '#F3F6F3', '--surf': '#FFFFFF', '--strip': '#E8EEE9', '--line': '#CFDBD2',
+    '--ink': '#0D1C15', '--dim': '#485C51', '--acc': '#1B4F39', '--accInk': '#FFFFFF',
+    '--tagBg': 'rgba(27,79,57,.10)', '--tagInk': '#1B4F39', '--track': '#CFDBD2',
+    '--knob': '#FFFFFF', '--scrim': 'rgba(13,28,21,.45)', '--shadow': 'rgba(13,28,21,.22)',
+    '--card': '#1B4F39', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.78)',
+    '--danger': '#A8331F',
+  },
+};
+
+const SIZES = [20, 24, 29, 34, 40];
+const VULGAR = [[0.25, '\u00bc'], [0.333, '\u2153'], [0.5, '\u00bd'], [0.667, '\u2154'], [0.75, '\u00be']];
+
+function fmtQty(n) {
+  const whole = Math.floor(n + 1e-9);
+  const frac = n - whole;
+  let f = '';
+  for (const pair of VULGAR) if (Math.abs(frac - pair[0]) < 0.03) f = pair[1];
+  if (!f && frac > 0.03) return String(Math.round(n * 100) / 100);
+  if (whole === 0) return f || '0';
+  return f ? whole + f : String(whole);
+}
+
+function scaleLine(text, mult) {
+  if (Math.abs(mult - 1) < 0.001) return text;
+  return text.replace(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/, m => {
+    let n;
+    if (m.indexOf('/') >= 0) {
+      const parts = m.trim().split(/\s+/);
+      const frac = parts[parts.length - 1].split('/');
+      n = (parts.length > 1 ? parseFloat(parts[0]) : 0) + parseFloat(frac[0]) / parseFloat(frac[1]);
+    } else n = parseFloat(m);
+    return fmtQty(n * mult);
+  });
+}
+
+class Component extends DCLogic {
+  state = {
+    recipe: null, theme: null, editing: false, fsIndex: 1, serves: null, w: 402,
+    checkedIng: {}, checkedStep: {}, awake: false, dlOpen: false, draft: null, saved: false,
+  };
+
+  constructor(props) {
+    super(props);
+    this.root = React.createRef();
+  }
+
+  componentDidMount() {
+    fetch('recipes.json').then(r => r.json()).then(all => {
+      const found = all.find(r => r.id === this.props.recipeId) || all[0];
+      this.setState({ recipe: found, serves: parseInt(found.servings, 10) || 4 });
+    }).catch(() => {});
+    const el = this.root.current;
+    if (el && window.ResizeObserver) {
+      this.ro = new ResizeObserver(es => {
+        const w = Math.round(es[0].contentRect.width);
+        if (w && w !== this.state.w) this.setState({ w });
+      });
+      this.ro.observe(el);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+  }
+
+  draft() {
+    return this.state.draft || Object.assign({}, this.state.recipe);
+  }
+
+  editDraft(patch) {
+    this.setState(p => ({ draft: Object.assign({}, p.draft || p.recipe, patch), saved: false }));
+  }
+
+  editList(key, i, value) {
+    const d = this.draft();
+    const arr = (d[key] || []).slice();
+    if (value === null) arr.splice(i, 1); else arr[i] = value;
+    this.editDraft({ [key]: arr });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const r = s.recipe || {};
+    const d = s.draft || r;
+    const theme = s.theme || this.props.theme || 'dark';
+    const isDark = theme === 'dark';
+    const fs = SIZES[s.fsIndex];
+    const w = s.w;
+    const wide = w >= 900;
+    const mid = w >= 640;
+    const pad = wide ? 40 : mid ? 28 : 16;
+
+    const base = parseInt(r.servings, 10) || 4;
+    const serves = s.serves || base;
+    const mult = serves / base;
+
+    const track = on => ({
+      width: 64, height: 36, flex: 'none', borderRadius: 999, padding: 3, boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start',
+      background: on ? 'var(--acc)' : 'var(--track)',
+      border: '1.5px solid ' + (on ? 'var(--acc)' : 'var(--line)'), cursor: 'pointer',
+    });
+    const knob = on => ({
+      width: 26, height: 26, borderRadius: 999, display: 'block',
+      background: on ? 'var(--accInk)' : 'var(--knob)',
+    });
+
+    const rowBase = {
+      width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'flex-start', gap: 14,
+      minHeight: 60, padding: '15px 16px', borderRadius: 14, cursor: 'pointer',
+      fontFamily: 'inherit', textAlign: 'left', background: 'var(--surf)',
+    };
+    const textOf = done => ({
+      flex: 1, fontSize: '1.02em', lineHeight: 1.45, color: done ? 'var(--dim)' : 'var(--ink)',
+      textDecoration: done ? 'line-through' : 'none', textWrap: 'pretty',
+    });
+
+    const ingredients = (r.ingredients || []).map((t, i) => {
+      const done = !!s.checkedIng[i];
+      return {
+        text: scaleLine(t, mult), done,
+        onClick: () => this.setState(p => ({ checkedIng: Object.assign({}, p.checkedIng, { [i]: !p.checkedIng[i] }) })),
+        rowStyle: Object.assign({}, rowBase, { alignItems: 'center', border: '1.5px solid ' + (done ? 'var(--acc)' : 'var(--line)') }),
+        boxStyle: {
+          width: 32, height: 32, flex: 'none', borderRadius: 8, display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          background: done ? 'var(--acc)' : 'transparent',
+          border: '2px solid ' + (done ? 'var(--acc)' : 'var(--line)'),
+        },
+        textStyle: textOf(done),
+      };
+    });
+
+    const steps = (r.steps || []).map((t, i) => {
+      const done = !!s.checkedStep[i];
+      return {
+        n: i + 1, text: scaleLine(t, mult), done,
+        onClick: () => this.setState(p => ({ checkedStep: Object.assign({}, p.checkedStep, { [i]: !p.checkedStep[i] }) })),
+        rowStyle: Object.assign({}, rowBase, { border: '1.5px solid ' + (done ? 'var(--acc)' : 'var(--line)') }),
+        numStyle: {
+          width: 36, height: 36, flex: 'none', borderRadius: 999, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', fontSize: '.85em', fontWeight: 700,
+          background: done ? 'var(--acc)' : 'var(--tagBg)', color: done ? 'var(--accInk)' : 'var(--tagInk)',
+        },
+        textStyle: textOf(done),
+      };
+    });
+
+    const stats = [];
+    if (r.prepTime) stats.push({ label: 'Prep', value: r.prepTime });
+    if (r.cookTime) stats.push({ label: 'Cook', value: r.cookTime });
+
+    const fieldStyle = {
+      width: '100%', boxSizing: 'border-box', minHeight: 58, borderRadius: 12,
+      border: '2px solid var(--line)', background: 'var(--surf)', color: 'var(--ink)',
+      padding: '0 14px', fontSize: '.95em',
+    };
+    const areaStyle = {
+      flex: 1, width: '100%', boxSizing: 'border-box', borderRadius: 12,
+      border: '2px solid var(--line)', background: 'var(--surf)', color: 'var(--ink)',
+      padding: '13px 15px', fontSize: '.92em', lineHeight: 1.45, resize: 'vertical',
+    };
+    const bigBtn = accent => ({
+      flex: '1 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+      minHeight: 64, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
+      fontSize: '.9em', fontWeight: 700,
+      background: accent ? 'var(--acc)' : 'var(--surf)',
+      color: accent ? 'var(--accInk)' : 'var(--ink)',
+      border: accent ? 0 : '1.5px solid var(--line)',
+    });
+
+    return {
+      rootRef: this.root,
+      themeVars: THEMES[theme],
+      isDark, isLight: !isDark,
+      themeLabel: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleTheme: () => this.setState({ theme: isDark ? 'light' : 'dark' }),
+
+      statusPad: { paddingTop: w < 500 ? 54 : 14 },
+      barStyle: {
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '6px ' + pad + 'px 12px', maxWidth: 1180, margin: '0 auto', width: '100%',
+        boxSizing: 'border-box',
+      },
+      stripStyle: {
+        display: 'flex', alignItems: 'center', gap: 10, background: 'var(--strip)',
+        borderTop: '1px solid var(--line)', padding: '10px ' + pad + 'px',
+      },
+      mainStyle: {
+        flex: 1, width: '100%', maxWidth: wide ? 1040 : 820, margin: '0 auto',
+        boxSizing: 'border-box', padding: '0 ' + pad + 'px 60px', fontSize: fs + 'px',
+      },
+      h1Style: {
+        margin: '0 0 22px', fontSize: wide ? '2.1em' : '1.75em', fontWeight: 700,
+        lineHeight: 1.1, letterSpacing: '-.02em', color: 'var(--ink)', textWrap: 'pretty',
+      },
+      topGrid: {
+        display: 'grid', gap: 12, marginBottom: 16,
+        gridTemplateColumns: mid ? 'repeat(auto-fit,minmax(230px,1fr))' : '1fr',
+      },
+      bodyGrid: {
+        display: 'grid', gap: wide ? 36 : 32,
+        gridTemplateColumns: wide ? 'minmax(280px,.85fr) 1.15fr' : '1fr',
+        alignItems: 'start',
+      },
+      ingCol: wide ? { position: 'sticky', top: 130 } : {},
+      actionRow: {
+        display: 'flex', flexWrap: 'wrap', gap: 12, margin: '36px 0 0',
+        paddingTop: 28, borderTop: '1.5px solid var(--line)',
+      },
+      shareBtn: bigBtn(false), dlBtn: bigBtn(true),
+
+      fs,
+      bigger: () => this.setState(p => ({ fsIndex: Math.min(SIZES.length - 1, p.fsIndex + 1) })),
+      smaller: () => this.setState(p => ({ fsIndex: Math.max(0, p.fsIndex - 1) })),
+
+      editing: s.editing, viewing: !s.editing,
+      toggleEdit: () => this.setState(p => ({ editing: !p.editing, dlOpen: false })),
+      modeNote: s.editing ? 'Edit mode \u2014 changes save on this phone' : 'Viewer mode \u2014 read only',
+      switchStyle: track(s.editing), knobStyle: knob(s.editing),
+
+      eyebrow: [r.contributor, r.category].filter(Boolean).join('  \u00b7  '),
+      title: r.title, stats,
+      servesLabel: serves + (serves === 1 ? ' person' : ' people'),
+      servesDown: () => this.setState(p => ({ serves: Math.max(1, (p.serves || base) - 1) })),
+      servesUp: () => this.setState(p => ({ serves: Math.min(40, (p.serves || base) + 1) })),
+      scaled: serves !== base,
+      scaledNote: 'Amounts adjusted from the original ' + base + '. Tap \u2212 / + to change.',
+      stepBtn: {
+        width: 56, height: 56, flex: 'none', borderRadius: 14, border: 0,
+        background: 'var(--cardInk)', color: 'var(--card)', fontFamily: 'inherit',
+        fontSize: 30, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0,
+      },
+
+      awake: s.awake, toggleAwake: () => this.setState(p => ({ awake: !p.awake })),
+      awakeTrack: track(s.awake), awakeKnob: knob(s.awake),
+
+      ingredients, steps,
+      hasNotes: !!r.notes, notes: r.notes,
+      hasFlags: !!(r.flagged && r.flagged.length), flags: r.flagged || [],
+      sourceLine: r.source ? 'From Mom\u2019s screenshots \u00b7 ' + r.source : 'From Mom\u2019s screenshots',
+
+      dlOpen: s.dlOpen, toggleDl: () => this.setState(p => ({ dlOpen: !p.dlOpen })),
+
+      fieldStyle, areaStyle,
+      dTitle: d.title || '', dServings: d.servings || '', dWho: d.contributor || '', dNotes: d.notes || '',
+      onTitle: e => this.editDraft({ title: e.target.value }),
+      onServings: e => this.editDraft({ servings: e.target.value }),
+      onWho: e => this.editDraft({ contributor: e.target.value }),
+      onNotes: e => this.editDraft({ notes: e.target.value }),
+      eIngredients: (d.ingredients || []).map((t, i) => ({
+        text: t, aria: 'Ingredient ' + (i + 1), del: 'Delete ingredient ' + (i + 1),
+        onInput: e => this.editList('ingredients', i, e.target.value),
+        onDelete: () => this.editList('ingredients', i, null),
+      })),
+      eSteps: (d.steps || []).map((t, i) => ({
+        text: t, aria: 'Step ' + (i + 1), del: 'Delete step ' + (i + 1),
+        onInput: e => this.editList('steps', i, e.target.value),
+        onDelete: () => this.editList('steps', i, null),
+      })),
+      addIngredient: () => this.editDraft({ ingredients: (d.ingredients || []).concat('') }),
+      addStep: () => this.editDraft({ steps: (d.steps || []).concat('') }),
+      addBtn: {
+        width: '100%', minHeight: 58, marginTop: 10, borderRadius: 12,
+        border: '2px dashed var(--line)', background: 'none', color: 'var(--acc)',
+        fontFamily: 'inherit', fontSize: '.95em', fontWeight: 700, cursor: 'pointer',
+      },
+      delBtn: {
+        width: 56, height: 56, flex: 'none', borderRadius: 12, cursor: 'pointer', padding: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: '1.5px solid var(--danger)', background: 'var(--surf)', color: 'var(--danger)',
+      },
+      saveLabel: s.saved ? 'Saved \u2713' : 'Save changes',
+      save: () => this.setState(p => ({ recipe: Object.assign({}, p.recipe, p.draft), saved: true })),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

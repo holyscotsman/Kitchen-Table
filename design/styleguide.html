@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen Table — style guide</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px var(--pad) 80px; }
+  h1 { font-size: 40px; font-weight: 700; letter-spacing: -.03em; margin: 0 0 6px; }
+  .sub { color: var(--dim); font-size: 18px; margin: 0 0 34px; }
+  h2 { font-size: 22px; font-weight: 700; margin: 44px 0 16px; padding-top: 22px; border-top: var(--bw) solid var(--line); }
+  .sw { display: grid; grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); gap: 12px; }
+  .sw div { border-radius: var(--r-card); padding: 14px; border: var(--bw) solid var(--line); }
+  .sw b { display: block; font-size: 15px; }
+  .sw code { font-size: 13px; opacity: .8; }
+  .chip { min-height: 52px; padding: 0 18px; border-radius: var(--r-pill); font: 700 18px var(--font); cursor: pointer; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .card { background: var(--card); color: var(--card-ink); border-radius: var(--r-card); padding: 16px; min-height: 88px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; box-shadow: var(--hi-card); }
+  .card b { font-size: 21px; font-weight: 700; line-height: 1.2; }
+  .card span { display: block; font-size: 15px; color: var(--card-dim); margin-top: 5px; }
+  .btn-p { min-height: 60px; padding: 0 24px; border: 0; border-radius: var(--r-row); background: var(--acc); color: var(--acc-ink); font: 700 19px var(--font); cursor: pointer; }
+  .btn-s { min-height: 60px; padding: 0 24px; border: var(--bw) solid var(--line); border-radius: var(--r-row); background: var(--surf); color: var(--ink); font: 700 19px var(--font); cursor: pointer; }
+  .fld { width: 100%; box-sizing: border-box; min-height: 58px; border-radius: var(--r-input); border: var(--bw-field) solid var(--line); background: var(--surf); color: var(--ink); padding: 0 14px; font-size: 19px; }
+  .scale p { margin: 0 0 10px; }
+  .tgl { position: fixed; top: 18px; right: 18px; min-height: 48px; padding: 0 18px; border-radius: var(--r-input); border: var(--bw) solid var(--line); background: var(--surf); color: var(--ink); font: 700 17px var(--font); cursor: pointer; z-index: 9; }
+</style>
+</head>
+<body>
+<button class="tgl" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'">Toggle theme</button>
+<div class="wrap">
+  <h1>Kitchen Table</h1>
+  <p class="sub">Every color, size and component in the app. The build must match this page. Toggle the theme and check both.</p>
+
+  <h2>Surfaces</h2>
+  <div class="sw">
+    <div style="background:var(--bg)"><b>--bg</b><code>page background</code></div>
+    <div style="background:var(--surf)"><b>--surf</b><code>cards, inputs</code></div>
+    <div style="background:var(--strip)"><b>--strip</b><code>mode strip</code></div>
+    <div style="background:var(--line)"><b>--line</b><code>borders 1.5px</code></div>
+  </div>
+
+  <h2>Accent &amp; card</h2>
+  <div class="sw">
+    <div style="background:var(--acc);color:var(--acc-ink);border-color:var(--acc)"><b>--acc</b><code>on --acc-ink</code></div>
+    <div style="background:var(--card);color:var(--card-ink);border-color:var(--card)"><b>--card</b><code>recipe cards</code></div>
+    <div style="background:var(--tag-bg);color:var(--tag-ink)"><b>--tag-bg</b><code>step chips</code></div>
+    <div style="background:var(--danger);color:var(--bg);border-color:var(--danger)"><b>--danger</b><code>remove</code></div>
+  </div>
+
+  <h2>Text</h2>
+  <p style="color:var(--ink);font-size:21px;margin:0 0 6px">--ink &mdash; primary text, 16:1 contrast</p>
+  <p style="color:var(--dim);font-size:19px;margin:0">--dim &mdash; secondary text, labels, placeholders</p>
+
+  <h2>Type &mdash; Atkinson Hyperlegible only</h2>
+  <div class="scale">
+    <p style="font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1.02">Main h1 &mdash; 34/46px, 700</p>
+    <p style="font-size:26px;font-weight:700;letter-spacing:-.015em">Menu h1 &mdash; 26px, 700</p>
+    <p style="font-size:24px;line-height:1.45">Instruction text &mdash; 24px default, 400. This is the size that matters most.</p>
+    <p style="font-size:21px;font-weight:700">Card title &mdash; 21px, 700</p>
+    <p style="font-size:15px;color:var(--dim)">Card meta &mdash; 15px, 400, --dim</p>
+    <p style="font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)">Eyebrow &mdash; 12px, 700, .13em</p>
+  </div>
+
+  <h2>Recipe cards</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+    <div class="card"><div style="flex:1"><b>Bacon Ranch Chicken Casserole</b><span>Mom &middot; 45 min</span></div></div>
+    <div class="card"><div style="flex:1"><b>Scottish Tablet</b><span>Mom &middot; 20 min</span></div></div>
+  </div>
+
+  <h2>Chips &mdash; 52px min, radius 999</h2>
+  <div class="row">
+    <button class="chip" style="background:var(--acc);color:var(--acc-ink);border:var(--bw) solid var(--acc)">Mom&nbsp;&nbsp;25</button>
+    <button class="chip" style="background:var(--surf);color:var(--ink);border:var(--bw) solid var(--line)">Me&nbsp;&nbsp;18</button>
+    <button class="chip" style="background:var(--surf);color:var(--ink);border:var(--bw) solid var(--line)">Jennifer&nbsp;&nbsp;5</button>
+  </div>
+
+  <h2>Buttons &amp; fields</h2>
+  <div class="row" style="margin-bottom:16px">
+    <button class="btn-p">Add recipe</button>
+    <button class="btn-s">Share</button>
+  </div>
+  <input class="fld" placeholder="Search 48 recipes" aria-label="Example field">
+
+  <h2>Radii</h2>
+  <div class="row">
+    <div style="width:104px;height:76px;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-input);display:flex;align-items:center;justify-content:center;font-size:15px">12 input</div>
+    <div style="width:104px;height:76px;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-row);display:flex;align-items:center;justify-content:center;font-size:15px">14 row</div>
+    <div style="width:104px;height:76px;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-card);display:flex;align-items:center;justify-content:center;font-size:15px">16 card</div>
+    <div style="width:104px;height:76px;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-hero);display:flex;align-items:center;justify-content:center;font-size:15px">20 hero</div>
+  </div>
+</div>
+</body>
+</html>

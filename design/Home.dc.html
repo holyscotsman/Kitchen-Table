@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"><style>
+.xs::-webkit-scrollbar{display:none}
+.xs{scrollbar-width:none}
+.kt a{color:var(--acc)}
+.kt input::placeholder{color:var(--dim);opacity:1}
+</style></helmet>
+
+<div class="kt" ref="{{ rootRef }}" style="{{ themeVars }}">
+<div style="min-height:100%;background:var(--bg);display:flex;flex-direction:column;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <header style="position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)">
+    <div style="{{ statusPad }}"></div>
+    <div style="{{ barStyle }}">
+      <div style="flex:1;min-width:0">
+        <p style="margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)">Kitchen Table</p>
+        <h1 style="margin:0;font-size:26px;font-weight:700;line-height:1.05;letter-spacing:-.015em;color:var(--ink)">Menu</h1>
+      </div>
+      <button type="button" onClick="{{ toggleSearch }}" aria-label="Search recipes" aria-expanded="{{ searchOpen }}" style="{{ searchBtnStyle }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg></button>
+      <button type="button" onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="width:48px;height:48px;flex:none;border-radius:12px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ true }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6"></circle><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"></path></svg></sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"></path></svg></sc-if>
+      </button>
+      <button type="button" aria-label="Text size" style="width:48px;height:48px;flex:none;border-radius:12px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);font-size:18px;font-weight:700;cursor:pointer;padding:0">Aa</button>
+    </div>
+
+    <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ padX }}">
+        <label for="kt-q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Search recipes</label>
+        <input id="kt-q" type="search" value="{{ q }}" onInput="{{ onQ }}" placeholder="Search titles &amp; ingredients" style="width:100%;box-sizing:border-box;height:54px;border-radius:12px;border:2px solid var(--acc);background:var(--surf);padding:0 14px;font-family:inherit;font-size:19px;color:var(--ink)">
+      </div>
+    </sc-if>
+
+    <div style="{{ toolRow }}">
+      <button type="button" onClick="{{ openFilter }}" aria-haspopup="dialog" style="{{ filterBtnStyle }}">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
+        <span>Filter</span>
+        <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}"><span style="min-width:26px;height:26px;padding:0 7px;box-sizing:border-box;border-radius:999px;background:var(--accInk);color:var(--acc);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ filterCount }}</span></sc-if>
+      </button>
+      <button type="button" onClick="{{ toggleSort }}" aria-haspopup="menu" aria-expanded="{{ sortOpen }}" style="{{ sortBtnStyle }}">
+        <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sortLabel }}</span>
+        <svg width="17" height="11" viewBox="0 0 18 11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M2 2l7 7 7-7"></path></svg>
+      </button>
+    </div>
+
+    <sc-if value="{{ sortOpen }}" hint-placeholder-val="{{ false }}">
+      <div role="menu" aria-label="Sort recipes" style="{{ sortMenuStyle }}background:var(--surf);border:1.5px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 18px 40px var(--shadow)">
+        <sc-for list="{{ sortOptions }}" as="o" hint-placeholder-count="4">
+          <button type="button" role="menuitemradio" aria-checked="{{ o.on }}" onClick="{{ o.onClick }}" style="{{ o.style }}">
+            <span style="flex:1;text-align:left">{{ o.label }}</span>
+            <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg></sc-if>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+  </header>
+
+  <div style="{{ countRow }}">
+    <p style="margin:0;font-size:15px;color:var(--dim)">{{ countLabel }}</p>
+    <div style="display:flex;align-items:center;gap:4px">
+      <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{ clearFilters }}" style="background:none;border:0;min-height:44px;padding:0 10px;font-family:inherit;font-size:16px;font-weight:700;color:var(--acc);cursor:pointer">Clear</button>
+      </sc-if>
+      <button type="button" onClick="{{ toggleRemoving }}" aria-pressed="{{ removing }}" style="{{ removeBtnStyle }}">{{ removeBtnLabel }}</button>
+    </div>
+  </div>
+
+  <ul style="{{ gridStyle }}">
+    <sc-for list="{{ list }}" as="rc" hint-placeholder-count="5">
+      <li>
+        <a href="{{ rc.href }}" style="display:flex;align-items:center;gap:14px;background:var(--card);border:1.5px solid var(--card);border-radius:16px;padding:16px;text-decoration:none;min-height:88px;box-sizing:border-box">
+          <span style="flex:1;display:flex;flex-direction:column;gap:5px">
+            <span style="font-size:21px;font-weight:700;line-height:1.2;color:var(--cardInk);text-wrap:pretty">{{ rc.title }}</span>
+            <span style="font-size:15px;line-height:1.3;color:var(--cardDim)">{{ rc.meta }}</span>
+          </span>
+          <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="var(--cardInk)" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M2 2l9 9-9 9"></path></svg>
+        </a>
+      </li>
+    </sc-for>
+    <sc-for list="{{ removeList }}" as="rc" hint-placeholder-count="0">
+      <li>
+        <button type="button" onClick="{{ rc.onRemove }}" aria-label="{{ rc.aria }}" style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:14px;background:var(--surf);border:1.5px solid var(--danger);border-radius:16px;padding:16px;min-height:88px;cursor:pointer;text-align:left;font-family:inherit">
+          <span style="flex:1;display:flex;flex-direction:column;gap:5px">
+            <span style="font-size:21px;font-weight:700;line-height:1.2;color:var(--ink);text-wrap:pretty">{{ rc.title }}</span>
+            <span style="font-size:15px;line-height:1.3;color:var(--dim)">{{ rc.meta }}</span>
+          </span>
+          <span style="width:44px;height:44px;flex:none;border-radius:999px;background:var(--danger);display:flex;align-items:center;justify-content:center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </span>
+        </button>
+      </li>
+    </sc-for>
+    <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+      <li style="padding:28px 4px">
+        <p style="margin:0 0 16px;font-size:19px;line-height:1.5;color:var(--dim)">No recipes match. Try a different word, or clear the filters.</p>
+        <button type="button" onClick="{{ resetAll }}" style="min-height:54px;padding:0 22px;border-radius:12px;border:0;background:var(--acc);color:var(--accInk);font-family:inherit;font-size:18px;font-weight:700;cursor:pointer">Show all recipes</button>
+      </li>
+    </sc-if>
+  </ul>
+
+  <div style="{{ addBar }}">
+    <button type="button" style="display:flex;align-items:center;gap:10px;min-height:60px;padding:0 24px;border-radius:999px;border:0;background:var(--acc);color:var(--accInk);font-family:inherit;font-size:19px;font-weight:700;cursor:pointer;box-shadow:0 10px 26px var(--shadow)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      Add recipe
+    </button>
+  </div>
+
+  <sc-if value="{{ filterOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end">
+      <button type="button" aria-label="Close filters" onClick="{{ closeFilter }}" style="position:absolute;inset:0;border:0;padding:0;background:var(--scrim);cursor:pointer"></button>
+      <div role="dialog" aria-modal="true" aria-label="Filter recipes" style="{{ sheetStyle }}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <h2 style="flex:1;margin:0;font-size:24px;font-weight:700;color:var(--ink)">Filter</h2>
+          <button type="button" onClick="{{ closeFilter }}" style="min-height:48px;padding:0 20px;border-radius:12px;border:0;background:var(--acc);color:var(--accInk);font-family:inherit;font-size:18px;font-weight:700;cursor:pointer">Done</button>
+        </div>
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">Who it&rsquo;s from</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:26px">
+          <sc-for list="{{ whoChips }}" as="c" hint-placeholder-count="4">
+            <button type="button" onClick="{{ c.onClick }}" aria-pressed="{{ c.on }}" style="{{ c.style }}">{{ c.label }}</button>
+          </sc-for>
+        </div>
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)">Course</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:26px">
+          <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="5">
+            <button type="button" onClick="{{ c.onClick }}" aria-pressed="{{ c.on }}" style="{{ c.style }}">{{ c.label }}</button>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ clearFilters }}" style="width:100%;min-height:54px;border-radius:12px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);font-family:inherit;font-size:18px;font-weight:700;cursor:pointer">Reset to all recipes</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:874},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;}}">
+const CATS = ['Dinner', 'Breakfast', 'Side', 'Dessert', 'Snack', 'Drink'];
+const WHO = ['Mom', 'Me', 'Jennifer'];
+const SORTS = [
+  { key: 'recent', label: 'Recently added' },
+  { key: 'az', label: 'Name A \u2013 Z' },
+  { key: 'quick', label: 'Quickest first' },
+  { key: 'course', label: 'Course' },
+  { key: 'who', label: 'Who it\u2019s from' },
+];
+
+const THEMES = {
+  dark: {
+    '--bg': '#0E1712', '--surf': '#182620', '--strip': '#13201A', '--line': '#31483D',
+    '--ink': '#F1F5F2', '--dim': '#A9BDB1', '--acc': '#8FD3AC', '--accInk': '#08120D',
+    '--tagBg': 'rgba(143,211,172,.15)', '--tagInk': '#9BDCB6', '--track': '#31483D',
+    '--knob': '#8A9E92', '--scrim': 'rgba(0,0,0,.62)', '--shadow': 'rgba(0,0,0,.55)',
+    '--card': '#1D4234', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.74)',
+    '--danger': '#F0846E',
+  },
+  light: {
+    '--bg': '#F3F6F3', '--surf': '#FFFFFF', '--strip': '#E8EEE9', '--line': '#CFDBD2',
+    '--ink': '#0D1C15', '--dim': '#485C51', '--acc': '#1B4F39', '--accInk': '#FFFFFF',
+    '--tagBg': 'rgba(27,79,57,.10)', '--tagInk': '#1B4F39', '--track': '#CFDBD2',
+    '--knob': '#FFFFFF', '--scrim': 'rgba(13,28,21,.45)', '--shadow': 'rgba(13,28,21,.22)',
+    '--card': '#1B4F39', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.78)',
+    '--danger': '#A8331F',
+  },
+};
+
+class Component extends DCLogic {
+  state = {
+    recipes: [], q: '', searchOpen: false, filterOpen: false, sortOpen: false,
+    who: [], cats: [], sort: 'recent', theme: null, removing: false, w: 402,
+  };
+
+  constructor(props) {
+    super(props);
+    this.root = React.createRef();
+  }
+
+  componentDidMount() {
+    fetch('recipes.json').then(r => r.json()).then(recipes => this.setState({ recipes })).catch(() => {});
+    const el = this.root.current;
+    if (el && window.ResizeObserver) {
+      this.ro = new ResizeObserver(es => {
+        const w = Math.round(es[0].contentRect.width);
+        if (w && w !== this.state.w) this.setState({ w });
+      });
+      this.ro.observe(el);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+  }
+
+  theme() {
+    return this.state.theme || this.props.theme || 'dark';
+  }
+
+  minutes(r) {
+    const txt = [r.prepTime, r.cookTime].filter(Boolean).join(' ');
+    if (!txt) return 1e6;
+    let m = 0;
+    const re = /(\d+(?:\.\d+)?)\s*(hour|hr|h|minute|min|m)\b/gi;
+    let hit;
+    while ((hit = re.exec(txt))) {
+      const n = parseFloat(hit[1]);
+      m += /^h/i.test(hit[2]) ? n * 60 : n;
+    }
+    return m || 1e6;
+  }
+
+  shortTime(r) {
+    const t = r.cookTime || r.prepTime;
+    return t && t.length <= 14 ? t : null;
+  }
+
+  chip(label, count, on, onClick) {
+    return {
+      label: count == null ? label : label + '  ' + count, on, onClick,
+      style: {
+        fontFamily: 'inherit', fontSize: 18, fontWeight: 700, minHeight: 52, padding: '0 18px',
+        borderRadius: 999, cursor: 'pointer', flex: 'none', whiteSpace: 'nowrap',
+        background: on ? 'var(--acc)' : 'var(--surf)', color: on ? 'var(--accInk)' : 'var(--ink)',
+        border: '1.5px solid ' + (on ? 'var(--acc)' : 'var(--line)'),
+      },
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = this.theme();
+    const isDark = theme === 'dark';
+
+    const q = s.q.trim().toLowerCase();
+    let list = s.recipes.filter(r => {
+      if (s.who.length && !s.who.includes(r.contributor)) return false;
+      if (s.cats.length && !s.cats.includes(r.category)) return false;
+      if (!q) return true;
+      return r.title.toLowerCase().includes(q) || (r.ingredients || []).some(i => i.toLowerCase().includes(q));
+    });
+
+    const by = {
+      recent: () => 0,
+      az: (a, b) => a.title.localeCompare(b.title),
+      quick: (a, b) => this.minutes(a) - this.minutes(b),
+      course: (a, b) => CATS.indexOf(a.category) - CATS.indexOf(b.category) || a.title.localeCompare(b.title),
+      who: (a, b) => WHO.indexOf(a.contributor) - WHO.indexOf(b.contributor) || a.title.localeCompare(b.title),
+    };
+    if (s.sort !== 'recent') list = list.slice().sort(by[s.sort]);
+
+    const toggleIn = (key, v) => () => this.setState(p => ({
+      [key]: p[key].includes(v) ? p[key].filter(x => x !== v) : p[key].concat(v),
+    }));
+    const pool = s.recipes.filter(r => !s.cats.length || s.cats.includes(r.category));
+    const poolWho = s.recipes.filter(r => !s.who.length || s.who.includes(r.contributor));
+
+    const active = s.who.map(w => ({ label: w, key: 'who', v: w })).concat(s.cats.map(c => ({ label: c, key: 'cats', v: c })));
+    const btnBase = {
+      fontFamily: 'inherit', fontSize: 18, fontWeight: 700, minHeight: 54, cursor: 'pointer',
+      borderRadius: 12, display: 'flex', alignItems: 'center', gap: 9, padding: '0 16px',
+    };
+
+    const w = s.w;
+    const cols = w >= 1180 ? 3 : w >= 720 ? 2 : 1;
+    const pad = w >= 900 ? 40 : w >= 640 ? 28 : 16;
+    const shell = { maxWidth: 1320, margin: '0 auto', width: '100%', boxSizing: 'border-box' };
+
+    return {
+      rootRef: this.root,
+      statusPad: { paddingTop: w < 500 ? 54 : 14 },
+      barStyle: Object.assign({}, shell, {
+        display: 'flex', alignItems: 'center', gap: 8, padding: '6px ' + pad + 'px 12px',
+      }),
+      padX: Object.assign({}, shell, { padding: '0 ' + pad + 'px 12px' }),
+      toolRow: Object.assign({}, shell, {
+        display: 'flex', gap: 10, padding: '0 ' + pad + 'px 12px',
+        maxWidth: w >= 720 ? 660 : 1320, marginLeft: w >= 720 ? 0 : 'auto',
+      }),
+      sortMenuStyle: {
+        position: 'absolute', left: pad, width: 'min(420px, calc(100% - ' + pad * 2 + 'px))',
+        zIndex: 30, background: 'var(--surf)', border: '1.5px solid var(--line)',
+        borderRadius: 14, overflow: 'hidden', boxShadow: '0 18px 40px var(--shadow)',
+      },
+      countRow: Object.assign({}, shell, {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, padding: '14px ' + pad + 'px 12px',
+      }),
+      gridStyle: Object.assign({}, shell, {
+        listStyle: 'none', margin: 0, padding: '0 ' + pad + 'px 24px',
+        display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', minmax(0, 1fr))', gap: 12,
+      }),
+      addBar: Object.assign({}, shell, {
+        position: 'sticky', bottom: 0, marginTop: 'auto', display: 'flex', justifyContent: 'flex-end',
+        padding: '14px ' + pad + 'px ' + (w < 500 ? 30 : 22) + 'px',
+        background: 'linear-gradient(to top,var(--bg) 58%,transparent)',
+      }),
+      sheetStyle: {
+        position: 'relative', background: 'var(--bg)', borderTop: '1.5px solid var(--line)',
+        borderRadius: '20px 20px 0 0', padding: '18px ' + pad + 'px 30px', maxHeight: '82%',
+        overflowY: 'auto', boxShadow: '0 -18px 50px var(--shadow)',
+      },
+      themeVars: THEMES[theme],
+      isDark, isLight: !isDark,
+      themeLabel: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleTheme: () => this.setState({ theme: isDark ? 'light' : 'dark' }),
+
+      q: s.q, searchOpen: s.searchOpen,
+      onQ: e => this.setState({ q: e.target.value }),
+      toggleSearch: () => this.setState(p => ({ searchOpen: !p.searchOpen, q: p.searchOpen ? '' : p.q, sortOpen: false })),
+      searchBtnStyle: {
+        width: 48, height: 48, flex: 'none', borderRadius: 12, padding: 0, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: s.searchOpen ? 'var(--acc)' : 'var(--surf)',
+        color: s.searchOpen ? 'var(--accInk)' : 'var(--ink)',
+        border: '1.5px solid ' + (s.searchOpen ? 'var(--acc)' : 'var(--line)'),
+      },
+
+      filterBtnStyle: Object.assign({}, btnBase, {
+        flex: '0 0 auto',
+        background: active.length ? 'var(--acc)' : 'var(--surf)',
+        color: active.length ? 'var(--accInk)' : 'var(--ink)',
+        border: '1.5px solid ' + (active.length ? 'var(--acc)' : 'var(--line)'),
+      }),
+      sortBtnStyle: Object.assign({}, btnBase, {
+        flex: 1, minWidth: 0, background: 'var(--surf)', color: 'var(--ink)',
+        border: '1.5px solid ' + (s.sortOpen ? 'var(--acc)' : 'var(--line)'),
+      }),
+      openFilter: () => this.setState({ filterOpen: true, sortOpen: false }),
+      closeFilter: () => this.setState({ filterOpen: false }),
+      filterOpen: s.filterOpen,
+      hasFilters: active.length > 0,
+      filterCount: active.length,
+      removing: s.removing,
+      toggleRemoving: () => this.setState(p => ({ removing: !p.removing })),
+      removeBtnLabel: s.removing ? 'Done' : 'Remove',
+      removeBtnStyle: {
+        background: s.removing ? 'var(--danger)' : 'none',
+        color: s.removing ? 'var(--bg)' : 'var(--acc)',
+        border: 0, borderRadius: 999, minHeight: 44, padding: '0 16px',
+        fontFamily: 'inherit', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+      },
+      removeList: s.removing ? list.map(r => ({
+        title: r.title,
+        meta: [r.contributor, this.shortTime(r)].filter(Boolean).join('  \u00b7  '),
+        aria: 'Remove ' + r.title,
+        onRemove: () => this.setState(p => ({ recipes: p.recipes.filter(x => x.id !== r.id) })),
+      })) : [],
+      clearFilters: () => this.setState({ who: [], cats: [] }),
+      resetAll: () => this.setState({ who: [], cats: [], q: '', searchOpen: false }),
+
+      sortOpen: s.sortOpen,
+      toggleSort: () => this.setState(p => ({ sortOpen: !p.sortOpen })),
+      sortLabel: 'Sort: ' + (SORTS.find(o => o.key === s.sort) || SORTS[0]).label,
+      sortOptions: SORTS.map(o => ({
+        label: o.label, on: s.sort === o.key,
+        onClick: () => this.setState({ sort: o.key, sortOpen: false }),
+        style: {
+          width: '100%', boxSizing: 'border-box', minHeight: 58, padding: '0 16px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 10, border: 0,
+          borderTop: '1px solid var(--line)', fontFamily: 'inherit', fontSize: 18,
+          fontWeight: s.sort === o.key ? 700 : 400,
+          background: s.sort === o.key ? 'var(--tagBg)' : 'var(--surf)',
+          color: s.sort === o.key ? 'var(--tagInk)' : 'var(--ink)',
+        },
+      })),
+
+      whoChips: WHO.map(w => this.chip(w, pool.filter(r => r.contributor === w).length, s.who.includes(w), toggleIn('who', w))),
+      catChips: CATS.filter(c => s.recipes.some(r => r.category === c))
+        .map(c => this.chip(c, poolWho.filter(r => r.category === c).length, s.cats.includes(c), toggleIn('cats', c))),
+
+      list: s.removing ? [] : list.map(r => ({
+        href: '#' + r.id, title: r.title,
+        meta: [r.contributor, this.shortTime(r)].filter(Boolean).join('  \u00b7  '),
+      })),
+      isEmpty: s.recipes.length > 0 && list.length === 0,
+      countLabel: s.removing
+        ? 'Tap a recipe to remove it'
+        : list.length + (list.length === 1 ? ' recipe' : ' recipes'),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
