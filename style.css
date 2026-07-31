@@ -1621,8 +1621,20 @@ input[type="file"].input {
     break-inside: avoid;
   }
 
+  /* These carry --dim / --card-dim, which are near-white on the dark theme and
+     so vanish entirely on paper. */
+  .minilabel,
+  .r-eyebrow,
+  .sourceline,
+  .scalednote,
+  .servcard__value,
+  .statcard__value {
+    color: #000 !important;
+  }
+
   .checkbox,
-  .servbtn {
+  .servbtn,
+  .screen-only {
     display: none !important;
   }
 

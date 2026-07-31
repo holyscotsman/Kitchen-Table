@@ -847,7 +847,7 @@
 
     if (S.serves !== r.servings) {
       h += '<p class="scalednote">Amounts adjusted from the original ' +
-           r.servings + ". Tap − / + to change.</p>";
+           r.servings + '.<span class="screen-only"> Tap − / + to change.</span></p>';
     }
 
     if ("wakeLock" in navigator) {
