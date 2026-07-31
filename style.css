@@ -1,0 +1,1118 @@
+/* ==========================================================================
+   Mom's Recipe Book
+   Mobile-first, low-vision-first. Built from scratch — design files in the
+   project folder were treated as visual reference only.
+
+   Type scale is driven by two multipliers so they compose cleanly:
+     --fs  the A+/A- stepper (user picks 0.9 -> 2.0)
+     --rb  the reader-mode boost (1 normally, 1.45 in reader mode)
+   Everything else is sized in rem, so both controls move the whole page.
+   ========================================================================== */
+
+:root {
+  --fs: 1;
+  --rb: 1;
+
+  --bg: #fbf9f6;
+  --surface: #ffffff;
+  --surface-sunk: #f4f0ea;
+  --text: #1c1a17;
+  --text-soft: #55504a;
+  --accent: #9a3a12;
+  --accent-ink: #ffffff;
+  --accent-wash: #f7ebe4;
+  --border: #e3ddd4;
+  --border-strong: #cdc4b7;
+  --focus: #0b5cad;
+  --danger: #9c1f14;
+  --ok: #1f6b3a;
+  --warn-bg: #fdf4e0;
+  --warn-border: #e0c37a;
+
+  --radius: 12px;
+  /* Scales up with the text, but never drops below 48px even at the smallest
+     text setting. max() is doing the real work here. */
+  --tap: max(48px, 3rem);
+  --pad: 16px; /* fixed: gutters shouldn't eat the screen at 2x text */
+  --measure: 40rem;
+  --chrome: 18px; /* site header sizing, deliberately independent of --fs */
+
+  --shadow: 0 1px 2px rgba(28, 26, 23, 0.06), 0 4px 12px rgba(28, 26, 23, 0.05);
+}
+
+/* Reader mode: maximum contrast, no soft grays, wider single column. */
+html.reader {
+  --rb: 1.45;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunk: #f2f2f2;
+  --text: #000000;
+  --text-soft: #000000;
+  --accent: #7d2c0a;
+  --accent-wash: #f6ece6;
+  --border: #000000;
+  --border-strong: #000000;
+  --shadow: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: calc(17px * var(--fs) * var(--rb));
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 40rem) {
+  html {
+    font-size: calc(18px * var(--fs) * var(--rb));
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+html.reader body {
+  line-height: 1.75;
+  letter-spacing: 0.005em;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+/* Headings grow sub-linearly: at 2x body text a heading only needs to stay
+   *distinguishable*, not twice as large again, or long recipe titles start
+   breaking mid-word on a phone. */
+h1 {
+  font-size: min(1.6rem, calc(1rem + 11px));
+}
+h2 {
+  font-size: min(1.25rem, calc(1rem + 6px));
+}
+h3 {
+  font-size: min(1.05rem, calc(1rem + 3px));
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -10rem;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+html.reader .wrap {
+  max-width: var(--measure);
+}
+
+/* ---------------------------------------------------------------- header */
+
+/* The header is sized off --chrome, not the reader scale. Growing the text
+   should grow the recipe, not push it below the fold behind a giant toolbar —
+   so everything in here is em-relative to a fixed base. Tap targets are still
+   comfortably over 44px. */
+.site-header {
+  font-size: var(--chrome);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.7em 0 0.6em;
+}
+
+html.reader .site-header {
+  border-bottom-width: 3px;
+}
+
+/* Fixed px, not em: an em min-height resolves against the button's own
+   font-size, which quietly lands these under 44px. */
+.site-header .btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0.45em 0.8em;
+  font-size: 0.95em;
+  gap: 0.35em;
+}
+
+.site-header .btn--small {
+  min-height: 46px;
+  padding: 0.35em 0.7em;
+  font-size: 0.92em;
+}
+
+.site-header__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7em;
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 1.3em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wordmark a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.wordmark__sub {
+  display: block;
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Row of accessibility + mode controls. Wraps freely on narrow phones. */
+.header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: 0.55em;
+}
+
+.text-size {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.15em;
+  background: var(--surface);
+}
+
+.text-size__label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-soft);
+  padding: 0 0.3em;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn--danger {
+  background: var(--surface);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  text-decoration: underline;
+}
+
+.btn--small {
+  min-height: max(44px, 2.6rem);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn__icon {
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- filters */
+
+.controls {
+  padding: 1rem 0 0.25rem;
+}
+
+.search-field {
+  position: relative;
+  margin-bottom: 0.85rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  color: var(--text);
+}
+
+input[type="text"],
+input[type="search"],
+input[type="url"],
+input[type="password"],
+select,
+textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+textarea {
+  min-height: 7rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-soft);
+  opacity: 1;
+}
+
+/* Horizontally scrolling chip rows — thumb-friendly, no hover needed. */
+.filter-group {
+  margin-bottom: 0.75rem;
+}
+
+.chip-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+html.reader .chip-row {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.chip {
+  flex: 0 0 auto;
+  min-height: var(--tap);
+  padding: 0.45rem 0.9rem;
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.result-count {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------ recipe list */
+
+.recipe-grid {
+  list-style: none;
+  margin: 1rem 0 2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 40rem) {
+  .recipe-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 60rem) {
+  .recipe-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Reader mode always collapses to one wide column. */
+html.reader .recipe-grid {
+  grid-template-columns: 1fr;
+}
+
+.recipe-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+html.reader .recipe-card {
+  border-width: 3px;
+}
+
+.recipe-card__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  min-height: var(--tap);
+  color: var(--text);
+  text-decoration: none;
+  flex: 1;
+}
+
+.recipe-card__title {
+  font-size: min(1.08rem, calc(1rem + 3px));
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.recipe-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+html.reader .tag {
+  border-color: var(--accent);
+}
+
+/* Thumbnail only renders when a recipe actually has an image — no
+   placeholder box, no broken-image icon, no reserved blank space. */
+.recipe-card__thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--border);
+}
+
+.recipe-card__edit {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0 1rem 0.85rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-soft);
+}
+
+.empty-state h2 {
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------- recipe detail */
+
+.recipe {
+  padding: 4px 0 48px;
+  max-width: var(--measure);
+}
+
+.recipe__hero {
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.recipe__title {
+  font-size: min(1.85rem, calc(1rem + 14px));
+  margin-bottom: 0.4rem;
+}
+
+.recipe__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  padding: 0.75rem 0;
+  margin: 0 0 1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+
+html.reader .recipe__meta {
+  border-width: 3px 0;
+}
+
+.recipe__meta div {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.recipe__meta dt {
+  font-weight: 700;
+  margin: 0;
+}
+
+.recipe__meta dd {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.recipe__section {
+  margin: 0 0 1.75rem;
+}
+
+.recipe__section h2 {
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 0.75rem;
+}
+
+.ingredients {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ingredients li {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ingredients li::before {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  top: 1.05em;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 1.1rem 2.6rem;
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.callout {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunk);
+  margin-bottom: 1.25rem;
+}
+
+.callout h2,
+.callout h3 {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+  border: 0;
+  padding: 0;
+}
+
+.callout--warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+}
+
+.callout--warn ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.callout p:last-child,
+.callout ul:last-child {
+  margin-bottom: 0;
+}
+
+.recipe__missing {
+  font-style: italic;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.recipe__source {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+/* Navigation and the action row are chrome, not reading material: they stay a
+   constant, comfortably tappable size so scaling the text pushes the recipe up
+   the page rather than burying it under giant buttons. */
+.detail-actions {
+  font-size: var(--chrome);
+  padding: 0.2em 0 0.9em;
+  margin-bottom: 1em;
+  border-bottom: 1px solid var(--border);
+}
+
+html.reader .detail-actions {
+  border-bottom-width: 3px;
+}
+
+.detail-actions .btn-row {
+  gap: 0.45em;
+}
+
+.detail-actions .btn {
+  flex: 1 1 9em;
+  min-height: 2.9em;
+  padding: 0.5em 0.9em;
+  font-size: 1em;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  min-height: 2.6em;
+  font-size: var(--chrome);
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+/* -------------------------------------------------------------- edit mode */
+
+/* Everything in this block is hidden unless <html> carries .edit-mode, so
+   Viewer Mode shows zero edit affordances. */
+[data-edit-only] {
+  display: none !important;
+}
+
+html.edit-mode [data-edit-only] {
+  display: block !important;
+}
+
+html.edit-mode .btn[data-edit-only],
+html.edit-mode .mode-indicator[data-edit-only] {
+  display: inline-flex !important;
+}
+
+html.edit-mode .edit-bar[data-edit-only],
+html.edit-mode .btn-row[data-edit-only],
+html.edit-mode .recipe-card__edit[data-edit-only] {
+  display: flex !important;
+}
+
+.edit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0 0;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-wash);
+}
+
+.edit-bar__status {
+  flex: 1 1 12rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.edit-bar__status strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.25em 0.7em;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------- dialogs */
+
+dialog {
+  width: min(42rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+}
+
+html.reader dialog {
+  border-width: 3px;
+}
+
+dialog::backdrop {
+  background: rgba(20, 18, 15, 0.55);
+}
+
+.dialog__head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 2;
+}
+
+.dialog__head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.dialog__body {
+  padding: 1rem;
+}
+
+.dialog__foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.dialog__foot .btn {
+  flex: 1 1 9rem;
+}
+
+@media (min-width: 34rem) {
+  .dialog__foot .btn {
+    flex: 0 0 auto;
+  }
+}
+
+/* ----------------------------------------------------------------- forms */
+
+.form-row {
+  margin-bottom: 1rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 34rem) {
+  .form-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .form-grid--2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+html.reader .form-grid {
+  grid-template-columns: 1fr !important;
+}
+
+.hint {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  margin-top: 0.25rem;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+legend {
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0 0.35rem;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 0.3rem;
+}
+
+/* -------------------------------------------------------------- messages */
+
+.msg {
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--border-strong);
+  background: var(--surface-sunk);
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.msg--error {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: #fdf1f0;
+}
+
+.msg--ok {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: #eff7f1;
+}
+
+.msg--warn {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--text);
+}
+
+.msg[hidden] {
+  display: none;
+}
+
+/* A live region for status updates that also reads well visually. Sized off
+   --chrome so a confirmation never grows into a full-screen overlay. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  padding: 0.7em 1.1em;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: var(--chrome);
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  z-index: 200;
+}
+
+html.reader .toast {
+  background: #000;
+  color: #fff;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------- staged-change list */
+
+.staged-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.staged-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+
+.staged-badge {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+}
+
+.staged-badge--added {
+  color: var(--ok);
+}
+.staged-badge--edited {
+  color: var(--accent);
+}
+.staged-badge--deleted {
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------- dynamic list editor */
+
+.list-editor {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+}
+
+.list-editor li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+}
+
+.list-editor__index {
+  flex: 0 0 1.6rem;
+  padding-top: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.list-editor textarea {
+  min-height: var(--tap);
+  height: var(--tap);
+}
+
+.list-editor .btn {
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------- loading */
+
+.loading {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ print */
+
+@media print {
+  :root {
+    --bg: #fff;
+    --surface: #fff;
+    --text: #000;
+    --text-soft: #000;
+    --accent: #000;
+    --border: #999;
+  }
+
+  html {
+    font-size: 12pt;
+  }
+
+  .site-header,
+  .detail-actions,
+  .controls,
+  .edit-bar,
+  .back-link,
+  .toast,
+  dialog,
+  [data-edit-only] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .recipe {
+    padding: 0;
+    max-width: none;
+  }
+
+  .steps li,
+  .ingredients li {
+    break-inside: avoid;
+  }
+
+  .recipe__hero {
+    max-height: 3in;
+    object-fit: cover;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}

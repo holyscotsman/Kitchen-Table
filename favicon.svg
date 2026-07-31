@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Recipe book">
+  <rect width="64" height="64" rx="12" fill="#9a3a12" />
+  <path
+    d="M16 16h14c2.5 0 4 1.4 4 3.6v28c0-2.2-1.5-3.6-4-3.6H16z"
+    fill="#fbf9f6"
+  />
+  <path
+    d="M48 16H34c-2.5 0-4 1.4-4 3.6v28c0-2.2 1.5-3.6 4-3.6h14z"
+    fill="#f0e6dc"
+  />
+  <path d="M32 19.5v28" stroke="#9a3a12" stroke-width="2.5" />
+</svg>

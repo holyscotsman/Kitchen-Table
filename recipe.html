@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Recipe — Mom's Recipe Book</title>
+    <meta name="theme-color" content="#fbf9f6" />
+    <meta name="apple-mobile-web-app-title" content="Recipes" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to the recipe</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <div class="site-header__top">
+          <h1 class="wordmark">
+            <a href="index.html">
+              <span class="wordmark__sub">The Family</span>
+              Recipe Book
+            </a>
+          </h1>
+          <span class="mode-indicator" data-edit-only>Edit mode</span>
+        </div>
+
+        <div class="header-controls">
+          <button
+            type="button"
+            class="btn"
+            id="reader-toggle"
+            aria-pressed="false"
+          >
+            <span class="btn__icon" aria-hidden="true">◐</span>
+            <span>Reader mode</span>
+          </button>
+
+          <div class="text-size" role="group" aria-label="Text size">
+            <span class="text-size__label" aria-hidden="true">Text</span>
+            <button type="button" class="btn btn--small" id="text-smaller">
+              <span aria-hidden="true">A−</span>
+              <span class="visually-hidden">Make text smaller</span>
+            </button>
+            <button type="button" class="btn btn--small" id="text-larger">
+              <span aria-hidden="true">A+</span>
+              <span class="visually-hidden">Make text larger</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="btn"
+            id="edit-toggle"
+            aria-pressed="false"
+          >
+            <span class="btn__icon" aria-hidden="true">✎</span>
+            <span id="edit-toggle-label">Edit mode</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="wrap">
+      <a class="back-link" href="index.html">
+        <span aria-hidden="true">←</span> All recipes
+      </a>
+
+      <div class="loading" id="loading">Loading recipe…</div>
+
+      <!-- Kept in normal flow at the top rather than pinned to the bottom: a
+           sticky bar swallows most of a phone screen once the text is scaled
+           up, which is the exact situation this site is built for. -->
+      <div class="detail-actions" id="detail-actions" hidden>
+        <div class="btn-row">
+          <button type="button" class="btn btn--primary" id="share-recipe">
+            <span class="btn__icon" aria-hidden="true">↗</span>
+            <span id="share-label">Save to Notes</span>
+          </button>
+          <button type="button" class="btn" id="download-recipe">
+            <span class="btn__icon" aria-hidden="true">⇩</span> Download
+          </button>
+          <button type="button" class="btn" id="print-recipe">
+            <span class="btn__icon" aria-hidden="true">⎙</span> Print
+          </button>
+          <button type="button" class="btn" id="edit-this" data-edit-only>
+            <span class="btn__icon" aria-hidden="true">✎</span> Edit
+          </button>
+        </div>
+      </div>
+
+      <article class="recipe" id="recipe" hidden></article>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- The recipe editor is shared with the home page so an edit started on a
+         detail page stages into the same place. -->
+    <dialog id="editor-dialog" aria-labelledby="editor-title">
+      <form method="dialog" id="editor-form">
+        <div class="dialog__head">
+          <h2 id="editor-title">Edit recipe</h2>
+          <button
+            type="button"
+            class="btn btn--small"
+            data-close-dialog="editor-dialog"
+          >
+            <span aria-hidden="true">✕</span>
+            <span class="visually-hidden">Close</span>
+          </button>
+        </div>
+
+        <div class="dialog__body">
+          <p class="msg msg--error" id="editor-error" hidden></p>
+
+          <div class="form-row">
+            <label class="field-label" for="f-title">Recipe title</label>
+            <input type="text" id="f-title" required />
+            <p class="field-error" id="f-title-error" hidden>
+              A title is required.
+            </p>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <div class="form-row">
+              <label class="field-label" for="f-category">Category</label>
+              <select id="f-category">
+                <option>Breakfast</option>
+                <option>Lunch</option>
+                <option>Dinner</option>
+                <option>Dessert</option>
+                <option>Side</option>
+                <option>Snack</option>
+                <option>Drink</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="field-label" for="f-contributor">Who made it</label>
+              <input
+                type="text"
+                id="f-contributor"
+                list="contributor-options"
+                placeholder="Mom"
+              />
+              <datalist id="contributor-options"></datalist>
+            </div>
+          </div>
+
+          <div class="form-grid form-grid--3">
+            <div class="form-row">
+              <label class="field-label" for="f-servings">Servings</label>
+              <input type="text" id="f-servings" placeholder="4" />
+            </div>
+            <div class="form-row">
+              <label class="field-label" for="f-prep">Prep time</label>
+              <input type="text" id="f-prep" placeholder="15 min" />
+            </div>
+            <div class="form-row">
+              <label class="field-label" for="f-cook">Cook time</label>
+              <input type="text" id="f-cook" placeholder="30 min" />
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Ingredients</legend>
+            <ul class="list-editor" id="ingredients-editor"></ul>
+            <button type="button" class="btn btn--small" id="add-ingredient">
+              <span aria-hidden="true">＋</span> Add ingredient
+            </button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Steps</legend>
+            <ul class="list-editor" id="steps-editor"></ul>
+            <button type="button" class="btn btn--small" id="add-step">
+              <span aria-hidden="true">＋</span> Add step
+            </button>
+          </fieldset>
+
+          <div class="form-row">
+            <label class="field-label" for="f-notes">Notes</label>
+            <textarea id="f-notes"></textarea>
+          </div>
+
+          <div class="form-row">
+            <label class="field-label" for="f-source">Where it came from</label>
+            <input type="text" id="f-source" />
+          </div>
+
+          <div class="form-row">
+            <label class="field-label" for="f-flagged">
+              Things to double-check
+            </label>
+            <textarea id="f-flagged" placeholder="One per line."></textarea>
+          </div>
+
+          <div class="form-row">
+            <label class="field-label" for="f-photo">Photo (optional)</label>
+            <input type="file" id="f-photo" accept="image/*" />
+            <span class="hint" id="f-photo-hint">
+              Gets resized and published to <code>images/</code> alongside the
+              recipe.
+            </span>
+          </div>
+        </div>
+
+        <div class="dialog__foot">
+          <button type="button" class="btn" data-close-dialog="editor-dialog">
+            Cancel
+          </button>
+          <button type="button" class="btn btn--primary" id="editor-save">
+            Save to staged changes
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="github-dialog" aria-labelledby="github-title">
+      <div class="dialog__head">
+        <h2 id="github-title">Connect to GitHub</h2>
+        <button
+          type="button"
+          class="btn btn--small"
+          data-close-dialog="github-dialog"
+        >
+          <span aria-hidden="true">✕</span>
+          <span class="visually-hidden">Close</span>
+        </button>
+      </div>
+
+      <div class="dialog__body">
+        <p class="msg msg--error" id="github-error" hidden></p>
+
+        <p>
+          Publishing writes your changes straight to the recipe repository on
+          GitHub. To do that, this device needs its own access token — you only
+          set this up once per device.
+        </p>
+
+        <h3>Making a token</h3>
+        <ol>
+          <li>
+            Open
+            <a
+              href="https://github.com/settings/personal-access-tokens/new"
+              target="_blank"
+              rel="noopener"
+              >GitHub's new fine-grained token page</a
+            >.
+          </li>
+          <li>
+            Under <strong>Repository access</strong>, pick
+            <strong>Only select repositories</strong> and choose
+            <strong id="github-repo-name">this repository</strong> — nothing
+            else.
+          </li>
+          <li>
+            Under <strong>Permissions → Repository permissions</strong>, set
+            <strong>Contents</strong> to <strong>Read and write</strong>. Leave
+            every other permission alone.
+          </li>
+          <li>Generate the token and paste it below.</li>
+        </ol>
+
+        <div class="form-row">
+          <label class="field-label" for="github-token">
+            Personal access token
+          </label>
+          <input
+            type="password"
+            id="github-token"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="github_pat_…"
+          />
+          <span class="hint">
+            Stored only in this browser, on this device. It's sent to
+            github.com and nowhere else, and never becomes part of the site.
+          </span>
+        </div>
+
+        <div class="callout callout--warn">
+          <h3>Worth knowing</h3>
+          <p>
+            Anyone who can use this browser can publish recipe changes with this
+            token. That's a fine trade for a family recipe book — don't reuse
+            this pattern for anything more sensitive.
+          </p>
+        </div>
+      </div>
+
+      <div class="dialog__foot">
+        <button type="button" class="btn btn--danger" id="github-forget" hidden>
+          Forget this token
+        </button>
+        <button type="button" class="btn" data-close-dialog="github-dialog">
+          Cancel
+        </button>
+        <button type="button" class="btn btn--primary" id="github-save">
+          Connect
+        </button>
+      </div>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

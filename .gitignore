@@ -1,0 +1,23 @@
+# OS cruft
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Tooling that must never affect the deployed site
+node_modules/
+.cache/
+*.log
+
+# Source material, not site assets: the original recipe screenshots each
+# recipe was transcribed from. Hundreds of files, none of them needed at
+# runtime — recipes.json is the published source of truth.
+Attachments/
+**/Attachments/
+"All Recipes"/
