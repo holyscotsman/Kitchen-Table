@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"><script src="./image-slot.js"></script><style>
+.kt a{color:var(--acc)}
+.kt input::placeholder{color:var(--dim);opacity:1}
+.kt button:active{transform:scale(.985)}
+</style></helmet>
+
+<div class="kt" ref="{{ rootRef }}" style="{{ themeVars }}">
+<div style="min-height:100%;background:var(--bg);display:flex;flex-direction:column;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <div style="{{ statusPad }}"></div>
+
+  <div style="{{ shell }}">
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:20px">
+      <div style="flex:1;min-width:0">
+        <h1 style="{{ h1Style }}">Kitchen Table</h1>
+        <p style="margin:6px 0 0;font-size:17px;line-height:1.35;color:var(--dim)">{{ subtitle }}</p>
+      </div>
+      <button type="button" onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="width:52px;height:52px;flex:none;border-radius:14px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ true }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6"></circle><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"></path></svg></sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"></path></svg></sc-if>
+      </button>
+    </div>
+
+    <div style="position:relative;margin-bottom:30px">
+      <label for="kt-main-q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Search all recipes</label>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:18px;top:50%;transform:translateY(-50%)"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+      <input id="kt-main-q" type="search" value="{{ q }}" onInput="{{ onQ }}" placeholder="Search 48 recipes" style="width:100%;box-sizing:border-box;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surf);padding:0 18px 0 52px;font-family:inherit;font-size:19px;color:var(--ink)">
+    </div>
+
+    <sc-if value="{{ searching }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-bottom:34px">
+        <h2 style="{{ h2Style }}">{{ resultLabel }}</h2>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ results }}" as="rc" hint-placeholder-count="3">
+            <li>
+              <a href="{{ rc.href }}" style="{{ cardStyle }}">
+                <span style="flex:1;display:flex;flex-direction:column;gap:5px">
+                  <span style="font-size:20px;font-weight:700;line-height:1.2;color:var(--cardInk)">{{ rc.title }}</span>
+                  <span style="font-size:15px;color:var(--cardDim)">{{ rc.meta }}</span>
+                </span>
+                <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="var(--cardInk)" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M2 2l9 9-9 9"></path></svg>
+              </a>
+            </li>
+          </sc-for>
+        </ul>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ browsing }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <h2 style="{{ h2Style }}">Tonight&rsquo;s idea</h2>
+        <a href="{{ pickHref }}" style="{{ heroStyle }}">
+          <span style="position:relative;display:block;height:200px;background:var(--line)">
+            <image-slot id="kt-hero" shape="rect" placeholder="Drop a photo of this dish"></image-slot>
+          </span>
+          <span style="display:block;padding:20px 20px 22px">
+            <span style="display:block;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cardDim);margin-bottom:8px">{{ pickMeta }}</span>
+            <span style="display:block;font-size:27px;font-weight:700;line-height:1.15;letter-spacing:-.015em;color:var(--cardInk);text-wrap:pretty">{{ pickTitle }}</span>
+          </span>
+        </a>
+
+        <h2 style="{{ h2Style }}">Whose recipe?</h2>
+        <div style="{{ whoGrid }}">
+          <sc-for list="{{ whoTiles }}" as="t" hint-placeholder-count="3">
+            <a href="{{ t.href }}" style="{{ t.style }}">
+              <span style="font-size:38px;font-weight:700;line-height:1;color:var(--cardInk)">{{ t.count }}</span>
+              <span style="font-size:19px;font-weight:700;color:var(--cardInk)">{{ t.name }}</span>
+            </a>
+          </sc-for>
+        </div>
+
+        <h2 style="{{ h2Style }}">What kind of thing?</h2>
+        <div style="{{ catGrid }}">
+          <sc-for list="{{ catTiles }}" as="t" hint-placeholder-count="5">
+            <a href="{{ t.href }}" style="{{ t.style }}">
+              <span style="flex:1;font-size:19px;font-weight:700;color:var(--ink)">{{ t.name }}</span>
+              <span style="font-size:19px;font-weight:700;color:var(--dim)">{{ t.count }}</span>
+            </a>
+          </sc-for>
+        </div>
+
+        <a href="#menu" style="{{ allBtn }}">
+          <span>See all 48 recipes</span>
+          <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l9 9-9 9"></path></svg>
+        </a>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:874},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;}}">
+const THEMES = {
+  dark: {
+    '--bg': '#0E1712', '--surf': '#182620', '--strip': '#13201A', '--line': '#31483D',
+    '--ink': '#F1F5F2', '--dim': '#A9BDB1', '--acc': '#8FD3AC', '--accInk': '#08120D',
+    '--tagBg': 'rgba(143,211,172,.15)', '--tagInk': '#9BDCB6', '--track': '#31483D',
+    '--knob': '#8A9E92', '--scrim': 'rgba(0,0,0,.62)', '--shadow': 'rgba(0,0,0,.55)',
+    '--card': '#1D4234', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.74)',
+    '--danger': '#F0846E',
+  },
+  light: {
+    '--bg': '#F3F6F3', '--surf': '#FFFFFF', '--strip': '#E8EEE9', '--line': '#CFDBD2',
+    '--ink': '#0D1C15', '--dim': '#485C51', '--acc': '#1B4F39', '--accInk': '#FFFFFF',
+    '--tagBg': 'rgba(27,79,57,.10)', '--tagInk': '#1B4F39', '--track': '#CFDBD2',
+    '--knob': '#FFFFFF', '--scrim': 'rgba(13,28,21,.45)', '--shadow': 'rgba(13,28,21,.22)',
+    '--card': '#1B4F39', '--cardInk': '#FFFFFF', '--cardDim': 'rgba(255,255,255,.78)',
+    '--danger': '#A8331F',
+  },
+};
+
+const CATS = ['Dinner', 'Breakfast', 'Side', 'Dessert', 'Snack', 'Drink'];
+const WHO = ['Mom', 'Me', 'Jennifer'];
+
+class Component extends DCLogic {
+  state = { recipes: [], q: '', theme: null, w: 402 };
+
+  constructor(props) {
+    super(props);
+    this.root = React.createRef();
+  }
+
+  componentDidMount() {
+    fetch('recipes.json').then(r => r.json()).then(recipes => this.setState({ recipes })).catch(() => {});
+    const el = this.root.current;
+    if (el && window.ResizeObserver) {
+      this.ro = new ResizeObserver(es => {
+        const w = Math.round(es[0].contentRect.width);
+        if (w && w !== this.state.w) this.setState({ w });
+      });
+      this.ro.observe(el);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme || this.props.theme || 'dark';
+    const isDark = theme === 'dark';
+    const w = s.w;
+    const wide = w >= 900;
+    const mid = w >= 640;
+    const pad = wide ? 40 : mid ? 28 : 18;
+
+    const q = s.q.trim().toLowerCase();
+    const results = q ? s.recipes.filter(r =>
+      r.title.toLowerCase().includes(q) || (r.ingredients || []).some(i => i.toLowerCase().includes(q))) : [];
+
+    const dinners = s.recipes.filter(r => r.category === 'Dinner');
+    const pick = dinners.length
+      ? dinners[new Date().getDate() % dinners.length]
+      : (s.recipes[0] || {});
+
+    const cardStyle = {
+      display: 'flex', alignItems: 'center', gap: 14, background: 'var(--card)',
+      borderRadius: 16, padding: 18, textDecoration: 'none', minHeight: 88,
+      boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.09)',
+    };
+
+    return {
+      rootRef: this.root,
+      themeVars: THEMES[theme],
+      isDark, isLight: !isDark,
+      themeLabel: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleTheme: () => this.setState({ theme: isDark ? 'light' : 'dark' }),
+
+      statusPad: { paddingTop: w < 500 ? 60 : 26 },
+      shell: {
+        width: '100%', maxWidth: wide ? 1040 : 760, margin: '0 auto',
+        boxSizing: 'border-box', padding: '0 ' + pad + 'px 60px',
+      },
+      h1Style: {
+        margin: 0, fontSize: wide ? 46 : 34, fontWeight: 700, lineHeight: 1.02,
+        letterSpacing: '-.03em', color: 'var(--ink)',
+      },
+      h2Style: {
+        margin: '0 0 14px', fontSize: 21, fontWeight: 700,
+        letterSpacing: '-.01em', color: 'var(--ink)',
+      },
+      subtitle: 'Everything Mom cooks, in one place.',
+
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      searching: q.length > 0, browsing: q.length === 0,
+      resultLabel: results.length + (results.length === 1 ? ' match' : ' matches'),
+      results: results.slice(0, 12).map(r => ({
+        href: '#' + r.id, title: r.title,
+        meta: [r.contributor, r.category].filter(Boolean).join('  \u00b7  '),
+      })),
+      cardStyle,
+
+      pickHref: '#' + (pick.id || ''),
+      pickTitle: pick.title || '',
+      pickMeta: [pick.contributor, pick.cookTime || pick.prepTime].filter(Boolean).join('  \u00b7  '),
+      heroStyle: {
+        display: 'block', background: 'var(--card)', borderRadius: 20, overflow: 'hidden',
+        textDecoration: 'none', marginBottom: 34, boxShadow: '0 12px 30px var(--shadow)',
+      },
+
+      whoGrid: {
+        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))',
+        gap: 12, marginBottom: 34,
+      },
+      whoTiles: WHO.map(name => ({
+        name, count: s.recipes.filter(r => r.contributor === name).length,
+        href: '#menu-' + name.toLowerCase(),
+        style: {
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8,
+          minHeight: 118, padding: 16, borderRadius: 16, textDecoration: 'none',
+          background: 'var(--card)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.09)',
+        },
+      })),
+
+      catGrid: {
+        display: 'grid', gridTemplateColumns: mid ? 'repeat(2, minmax(0,1fr))' : '1fr',
+        gap: 10, marginBottom: 34,
+      },
+      catTiles: CATS.filter(c => s.recipes.some(r => r.category === c)).map(name => ({
+        name, count: s.recipes.filter(r => r.category === name).length,
+        href: '#menu-' + name.toLowerCase(),
+        style: {
+          display: 'flex', alignItems: 'center', gap: 12, minHeight: 68, padding: '0 18px',
+          borderRadius: 14, textDecoration: 'none', background: 'var(--surf)',
+          border: '1.5px solid var(--line)',
+        },
+      })),
+
+      allBtn: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        minHeight: 68, padding: '0 22px', borderRadius: 16, textDecoration: 'none',
+        background: 'var(--acc)', color: 'var(--accInk)', fontSize: 20, fontWeight: 700,
+      },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

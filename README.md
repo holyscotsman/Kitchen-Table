@@ -1,83 +1,101 @@
-# Mom's Recipe Book
+# Kitchen Table
 
-A family recipe collection, built to be genuinely readable on an iPhone — large
-text and high contrast as a real mode, not pinch-zoom — with a one-tap route
-into the iOS Notes app.
+Everything Mom cooks, in one place.
 
-Plain HTML, CSS, and JavaScript. No build step, no framework, no dependencies.
-Every file here is served as-is by GitHub Pages.
+A static family recipe site for ~48 transcribed recipes. The primary user is on
+an iPhone with low vision, so legibility beats density everywhere. Plain HTML,
+CSS, and vanilla JavaScript on GitHub Pages — no build step, no framework, no
+bundler, no server.
+
+**Live:** https://holyscotsman.github.io/Kitchen-Table/
 
 ## Files
 
-| File | What it does |
+| File | What it is |
 | --- | --- |
-| `index.html` | Recipe list, search, category and contributor filters |
-| `recipe.html` | One recipe, chosen by URL (`recipe.html?id=shepherds-pie`) |
-| `style.css` | All styling, including reader mode, edit mode, and print |
-| `app.js` | Rendering, filters, reader mode, edit mode, import, publish |
-| `recipes.json` | The recipe database — the site's only data source |
-| `images/` | Optional recipe photos, referenced by a recipe's `image` field |
+| `index.html` | The whole app — one page, hash-routed |
+| `app.js` | Router, three screens, scaling, edit mode |
+| `tokens.css` | **The palette.** Copied verbatim from the design handoff |
+| `style.css` | Layout and components; every colour is a `var(--*)` |
+| `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
+| `recipe.html` | Redirect stub for bookmarks from the previous build |
+| `CLAUDE.md` | Build rules and the colour contract — **read first** |
+| `DESIGN.md` | Full screen-by-screen spec from the design handoff |
+| `design/` | Styleguide, screenshots, and the `.dc.html` design references |
 
-## Reading
+## Screens
 
-**Reader mode** switches to large text, pure black on white, and a single wide
-column. **A+ / A−** step the text size across seven sizes on top of that. Both
-choices are remembered on the device.
+Navigation is hash-based, so back and forward work normally.
 
-Site chrome — the header, the nav, the action buttons — deliberately does *not*
-grow with the text setting. Scaling the text makes the recipe bigger, rather
-than burying it under a toolbar.
+- `#` — **Main.** Search, tonight's dinner idea, browse by contributor or course.
+- `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom` and
+  `#menu?cat=Dessert` open it pre-filtered.
+- `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.
 
-Each recipe page offers **Save to Notes** (the iOS share sheet via the Web Share
-API, falling back to copy-to-clipboard elsewhere), **Download** for a clean
-single-recipe `.txt`, and **Print**.
+## Reading a recipe
+
+Instruction text starts at **24px** and steps through 20 / 24 / 29 / 34 / 40 via
+A− / A+. The choice persists. The typeface is Atkinson Hyperlegible, designed by
+the Braille Institute for low-vision readers — that is a functional requirement,
+not a stylistic one.
+
+Dark is the default theme; the sun/moon button switches to light and remembers it.
+
+**Servings** rescales the recipe. Pick how many people you're feeding and every
+ingredient *and* instruction quantity adjusts with it — "Bake 2 cups of…" scales
+in the steps too. Lines with no leading number are left alone, which is correct.
+
+**Tap any ingredient or step to check it off** while you cook. That state is
+deliberately per-visit and resets when you leave the recipe.
+
+**Keep screen on while cooking** holds a screen wake lock so the phone doesn't
+sleep mid-recipe. The row hides itself on browsers without the API.
+
+**Share** uses the iOS share sheet (Notes is one of the targets), falling back to
+clipboard or a `.txt` download. **Download** offers a printable PDF or plain
+text — both contain only the recipe, at the currently scaled quantities, and say
+so when the amounts have been adjusted.
 
 ## Editing
 
-**Edit mode** is off by default and shows no edit controls until it's turned on
-from the header. Everything is staged locally first; nothing reaches the live
-site until **Publish changes**.
+The switch in the mode strip on any recipe turns on Edit mode. Viewer mode shows
+no edit affordances at all.
 
-Publishing commits straight to this repository through the GitHub REST API — no
-backend, no server. Each editor pastes in their own fine-grained personal access
-token once, which is stored only in their own browser:
+**Edits save to this browser only. Nothing is written back to the repository.**
+Change a recipe, press Save, and it persists on that device. To make an edit
+real for everyone, press **Download updated recipes.json** and commit that file:
 
-- Scope it to **this repository only**
-- Give it **Contents: Read and write** — nothing else
-- Create one at <https://github.com/settings/personal-access-tokens/new>
+```sh
+# replace recipes.json with the downloaded file, then
+git add recipes.json && git commit -m "Update recipes" && git push
+```
 
-The token is never written into `recipes.json`, never committed, and only ever
-sent to `api.github.com`. Anyone with that token and access to that browser can
-write to this repo. That's an acceptable trade for a family recipe book and not
-a pattern to reuse anywhere the stakes are higher.
+GitHub Pages redeploys within a minute or two.
 
-If someone else published a change to the same recipe while you were editing,
-the publish stops and says so instead of overwriting their work. Unrelated
-edits merge without complaint.
+`localStorage` keys are namespaced under `kt.` — `kt.theme`, `kt.fsIndex`,
+`kt.easyRead`, `kt.recipes`.
 
-After a successful publish, GitHub Pages takes about a minute to rebuild before
-the change is visible.
+## Local preview
 
-## Importing a recipe
+Serve over HTTP, not `file://` — the page fetches `recipes.json`:
 
-Edit mode can start a recipe from a link or from text you paste. A link is
-fetched directly and read for standard recipe markup, which works on sites that
-allow it; many sites block cross-origin reads, and pasting the recipe text
-always works. Either path lands on the normal editing form with anything
-uncertain flagged rather than guessed at — nothing is ever published without
-someone seeing it first.
+```sh
+python3 -m http.server 8000
+```
+
+Then open <http://localhost:8000>.
 
 ## Adding a recipe by hand
 
-Append an object to `recipes.json` and push:
+Append an object to `recipes.json` and push. Field order matters for diffs:
 
 ```json
 {
   "id": "kebab-case-slug",
   "title": "Recipe Title",
-  "category": "Breakfast | Lunch | Dinner | Dessert | Side | Snack | Drink",
-  "contributor": "Mom",
-  "servings": "4",
+  "category": "Dinner | Breakfast | Side | Dessert | Snack | Drink",
+  "contributor": "Mom | Me | Jennifer",
+  "servings": 4,
   "prepTime": "15 min",
   "cookTime": "30 min",
   "ingredients": ["1 cup flour"],
@@ -89,16 +107,13 @@ Append an object to `recipes.json` and push:
 }
 ```
 
-`id`, `title`, `category`, `contributor`, `ingredients`, and `steps` are
-required; the rest are optional and simply don't render when absent. A recipe
-with no `image` shows no image — no placeholder, no reserved space.
+`servings` is an integer. `prepTime` and `cookTime` are free text and are
+displayed verbatim — never parsed for display. `flagged` entries surface on the
+recipe page in Viewer mode too, because a reader should know when a transcribed
+line is uncertain.
 
-## Local preview
+## Contributing changes to the design
 
-Open it over HTTP, not `file://` — the pages fetch `recipes.json`:
-
-```sh
-python3 -m http.server 8000
-```
-
-Then visit <http://localhost:8000>.
+`CLAUDE.md` is the build contract and `tokens.css` is the palette. Do not
+generate a new palette or substitute a font — both were chosen deliberately, and
+the colours are contrast-checked in both themes.
