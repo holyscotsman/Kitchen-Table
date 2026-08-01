@@ -28,8 +28,8 @@ bundler, no server.
 Navigation is hash-based, so back and forward work normally.
 
 - `#` — **Main.** Search, tonight's dinner idea, browse by contributor or course.
-- `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom` and
-  `#menu?cat=Dessert` open it pre-filtered.
+- `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
+  `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.
 
 ## Reading a recipe
@@ -59,6 +59,22 @@ sleep mid-recipe. The row hides itself on browsers without the API.
 clipboard or a `.txt` download. **Download** offers a printable PDF or plain
 text — both contain only the recipe, at the currently scaled quantities, and say
 so when the amounts have been adjusted.
+
+## Photos and tags
+
+Attach a photo in Edit mode, or while adding a recipe. It's shrunk on the device
+and kept in the browser — it shows immediately as the recipe's hero image and as
+a thumbnail on the Menu. A recipe without one renders no image at all, never a
+placeholder.
+
+To make a photo permanent: **Download photos** saves each as `<id>.jpg`. Put
+them in `images/` and commit them alongside `recipes.json`, which by then
+references `images/<id>.jpg` rather than carrying the picture inline.
+
+**Tags** are free-form and comma-separated — include where a dish is from. They
+filter (picking two means both), they're searched, and tapping one on a recipe
+opens the Menu filtered to it. Nothing ships pre-tagged; the tag filter appears
+once something has been tagged.
 
 ## Editing
 
@@ -127,7 +143,7 @@ Append an object to `recipes.json` and push. Field order matters for diffs:
 {
   "id": "kebab-case-slug",
   "title": "Recipe Title",
-  "category": "Dinner | Breakfast | Side | Dessert | Snack | Drink",
+  "category": "Breakfast | Brunch | Lunch | Dinner | Sides | Snacks | Baking | Desserts | Cocktails | Drinks",
   "contributor": "Mom | Me | Jennifer",
   "servings": 4,
   "prepTime": "15 min",
@@ -137,7 +153,8 @@ Append an object to `recipes.json` and push. Field order matters for diffs:
   "notes": "optional",
   "flagged": ["optional: anything worth double-checking"],
   "source": "optional",
-  "image": "optional: images/kebab-case-slug.jpg"
+  "image": "optional: images/kebab-case-slug.jpg",
+  "tags": ["optional", "Italian", "vegetarian"]
 }
 ```
 
