@@ -36,8 +36,14 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('recipe opens at the top', await p.evaluate(()=>window.scrollY)<50);
   await p.goBack();
   await p.waitForSelector('.rcard');
-  await p.waitForTimeout(400);
-  const back=await p.evaluate(()=>window.scrollY);
+  /* Restore lands after the fresh render commits — poll rather than sample
+     once, for machines where that frame is slow. */
+  let back = 0;
+  for (let t = 0; t < 20; t++) {
+    await p.waitForTimeout(150);
+    back = await p.evaluate(()=>window.scrollY);
+    if (Math.abs(back-y) < 80) break;
+  }
   chk('menu scroll position restored', Math.abs(back-y)<80, y+' -> '+back);
 
   console.log('\n== Reset local changes ==');

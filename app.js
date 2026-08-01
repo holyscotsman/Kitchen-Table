@@ -2285,6 +2285,11 @@
   var scrollPos = {};
   var scrollTick = null;
 
+  /* The app restores scroll itself per hash route; left on "auto" the
+     browser races it with its own restore on back/forward and one of the
+     two loses on a slow machine. */
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
   function routeKey(route) {
     return route.name + ":" + (route.id || "");
   }
@@ -2365,6 +2370,10 @@
       S.dlOpen = false;
       releaseWake();
     }
+
+    /* A scroll sample still queued for the old route must not be filed under
+       the new one — cancel it before the key changes. */
+    if (scrollTick) { clearTimeout(scrollTick); scrollTick = null; }
 
     S.route = next;
     S.notice = "";
