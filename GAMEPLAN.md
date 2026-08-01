@@ -337,8 +337,9 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 - [x] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
   - *Needs:* `035`–`043` · *Done when:* it is drawn, and it clears AA against every surface it lands on.
   - *Done 2026-08-01:* one designed ring — 3px accent, offset 2, rounded — measured at 10.5:1 (dark) / 8.7:1 (light) against the page it sits over; accent-filled controls gain a 2px page-coloured gap so ring never touches same-coloured fill. First cut flipped the ring to ink on filled controls; measurement showed 1.6:1 and killed it — the gap, not a colour change, is what works. (`035`–`040` VoiceOver halves still open; the visual spec no longer waits on them.)
-- [ ] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
+- [x] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
   - *Needs:* `040` · *Done when:* all ten are identifiable at 20px on a phone.
+  - *Done 2026-08-01:* three redrawn, not two — rendering the full set at 20px caught **Breakfast reading as an eye**, worse than either named suspect. Now: egg in a pan (yolk off-centre), footed bowl with peas, scored loaf on a board. All ten verified by rendered strip at 20px and 44px. (`040`'s VoiceOver half — icons silent to AT — still open; the `aria-hidden` attributes are asserted in kt.js.)
 - [x] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
   - *Needs:* — · *Done when:* a portrait photo, a landscape photo and a square photo all look deliberate in both slots.
 - [ ] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.

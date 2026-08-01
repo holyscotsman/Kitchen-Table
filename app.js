@@ -217,13 +217,20 @@
   /* One per category, drawn rather than pulled from a library — the handoff
      asks for stroke-based inline SVG in currentColor and nothing else. */
   var CAT_ICON = {
-    Breakfast: '<ellipse cx="12" cy="12" rx="8" ry="6"/><circle cx="12" cy="12" r="2.6"/>',
+    /* 056: the centred ellipse-plus-circle read as an eye, not an egg. In a
+       pan, with the yolk off-centre, it can only be breakfast. */
+    Breakfast: '<circle cx="10" cy="12" r="7"/><circle cx="8.8" cy="10.8" r="2.4"/><path d="M17 12h4.5"/>',
     Brunch: '<path d="M6 5h9v5a4.5 4.5 0 01-9 0z"/><path d="M15 6.5h1.8a2 2 0 010 4H15"/><path d="M4 19h13"/>',
     Lunch: '<path d="M3.5 15l8.5-8 8.5 8z"/><path d="M3.5 15h17"/><path d="M6 18.5h12"/>',
     Dinner: '<path d="M6 3v8a2 2 0 004 0V3"/><path d="M8 11v10"/><path d="M17 3c-1.6 1.4-2.2 3.4-2 6 .1 1.3.7 2 2 2z"/><path d="M17 11v10"/>',
-    Sides: '<path d="M3.5 11h17a8.5 8.5 0 01-17 0z"/><path d="M2.5 20h19"/>',
+    /* 056: the old lone half-dome read as a mound at 20px and shadowed the
+       Lunch cloche. A footed bowl with two peas above the rim is a side dish
+       at any size. */
+    Sides: '<path d="M4 10.5h16"/><path d="M4.5 10.5a7.5 7.5 0 0015 0"/><path d="M9.5 18h5"/><circle cx="9.5" cy="7" r="1.3"/><circle cx="14" cy="6.2" r="1.3"/>',
     Snacks: '<circle cx="12" cy="12" r="8"/><circle cx="9.5" cy="10" r="1"/><circle cx="14" cy="9.5" r="1"/><circle cx="12.5" cy="14.5" r="1"/>',
-    Baking: '<path d="M6.5 4.5l11 11"/><path d="M4.5 8.5a3 3 0 014-4l11 11a3 3 0 01-4 4z"/>',
+    /* 056: the diagonal whisk collapsed into a pill below 24px. A scored
+       loaf on a board is bread — bread is baking. */
+    Baking: '<path d="M4 14a4.5 4.5 0 014.5-4.5h7A4.5 4.5 0 0120 14v4H4z"/><path d="M9 12.2l-1.2 2.6M13.2 12.2l-1.2 2.6M17.2 12.2L16 14.8"/><path d="M2.5 21h19"/>',
     Desserts: '<path d="M7 10h10l-1.4 9.5a1.5 1.5 0 01-1.5 1.3h-4.2a1.5 1.5 0 01-1.5-1.3z"/><path d="M8 10a4 4 0 018 0"/><path d="M12 3v3"/>',
     Cocktails: '<path d="M4 5h16l-8 8z"/><path d="M12 13v7"/><path d="M8.5 20h7"/>',
     Drinks: '<path d="M7 4h10l-1.2 15a1.6 1.6 0 01-1.6 1.4h-4.4A1.6 1.6 0 018.2 19z"/><path d="M7.6 10h8.8"/>'
