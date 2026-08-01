@@ -121,11 +121,11 @@ Then open <http://localhost:8000>.
 The **Add recipe** pill on the Menu opens three ways in:
 
 - **Type it in** — a blank form.
-- **From a link** — paste a recipe page address. The page is fetched through a
-  free public relay (`api.allorigins.win`, disclosed in the UI because the
-  address is sent there) and read for `schema.org/Recipe` data, which most
-  recipe sites publish. Plenty of pages won't have it; the failure says so and
-  points you elsewhere.
+- **From a link** — paste a recipe page address. Several free public relays are
+  tried in turn (disclosed in the UI, because the address is sent to them), and
+  the page is read for `schema.org/Recipe` data. If none get through there's a
+  paste box right below the field that needs no network at all — that one can
+  never break.
 - **From a photo** — reads the text out of a picture on the device itself. The
   picture is never uploaded. It will get things wrong.
 
@@ -144,7 +144,7 @@ Append an object to `recipes.json` and push. Field order matters for diffs:
   "id": "kebab-case-slug",
   "title": "Recipe Title",
   "category": "Breakfast | Brunch | Lunch | Dinner | Sides | Snacks | Baking | Desserts | Cocktails | Drinks",
-  "contributor": "Mom | Me | Jennifer",
+  "contributor": "Joan | Jason | Jennifer | Lindsay | Siobhan",
   "servings": 4,
   "prepTime": "15 min",
   "cookTime": "30 min",

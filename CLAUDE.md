@@ -166,8 +166,18 @@ These came from Jason directly and supersede the corresponding parts of
   `#menu?tag=…`. Nothing ships pre-tagged.
 - **Photos.** See below.
 - The Main subtitle is "A Simmonds Styled Menu"; the Add pill is smaller.
-- **"Me" is now "Jason"** across the data, the WHO list, and the filter.
-  `normalizeRecipe` maps the old value so a saved overlay still resolves.
+- **Contributors are Joan, Jason, Jennifer, Lindsay, and Siobhan.** Every one
+  of the 48 recipes is Joan's — the handoff's 25/18/5 split was a placeholder
+  and was wrong. The other four are sections waiting to be filled, drawn as
+  outlined tiles so they recede rather than shouting a zero, and hidden from
+  the Filter sheet since a chip returning nothing is not a filter.
+  `WHO_ALIASES` maps `Mom`→`Joan` and `Me`→`Jason` so a saved overlay resolves.
+- **Link import tries several relays, then falls back to text.** One free relay
+  is a single point of failure — `api.allorigins.win` was returning 522. The
+  chain is: direct fetch, allorigins, corsproxy.io, then `r.jina.ai`, which
+  returns readable text the photo parser can still handle. Below the URL field
+  there is a paste box that needs no network at all, which is the only path
+  that can never break.
 - **An app mark sits in Main's top-right**, beside the theme button. Both were
   trimmed (40px and 44px) so "Kitchen Table" still fits on one line at 390px —
   it wraps below about 340px, which is unavoidable at 34px type.

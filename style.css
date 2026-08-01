@@ -478,6 +478,19 @@ img {
   box-shadow: var(--hi-card);
 }
 
+/* An empty section: outlined rather than filled, so the people who have
+   contributed carry the visual weight and the rest read as room to grow. */
+.who-tile--empty {
+  background: none;
+  border: var(--bw) solid var(--line);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.who-tile--empty .who-tile__count {
+  color: var(--dim);
+}
+
 .who-tile__count {
   font-size: 38px;
   font-weight: 700;
