@@ -19,8 +19,11 @@ bundler, no server.
 | `style.css` | Layout and components; every colour is a `var(--*)` |
 | `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
 | `recipe.html` | Redirect stub for bookmarks from the previous build |
+| `tests/` | Every check the app must pass — see *Checks* below |
 | `CLAUDE.md` | Build rules and the colour contract — **read first** |
 | `DESIGN.md` | Full screen-by-screen spec from the design handoff |
+| `GAMEPLAN.md` | The 1.0 plan: 130 tasks in dependency order, and the loop that works through them |
+| `CONTENT.md` | What is known-wrong in the recipe data, awaiting answers from the family |
 | `design/` | Styleguide, screenshots, and the `.dc.html` design references |
 
 ## Screens
@@ -115,6 +118,24 @@ python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000>.
+
+## Checks
+
+Everything the app promises is asserted by the suites in `tests/` — the
+functional checks, the WCAG AA contrast audit across both themes and Easy
+Read, a first-paint budget on a throttled connection, and the tap-target
+floor. One command runs the lot:
+
+```sh
+cd tests && npm install && npx playwright install chromium
+bash run.sh
+```
+
+CI runs the same command on every pull request, so a regression goes red
+before it merges. `KT_ONLY="kt feat" bash run.sh` narrows to named suites
+while working; `KT_BASE=https://…` points them at a deployed copy instead of
+a local server. `tests/measure-quota.js` is a measuring tool rather than a
+suite — it reports how many photos this browser's storage can actually hold.
 
 ## Adding a recipe
 

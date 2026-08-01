@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · 0 of 130 tasks complete · Act I, Phase 1
+**Status:** `v0.9` · 10 of 130 tasks complete · Act I done for agent work; Phases 2–3 parked on people · working Act II
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -597,6 +597,9 @@ finds out what the last one learned.*
 | `012` | 2026-08-01 | FCP on fast-3G, hermetic (repo bytes only): **720 ms median**; budget 4000 ms, enforced in CI (`tests/perf.js`). With the render-blocking Google Fonts CSS through this sandbox's proxy it was 12.7 s — that cost is `049`'s evidence for self-hosting the font. |
 | `013` | 2026-08-01 | `CONTENT.md` created: 34 inferred servings (ids recovered from the pre-handoff file at `9d6ae5c`), 4 empty ingredient lists, 6 mid-sentence truncations, 3 unshown quantities, 2 faithful oddities, and the collection-wide gaps. Phase 8's worklist. |
 | `014` | 2026-08-01 | `CLAUDE.md` now states it: the contributor field is a byline, never authentication — no per-person permissions may ever hang off it. Real access control = the backend gate, not this string. |
+| *Phase 1* | 2026-08-01 | **Closed.** 10 of 14 done; `004`–`007` parked on a physical iPhone (§11). 214 functional checks + perf budget green, contrast 0 failures, README gained the Checks section and the new files. One real bug found and fixed (invisible quota notice). |
+| *Phase 2* | 2026-08-01 | **Closed, fully parked.** All ten tasks are watching Joan and one other family member use the app — §11 says exactly what is needed. Nothing an agent can substitute for. |
+| *Phase 3* | 2026-08-01 | **Closed, fully parked.** Nine rulings for Jason (§11), led by `026`, the gate — its measured inputs are ready in this log. `034` waits on the VoiceOver findings it should cite. |
 
 ---
 
@@ -607,7 +610,15 @@ blocks something. Clearing an item here unblocks the loop.*
 
 | Task | What is needed | Blocks |
 | --- | --- | --- |
-| — | *(nothing yet — the loop has not started)* | — |
+| `004`–`007` | **A physical iPhone.** Font rendering, Save-to-Notes through the real share sheet, a 40-minute wake-lock bake, a print to paper. | `015`, `035`, `042`, `049`, `054` |
+| `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use — no agent can do any of it. | `023`→`027`, `024`→`033`, `020`→`074`, `022`→`025` |
+| `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) | `026` |
+| `026` | **The backend decision — the gate.** Jason writes/settles the one-page memo. The measured inputs are ready: photo ceiling (12), quota behaviour, FCP numbers. Missing: `021`/`025`, the human half. | all 41 tasks of Act IV, `031`, `032` |
+| `027` | Ruling on Sides + Drinks staying in the category list (needs Joan's vocabulary from `023`). | `028`→`060`/`067`/`076`/`079` |
+| `029` | The "done recipe" bar — photo? verified servings? a tag? Jason's call; `CONTENT.md` is the input. | `071`→`072` |
+| `030` | Calendar in 1.0 or not — decide after `026`. | Phase 15 (11 tasks) |
+| `031`–`033` | Merge story, pull cadence, first a11y-vs-feature ruling — all writing that follows `026`/`024`. | `034`, `110`, `111` |
+| `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
 
 ---
 
