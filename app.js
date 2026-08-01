@@ -77,7 +77,11 @@
     fs: "kt.fsIndex",
     easyRead: "kt.easyRead",
     recipes: "kt.recipes",
-    images: "kt.images"
+    images: "kt.images",
+    /* sessionStorage, not localStorage: an accidental refresh mid-import
+       keeps the work, closing the tab lets it go. Nothing here is "saved" —
+       the draft only becomes a recipe when Save is pressed. */
+    addDraft: "kt.addDraft"
   };
 
   /* Photos are held apart from the recipe records, keyed by id. Inlining data
@@ -1878,6 +1882,7 @@
     S.addPhotos = [];
     S.addDupe = null;
     S.addDupeOk = false;
+    clearAddDraft();
     location.hash = "#" + id;
   }
 
@@ -2495,8 +2500,10 @@
       }
     }
 
-    /* Arriving at Add from elsewhere starts a fresh one. Staying on it keeps
-       the draft, so "Start over" is the only thing that discards work. */
+    /* Arriving at Add resets the transient state, then restores whatever the
+       session snapshot holds — so a refresh (or a detour to check a recipe)
+       lands back in the half-finished import. Save and choosing a new path
+       are what discard work, never navigation. */
     if (next.name === "add" && S.route.name !== "add") {
       S.addStep = "choose";
       S.addDraft = null;
@@ -2507,6 +2514,7 @@
       S.addPhotos = [];
       S.addDupe = null;
       S.addDupeOk = false;
+      restoreAddDraft();
     }
 
     if (changedRecipe) {
@@ -2537,7 +2545,13 @@
     document.title = screenTitle();
 
     if (changedRoute) {
-      window.scrollTo(0, scrollPos[routeKey(next)] || 0);
+      /* After the frame, so the fresh screen's full height exists — a
+         same-tick scrollTo can clamp against a layout that hasn't settled. */
+      var backTo = scrollPos[routeKey(next)] || 0;
+      window.scrollTo(0, backTo);
+      if (backTo && window.requestAnimationFrame) {
+        requestAnimationFrame(function () { window.scrollTo(0, backTo); });
+      }
       /* Move focus to the new screen's heading so a screen reader and a
          keyboard both land somewhere sensible after navigating. */
       var head = document.querySelector("#app h1");
@@ -2547,6 +2561,56 @@
       }
       announce(document.title);
     }
+  }
+
+  /* Gameplan 084 — a half-finished import survives an accidental refresh.
+     Snapshotted on every Add-screen render (the cheapest "on change" there
+     is when every change renders), restored at boot, cleared by Save and by
+     Start over. Chosen photo files can't be serialised; everything typed or
+     parsed can, and is. */
+  function persistAddDraft() {
+    try {
+      if (S.route.name !== "add") return;
+      if (S.addStep === "choose" && !S.addDraft && !S.addUrl && !S.addPaste) {
+        sessionStorage.removeItem(K.addDraft);
+        return;
+      }
+      sessionStorage.setItem(K.addDraft, JSON.stringify({
+        step: S.addStep === "photo" ? "choose" : S.addStep,
+        draft: S.addDraft,
+        url: S.addUrl,
+        paste: S.addPaste
+      }));
+    } catch (e) { /* private browsing — the draft just won't survive */ }
+  }
+
+  function restoreAddDraft() {
+    try {
+      var raw = sessionStorage.getItem(K.addDraft);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d && (d.draft || d.url || d.paste)) {
+        S.addStep = d.step || "choose";
+        S.addDraft = d.draft || null;
+        S.addUrl = d.url || "";
+        S.addPaste = d.paste || "";
+      }
+    } catch (e) {}
+  }
+
+  function clearAddDraft() {
+    try { sessionStorage.removeItem(K.addDraft); } catch (e) {}
+  }
+
+  /* Typing deliberately doesn't re-render, so the snapshot is scheduled off
+     the input handlers instead — debounced to one write per pause. */
+  var addPersistTick = null;
+  function scheduleAddPersist() {
+    if (addPersistTick) clearTimeout(addPersistTick);
+    addPersistTick = setTimeout(function () {
+      addPersistTick = null;
+      persistAddDraft();
+    }, 250);
   }
 
   function render() {
@@ -2623,6 +2687,7 @@
     }
 
     syncSheetFocus();
+    persistAddDraft();
   }
 
   /* One delegated listener for every action in the app. */
@@ -2819,10 +2884,11 @@
 
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
-    if (act === "a-url") { S.addUrl = el.value; return; }
+    if (act === "a-url") { S.addUrl = el.value; scheduleAddPersist(); return; }
     if (act === "a-paste") {
       var had = !!(S.addPaste || "").trim();
       S.addPaste = el.value;
+      scheduleAddPersist();
       /* Re-render only when the button's enabled state actually flips, so
          typing doesn't rebuild the textarea on every keystroke. */
       if (had !== !!el.value.trim()) render();
@@ -2856,10 +2922,12 @@
     }
     if (act === "ad") {
       S.addDraft[el.getAttribute("data-k")] = el.value;
+      scheduleAddPersist();
       return;
     }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
+      scheduleAddPersist();
       return;
     }
     if (act === "d") {

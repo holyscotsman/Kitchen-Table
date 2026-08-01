@@ -114,6 +114,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('names which relay answered', (await p.locator('.panel--flag').textContent()).includes('allorigins.win'), (await p.locator('.panel--flag').textContent()).slice(0,90));
 
   console.log('\n== Link import: page without recipe data ==');
+  await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
   await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
   await p.click('.addpill');
   await p.waitForSelector('.pathbtn');
@@ -125,6 +126,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('explains the failure, offers alternatives', /Paste the recipe text below/.test(await p.locator('.notice--bad').textContent()), (await p.locator('.notice--bad').textContent()).slice(0,60));
 
   console.log('\n== Photo path UI ==');
+  await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
   await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
   await p.click('.addpill');
   await p.waitForSelector('.pathbtn');
@@ -137,6 +139,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('back works', await p.locator('.pathbtn').count()===3);
 
   console.log('\n== Likely duplicates warn, never block (task 070) ==');
+  await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
   await p.goto(B+'/index.html#add'); await p.waitForSelector('.pathbtn');
   await p.click('[data-key="review"]'); await p.waitForSelector('#a-title');
   await p.fill('#a-title','Scottish Tablet');
@@ -206,6 +209,37 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   }));
   chk('both pages retained in the store', pages===2, String(pages));
   await ctx2.close();
+
+  console.log('\n== A half-finished import survives a refresh (task 084) ==');
+  await p.click('[data-key="review"]'); await p.waitForSelector('#a-title');
+  await p.fill('#a-title','Half Finished Pie');
+  await p.fill('#a-ing-0','3 apples');
+  await p.waitForTimeout(300);
+  await p.reload(); await p.waitForSelector('#a-title', {timeout: 10000});
+  chk('title survives the refresh', (await p.inputValue('#a-title'))==='Half Finished Pie', await p.inputValue('#a-title'));
+  chk('ingredient survives the refresh', (await p.inputValue('#a-ing-0'))==='3 apples');
+  chk('still not saved', await p.evaluate(()=>localStorage.getItem('kt.recipes')===null));
+  await p.click('[data-act="add-save"]'); await p.waitForTimeout(500);
+  chk('saving clears the snapshot', await p.evaluate(()=>sessionStorage.getItem('kt.addDraft')===null));
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
+  console.log('\n== Every relay dead, paste still saves (task 086) ==');
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
+  await p.click('[data-key="link"]'); await p.waitForSelector('#a-url');
+  await p.fill('#a-url','https://example.com/unreachable');
+  await p.click('[data-act="add-fetch"]');
+  await p.waitForSelector('.notice--bad', {timeout: 20000});
+  chk('failure points at the paste box', /Paste the recipe text/i.test(await p.locator('.notice--bad').textContent()));
+  await p.fill('#a-paste','Offline Flapjacks\nIngredients\n1 cup oats\n2 tbsp syrup\nInstructions\nMix.\nBake for 20 minutes.');
+  await p.waitForTimeout(200);
+  await p.click('[data-act="add-paste"]');
+  await p.waitForSelector('#a-title', {timeout: 10000});
+  chk('paste parsed with no network at all', (await p.inputValue('#a-title'))==='Offline Flapjacks');
+  await p.click('[data-act="add-save"]'); await p.waitForTimeout(500);
+  chk('saved end to end', /#offline-flapjacks$/.test(p.url()), p.url());
+  chk('recipe is real', (await p.locator('.r-title').textContent())==='Offline Flapjacks');
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
 
   console.log('\n== Tap targets on the add screen ==');
   await p.click('[data-key="review"]');

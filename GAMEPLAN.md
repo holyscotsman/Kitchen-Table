@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · 10 of 130 tasks complete · Act I done for agent work; Phases 2–3 parked on people · working Act II
+**Status:** `v0.9` · 29 of 130 tasks complete · every agent-doable task in Acts I–III is done · **all remaining work waits on §11**
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -410,11 +410,11 @@ of one of Joan's cards.*
   - *Needs:* `081` · *Done when:* `flagged` names fields, and the recipe page shows the flag beside the field it belongs to.
 - [ ] `083` 🤖 **FE-B** — Let a user correct the ingredients-versus-steps split with one control when the parser guessed wrong.
   - *Needs:* `081` · *Done when:* a misplaced line moves between the two lists in one tap.
-- [ ] `084` 🤖 **FE-B** — Preserve a half-finished import across an accidental refresh instead of losing the work.
+- [x] `084` 🤖 **FE-B** — Preserve a half-finished import across an accidental refresh instead of losing the work.
   - *Needs:* — · *Done when:* a refresh mid-review returns to the same draft, and the draft is still never saved until Save is pressed.
 - [ ] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.
   - *Needs:* `081` `082` · *Done when:* an unreadable photo produces flags and empty fields, never plausible-looking fiction.
-- [ ] `086` 🤖 **QA** — Run the import with all four relays blocked and confirm the paste box still completes a save.
+- [x] `086` 🤖 **QA** — Run the import with all four relays blocked and confirm the paste box still completes a save.
   - *Needs:* `051` · *Done when:* asserted by a test, with the network fully blocked.
 
 ## Phase 10 — Search and scale
@@ -620,6 +620,12 @@ finds out what the last one learned.*
 | `065` | 2026-08-01 | The hero taps open the whole photograph — the writing a 3:2 crop loses is the point. Full dialog contract (trap, Escape, focus return) by joining the sheets' machinery; native pinch-zoom preserved on the image. |
 | `066` | 2026-08-01 | Photos accumulate on the Add path; all are OCR'd in sequence into one draft, and the cards are kept as the recipe's pages — page 1 is the hero, later cards render whole, Download photos writes `<id>-2.jpg`, and the flag says the join may sit mid-list. |
 | `070` | 2026-08-01 | Saving something that looks like an existing recipe warns once — names it, links to it — and "Save anyway" is one tap. Detector is deliberately conservative: exact normalized title, or ≥50% title-word + ≥40% ingredient-line overlap. |
+| `084` | 2026-08-01 | A half-finished import survives a refresh: the draft snapshots to sessionStorage (debounced off typing, since typing deliberately doesn't render) and restores on arrival at Add. Save and picking a new path discard; navigation never does. Still nothing saved until Save. |
+| `086` | 2026-08-01 | With every relay dead the paste box carries a recipe from text to saved page, no network at all — asserted end to end in add.js. |
+| *Phase 7* | 2026-08-01 | **Closed.** 6 of 10 done. `067`–`069` (tag machinery) wait on the `028` category-vs-tag ruling + `060` chip spec; `071` waits on the `029` done-bar. |
+| *Phase 9* | 2026-08-01 | **Closed.** 2 of 6 done. `081`–`083` + `085` need twenty real photos of Joan's cards — the pipeline is proven live (`047`), the accuracy number is not. |
+| *Phase 10* | 2026-08-01 | **Closed, fully parked.** Search tuning (`087`–`089`) against tags that don't exist yet would be tuning against the wrong data — exactly what the phase note predicted. |
+| — | 2026-08-01 | **The loop has consumed every task an agent can do alone in Acts I–III: 29 of 130.** Everything remaining is in §11. Act IV stays shut behind `026`. |
 
 ---
 
@@ -644,6 +650,10 @@ blocks something. Clearing an item here unblocks the loop.*
 | `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast** — the assistive-tech pass no simulator here can stand in for. | `034`, `055`, `056` |
 | `054` `055` `058` `059` `060` | **Designer rulings**: the print palette as tokens, focus-visible as a designed state, the empty tile, Easy Read's dim-tier removal endorsed or redrawn, the tag chip spec. `design/improvised-values.md` is the briefing doc. | `061`, then `067`+ |
 | `061` | The component reference — last, because it documents the outcomes of `053`–`060`. | onboarding for any new screen |
+| `067`–`069`, `071` | Tag autocomplete/bulk/rename need the `028` category-vs-tag rule and `060` chip spec; the empty-ingredient prompt needs the `029` done-bar. All four are 🤖 the moment those land. | `076`, `079` |
+| `072`–`078` | **The content truth pass — sit-downs with Joan.** `CONTENT.md` is the worklist: 4 ingredient lists, 6 truncations, 34 servings, first tags, first photos, chasing the other four contributors. | `080`, `081`, `087` |
+| `081`–`083`, `085` | **Twenty real photos of Joan's recipe cards.** The OCR pipeline is proven live and pinned; its honest error rate is unmeasured until real cards go through it. | per-field flagging, split-fix control |
+| `087`–`089` | Search tuning waits for real tags (`076`); virtualisation waits for a collection that grows (`078`). | — |
 
 ---
 
