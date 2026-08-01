@@ -326,7 +326,7 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
   - *Needs:* `035`–`043` · *Done when:* it is drawn, and it clears AA against every surface it lands on.
 - [ ] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
   - *Needs:* `040` · *Done when:* all ten are identifiable at 20px on a phone.
-- [ ] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
+- [x] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
   - *Needs:* — · *Done when:* a portrait photo, a landscape photo and a square photo all look deliberate in both slots.
 - [ ] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
   - *Needs:* `043` · *Done when:* it reads as an invitation rather than a zero, without colour being the only signal.
@@ -611,6 +611,9 @@ finds out what the last one learned.*
 | `051` | 2026-08-01 | Every imported draft's flagged entry now says which route answered — "fetched directly from the site" or "fetched through allorigins.win" — so a persistent failure is diagnosable. Asserted in add.js. |
 | *Phase 5* | 2026-08-01 | **Closed.** 4 of 6 done; `049` and `052` parked on the iPhone font check (§11). CLAUDE.md's known-limits brought current — the "sandbox cannot reach the Tesseract CDN" limit no longer holds. |
 | `053` | 2026-08-01 | `design/improvised-values.md`: every Add/edit value sorted into complies / deliberate-scaling-deviation / improvised-awaiting-designer. One compliance miss fixed on the spot — `.outlinebtn` 58→60, the styleguide's secondary-button height. |
+| `057` | 2026-08-01 | `design/photo-treatment.md`: one deliberate box per slot, centre-crop only, reserved before decode. Recipe hero now declares 3:2 (was content-height). Verified: portrait, landscape and square all land at identical 358×239 hero / 64×64 thumb. |
+| *Phase 4* | 2026-08-01 | **Closed.** 5 of 12 done (`041` `043`–`046`); `035`–`040` + `042` parked on VoiceOver/iOS (§11). Close-gate contrast audit green. |
+| *Phase 6* | 2026-08-01 | **Closed.** 2 of 9 done; the rest are designer rulings (`054` `055` `058` `059` `060`), a redraw gated on the VoiceOver check (`056`), and the reference that needs all of them (`061`). §11 holds each. |
 
 ---
 
@@ -632,6 +635,9 @@ blocks something. Clearing an item here unblocks the loop.*
 | `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
 | `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
 | `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
+| `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast** — the assistive-tech pass no simulator here can stand in for. | `034`, `055`, `056` |
+| `054` `055` `058` `059` `060` | **Designer rulings**: the print palette as tokens, focus-visible as a designed state, the empty tile, Easy Read's dim-tier removal endorsed or redrawn, the tag chip spec. `design/improvised-values.md` is the briefing doc. | `061`, then `067`+ |
+| `061` | The component reference — last, because it documents the outcomes of `053`–`060`. | onboarding for any new screen |
 
 ---
 

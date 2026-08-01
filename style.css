@@ -858,6 +858,10 @@ img {
 
 .r-hero {
   width: 100%;
+  /* One deliberate box for any input: 3:2, capped at 280px tall, centre-crop.
+     A portrait phone photo, a landscape one and a square all land identically
+     — and the box is reserved before the image decodes, so nothing reflows. */
+  aspect-ratio: 3 / 2;
   max-height: 280px;
   object-fit: cover;
   border-radius: var(--r-card);
