@@ -242,8 +242,9 @@ here is built; everything here is written down.*
 - [x] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
   - *Needs:* `023` · *Done when:* the list is final and `CAT_ALIASES` covers anything dropped.
   - *Ruled 2026-08-01, provisional:* **the ten stay** — nothing dropped, so `CAT_ALIASES` is already complete. `DECISIONS.md` §027; Joan's vocabulary (`023`) can still reopen it.
-- [ ] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
+- [x] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
   - *Needs:* `027` · *Done when:* the rule is in `README.md` and someone can apply it to a new recipe without asking.
+  - *Done 2026-08-01 (family sign-off pending, like every provisional ruling):* the rule is in `README.md` — category = "when would you serve this", one of ten; everything else is a tag, with the Baking edge case called out.
 - [x] `029` 🤝 **PM** — Set the bar for what "done" means for a recipe: does it need a photo, verified servings, and at least one tag before it counts as finished?
   - *Needs:* `013` · *Done when:* written. This is the acceptance criterion for all of Phase 8.
   - *Ruled 2026-08-01, provisional:* **true text** — real ingredients and steps, servings confirmed-or-marked-unknown; photos and tags optional. `DECISIONS.md` §029. The 1.0 content blockers are exactly the 4 empty lists + 34 inferred servings.
@@ -649,7 +650,8 @@ finds out what the last one learned.*
 | `032` | 2026-08-01 | Pull cadence: on request + monthly nudge, owner Jason. |
 | `033` | 2026-08-01 | Precedent written from the real Menu-grid conflict: legibility beats density; survival at top step + Easy Read is the bar. (`024` still open — deviation noted on the task.) |
 | `034` | 2026-08-01 | `design/a11y-criteria.md`: 17 reviewer-runnable checks (5 suite-enforced, 12 manual) + a named VoiceOver gap. Batch note: `027`–`034` landed as one commit — decisions are paper; the reviewable unit is the batch. Rule 7 resumes with code. |
-| *Phase 3* | 2026-08-01 | **Re-closed, now truly closed: 8 of 10 done.** `025` stays open as the *check* on the provisional gate ruling; `028` lands with the README in the next commit. Act IV struck: 41 tasks. |
+| `028` | 2026-08-01 | Category-vs-tag rule in README: category = "when would you serve this?", one of ten; everything else tags. |
+| *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
 
 ---
 

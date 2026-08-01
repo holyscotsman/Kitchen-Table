@@ -92,6 +92,15 @@ filter (picking two means both), they're searched, and tapping one on a recipe
 opens the Menu filtered to it. Nothing ships pre-tagged; the tag filter appears
 once something has been tagged.
 
+**Category or tag?** The rule: **the category answers "when would you serve
+this?" — one per recipe, from the fixed list of ten. Everything else true about
+a dish is a tag.** Where it's from (Italian), what's in it (chicken), how it's
+made (slow cooker, air fryer), who it suits (vegetarian), occasions
+(Christmas) — all tags, as many as are useful. If you're torn between two
+categories, pick when it's most often served and add the other as a tag;
+"Baking" is for things whose point is the baking (bread, scones), not for
+anything that touches an oven.
+
 ## Editing
 
 The switch in the mode strip on any recipe turns on Edit mode. Viewer mode shows
