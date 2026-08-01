@@ -2,6 +2,10 @@
 
 Everything Mom cooks, in one place.
 
+**Version 0.9** — the app is feature-complete and live; `GAMEPLAN.md` is the
+road to 1.0, and its Waiting-on-you table is what stands between here and
+there.
+
 A static family recipe site for ~48 transcribed recipes. The primary user is on
 an iPhone with low vision, so legibility beats density everywhere. Plain HTML,
 CSS, and vanilla JavaScript on GitHub Pages — no build step, no framework, no
@@ -65,14 +69,23 @@ so when the amounts have been adjusted.
 
 ## Photos and tags
 
-Attach a photo in Edit mode, or while adding a recipe. It's shrunk on the device
-and kept in the browser — it shows immediately as the recipe's hero image and as
-a thumbnail on the Menu. A recipe without one renders no image at all, never a
-placeholder.
+Attach a photo in Edit mode, or while adding a recipe. It's shrunk on the
+device and kept in the browser's own database — big enough for a photo on
+every recipe — and it shows immediately as the recipe's hero image and as a
+thumbnail on the Menu. A recipe without one renders no image at all, never a
+placeholder, and a photo that goes missing degrades to the category icon
+rather than a broken-image glyph.
 
-To make a photo permanent: **Download photos** saves each as `<id>.jpg`. Put
-them in `images/` and commit them alongside `recipes.json`, which by then
-references `images/<id>.jpg` rather than carrying the picture inline.
+**Tap the hero to see the whole photograph.** The hero is a tidy 3:2 crop;
+the tap opens the full picture — which matters when the photo is a
+handwritten card and the writing is what got cropped. A recipe read from
+several cards keeps every card: the first is its face, the rest appear in
+full under "Recipe card photos".
+
+To make a photo permanent: **Download photos** saves each as `<id>.jpg`
+(`<id>-2.jpg` for later cards). Put them in `images/` and commit them
+alongside `recipes.json`, which by then references `images/<id>.jpg` rather
+than carrying the picture inline.
 
 **Tags** are free-form and comma-separated — include where a dish is from. They
 filter (picking two means both), they're searched, and tapping one on a recipe
@@ -107,7 +120,9 @@ knowing:
   recipe to open Edit mode from, and no way back.
 
 `localStorage` keys are namespaced under `kt.` — `kt.theme`, `kt.fsIndex`,
-`kt.easyRead`, `kt.recipes`. Nothing else is touched.
+`kt.easyRead`, `kt.recipes`. Photos live in the browser's IndexedDB
+(database `kt`), and a mid-import draft sits in sessionStorage until it's
+saved. Nothing else is touched.
 
 ## Local preview
 
@@ -142,16 +157,25 @@ suite — it reports how many photos this browser's storage can actually hold.
 The **Add recipe** pill on the Menu opens three ways in:
 
 - **Type it in** — a blank form.
-- **From a link** — paste a recipe page address. Several free public relays are
-  tried in turn (disclosed in the UI, because the address is sent to them), and
-  the page is read for `schema.org/Recipe` data. If none get through there's a
-  paste box right below the field that needs no network at all — that one can
-  never break.
-- **From a photo** — reads the text out of a picture on the device itself. The
-  picture is never uploaded. It will get things wrong.
+- **From a link** — paste a recipe page address. Several free public relays
+  are tried in turn — each is named in the UI before anything is sent,
+  because the address goes to them — and the page is read for
+  `schema.org/Recipe` data. The import records which route answered, so a
+  persistently failing relay is diagnosable. If none get through there's a
+  paste box right below the field that needs no network at all — that one
+  can never break.
+- **From a photo** — reads the text out of a picture on the device itself.
+  The picture is never uploaded (the library is version-pinned with an
+  integrity hash, and a tampered copy refuses to load). A recipe that spans
+  two cards can be read as one: add each photo and they're read in
+  sequence into a single draft, with every card kept.
 
-All three land on the same review screen before anything is saved, and anything
-a parser had to guess is written into `flagged` so the recipe page shows it.
+All three land on the same review screen before anything is saved, and
+anything a parser had to guess is written into `flagged` so the recipe page
+shows it. A half-finished import survives an accidental refresh — the draft
+comes back until you save it or start over. And if what you're saving looks
+a lot like a recipe already in the book, it says so once and lets you save
+anyway — two versions is allowed, it just shouldn't be an accident.
 
 Like every other edit, a new recipe lives in `localStorage` until you press
 **Download updated recipes.json** and commit the file.

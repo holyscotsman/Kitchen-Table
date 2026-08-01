@@ -253,11 +253,40 @@ no-login model, not an oversight. If real access control is ever wanted, that
 is a new architecture conversation (the gameplan's backend gate), not a
 feature to hang off this field.
 
+### The gameplan era (v0.9 →)
+
+`GAMEPLAN.md` is now the working plan: all 130 team-plan tasks in dependency
+order, worked one at a time, one commit each. Decisions taken while looping
+it, each with its task number in the log there:
+
+- **A version stamp** (`VERSION` in `app.js`, rendered bottom-corner) reads
+  `0.9`; flipping it to `1.0` is the release checklist's last line.
+- **Motion and artwork**: every animation is armed by the action that earned
+  it and consumed by one paint; all of it off under reduced-motion. The
+  artwork (steam bowl, empty plate) is decorative, aria-hidden, currentColor.
+- **Photos live in IndexedDB** (`062`) behind a boot-filled in-memory cache —
+  localStorage held only 12 of the 48. Legacy `kt.images` migrates at boot;
+  no-IndexedDB browsers fall back to localStorage and its loud quota message.
+  A store value is one data URL or an array of pages (`066`).
+- **The tests live in `tests/`** and run in CI on every PR (`002`/`003`).
+  The suites are hermetic — relays stubbed, full Chromium pinned for the
+  wake-lock check, screenshots to a gitignored dir.
+- **Tesseract is pinned with SRI** (`048`) and proven local by network trace
+  (`047`); the import chain disclosure names every relay (`050`) and each
+  import records which answered (`051`). Imported fields are capped, trims
+  disclosed (`046`).
+- **Reflow at 320px** (200% zoom) + Easy Read + top step is enforced by
+  `tests/zoom.js` (`041`); scroll restoration is app-owned
+  (`history.scrollRestoration = manual`).
+- **`CONTENT.md`** is the known-wrong-data ledger (`013`); nothing on it may
+  be resolved by inference.
+
 ### Verified
 
-81 functional checks in Chromium at iPhone and desktop widths, covering both
-themes, the filter and sort behaviour, quantity rescaling, check-off reset,
-the font stepper and its persistence, edit-mode save and reload, and the
-download outputs. WCAG AA contrast audited across all three screens plus the
-filter, sort, and download sheets in **both** themes — zero failures. Nothing
-interactive measures under 44px.
+The suite as of the gameplan era: **279 functional checks** across nine
+suites (kt 83, feat 49, add 58, relay 16, quick 21, polish 26, sec 16,
+zoom 9, plus the perf budget: FCP 720 ms median on throttled 3G against a
+4000 ms gate, CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
+zero failures across all 48 screen × theme × Easy-Read combinations.
+Nothing interactive measures under 44px. All of it runs on every pull
+request via `tests/run.sh`.
