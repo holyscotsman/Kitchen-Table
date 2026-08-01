@@ -188,9 +188,9 @@ of content in Act III cites something measured here.*
   - *Needs:* — · *Done when:* the screen is still on at the end, after a phone call or a switch to another app.
 - [ ] `007` 👤 **QA** — Print a recipe to real paper and confirm nothing is white-on-white.
   - *Needs:* — · *Done when:* a printed page is legible in both themes' starting states.
-- [ ] `008` 🤖 **QA** — Confirm a removed recipe stays removed across a reload, a theme change and a browser restart.
+- [x] `008` 🤖 **QA** — Confirm a removed recipe stays removed across a reload, a theme change and a browser restart.
   - *Needs:* — · *Done when:* covered by an automated check, not a manual pass.
-- [ ] `009` 🤖 **QA** — Test "Undo all my changes" from the Menu empty state — the only route back when everything is removed.
+- [x] `009` 🤖 **QA** — Test "Undo all my changes" from the Menu empty state — the only route back when everything is removed.
   - *Needs:* — · *Done when:* automated, from a state with zero recipes.
 - [ ] `010` 🤖 **FE-A** — Measure localStorage headroom with 48 photos attached and document the ceiling.
   - *Needs:* — · *Done when:* a number is written into §10. This decides task `062`.
@@ -590,6 +590,8 @@ finds out what the last one learned.*
 | `001` | 2026-08-01 | Full-history scan clean: zero credential patterns; the removed publish flow read its token from localStorage at runtime, never from code. |
 | `002` | 2026-08-01 | Six suites + contrast audit now live in `tests/`, one command (`tests/run.sh`), hermetic — every relay stubbed, so no test waits on a real network. Wake-lock check needs full Chromium; the runner finds it. |
 | `003` | 2026-08-01 | CI runs `tests/run.sh` on every PR. Red path proven locally: a deliberately broken `app.js` exits the runner non-zero. The green path shows on this PR's own checks. |
+| `008` | 2026-08-01 | Removal persistence now asserted across reload, theme change, and a fresh browser context carrying only stored state — the closest a test gets to quitting Safari. |
+| `009` | 2026-08-01 | Already covered when the suites moved in: polish.js empties the collection, recovers via the Menu empty state's undo, and counts 48 back. No new code — verified, ticked. |
 
 ---
 

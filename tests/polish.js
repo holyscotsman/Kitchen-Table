@@ -69,6 +69,16 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('47 after removing one', await p.locator('.rrow, .rcard').count()===47, String(await p.locator('.rrow, .rcard').count()));
   await p.reload(); await p.waitForSelector('.rcard');
   chk('still 47 after a reload', await p.locator('.rcard').count()===47, String(await p.locator('.rcard').count()));
+  await p.click('[data-act="theme"]'); await p.waitForTimeout(300);
+  chk('still 47 after a theme change', await p.locator('.rcard').count()===47, String(await p.locator('.rcard').count()));
+  /* Browser restart: a brand-new context carrying only the stored state, the
+     closest a test can get to quitting and reopening Safari. */
+  const state = await ctx.storageState();
+  const ctx2 = await br.newContext({ ...devices['iPhone 13'], storageState: state });
+  const p2 = await ctx2.newPage();
+  await p2.goto(B+'/index.html#menu'); await p2.waitForSelector('.rcard');
+  chk('still 47 after a browser restart', await p2.locator('.rcard').count()===47, String(await p2.locator('.rcard').count()));
+  await ctx2.close();
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
   await p.reload(); await p.waitForSelector('.rcard');
   chk('48 again once local changes are cleared', await p.locator('.rcard').count()===48);
