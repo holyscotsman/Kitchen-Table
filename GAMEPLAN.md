@@ -319,8 +319,9 @@ because it can only be written once every legitimate origin is known.*
   - *Needs:* — · *Done when:* the disclosure names the relays and says what is sent, before the request is made.
 - [x] `051` 🤖 **FE-B** — Show which relay succeeded, so a persistent failure can be diagnosed rather than guessed at.
   - *Needs:* `050` · *Done when:* the review screen names the relay that answered.
-- [ ] `052` 🤖 **SEC** — Add a Content-Security-Policy and confirm it does not break the lazily-loaded OCR library.
+- [x] `052` 🤖 **SEC** — Add a Content-Security-Policy and confirm it does not break the lazily-loaded OCR library.
   - *Needs:* `047` `048` `049` `050` · *Done when:* the policy is as tight as the known origin list allows, and every path still works.
+  - *Done 2026-08-01:* meta CSP in `index.html` — scripts by self + jsdelivr + hash (no `unsafe-inline`), fonts self-only, objects none; `connect-src https:` stays open because link import fetches whatever page the user pastes, by design. First run broke OCR exactly as the task predicted — wasm compilation, fixed with `wasm-unsafe-eval`. Live OCR re-proven under the policy; 7 CSP checks added to sec.js. Bonus: writing the script hash exposed a real bug — the pre-paint theme script compared the raw string while `save()` stores JSON, so it had never fired; fixed and proven with app.js blocked.
 
 ## Phase 6 — Design the screens that were never designed
 
@@ -653,6 +654,8 @@ finds out what the last one learned.*
 | `034` | 2026-08-01 | `design/a11y-criteria.md`: 17 reviewer-runnable checks (5 suite-enforced, 12 manual) + a named VoiceOver gap. Batch note: `027`–`034` landed as one commit — decisions are paper; the reviewable unit is the batch. Rule 7 resumes with code. |
 | `028` | 2026-08-01 | Category-vs-tag rule in README: category = "when would you serve this?", one of ten; everything else tags. |
 | `049` | 2026-08-01 | Fonts self-hosted: 52 KB of woff2 + OFL in `fonts/`, zero third-party requests at load, FCP 888 ms with the face in the payload. The 12.7 s degraded-network figure is retired. |
+| `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
+| *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |
 | *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
 
 ---

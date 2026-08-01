@@ -7,6 +7,22 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <title>Kitchen Table</title>
+
+    <!-- The policy is as tight as the app's real behaviour allows (gameplan
+         052). The loose-looking lines are load-bearing, not lazy:
+           connect-src https:  - link import fetches whatever recipe page the
+                                 user pastes, directly first, relays after, and
+                                 OCR pulls its wasm + language data at runtime;
+           script-src jsdelivr - Tesseract, pinned + SRI'd where it's loaded;
+           worker-src blob:    - Tesseract builds its worker from a blob;
+           img/media data: blob: - photos live as data URLs, downloads as blobs;
+           style 'unsafe-inline' - the renderer sets style="" attributes (font
+                                 stepping); element styles stay in the sheets.
+         The inline theme script is admitted by hash - change it, rehash it. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-o1OJtOYup8CcPW/GTXWqN/q4fHOREV9wzGW+rZoycms='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self' blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <meta
       name="description"
       content="Everything Mom cooks, in one place."
@@ -17,8 +33,10 @@
     <script>
       (function () {
         try {
+          /* app.js stores JSON, so the value arrives as '"light"' — quoted.
+             The bare form is accepted too in case anything ever wrote it raw. */
           var saved = localStorage.getItem("kt.theme");
-          if (saved === "light") {
+          if (saved === '"light"' || saved === "light") {
             document.documentElement.setAttribute("data-theme", "light");
           }
         } catch (e) {}
