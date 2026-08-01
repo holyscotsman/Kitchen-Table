@@ -33,27 +33,49 @@
 
   var FS = [20, 24, 29, 34, 40]; // px; index 1 (24px) is the default
   var DEFAULT_FS = 1;
-  var CATS = ["Dinner", "Breakfast", "Side", "Dessert", "Snack", "Drink"];
+  /* Meal order, so the "Course" sort reads like a day rather than an
+     alphabetical list. Sides and Drinks are here because the collection has 10
+     side dishes and a lemonade, and folding them into Dinner/Cocktails would
+     have mislabelled about a fifth of the recipes. */
+  var CATS = [
+    "Breakfast", "Brunch", "Lunch", "Dinner", "Sides",
+    "Snacks", "Baking", "Desserts", "Cocktails", "Drinks"
+  ];
+
+  /* Older category names, kept so a device with a saved overlay from before
+     the rename doesn't end up with recipes that match no filter. */
+  var CAT_ALIASES = {
+    Side: "Sides", Dessert: "Desserts", Snack: "Snacks", Drink: "Drinks"
+  };
+
   var WHO = ["Mom", "Me", "Jennifer"];
   var FIELD_ORDER = [
     "id", "title", "category", "contributor", "servings", "prepTime",
-    "cookTime", "ingredients", "steps", "notes", "flagged", "source", "image"
+    "cookTime", "ingredients", "steps", "notes", "flagged", "source",
+    "image", "tags"
   ];
 
   var SORTS = [
     { key: "recent", label: "Recently added" },
     { key: "az", label: "Name A – Z" },
-    { key: "quick", label: "Quickest first" },
-    { key: "course", label: "Course" },
-    { key: "who", label: "Who it's from" }
+    { key: "course", label: "Course" }
   ];
 
   var K = {
     theme: "kt.theme",
     fs: "kt.fsIndex",
     easyRead: "kt.easyRead",
-    recipes: "kt.recipes"
+    recipes: "kt.recipes",
+    images: "kt.images"
   };
+
+  /* Photos are held apart from the recipe records, keyed by id. Inlining data
+     URLs into kt.recipes would put multi-hundred-kilobyte blobs into the file
+     that "Download updated recipes.json" produces, which then gets committed —
+     the download writes an images/<id>.jpg path instead, and the picture comes
+     out of "Download photos" as a real file. */
+  var IMG_MAX_EDGE = 1200;
+  var IMG_QUALITY = 0.72;
 
   /* Easy Read never drops the reader below this step. The A−/A+ stepper still
      works above it — the mode is additive, not a replacement. */
@@ -189,6 +211,7 @@
     sortOpen: false,
     who: [],
     cats: [],
+    tags: [],
     sort: "recent",
     removing: false,
 
@@ -290,21 +313,6 @@
     );
   }
 
-  /* Sorting only — display never uses this. */
-  function totalMinutes(recipe) {
-    var text = (recipe.prepTime || "") + " " + (recipe.cookTime || "");
-    var re = /(\d+(?:\.\d+)?)\s*(hour|hr|h|minute|min|m)\b/gi;
-    var total = 0;
-    var found = false;
-    var m;
-    while ((m = re.exec(text))) {
-      found = true;
-      var n = parseFloat(m[1]);
-      total += /^h/i.test(m[2]) ? n * 60 : n;
-    }
-    return found ? total : 1e6;
-  }
-
   /* ======================================================================
      5. Helpers
      ====================================================================== */
@@ -320,6 +328,17 @@
       if (S.recipes[i].id === id) return S.recipes[i];
     }
     return null;
+  }
+
+  /* Title, ingredients, and tags — so "Thai" finds a dish tagged Thai even
+     when the word appears nowhere in the recipe itself. */
+  function matchesQuery(r, q) {
+    if (!q) return true;
+    if (r.title.toLowerCase().indexOf(q) > -1) return true;
+    if (tagsOf(r).some(function (t) { return t.toLowerCase().indexOf(q) > -1; })) return true;
+    return (r.ingredients || []).some(function (i) {
+      return i.toLowerCase().indexOf(q) > -1;
+    });
   }
 
   function countBy(list, key, value) {
@@ -350,11 +369,101 @@
      downloaded and committed, or undone with "Undo all my changes". */
   function applyOverlay() {
     var overlay = load(K.recipes, null);
-    S.recipes = Array.isArray(overlay) ? overlay.slice() : S.base.slice();
+    S.recipes = (Array.isArray(overlay) ? overlay : S.base).map(normalizeRecipe);
+  }
+
+  function normalizeRecipe(r) {
+    var out = {};
+    Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+    if (CAT_ALIASES[out.category]) out.category = CAT_ALIASES[out.category];
+    if (CATS.indexOf(out.category) === -1) out.category = "Dinner";
+    if (out.tags && !Array.isArray(out.tags)) delete out.tags;
+    return out;
   }
 
   function persistRecipes() {
     save(K.recipes, S.recipes);
+  }
+
+  /* ---- photos ---- */
+
+  function images() {
+    return load(K.images, {}) || {};
+  }
+
+  /* A local photo wins over the published path, so a freshly attached picture
+     shows before anyone has committed the file. */
+  function imageFor(recipe) {
+    return images()[recipe.id] || recipe.image || "";
+  }
+
+  function setImage(id, dataUrl) {
+    var map = images();
+    map[id] = dataUrl;
+    try {
+      localStorage.setItem(K.images, JSON.stringify(map));
+      return "";
+    } catch (e) {
+      return "There isn’t room on this phone for another photo. Download your " +
+             "photos and recipes.json, commit them, then remove some here.";
+    }
+  }
+
+  function removeImage(id) {
+    var map = images();
+    delete map[id];
+    save(K.images, map);
+  }
+
+  /* Downscaled in the browser: a phone photo is several megabytes and
+     localStorage is a few, so full-size originals fill it after two or three. */
+  function readPhoto(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("That image couldn’t be read.")); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error("That file isn’t an image this phone can open.")); };
+        img.onload = function () {
+          var scale = Math.min(1, IMG_MAX_EDGE / Math.max(img.width, img.height));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", IMG_QUALITY));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ---- tags ---- */
+
+  function tagsOf(recipe) {
+    return Array.isArray(recipe.tags) ? recipe.tags : [];
+  }
+
+  function allTags() {
+    var seen = {};
+    S.recipes.forEach(function (r) {
+      tagsOf(r).forEach(function (t) { seen[t] = true; });
+    });
+    return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); });
+  }
+
+  function parseTags(text) {
+    var seen = {};
+    var out = [];
+    String(text || "").split(",").forEach(function (raw) {
+      var t = raw.trim().replace(/\s+/g, " ");
+      if (!t) return;
+      var key = t.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(t);
+    });
+    return out;
   }
 
   function orderFields(recipe) {
@@ -362,7 +471,35 @@
     FIELD_ORDER.forEach(function (k) {
       if (recipe[k] !== undefined && recipe[k] !== "") out[k] = recipe[k];
     });
+    /* A locally attached photo becomes a repo path, not a base64 blob — the
+       committed recipes.json stays readable and small. */
+    if (images()[recipe.id]) out.image = "images/" + recipe.id + ".jpg";
     return out;
+  }
+
+  /* Saves each attached photo as images/<id>.jpg, one file at a time. Browsers
+     rate-limit rapid downloads, hence the stagger. */
+  function downloadPhotos() {
+    var map = images();
+    var ids = Object.keys(map).filter(function (id) { return id !== "__new__"; });
+    if (!ids.length) {
+      setNotice("There are no photos on this phone yet.");
+      return;
+    }
+    ids.forEach(function (id, i) {
+      setTimeout(function () {
+        var parts = map[id].split(",");
+        var bin = atob(parts[1]);
+        var bytes = new Uint8Array(bin.length);
+        for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+        downloadBlob(bytes, id + ".jpg", "image/jpeg");
+      }, i * 350);
+    });
+    setNotice(
+      ids.length === 1
+        ? "Saving 1 photo. Put it in the images folder and commit it."
+        : "Saving " + ids.length + " photos. Put them in the images folder and commit them."
+    );
   }
 
   /* ======================================================================
@@ -376,7 +513,7 @@
     h += '<div class="main" id="main-content">';
     h += '<div class="main__top"><div>' +
          '<h1 class="main__title">Kitchen Table</h1>' +
-         '<p class="main__sub">Everything Mom cooks, in one place.</p>' +
+         '<p class="main__sub">A Simmonds Styled Menu</p>' +
          "</div>" + themeBtn("themebtn--main") + "</div>";
 
     h += '<div class="searchwrap">' +
@@ -389,12 +526,7 @@
 
     if (q) {
       /* While searching, results replace the browse stack entirely. */
-      var hits = S.recipes.filter(function (r) {
-        if (r.title.toLowerCase().indexOf(q) > -1) return true;
-        return (r.ingredients || []).some(function (i) {
-          return i.toLowerCase().indexOf(q) > -1;
-        });
-      });
+      var hits = S.recipes.filter(function (r) { return matchesQuery(r, q); });
       h += '<h2 class="results__h">' + hits.length +
            (hits.length === 1 ? " match" : " matches") + "</h2>";
       if (!hits.length) {
@@ -413,8 +545,9 @@
       var pick = dinners[new Date().getDate() % dinners.length];
       h += '<section class="band"><h2 class="band__h">Tonight’s idea</h2>' +
            '<a class="hero press" href="#' + esc(pick.id) + '">' +
-           (pick.image
-             ? '<img class="hero__img" src="' + esc(pick.image) + '" alt="' + esc(pick.title) + '" />'
+           (imageFor(pick)
+             ? '<img class="hero__img" src="' + esc(imageFor(pick)) +
+               '" alt="' + esc(pick.title) + '" />'
              : '<div class="hero__blank"></div>') +
            '<div class="hero__body">' +
            '<p class="hero__meta">' + esc(pick.contributor) +
@@ -457,11 +590,25 @@
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
     var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
+    var src = imageFor(r);
+    /* No photo means no element at all — never a broken-image icon or a gap
+       where one would have been. */
+    var thumb = src
+      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" />'
+      : "";
+    var tags = tagsOf(r).slice(0, 2);
     return (
       '<a class="rcard press" href="#' + esc(r.id) + '">' +
+      thumb +
       '<span class="rcard__body">' +
       '<span class="rcard__title">' + esc(r.title) + "</span>" +
       '<span class="rcard__meta">' + meta + "</span>" +
+      (tags.length
+        ? '<span class="rcard__tags">' +
+          tags.map(function (t) {
+            return '<span class="minitag">' + esc(t) + "</span>";
+          }).join("") + "</span>"
+        : "") +
       "</span>" +
       '<span class="rcard__chev">' + I.chevR() + "</span>" +
       "</a>"
@@ -473,25 +620,18 @@
     var list = S.recipes.filter(function (r) {
       if (S.who.length && S.who.indexOf(r.contributor) === -1) return false;
       if (S.cats.length && S.cats.indexOf(r.category) === -1) return false;
-      if (!q) return true;
-      if (r.title.toLowerCase().indexOf(q) > -1) return true;
-      return (r.ingredients || []).some(function (i) {
-        return i.toLowerCase().indexOf(q) > -1;
-      });
+      /* Tags are AND-ed: picking Italian and Vegetarian means both. */
+      if (S.tags.length && !S.tags.every(function (t) {
+        return tagsOf(r).indexOf(t) > -1;
+      })) return false;
+      return matchesQuery(r, q);
     });
 
     if (S.sort === "az") {
       list.sort(function (a, b) { return a.title.localeCompare(b.title); });
-    } else if (S.sort === "quick") {
-      list.sort(function (a, b) { return totalMinutes(a) - totalMinutes(b); });
     } else if (S.sort === "course") {
       list.sort(function (a, b) {
         var d = CATS.indexOf(a.category) - CATS.indexOf(b.category);
-        return d || a.title.localeCompare(b.title);
-      });
-    } else if (S.sort === "who") {
-      list.sort(function (a, b) {
-        var d = WHO.indexOf(a.contributor) - WHO.indexOf(b.contributor);
         return d || a.title.localeCompare(b.title);
       });
     }
@@ -500,7 +640,7 @@
 
   function viewMenu() {
     var list = menuMatches();
-    var filterCount = S.who.length + S.cats.length;
+    var filterCount = S.who.length + S.cats.length + S.tags.length;
     var sortLabel = SORTS.filter(function (s) { return s.key === S.sort; })[0].label;
     var h = "";
 
@@ -568,7 +708,7 @@
            /* Recovery path: if the list is empty because recipes were removed
               on this phone, Edit mode is unreachable, so the reset lives here
               too. */
-           (hasLocalChanges() && !S.who.length && !S.cats.length && !S.menuQ
+           (hasLocalChanges() && !S.who.length && !S.cats.length && !S.tags.length && !S.menuQ
              ? '<button type="button" class="outlinebtn outlinebtn--danger press" ' +
                'data-act="reset-local" style="max-width:420px;margin:12px auto 0">' +
                "Undo all my changes on this phone</button>"
@@ -719,12 +859,14 @@
                esc(name) + " (" + countWho(name) + ")</button>";
       }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
-      CATS.map(function (cat) {
-        var on = S.cats.indexOf(cat) > -1;
-        return '<button type="button" class="chip press" aria-pressed="' + on +
-               '" data-act="fc" data-key="' + esc(cat) + '">' +
-               esc(cat) + " (" + countCat(cat) + ")</button>";
-      }).join("") + "</div>" +
+      CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
+        .map(function (cat) {
+          var on = S.cats.indexOf(cat) > -1;
+          return '<button type="button" class="chip press" aria-pressed="' + on +
+                 '" data-act="fc" data-key="' + esc(cat) + '">' +
+                 esc(cat) + " (" + countCat(cat) + ")</button>";
+        }).join("") + "</div>" +
+      tagGroupHtml() +
       '<div class="sheet__foot">' +
       '<button type="button" class="sheetbtn press" data-act="reset-filters">' +
       "Reset to all recipes</button></div>" +
@@ -764,6 +906,29 @@
       (S.easyRead ? ' aria-checked="true"' : "") + "></span></button>" +
       "</div></div>"
     );
+  }
+
+  /* The tag group only earns its space once something has been tagged —
+     nothing ships pre-tagged, since guessing a dish's nationality is exactly
+     how the contributor attributions ended up wrong. */
+  function tagGroupHtml() {
+    var tags = allTags();
+    if (!tags.length) return "";
+    function countTag(tag) {
+      return S.recipes.filter(function (r) {
+        if (tagsOf(r).indexOf(tag) === -1) return false;
+        if (S.who.length && S.who.indexOf(r.contributor) === -1) return false;
+        if (S.cats.length && S.cats.indexOf(r.category) === -1) return false;
+        return true;
+      }).length;
+    }
+    return '<h3 class="grouph">Tags</h3><div class="chiprow">' +
+      tags.map(function (tag) {
+        var on = S.tags.indexOf(tag) > -1;
+        return '<button type="button" class="chip press" aria-pressed="' + on +
+               '" data-act="ft" data-key="' + esc(tag) + '">' +
+               esc(tag) + " (" + countTag(tag) + ")</button>";
+      }).join("") + "</div>";
   }
 
   function downloadSheetHtml(r) {
@@ -820,8 +985,20 @@
       return h;
     }
 
+    var hero = imageFor(r);
+    if (hero) {
+      h += '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />';
+    }
+
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
     h += '<h1 class="r-title">' + esc(r.title) + "</h1>";
+
+    if (tagsOf(r).length) {
+      h += '<p class="r-tags">' + tagsOf(r).map(function (t) {
+        return '<a class="minitag minitag--link press" href="#menu?tag=' +
+               encodeURIComponent(t) + '">' + esc(t) + "</a>";
+      }).join("") + "</p>";
+    }
 
     h += '<div class="topgrid">';
     h += '<div class="servcard"><div class="servcard__text">' +
@@ -974,10 +1151,17 @@
          '<textarea class="textarea" id="e-notes" rows="4" data-act="d" ' +
          'data-k="notes">' + esc(d.notes || "") + "</textarea></div>";
 
+    h += tagsFieldHtml("e-tags", d.tags, "d");
+    h += photoFieldHtml("e-photo", r.id, "e-photo-act");
+
     h += '<button type="button" class="savebtn press" data-act="save">' +
          (S.saved ? "Saved ✓" : "Save changes") + "</button>";
     h += '<button type="button" class="outlinebtn press" data-act="dl-json">' +
          "Download updated recipes.json</button>";
+    if (Object.keys(images()).length) {
+      h += '<button type="button" class="outlinebtn press" data-act="dl-photos">' +
+           "Download photos</button>";
+    }
     if (hasLocalChanges()) {
       h += '<button type="button" class="outlinebtn outlinebtn--danger press" ' +
            'data-act="reset-local">Undo all my changes on this phone</button>';
@@ -996,7 +1180,8 @@
     if (!window.confirm(
       "Put every recipe back the way it is on the website?\n\n" +
       "This undoes everything changed, added, or removed on this phone. " +
-      "Anything already downloaded and committed is unaffected."
+      "Photos you have added are kept. Anything already downloaded and " +
+      "committed is unaffected."
     )) return;
     try { localStorage.removeItem(K.recipes); } catch (e) {}
     applyOverlay();
@@ -1008,6 +1193,37 @@
     else { render(); announce("Local changes undone."); }
   }
 
+  /* Shared by Edit mode and the Add review screen so the two field sets stay
+     identical, which is what the handoff asks for. */
+  function tagsFieldHtml(id, tags, act) {
+    /* Edit mode keeps the draft's tags as the raw comma string the user is
+       typing; the Add flow hands over a parsed array. Accept both. */
+    var value = Array.isArray(tags) ? tags.join(", ") : String(tags || "");
+    return '<div class="field">' +
+      '<label class="field__label" for="' + id + '">Tags</label>' +
+      '<input class="input" id="' + id + '" data-act="' + act + '" data-k="tags" ' +
+      'value="' + esc(value) + '" ' +
+      'placeholder="Italian, vegetarian, quick" />' +
+      '<span class="fieldhint">Separate with commas. Include where the dish is ' +
+      "from — those become filters.</span></div>";
+  }
+
+  function photoFieldHtml(id, recipeId, act) {
+    var src = images()[recipeId];
+    return '<div class="field">' +
+      '<label class="field__label" for="' + id + '">Photo</label>' +
+      (src
+        ? '<div class="photorow"><img class="photorow__img" src="' + esc(src) +
+          '" alt="" /><button type="button" class="delbtn press" ' +
+          'data-act="rm-photo" data-key="' + esc(recipeId) +
+          '" aria-label="Remove photo">' + I.x() + "</button></div>"
+        : "") +
+      '<input class="input" id="' + id + '" type="file" accept="image/*" ' +
+      'data-act="' + act + '" data-key="' + esc(recipeId) + '" />' +
+      '<span class="fieldhint">Shrunk and kept on this phone. ' +
+      '"Download photos" saves it as a file to commit.</span></div>';
+  }
+
   function startDraft(r) {
     S.draft = {
       title: r.title,
@@ -1015,7 +1231,8 @@
       contributor: r.contributor,
       ingredients: (r.ingredients || []).slice(),
       steps: (r.steps || []).slice(),
-      notes: r.notes || ""
+      notes: r.notes || "",
+      tags: tagsOf(r).join(", ")
     };
     S.saved = false;
   }
@@ -1030,6 +1247,8 @@
     updated.steps = S.draft.steps.filter(function (x) { return x.trim(); });
     if (S.draft.notes.trim()) updated.notes = S.draft.notes.trim();
     else delete updated.notes;
+    var tags = parseTags(S.draft.tags);
+    if (tags.length) updated.tags = tags; else delete updated.tags;
 
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
@@ -1052,7 +1271,7 @@
     return {
       title: "", category: "Dinner", contributor: WHO[0], servings: 4,
       prepTime: "", cookTime: "", ingredients: [""], steps: [""],
-      notes: "", flagged: [], source: ""
+      notes: "", flagged: [], source: "", tags: ""
     };
   }
 
@@ -1192,6 +1411,9 @@
          '<textarea class="textarea" id="a-notes" rows="4" data-act="ad" ' +
          'data-k="notes">' + esc(d.notes || "") + "</textarea></div>";
 
+    h += tagsFieldHtml("a-tags", parseTags(d.tags), "ad");
+    h += photoFieldHtml("a-photo-file", "__new__", "a-photo-act");
+
     h += '<button type="button" class="savebtn press" data-act="add-save">' +
          "Save to my recipes</button>";
     h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
@@ -1230,6 +1452,16 @@
     if ((d.notes || "").trim()) recipe.notes = d.notes.trim();
     if (d.flagged && d.flagged.length) recipe.flagged = d.flagged.slice();
     if ((d.source || "").trim()) recipe.source = d.source.trim();
+    var newTags = parseTags(d.tags);
+    if (newTags.length) recipe.tags = newTags;
+
+    /* The photo was staged under a placeholder key because the id only exists
+       once the title is known. Move it across now. */
+    var staged = images()["__new__"];
+    if (staged) {
+      setImage(id, staged);
+      removeImage("__new__");
+    }
 
     S.recipes = S.recipes.concat([recipe]);
     persistRecipes();
@@ -1385,12 +1617,22 @@
   }
 
   function guessCategory(raw) {
-    var v = String(raw || "").toLowerCase();
+    var v = String(raw || "").toLowerCase().trim();
+    if (!v) return "Dinner";
+    /* Recipe sites emit singular categories — "Dessert", "Side dish", "Drink".
+       Our names are plural, so match the stem as well or every import lands in
+       Dinner. */
     for (var i = 0; i < CATS.length; i++) {
-      if (v.indexOf(CATS[i].toLowerCase()) > -1) return CATS[i];
+      var cat = CATS[i].toLowerCase();
+      if (v.indexOf(cat) > -1 || v.indexOf(cat.replace(/s$/, "")) > -1) {
+        return CATS[i];
+      }
     }
-    if (/appetizer|salad|soup|bread|starter/.test(v)) return "Side";
-    if (/cake|cookie|pudding|sweet/.test(v)) return "Dessert";
+    if (/appetizer|salad|soup|bread|starter|accompaniment/.test(v)) return "Sides";
+    if (/cake|cookie|biscuit|pudding|sweet|pastry|tart/.test(v)) return "Desserts";
+    if (/cocktail|martini|negroni/.test(v)) return "Cocktails";
+    if (/smoothie|juice|tea|coffee|lemonade/.test(v)) return "Drinks";
+    if (/bake|bread|scone|muffin/.test(v)) return "Baking";
     return "Dinner";
   }
 
@@ -1646,13 +1888,14 @@
     if (raw === "add") return { name: "add", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
-      var who = [], cats = [];
+      var who = [], cats = [], tags = [];
       qs.split("&").forEach(function (pair) {
         var kv = pair.split("=");
         if (kv[0] === "who" && kv[1]) who = [decodeURIComponent(kv[1])];
         if (kv[0] === "cat" && kv[1]) cats = [decodeURIComponent(kv[1])];
+        if (kv[0] === "tag" && kv[1]) tags = [decodeURIComponent(kv[1])];
       });
-      return { name: "menu", id: "", who: who, cats: cats };
+      return { name: "menu", id: "", who: who, cats: cats, tags: tags };
     }
     return { name: "recipe", id: decodeURIComponent(raw) };
   }
@@ -1704,9 +1947,11 @@
     var changedRecipe = next.name !== "recipe" || next.id !== S.route.id;
     var changedRoute = routeKey(next) !== routeKey(S.route);
 
-    if (next.name === "menu" && (next.who.length || next.cats.length)) {
+    if (next.name === "menu" &&
+        (next.who.length || next.cats.length || next.tags.length)) {
       S.who = next.who;
       S.cats = next.cats;
+      S.tags = next.tags;
     }
 
     /* Arriving at Add from elsewhere starts a fresh one. Staying on it keeps
@@ -1844,13 +2089,23 @@
       if (ic > -1) S.cats.splice(ic, 1); else S.cats.push(key);
       render(); return;
     }
-    if (act === "reset-filters") { S.who = []; S.cats = []; render(); return; }
-    if (act === "clear-filters") { S.who = []; S.cats = []; S.menuQ = ""; render(); return; }
+    if (act === "ft") {
+      var it = S.tags.indexOf(key);
+      if (it > -1) S.tags.splice(it, 1); else S.tags.push(key);
+      render(); return;
+    }
+    if (act === "reset-filters") { S.who = []; S.cats = []; S.tags = []; render(); return; }
+    if (act === "clear-filters") {
+      S.who = []; S.cats = []; S.tags = []; S.menuQ = ""; render(); return;
+    }
     if (act === "show-all") {
-      S.who = []; S.cats = []; S.menuQ = ""; S.searchOpen = false; render(); return;
+      S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
+      S.searchOpen = false; render(); return;
     }
     if (act === "toggle-remove") { S.removing = !S.removing; render(); return; }
     if (act === "reset-local") { resetLocal(); return; }
+    if (act === "rm-photo") { removeImage(key); render(); return; }
+    if (act === "dl-photos") { downloadPhotos(); return; }
     if (act === "remove") {
       var victim = byId(el.getAttribute("data-id"));
       if (victim && window.confirm('Remove "' + victim.title + '" from the collection?')) {
@@ -1939,6 +2194,19 @@
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
     if (act === "a-url") { S.addUrl = el.value; return; }
+    if (act === "e-photo-act" || act === "a-photo-act") {
+      var file = el.files && el.files[0];
+      if (!file) return;
+      var target = el.getAttribute("data-key");
+      readPhoto(file)
+        .then(function (dataUrl) {
+          var err = setImage(target, dataUrl);
+          if (err) { S.addError = err; setNotice(err); }
+          else { S.addError = ""; render(); }
+        })
+        .catch(function (e) { setNotice(e.message); });
+      return;
+    }
     if (act === "a-photo") {
       S.addPhoto = (el.files && el.files[0]) || null;
       S.addError = "";

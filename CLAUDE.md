@@ -143,6 +143,44 @@ existing component vocabulary — no new colours, type sizes, or patterns.
   the Main screen's "Whose recipe?" tiles cover contributor browsing, which is
   what the handoff says they are for.
 
+### Changes requested after the handoff
+
+These came from Jason directly and supersede the corresponding parts of
+`DESIGN.md`:
+
+- **Categories are now ten**, not six: Breakfast, Brunch, Lunch, Dinner, Sides,
+  Snacks, Baking, Desserts, Cocktails, Drinks — in that order, so the "Course"
+  sort reads like a day. `recipes.json` was migrated (`Side`→`Sides`,
+  `Dessert`→`Desserts`, `Snack`→`Snacks`, `Drink`→`Drinks`), which means it is
+  no longer byte-identical to the handoff copy.
+  Jason's own list had eight and omitted Sides and Drinks; the collection has
+  10 side dishes and a lemonade, so folding them into Dinner and Cocktails
+  would have mislabelled about a fifth of the recipes. Sides and Drinks were
+  kept for that reason — worth revisiting if he'd rather they went.
+  `CAT_ALIASES` maps the old names so a device holding a pre-rename overlay
+  doesn't end up with recipes that match no filter.
+- **Sort is three options**: Recently added, A–Z, Course. "Quickest first" and
+  "Who it's from" were dropped.
+- **Tags**, free-form and comma-separated, including where a dish is from.
+  They filter (AND-ed), they are searched, and each one on a recipe links to
+  `#menu?tag=…`. Nothing ships pre-tagged.
+- **Photos.** See below.
+- The Main subtitle is "A Simmonds Styled Menu"; the Add pill is smaller.
+
+### Photos live outside the recipe records
+
+`kt.images` maps a recipe id to a downscaled data URL (max 1200px, JPEG 0.72).
+They are deliberately *not* stored in `kt.recipes`: "Download updated
+recipes.json" is meant to produce a file someone commits, and inlining base64
+would add hundreds of kilobytes per photo to it. Instead the download writes
+`image: "images/<id>.jpg"`, and **Download photos** saves the actual files to
+drop into `images/` alongside it.
+
+`imageFor()` prefers the local photo over the published path, so a picture
+shows the moment it is attached rather than after a commit. localStorage is
+only a few megabytes; a quota failure returns a plain message telling the user
+to download and commit what they have.
+
 ### The overlay is authoritative
 
 `kt.recipes` holds "the full edited recipe set", so when it exists it replaces

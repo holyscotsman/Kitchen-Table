@@ -732,6 +732,90 @@ img {
   color: var(--card-ink);
 }
 
+/* Thumbnail on the list card. Rendered only when a photo exists, so a recipe
+   without one keeps the original text-only layout rather than reserving a gap. */
+.rcard__thumb {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: var(--r-input);
+  object-fit: cover;
+  background: var(--tag-bg);
+}
+
+.rcard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.minitag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* On a --card surface, --tag-bg is the wrong tier in light mode, so the chip
+   goes outline-only using the card's own ink tokens. */
+.rcard .minitag {
+  background: none;
+  color: var(--card-ink);
+  border: 1px solid var(--card-dim);
+  padding: 2px 9px;
+}
+
+.minitag--link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.r-hero {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: var(--r-card);
+  margin-bottom: 16px;
+}
+
+.r-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.photorow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.photorow__img {
+  width: 84px;
+  height: 84px;
+  border-radius: var(--r-input);
+  object-fit: cover;
+}
+
+.fieldhint {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--dim);
+  margin-top: 6px;
+  text-wrap: pretty;
+}
+
 /* Remove mode swaps every card for a danger-outlined row. */
 .rrow {
   display: flex;
@@ -782,17 +866,19 @@ img {
   pointer-events: none;
 }
 
+/* Trimmed from 60px/24px/18px — it sits over the list permanently, so it only
+   needs to stay comfortably tappable, not dominate the screen. */
 .addpill {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 60px;
-  padding: 0 24px;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
   border-radius: var(--r-pill);
   background: var(--acc);
   color: var(--acc-ink);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   box-shadow: var(--sh-pill);
   text-decoration: none;

@@ -4,6 +4,7 @@
     "title": "Bacon Ranch Chicken Casserole",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 6,
     "cookTime": "44 min (chicken) + 15 min (bake)",
     "ingredients": [
       "2 lbs chicken, cooked and cubed",
@@ -29,14 +30,14 @@
       "Enjoy! Took it with salad."
     ],
     "notes": "Recipe source: favorite.happycoking.com (Bacon Ranch Chicken).",
-    "source": "Chicken",
-    "servings": 6
+    "source": "Chicken"
   },
   {
     "id": "bbq-steak-times",
     "title": "BBQ Steak Times",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 2,
     "ingredients": [
       "Steak (cut of your choice)"
     ],
@@ -46,14 +47,14 @@
       "Grill 10-12 minutes for a medium steak (145°F) — slightly pink and still very juicy."
     ],
     "notes": "This is a grilling time/temperature reference guide (a Google search result screenshot citing Simply Recipes' article 'How Long to Grill Steak'), not a full recipe with an ingredient list or prep instructions.",
-    "source": "BBQ steak times",
-    "servings": 2
+    "source": "BBQ steak times"
   },
   {
     "id": "boiled-eggs-in-ninja",
     "title": "Boiled Eggs in Ninja",
     "category": "Breakfast",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "Eggs",
       "1.5 cups water"
@@ -72,8 +73,7 @@
     "flagged": [
       "No explicit ingredients list appeared in the screenshots — only the numbered instructions were captured, so 'eggs' and '1.5 cups water' are inferred from those steps rather than transcribed from a dedicated ingredients section."
     ],
-    "source": "Boiled eggs in ninja",
-    "servings": 4
+    "source": "Boiled eggs in ninja"
   },
   {
     "id": "chicken-cordon-bleu",
@@ -103,8 +103,9 @@
   {
     "id": "chicken-fritters",
     "title": "Chicken Fritters",
-    "category": "Snack",
+    "category": "Snacks",
     "contributor": "Jennifer",
+    "servings": 4,
     "ingredients": [
       "Shredded chicken (leftover rotisserie chicken breast, or any leftover chicken)",
       "Egg (used as a binder)",
@@ -125,8 +126,7 @@
     "flagged": [
       "Exact ingredient quantities (amount of chicken beyond ~1.5 cups, cream cheese, mozzarella, flour, salt) were never shown as measurements — the source only described each ingredient's purpose, not amounts."
     ],
-    "source": "Chicken fritters",
-    "servings": 4
+    "source": "Chicken fritters"
   },
   {
     "id": "chicken-lasagne",
@@ -163,6 +163,7 @@
     "title": "Air Fryer Chops",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 2,
     "cookTime": "14 min (7 min per side)",
     "ingredients": [],
     "steps": [
@@ -176,14 +177,14 @@
     "flagged": [
       "No ingredients list was visible in either of the two available screenshots - both images show only the 'Instructions' section (steps 1-5), with the ingredients list never captured."
     ],
-    "source": "Chops",
-    "servings": 2
+    "source": "Chops"
   },
   {
     "id": "corn-on-the-cob",
     "title": "Corn on the Cob (Air Fryer)",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "2 ears of corn (husks and silks removed, tips trimmed) — plus more for additional batches",
       "Olive oil",
@@ -205,13 +206,12 @@
       "Only the numbered method steps were visible in the single screenshot — no explicit ingredients list, title, or source website was captured, so the ingredients above are inferred from what's mentioned in the steps.",
       "The end of step 6 is partially covered by app UI icons overlaying the text; reconstructed as best as legible."
     ],
-    "source": "Corn on cob",
-    "servings": 4
+    "source": "Corn on cob"
   },
   {
     "id": "crannachan",
     "title": "Traditional Scottish Cranachan",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Mom",
     "servings": 6,
     "prepTime": "5 min",
@@ -246,6 +246,7 @@
     "title": "Creamy Chicken Casserole",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 6,
     "ingredients": [
       "2-4 Large Boneless Chicken Breasts",
       "1 3/4 cup Chicken broth",
@@ -284,8 +285,7 @@
     "flagged": [
       "The blog presented two ingredient-quantity options ('a little bit of sauce' vs 'a lot of sauce'). The ingredient list above is the formal checklist card (the 'lot of sauce' amounts), but the numbered instructions actually use smaller amounts throughout (matching the 'little bit' option). The ingredient list and instructions may not be perfectly reconciled — worth double-checking before cooking."
     ],
-    "source": "Creamy chicken casserole",
-    "servings": 6
+    "source": "Creamy chicken casserole"
   },
   {
     "id": "chicken-stroganoff",
@@ -324,6 +324,7 @@
     "title": "Crepes",
     "category": "Breakfast",
     "contributor": "Mom",
+    "servings": 4,
     "ingredients": [
       "1 cup all-purpose flour",
       "2 large eggs",
@@ -338,8 +339,7 @@
       "Cook until the top of the crepe is no longer wet and the bottom has turned light brown, 1 to 2 minutes. Run a spatula around the edge of the skillet to loosen the crepe; flip and cook until the other side has turned light brown, about 1 minute more. Serve hot."
     ],
     "notes": "Reviewer tip (Morley, 5 stars): \"Great recipe, with ONE exception: I initially followed the directions to whisk the flour/eggs then add the wet ingredients, but this left me with VERY lumpy unusable batter. Doing the reverse - mixing the eggs & wet stuff then sifting in the flour - worked way better.\"",
-    "source": "Crepes",
-    "servings": 4
+    "source": "Crepes"
   },
   {
     "id": "crescent-roll-breakfast-casserole",
@@ -374,6 +374,7 @@
     "title": "Empinada (Empanadas)",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 4,
     "ingredients": [
       "1/2 pound ground beef",
       "1/4 onion, diced",
@@ -401,14 +402,14 @@
       "Allow to cool slightly before serving with guacamole. Enjoy!"
     ],
     "notes": "Make ahead: freeze before baking (add ~5 min to bake time from frozen) or bake then freeze. Reheat in microwave. Spicy variation: add 1 finely diced jalapeno with the onions/chiles/peppers. Personal tweak noted: 375F for 8-10 mins in air fryer as an alternative cooking method.",
-    "source": "Empinada",
-    "servings": 4
+    "source": "Empinada"
   },
   {
     "id": "fish-pie",
     "title": "Fish Pie",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 6,
     "ingredients": [
       "1 cup fish stock",
       "1 cup milk",
@@ -440,14 +441,14 @@
     "flagged": [
       "There were TWO separate 'Fish Pie' notes in the original Notes folder (creation dates ~2020 and ~2021). Only one exported successfully — same-titled files overwrite each other during export, so the second recipe's content could not be recovered. If you want that one, it needs to be pulled from Notes directly (e.g. rename one before re-exporting)."
     ],
-    "source": "Fish pie",
-    "servings": 6
+    "source": "Fish pie"
   },
   {
     "id": "vanilla-frosting",
     "title": "Vanilla Frosting",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Mom",
+    "servings": 8,
     "ingredients": [
       "3 cups powdered sugar",
       "1/3 cup butter, softened",
@@ -458,14 +459,14 @@
       "In medium bowl, mix powdered sugar and butter with spoon or electric mixer on low speed. Stir in vanilla and 1 tablespoon of the milk.",
       "Gradually beat in just enough remaining milk to make frosting smooth and spreadable. If frosting is too thick, beat in more milk, a few drops at a time. If frosting becomes too thin, beat in a small amount of powdered sugar. Frosts a 13x9-inch cake generously, or fills and frosts an 8- or 9-inch two-layer cake."
     ],
-    "source": "Frosting",
-    "servings": 8
+    "source": "Frosting"
   },
   {
     "id": "frozen-lemonade",
     "title": "Frozen Lemonade",
-    "category": "Drink",
+    "category": "Drinks",
     "contributor": "Me",
+    "servings": 2,
     "ingredients": [
       "1 cup Fresh Squeezed Lemon Juice (Sunkist brand recommended)",
       "1/2 cup Sugar",
@@ -482,14 +483,14 @@
       "Pour into cup and garnish with lemon slice."
     ],
     "notes": "Recipe source: cincyshopper.com.",
-    "source": "Frozen lemonade",
-    "servings": 2
+    "source": "Frozen lemonade"
   },
   {
     "id": "frozen-steak-and-mashed-potatoes",
     "title": "Frozen Steak and Mashed Potatoes",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "5 Russet potatoes, peeled, cut in 1/2-inch pieces",
       "1/2 cup water",
@@ -514,14 +515,14 @@
       "When cooking is complete, remove steaks from rack and allow to rest for 5 minutes before serving with mashed potatoes and asparagus."
     ],
     "notes": "Recipe source: m.ninjakitchen.com (Ninja pressure cooker/air fryer recipe).",
-    "source": "Frozen steak and mashed potatoes",
-    "servings": 4
+    "source": "Frozen steak and mashed potatoes"
   },
   {
     "id": "fries-in-ninja",
     "title": "Fries in Ninja",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [],
     "steps": [
       "390 - 3 mins",
@@ -532,13 +533,12 @@
     "flagged": [
       "Note is titled 'Fries in ninja' but also mentions adding fish partway through - unclear if this is a fries-only setting or a combined fish-and-fries timing note."
     ],
-    "source": "Fries in ninja",
-    "servings": 4
+    "source": "Fries in ninja"
   },
   {
     "id": "grilled-potatoes-and-peppers",
     "title": "Grilled Potatoes & Peppers",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
     "servings": 10,
     "ingredients": [
@@ -563,8 +563,9 @@
   {
     "id": "grilled-zucchini",
     "title": "Grilled Zucchini with Garlic Parmesan Butter",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "prepTime": "12 min",
     "cookTime": "8 min",
     "ingredients": [
@@ -585,14 +586,14 @@
       "The zucchini quantity wasn't visible in the screenshot.",
       "Step 4's exact grill time is obscured by an ad banner in all 3 copies of the screenshot."
     ],
-    "source": "Grilled zucchini",
-    "servings": 4
+    "source": "Grilled zucchini"
   },
   {
     "id": "hibachi-fried-rice",
     "title": "Hibachi Style Fried Rice",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "4 cups cooked short grain rice (preferably leftover, cold)",
       "8 tablespoons margarine",
@@ -625,14 +626,14 @@
     "flagged": [
       "The servings count at the top of the first screenshot is partly cut off by the browser header; couldn't be confirmed."
     ],
-    "source": "Hibachi",
-    "servings": 4
+    "source": "Hibachi"
   },
   {
     "id": "honey-glazed-parsnips",
     "title": "Honey Glazed Parsnips",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "250 g parsnips",
       "15 ml honey",
@@ -646,8 +647,7 @@
       "Place your honey glazed air fryer parsnips in your air fryer.",
       "Cook at 200C for approximately 18 minutes. Start checking from 15 minutes onwards."
     ],
-    "source": "Parsnips in ninja",
-    "servings": 4
+    "source": "Parsnips in ninja"
   },
   {
     "id": "keto-soup",
@@ -704,8 +704,9 @@
   {
     "id": "mushroom-risotto",
     "title": "Mushroom Risotto",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Mom",
+    "servings": 4,
     "cookTime": "About 35 min",
     "ingredients": [
       "1 tablespoon olive oil",
@@ -725,14 +726,14 @@
       "Add wine and cook until evaporated while stirring. Add warmed broth 1/2 cup at a time, stirring until evaporated after each addition. This will take about 20 minutes.",
       "Stir in mushrooms with any juices, parmesan cheese (reserve a couple of tablespoons for garnish) and parsley. Taste and add salt & pepper as needed. Garnish with fresh herbs as desired."
     ],
-    "source": "Mushroom risotto",
-    "servings": 4
+    "source": "Mushroom risotto"
   },
   {
     "id": "ninja-cookies",
     "title": "Ninja Cookies (Chocolate Chip Cookies)",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Me",
+    "servings": 8,
     "cookTime": "10 min per batch",
     "ingredients": [
       "1 cup (2 sticks) butter, softened",
@@ -754,14 +755,14 @@
       "Transfer the baking sheet to the oven, and bake for 10 minutes, or until cookies are golden.",
       "When cooking is complete, allow cookies to cool on baking sheet for 5 minutes, then transfer to a cooling rack. Repeat with remaining batter."
     ],
-    "source": "Ninja cookies",
-    "servings": 8
+    "source": "Ninja cookies"
   },
   {
     "id": "ninja-frozen-meatballs",
     "title": "Ninja Frozen Meatballs",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "Frozen meatballs of your choice"
     ],
@@ -771,14 +772,14 @@
       "Cook for 9 minutes, shaking often."
     ],
     "notes": "No defrosting necessary. Shaking the basket often makes sure the meatballs cook evenly and get a crispy outside and tender inside. No oil needed.",
-    "source": "Ninja frozen meatballs",
-    "servings": 4
+    "source": "Ninja frozen meatballs"
   },
   {
     "id": "parsnips",
     "title": "Parsnips (Air Fryer)",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [],
     "steps": [
       "Preheat air fryer to 390°F (200°C).",
@@ -794,8 +795,7 @@
       "No ingredients list was visible in the single available screenshot. Likely ingredients: parsnips, cooking oil spray, salt, and optional honey.",
       "The last step is cut off mid-sentence ('The parsnips are ready when they are...') by an ad banner, and only one image exists for this recipe."
     ],
-    "source": "Parsnips",
-    "servings": 4
+    "source": "Parsnips"
   },
   {
     "id": "picante-chicken-enchiladas",
@@ -892,6 +892,7 @@
     "title": "Potato Bacon Soup",
     "category": "Dinner",
     "contributor": "Jennifer",
+    "servings": 6,
     "ingredients": [
       "6 strips (uncooked) bacon, cut into small pieces",
       "3 Tablespoons butter",
@@ -922,14 +923,14 @@
       "Top with additional sour cream, bacon, cheddar cheese, or chives. Enjoy!"
     ],
     "notes": "Start with less salt and adjust to taste since it varies with the broth used. If you haven't used ancho chili powder before, start with 1/4 teaspoon. For a completely creamy soup, puree all of it in batches; for chunks of potato, puree only half.",
-    "source": "Potato bacon soup",
-    "servings": 6
+    "source": "Potato bacon soup"
   },
   {
     "id": "potato-scone",
     "title": "Potato Scone",
     "category": "Breakfast",
     "contributor": "Mom",
+    "servings": 4,
     "ingredients": [
       "1 lb / 500 g potatoes (cooked and mashed)",
       "1 oz / 30 g butter (melted, plus extra for greasing)",
@@ -951,14 +952,14 @@
       "Step 1 of the instructions (before 'Preheat the oven') wasn't captured in any screenshot.",
       "The bake step is cut off — text about transferring dough to a baking sheet beforehand may be missing."
     ],
-    "source": "Potato scone",
-    "servings": 4
+    "source": "Potato scone"
   },
   {
     "id": "rice-in-ninja",
     "title": "Rice in Ninja Foodi",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Me",
+    "servings": 4,
     "ingredients": [
       "2 cups brown or white rice",
       "2 1/2 cups water (for white rice)",
@@ -974,14 +975,14 @@
     "flagged": [
       "Step 5's instructions for brown rice are cut off mid-sentence ('If making brown rice allow it...') by an ad banner, and only one screenshot exists for this note, so the rest could not be recovered."
     ],
-    "source": "Rice in ninja",
-    "servings": 4
+    "source": "Rice in ninja"
   },
   {
     "id": "salmon-in-ninja",
     "title": "Perfect Air Fryer Salmon",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 2,
     "prepTime": "5 min",
     "cookTime": "7 min",
     "ingredients": [
@@ -1000,14 +1001,14 @@
     "flagged": [
       "The end of the Notes section is cut off mid-sentence ('...Things cook so fast sometimes a minute more is...') in all three screenshots."
     ],
-    "source": "Salmon in ninja",
-    "servings": 2
+    "source": "Salmon in ninja"
   },
   {
     "id": "satay-sauce",
     "title": "Satay Sauce",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Mom",
+    "servings": 4,
     "ingredients": [
       "1/2 lime, juiced",
       "1 tsp clear honey",
@@ -1019,14 +1020,14 @@
     "steps": [
       "Mix the lime juice, honey, soy sauce, curry powder and peanut butter in a small bowl. Add a splash of water if it's too stiff. Transfer to a small pan with the coconut milk, and heat gently for 5 mins, stirring continually, until combined."
     ],
-    "source": "Satay sauce",
-    "servings": 4
+    "source": "Satay sauce"
   },
   {
     "id": "scone-in-ninja",
     "title": "Scone in Ninja (Air Fryer Scones)",
     "category": "Breakfast",
     "contributor": "Me",
+    "servings": 8,
     "ingredients": [
       "175 g Self Raising Flour",
       "1/2 teaspoon Baking Powder",
@@ -1047,14 +1048,14 @@
       "Remove the scones from the air fryer basket and cool them on a wire rack for 10 minutes before serving."
     ],
     "notes": "Always use cold cubed butter straight from the fridge for a flakey texture. No rolling pin needed — just shape by hand. Make sure your self-raising flour and baking powder are in date to ensure the scones rise.",
-    "source": "Scone in Ninja",
-    "servings": 8
+    "source": "Scone in Ninja"
   },
   {
     "id": "scones",
     "title": "Scones",
     "category": "Breakfast",
     "contributor": "Mom",
+    "servings": 8,
     "prepTime": "10 min",
     "cookTime": "15 min",
     "ingredients": [
@@ -1072,14 +1073,14 @@
       "Turn dough out onto a lightly floured surface, and knead briefly. Roll dough out into a 1/2 inch thick round. Cut into 8 wedges, and place on the prepared baking sheet.",
       "Bake 15 minutes in the preheated oven, or until golden brown."
     ],
-    "source": "Scones",
-    "servings": 8
+    "source": "Scones"
   },
   {
     "id": "scottish-tablet",
     "title": "Scottish Tablet",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Mom",
+    "servings": 20,
     "ingredients": [
       "1 tin condensed milk",
       "1kg granulated sugar",
@@ -1103,14 +1104,14 @@
       "The instructions never explicitly state when the vinegar (listed as an ingredient) gets added — presumably with the condensed milk/sugar/milk in step 1, but not stated directly.",
       "The ingredient list literally reads 'A few drops of white chocolate,' transcribed exactly as shown even though it reads oddly."
     ],
-    "source": "Scottish tablet",
-    "servings": 20
+    "source": "Scottish tablet"
   },
   {
     "id": "shepherds-pie",
     "title": "Shepherds Pie",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 6,
     "prepTime": "20 min",
     "cookTime": "45 min",
     "ingredients": [
@@ -1151,14 +1152,14 @@
       "If the baking dish looks very full, place it on a rimmed baking sheet so that the filling doesn't bubble over into your oven. Bake uncovered for 25-30 minutes. Cool for 15 minutes before serving."
     ],
     "notes": "Recipe lists 'frozen mixed corn & carrots' in the ingredient list but the instructions reference 'frozen peas and carrots, and frozen corn' - transcribed as written in the note.",
-    "source": "Shepherds pie",
-    "servings": 6
+    "source": "Shepherds pie"
   },
   {
     "id": "shrimp-etouffee",
     "title": "Shrimp Etouffee",
     "category": "Dinner",
     "contributor": "Mom",
+    "servings": 4,
     "cookTime": "25 min",
     "ingredients": [
       "1/4 cup margarine",
@@ -1182,13 +1183,12 @@
       "Serve over white rice."
     ],
     "notes": "Cook time 25 min, ready in 45 min total. Cooked in the microwave.",
-    "source": "Shrimp etouffee",
-    "servings": 4
+    "source": "Shrimp etouffee"
   },
   {
     "id": "sponge-cake",
     "title": "Sponge Cake",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Mom",
     "servings": 8,
     "prepTime": "15 min",
@@ -1213,6 +1213,7 @@
     "title": "Square Sausage",
     "category": "Breakfast",
     "contributor": "Mom",
+    "servings": 4,
     "ingredients": [
       "2 lbs/905g minced beef",
       "2 lbs/905g minced pork",
@@ -1228,27 +1229,27 @@
       "Remove it and cut them to the thickness you prefer then put them into freezer bags and put them back in the freezer.",
       "When required, defrost and fry in a little fat or oil until brown and cooked through."
     ],
-    "source": "Square sausage",
-    "servings": 4
+    "source": "Square sausage"
   },
   {
     "id": "steak-time-to-cook",
     "title": "Steak Time to Cook",
     "category": "Dinner",
     "contributor": "Me",
+    "servings": 2,
     "cookTime": "20 min",
     "ingredients": [],
     "steps": [
       "Make it 20 mins in broil mode"
     ],
-    "source": "Steak time to cook",
-    "servings": 2
+    "source": "Steak time to cook"
   },
   {
     "id": "sweet-potato-casserole",
     "title": "Sweet Potato Casserole",
-    "category": "Side",
+    "category": "Sides",
     "contributor": "Jennifer",
+    "servings": 8,
     "cookTime": "25 min (plus 15 min simmer)",
     "ingredients": [
       "2 1/2 pounds sweet potatoes, peeled and cut into 1-inch cubes",
@@ -1265,8 +1266,7 @@
       "Place the sweet potatoes in a Dutch oven, and cover with cold water. Bring to a boil. Reduce heat, and simmer for 15 minutes or until very tender. Drain; cool slightly.",
       "Place potatoes in a large bowl. Add sugar, butter, salt, and vanilla. Mash sweet potato mixture with a potato masher. Fold in 1/4 cup pecans. Scrape potato mixture into an even layer in an 11 x 7-inch baking dish coated with cooking spray. Sprinkle with remaining 1/4 cup pecans; top with marshmallows. Bake at 375 degrees for 25 minutes or until golden."
     ],
-    "source": "Sweet potato casserole",
-    "servings": 8
+    "source": "Sweet potato casserole"
   },
   {
     "id": "taco-pasta",
@@ -1307,7 +1307,7 @@
   {
     "id": "warm-chocolate-pudding-cake",
     "title": "Warm Chocolate Pudding Cake",
-    "category": "Dessert",
+    "category": "Desserts",
     "contributor": "Mom",
     "servings": 8,
     "prepTime": "5 min",
