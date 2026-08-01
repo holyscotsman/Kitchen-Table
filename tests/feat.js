@@ -120,6 +120,23 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('migrated photo lands in the database', await inIdb('chicken-cordon-bleu'));
   chk('legacy key removed after migration', await p.evaluate(()=>localStorage.getItem('kt.images')===null));
   await p.evaluate(()=>new Promise(res=>{const r=indexedDB.open('kt',1);r.onsuccess=()=>{const tx=r.result.transaction('images','readwrite');tx.objectStore('images').delete('chicken-cordon-bleu');tx.oncomplete=()=>res();};}));
+  console.log('\n== A committed-but-missing photo degrades silently (task 064) ==');
+  await p.evaluate(async ()=>{
+    const list = await fetch('recipes.json').then(r=>r.json());
+    list[0].image = 'images/definitely-not-committed.jpg';
+    localStorage.setItem('kt.recipes', JSON.stringify(list));
+  });
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.waitForTimeout(800);
+  chk('broken published path falls back to the category icon',
+      await p.locator('.rcard__thumb').count()===0 && await p.locator('.rcard__icon').count()>0,
+      'thumbs='+await p.locator('.rcard__thumb').count());
+  const brokenId = await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes'))[0].id);
+  await p.goto(B+'/index.html#'+brokenId); await p.waitForSelector('.r-title');
+  await p.waitForTimeout(600);
+  chk('broken hero simply disappears', await p.locator('.r-hero').count()===0);
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   console.log('\n== Quota exhaustion fails loudly (task 011, via the 062 fallback) ==');
   /* Photos normally go to IndexedDB, whose quota is effectively out of reach
      for a test. The loud-failure contract is exercised through the designed

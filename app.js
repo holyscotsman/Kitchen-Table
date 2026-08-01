@@ -830,7 +830,7 @@
        there is always exactly one thing in that slot, so the rows line up. */
     var lead = src
       ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" ' +
-        'width="64" height="64" decoding="async" />'
+        'width="64" height="64" decoding="async" data-cat="' + esc(r.category) + '" />'
       : '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>";
     var tags = tagsOf(r).slice(0, 2);
     return (
@@ -1243,7 +1243,8 @@
 
     var hero = imageFor(r);
     if (hero) {
-      h += '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />';
+      h += '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) +
+           '" decoding="async" />';
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
@@ -2732,6 +2733,32 @@
     if (ev.target.closest && ev.target.closest('.sortmenu, [data-act="toggle-sort"]')) return;
     S.sortOpen = false;
     render();
+  }, true);
+
+  /* A recipe can reference images/<id>.jpg that was downloaded but never
+     actually committed — its local copy gone, the published file absent. The
+     broken-image glyph must never be the fallback: the thumbnail degrades to
+     its category icon and heroes disappear, silently. Error events don't
+     bubble, hence the capture phase. */
+  document.addEventListener("error", function (ev) {
+    var el = ev.target;
+    if (!el || el.tagName !== "IMG") return;
+    if (el.classList.contains("rcard__thumb")) {
+      var span = document.createElement("span");
+      span.className = "rcard__icon";
+      span.setAttribute("aria-hidden", "true");
+      span.innerHTML = catIcon(el.getAttribute("data-cat") || "", 24);
+      el.replaceWith(span);
+    } else if (el.classList.contains("r-hero")) {
+      el.remove();
+    } else if (el.classList.contains("hero__img")) {
+      var blank = document.createElement("div");
+      blank.className = "hero__blank";
+      blank.innerHTML = ART.steam();
+      el.replaceWith(blank);
+    } else if (el.classList.contains("photorow__img")) {
+      el.remove();
+    }
   }, true);
 
   window.addEventListener("hashchange", onRoute);
