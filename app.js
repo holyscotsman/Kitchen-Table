@@ -293,7 +293,7 @@
     addDraft: null,
     addUrl: "",
     addPaste: "",
-    addPhoto: null,
+    addPhotos: [],
 
     mainQ: "",
 
@@ -603,10 +603,18 @@
     return IMG;
   }
 
+  /* A stored value is one data URL, or an array of them when a recipe spans
+     several cards — the first page is the recipe's face everywhere. */
+  function pagesOf(id) {
+    var v = IMG[id];
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
+  }
+
   /* A local photo wins over the published path, so a freshly attached picture
      shows before anyone has committed the file. */
   function imageFor(recipe) {
-    return IMG[recipe.id] || recipe.image || "";
+    return pagesOf(recipe.id)[0] || recipe.image || "";
   }
 
   /* Resolves to "" on success or a user-facing message on failure. */
@@ -704,19 +712,26 @@
       setNotice("There are no photos on this phone yet.");
       return;
     }
-    ids.forEach(function (id, i) {
+    /* Multi-page recipes save as <id>.jpg, <id>-2.jpg, … */
+    var files = [];
+    ids.forEach(function (id) {
+      pagesOf(id).forEach(function (url, page) {
+        files.push({ name: id + (page ? "-" + (page + 1) : "") + ".jpg", url: url });
+      });
+    });
+    files.forEach(function (f, i) {
       setTimeout(function () {
-        var parts = map[id].split(",");
+        var parts = f.url.split(",");
         var bin = atob(parts[1]);
         var bytes = new Uint8Array(bin.length);
         for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-        downloadBlob(bytes, id + ".jpg", "image/jpeg");
+        downloadBlob(bytes, f.name, "image/jpeg");
       }, i * 350);
     });
     setNotice(
-      ids.length === 1
+      files.length === 1
         ? "Saving 1 photo. Put it in the images folder and commit it."
-        : "Saving " + ids.length + " photos. Put them in the images folder and commit them."
+        : "Saving " + files.length + " photos. Put them in the images folder and commit them."
     );
   }
 
@@ -1338,6 +1353,17 @@
 
     h += "</div>";
 
+    /* Later cards of a multi-photo recipe, uncropped — the transcription's
+       source, kept in sight. */
+    var extraPages = pagesOf(r.id).slice(1);
+    if (extraPages.length) {
+      h += '<section class="r-section"><h2 class="r-h2">Recipe card photos</h2>' +
+           extraPages.map(function (u, i) {
+             return '<img class="r-page" src="' + esc(u) + '" alt="' +
+                    esc(r.title) + " — card " + (i + 2) + '" decoding="async" />';
+           }).join("") + "</section>";
+    }
+
     if (r.notes) {
       h += '<section class="r-section"><h2 class="r-h2">Notes</h2>' +
            '<div class="panel">' + esc(r.notes) + "</div></section>";
@@ -1490,12 +1516,16 @@
   }
 
   function photoFieldHtml(id, recipeId, act) {
-    var src = images()[recipeId];
+    var pages = pagesOf(recipeId);
     return '<div class="field">' +
       '<label class="field__label" for="' + id + '">Photo</label>' +
-      (src
-        ? '<div class="photorow"><img class="photorow__img" src="' + esc(src) +
-          '" alt="" /><button type="button" class="delbtn press" ' +
+      (pages.length
+        ? '<div class="photorow"><img class="photorow__img" src="' + esc(pages[0]) +
+          '" alt="" />' +
+          (pages.length > 1
+            ? '<span class="fieldhint">' + pages.length + " pages</span>"
+            : "") +
+          '<button type="button" class="delbtn press" ' +
           'data-act="rm-photo" data-key="' + esc(recipeId) +
           '" aria-label="Remove photo">' + I.x() + "</button></div>"
         : "") +
@@ -1626,8 +1656,20 @@
     }
 
     if (S.addStep === "photo") {
+      /* A long recipe spans two cards — photos accumulate, and all of them
+         are read into one draft and kept as the recipe's pages. */
+      if (S.addPhotos.length) {
+        h += '<ul class="pagelist">' + S.addPhotos.map(function (f, i) {
+          return '<li class="pagelist__row"><span>Photo ' + (i + 1) +
+                 " · " + esc(f.name || "picture") + "</span>" +
+                 '<button type="button" class="delbtn press" data-act="a-photo-rm" ' +
+                 'data-i="' + i + '" aria-label="Remove photo ' + (i + 1) + '">' +
+                 I.x() + "</button></li>";
+        }).join("") + "</ul>";
+      }
       h += '<div class="field"><label class="field__label" for="a-photo">' +
-           "Photo of the recipe</label>" +
+           (S.addPhotos.length ? "Add another photo" : "Photo of the recipe") +
+           "</label>" +
            '<input class="input" id="a-photo" type="file" accept="image/*" ' +
            'data-act="a-photo" /></div>';
       h += '<p class="addscreen__note">The text is read on this phone — the ' +
@@ -1635,7 +1677,8 @@
            "printed text, and it will get some things wrong; anything it isn’t " +
            "sure about gets flagged for you on the next screen.</p>";
       h += '<button type="button" class="savebtn press" data-act="add-ocr"' +
-           (S.addBusy || !S.addPhoto ? " disabled" : "") + ">Read the photo</button>";
+           (S.addBusy || !S.addPhotos.length ? " disabled" : "") + ">Read the photo" +
+           (S.addPhotos.length > 1 ? "s" : "") + "</button>";
       h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
       h += "</div>";
       return h;
@@ -1773,7 +1816,7 @@
     S.addError = "";
     S.addUrl = "";
     S.addPaste = "";
-    S.addPhoto = null;
+    S.addPhotos = [];
     location.hash = "#" + id;
   }
 
@@ -2062,36 +2105,61 @@
   }
 
   function importFromPhoto() {
-    if (!S.addPhoto) return;
+    if (!S.addPhotos.length) return;
+    var photos = S.addPhotos.slice();
+    var many = photos.length > 1;
     S.addError = "";
     S.addBusy = "Getting ready…";
     render();
 
     loadTesseract()
       .then(function (T) {
-        S.addBusy = "Reading the photo… this can take a minute.";
-        render();
-        return T.recognize(S.addPhoto, "eng", {
-          logger: function (m) {
-            if (m.status === "recognizing text" && typeof m.progress === "number") {
-              S.addBusy = "Reading the photo… " + Math.round(m.progress * 100) + "%";
-              var n = document.querySelector(".notice");
-              if (n) n.textContent = S.addBusy;
-            }
-          }
+        /* Sequential, one card at a time — the texts join into one draft. */
+        var texts = [];
+        var chain = Promise.resolve();
+        photos.forEach(function (file, i) {
+          chain = chain.then(function () {
+            S.addBusy = many
+              ? "Reading photo " + (i + 1) + " of " + photos.length + "…"
+              : "Reading the photo… this can take a minute.";
+            render();
+            return T.recognize(file, "eng", {
+              logger: function (m) {
+                if (m.status === "recognizing text" && typeof m.progress === "number") {
+                  S.addBusy = (many ? "Photo " + (i + 1) + " of " + photos.length + " — " : "") +
+                    "reading… " + Math.round(m.progress * 100) + "%";
+                  var n = document.querySelector(".notice");
+                  if (n) n.textContent = S.addBusy;
+                }
+              }
+            }).then(function (res) {
+              texts.push((res && res.data && res.data.text) || "");
+            });
+          });
         });
+        return chain.then(function () { return texts; });
       })
-      .then(function (res) {
-        var text = (res && res.data && res.data.text) || "";
+      .then(function (texts) {
+        var text = texts.join("\n\n");
         if (!text.trim()) {
           throw new Error("No readable text was found in that picture. Try a clearer, flatter photo.");
         }
         var draft = draftFromText(text);
-        draft.flagged.push("Read from a photo — the text will have mistakes. Check every line.");
-        S.addDraft = draft;
-        S.addStep = "review";
-        S.addBusy = "";
-        render();
+        draft.flagged.push(many
+          ? "Read from " + photos.length + " photos — the text will have mistakes, " +
+            "and the join between cards may sit mid-list. Check every line."
+          : "Read from a photo — the text will have mistakes. Check every line.");
+        /* The cards themselves are kept as the recipe's pages, so the source
+           is always one tap away from the transcription. */
+        return Promise.all(photos.map(readPhoto)).then(function (pages) {
+          return setImage("__new__", many ? pages : pages[0]).then(function (err) {
+            if (err) draft.flagged.push("The photos couldn’t be kept on this phone (" + err + ")");
+            S.addDraft = draft;
+            S.addStep = "review";
+            S.addBusy = "";
+            render();
+          });
+        });
       })
       .catch(function (err) {
         S.addBusy = "";
@@ -2375,7 +2443,7 @@
       S.addBusy = "";
       S.addUrl = "";
       S.addPaste = "";
-      S.addPhoto = null;
+      S.addPhotos = [];
     }
 
     if (changedRecipe) {
@@ -2710,8 +2778,15 @@
       return;
     }
     if (act === "a-photo") {
-      S.addPhoto = (el.files && el.files[0]) || null;
+      var picked = el.files && el.files[0];
+      if (picked) S.addPhotos.push(picked);
+      el.value = "";
       S.addError = "";
+      render();
+      return;
+    }
+    if (act === "a-photo-rm") {
+      S.addPhotos.splice(idx, 1);
       render();
       return;
     }

@@ -359,7 +359,7 @@ bulk tagging exists before anyone is asked to tag.*
   - *Needs:* `062` · *Done when:* the fallback to the category icon is silent.
 - [x] `065` 🤖 **FE-A** — Add a photo lightbox on the recipe page, since a hero at 280px is not enough to read a handwritten card.
   - *Needs:* `057` · *Done when:* it opens, traps focus, closes on Escape and returns focus — same contract as every other sheet.
-- [ ] `066` 🤖 **FE-B** — Support importing several photos into one recipe, since a long recipe spans two cards.
+- [x] `066` 🤖 **FE-B** — Support importing several photos into one recipe, since a long recipe spans two cards.
   - *Needs:* `062` `057` · *Done when:* two cards produce one recipe with both pages retained.
 - [ ] `067` 🤖 **FE-B** — Add tag autocomplete drawing on tags already in use, to stop near-duplicates being created.
   - *Needs:* `060` `028` · *Done when:* typing "ital" offers "Italian" before it offers to create "italian". **→ README**
@@ -618,6 +618,7 @@ finds out what the last one learned.*
 | `063` | 2026-08-01 | Thumbs carry `width/height/loading=lazy/decoding=async`; hero reserved by `aspect-ratio` (057). Measured with all 48 recipes photographed and a full scroll: **CLS 0.0000**, gated at 0.02 in CI (`tests/perf.js`). |
 | `064` | 2026-08-01 | A referenced-but-absent `images/<id>.jpg` never shows a broken glyph: capture-phase error handler swaps thumbs to their category icon, drops heroes, restores the Main blank. Asserted in feat.js. |
 | `065` | 2026-08-01 | The hero taps open the whole photograph — the writing a 3:2 crop loses is the point. Full dialog contract (trap, Escape, focus return) by joining the sheets' machinery; native pinch-zoom preserved on the image. |
+| `066` | 2026-08-01 | Photos accumulate on the Add path; all are OCR'd in sequence into one draft, and the cards are kept as the recipe's pages — page 1 is the hero, later cards render whole, Download photos writes `<id>-2.jpg`, and the flag says the join may sit mid-list. |
 
 ---
 

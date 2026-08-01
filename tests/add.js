@@ -136,6 +136,64 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.waitForTimeout(250);
   chk('back works', await p.locator('.pathbtn').count()===3);
 
+  console.log('\n== Two cards, one recipe (task 066) ==');
+  /* A stub recogniser stands in for Tesseract (the real one runs in
+     tests/ocr-live.js); what's under test is the multi-photo flow. */
+  const ctx2 = await br.newContext({...devices['iPhone 13']});
+  const p2 = await ctx2.newPage();
+  await p2.addInitScript(() => {
+    window.Tesseract = {
+      recognize: (file) => new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res({ data: { text:
+          file.name === 'card1.jpg'
+            ? 'Two Card Scones\nIngredients\n2 cups flour\n1 cup milk'
+            : 'Instructions\nMix everything.\nBake at 400 for 15 minutes.'
+        } });
+        fr.readAsArrayBuffer(file);
+      })
+    };
+  });
+  await p2.goto(B+'/index.html#add');
+  await p2.waitForSelector('.pathbtn');
+  await p2.click('[data-key="photo"]');
+  await p2.waitForSelector('#a-photo');
+  const addCard = name => p2.evaluate(async n => {
+    const c = document.createElement('canvas'); c.width = 400; c.height = 300;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 400, 300);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+    const input = document.getElementById('a-photo');
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], n, { type: 'image/jpeg' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, name);
+  await addCard('card1.jpg'); await p2.waitForTimeout(300);
+  chk('first photo listed', await p2.locator('.pagelist__row').count()===1);
+  chk('label flips to "Add another photo"', (await p2.locator('.field__label').first().textContent())==='Add another photo');
+  await addCard('card2.jpg'); await p2.waitForTimeout(300);
+  chk('second photo listed', await p2.locator('.pagelist__row').count()===2);
+  chk('read button says photos', (await p2.locator('[data-act="add-ocr"]').textContent()).includes('photos'));
+  await p2.click('[data-act="add-ocr"]');
+  await p2.waitForSelector('#a-title', { timeout: 20000 });
+  chk('title from card 1', (await p2.inputValue('#a-title'))==='Two Card Scones', await p2.inputValue('#a-title'));
+  chk('steps from card 2', await p2.locator('[data-k="steps"][data-act="adl"]').count()===2, String(await p2.locator('[data-k="steps"][data-act="adl"]').count()));
+  chk('flag names both photos', (await p2.locator('.panel--flag').textContent()).includes('2 photos'));
+  await p2.click('[data-act="add-save"]');
+  await p2.waitForTimeout(700);
+  chk('recipe page opens', await p2.locator('.r-title').count()===1);
+  chk('hero from page one', await p2.locator('.herobtn .r-hero').count()===1);
+  chk('second card shown whole', await p2.locator('.r-page').count()===1, String(await p2.locator('.r-page').count()));
+  const pages = await p2.evaluate(() => new Promise(res => {
+    const r = indexedDB.open('kt', 1);
+    r.onsuccess = () => {
+      const g = r.result.transaction('images').objectStore('images').get('two-card-scones');
+      g.onsuccess = () => res(Array.isArray(g.result) ? g.result.length : (g.result ? 1 : 0));
+    };
+  }));
+  chk('both pages retained in the store', pages===2, String(pages));
+  await ctx2.close();
+
   console.log('\n== Tap targets on the add screen ==');
   await p.click('[data-key="review"]');
   await p.waitForSelector('#a-title');
