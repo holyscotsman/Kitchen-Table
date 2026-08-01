@@ -283,7 +283,7 @@ it, each with its task number in the log there:
 
 ### Verified
 
-The suite as of the gameplan era: **279 functional checks** across nine
+The suite as of the gameplan era: **278 functional checks** across eight
 suites (kt 83, feat 49, add 58, relay 16, quick 21, polish 26, sec 16,
 zoom 9, plus the perf budget: FCP 720 ms median on throttled 3G against a
 4000 ms gate, CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
