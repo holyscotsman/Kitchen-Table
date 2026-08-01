@@ -318,7 +318,7 @@ because it can only be written once every legitimate origin is known.*
 composed from the existing vocabulary by an engineer. They hold together and
 they pass contrast, but nobody with a designer's eye has reviewed them.*
 
-- [ ] `053` 🤖 **UI** — Audit the Add and Import screens against `styleguide.html` and mark every value that was improvised.
+- [x] `053` 🤖 **UI** — Audit the Add and Import screens against `styleguide.html` and mark every value that was improvised.
   - *Needs:* — · *Done when:* a list exists of every size, space and radius that is not in the styleguide.
 - [ ] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
   - *Needs:* `007` `053` · *Done when:* the `@media print` block's literal black, white and grey are tokens, and the file's hex count outside it is still zero. **Any new value is asked for, never invented.**
@@ -610,6 +610,7 @@ finds out what the last one learned.*
 | `050` | 2026-08-01 | The link-import disclosure now names every relay by name, drawn from the live `RELAYS` list so text and code can't drift, and says exactly what is sent (the pasted address, nothing else) before any request is made. |
 | `051` | 2026-08-01 | Every imported draft's flagged entry now says which route answered — "fetched directly from the site" or "fetched through allorigins.win" — so a persistent failure is diagnosable. Asserted in add.js. |
 | *Phase 5* | 2026-08-01 | **Closed.** 4 of 6 done; `049` and `052` parked on the iPhone font check (§11). CLAUDE.md's known-limits brought current — the "sandbox cannot reach the Tesseract CDN" limit no longer holds. |
+| `053` | 2026-08-01 | `design/improvised-values.md`: every Add/edit value sorted into complies / deliberate-scaling-deviation / improvised-awaiting-designer. One compliance miss fixed on the spot — `.outlinebtn` 58→60, the styleguide's secondary-button height. |
 
 ---
 
