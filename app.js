@@ -3,7 +3,7 @@
 
    Plain ES2018, no build step, no framework. A hash router over three screens:
      #            → Main
-     #menu        → Menu   (#menu?who=Mom / #menu?cat=Dinner pre-filter it)
+     #menu        → Menu   (#menu?who=Joan / #menu?cat=Dinner pre-filter it)
      #<recipe-id> → Recipe
 
    Rendering is a full re-render of the active screen into #app on every state
@@ -48,7 +48,13 @@
     Side: "Sides", Dessert: "Desserts", Snack: "Snacks", Drink: "Drinks"
   };
 
-  var WHO = ["Mom", "Jason", "Jennifer"];
+  /* Everyone with a section, whether or not they have recipes yet. Joan holds
+     the whole collection today; the rest are here so there is somewhere to put
+     a recipe when they contribute one. */
+  var WHO = ["Joan", "Jason", "Jennifer", "Lindsay", "Siobhan"];
+
+  /* Earlier names, mapped so a device holding a saved overlay keeps resolving. */
+  var WHO_ALIASES = { Mom: "Joan", Me: "Jason" };
   var FIELD_ORDER = [
     "id", "title", "category", "contributor", "servings", "prepTime",
     "cookTime", "ingredients", "steps", "notes", "flagged", "source",
@@ -81,7 +87,18 @@
      works above it — the mode is additive, not a replacement. */
   var EASY_MIN_FS = 2;
 
-  var CORS_PROXY = "https://api.allorigins.win/raw?url=";
+  /* A static page cannot fetch another origin, so the page has to come through
+     a relay. Any one free relay goes down — allorigins was returning 522 for a
+     while — so they are tried in turn, and the last one returns readable text
+     rather than HTML, which the photo parser can still make sense of. If every
+     one of them fails there is always the paste box, which needs no network. */
+  var RELAYS = [
+    { url: function (u) { return u; }, kind: "html" },
+    { url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
+    { url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
+    { url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
+  ];
+  var RELAY_TIMEOUT = 12000;
   var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 
   function load(key, fallback) {
@@ -229,6 +246,7 @@
     addError: "",
     addDraft: null,
     addUrl: "",
+    addPaste: "",
     addPhoto: null,
 
     mainQ: "",
@@ -403,7 +421,7 @@
   function normalizeRecipe(r) {
     var out = {};
     Object.keys(r).forEach(function (k) { out[k] = r[k]; });
-    if (out.contributor === "Me") out.contributor = "Jason";
+    if (WHO_ALIASES[out.contributor]) out.contributor = WHO_ALIASES[out.contributor];
     if (CAT_ALIASES[out.category]) out.category = CAT_ALIASES[out.category];
     if (CATS.indexOf(out.category) === -1) out.category = "Dinner";
     if (out.tags && !Array.isArray(out.tags)) delete out.tags;
@@ -595,8 +613,12 @@
     h += '<section class="band"><h2 class="band__h">Whose recipe?</h2>' +
          '<div class="who-grid">' +
          WHO.map(function (name) {
-           return '<a class="who-tile press" href="#menu?who=' + encodeURIComponent(name) + '">' +
-                  '<span class="who-tile__count">' + countBy(S.recipes, "contributor", name) + "</span>" +
+           var n = countBy(S.recipes, "contributor", name);
+           /* A section with nothing in it yet recedes rather than shouting a
+              zero — it is a place to put something, not a result. */
+           return '<a class="who-tile press' + (n ? "" : " who-tile--empty") +
+                  '" href="#menu?who=' + encodeURIComponent(name) + '">' +
+                  '<span class="who-tile__count">' + n + "</span>" +
                   '<span class="who-tile__name">' + esc(name) + "</span></a>";
          }).join("") +
          "</div></section>";
@@ -742,8 +764,15 @@
          "</span></div>";
 
     if (!list.length) {
-      h += '<div class="emptystate"><p>No recipes match. Try a different word, ' +
-           "or clear the filters.</p>" +
+      /* "No recipes match" is the wrong sentence when a person simply hasn't
+         contributed anything yet — say what is actually true. */
+      var lonePerson = S.who.length === 1 && !S.cats.length && !S.tags.length &&
+        !S.menuQ && !countBy(S.recipes, "contributor", S.who[0]) ? S.who[0] : "";
+      h += '<div class="emptystate"><p>' +
+           (lonePerson
+             ? esc(lonePerson) + " hasn’t added any recipes yet."
+             : "No recipes match. Try a different word, or clear the filters.") +
+           "</p>" +
            '<button type="button" class="bigbtn press" data-act="show-all">' +
            "Show all recipes</button>" +
            /* Recovery path: if the list is empty because recipes were removed
@@ -893,12 +922,13 @@
       '<button type="button" class="donebtn press" data-act="close-filter">Done</button>' +
       "</div>" +
       '<h3 class="grouph">Who it’s from</h3><div class="chiprow">' +
-      WHO.map(function (name) {
-        var on = S.who.indexOf(name) > -1;
-        return '<button type="button" class="chip press" aria-pressed="' + on +
-               '" data-act="fw" data-key="' + esc(name) + '">' +
-               esc(name) + " (" + countWho(name) + ")</button>";
-      }).join("") + "</div>" +
+      WHO.filter(function (n) { return countBy(S.recipes, "contributor", n); })
+        .map(function (name) {
+          var on = S.who.indexOf(name) > -1;
+          return '<button type="button" class="chip press" aria-pressed="' + on +
+                 '" data-act="fw" data-key="' + esc(name) + '">' +
+                 esc(name) + " (" + countWho(name) + ")</button>";
+        }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
       CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
         .map(function (cat) {
@@ -1131,7 +1161,7 @@
     }
 
     if (r.source) {
-      h += '<p class="sourceline">From Mom’s screenshots · ' + esc(r.source) + "</p>";
+      h += '<p class="sourceline">From Joan’s screenshots · ' + esc(r.source) + "</p>";
     }
 
     h += "</div>";
@@ -1353,12 +1383,26 @@
            "Recipe address</label>" +
            '<input class="input" id="a-url" type="url" placeholder="https://…" ' +
            'data-act="a-url" value="' + esc(S.addUrl || "") + '" /></div>';
-      h += '<p class="addscreen__note">Most recipe sites block other sites from ' +
-           "reading their pages directly, so the page is fetched through a free " +
-           "public relay (allorigins.win). The address you paste is sent to that " +
-           "relay. Nothing else about you is.</p>";
+      h += '<p class="addscreen__note">Most recipe sites stop other sites reading ' +
+           "their pages directly, so this goes through a free public relay. The " +
+           "address you paste is sent to that relay; nothing else about you is. " +
+           "Relays go down sometimes — if it can’t get through, use the box " +
+           "below.</p>";
       h += '<button type="button" class="savebtn press" data-act="add-fetch"' +
            (S.addBusy ? " disabled" : "") + ">Fetch the recipe</button>";
+
+      /* The path that never fails: no network, no relay, no third party. */
+      h += '<div class="field" style="margin-top:26px">' +
+           '<label class="field__label" for="a-paste">Or paste the recipe text</label>' +
+           '<textarea class="textarea" id="a-paste" rows="8" data-act="a-paste" ' +
+           'placeholder="Copy the recipe off the page and paste it here — title, ' +
+           'ingredients, then the steps.">' + esc(S.addPaste || "") + "</textarea>" +
+           '<span class="fieldhint">Works offline and always works. Keep the ' +
+           "site’s own “Ingredients” and “Instructions” headings in if you can — " +
+           "they make the split exact rather than guessed.</span></div>";
+      h += '<button type="button" class="outlinebtn press" data-act="add-paste"' +
+           (S.addPaste && S.addPaste.trim() ? "" : " disabled") +
+           ">Read the pasted text</button>";
       h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
       h += "</div>";
       return h;
@@ -1510,6 +1554,7 @@
     S.addStep = "choose";
     S.addError = "";
     S.addUrl = "";
+    S.addPaste = "";
     S.addPhoto = null;
     location.hash = "#" + id;
   }
@@ -1524,6 +1569,49 @@
 
   /* ---- from a link: schema.org/Recipe JSON-LD via a public relay ---- */
 
+  function fetchWithTimeout(url) {
+    if (typeof AbortController === "undefined") return fetch(url);
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, RELAY_TIMEOUT);
+    return fetch(url, { signal: ctl.signal }).then(
+      function (res) { clearTimeout(timer); return res; },
+      function (err) { clearTimeout(timer); throw err; }
+    );
+  }
+
+  /* Walks the relay list until one returns something usable. */
+  function fetchViaRelays(url, index) {
+    index = index || 0;
+    if (index >= RELAYS.length) {
+      return Promise.reject(new Error(
+        "None of the ways in could reach that page — the site may block it, or " +
+        "the relay services may be down. Paste the recipe text below instead; " +
+        "that always works."
+      ));
+    }
+    var relay = RELAYS[index];
+    S.addBusy = "Fetching the page… (" + (index + 1) + " of " + RELAYS.length + ")";
+    render();
+
+    return fetchWithTimeout(relay.url(url))
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (body) {
+        if (!body || body.length < 200) throw new Error("empty response");
+        var draft = relay.kind === "html" ? recipeFromHtml(body) : null;
+        if (draft) return { draft: draft, guessed: false };
+        /* r.jina.ai hands back readable text rather than markup — no JSON-LD to
+           find, but the photo parser handles exactly this shape. */
+        if (relay.kind === "text") return { draft: draftFromText(body), guessed: true };
+        throw new Error("no recipe data");
+      })
+      .catch(function () {
+        return fetchViaRelays(url, index + 1);
+      });
+  }
+
   function importFromLink() {
     var url = (S.addUrl || "").trim();
     S.addError = "";
@@ -1535,21 +1623,16 @@
     S.addBusy = "Fetching the page…";
     render();
 
-    fetch(CORS_PROXY + encodeURIComponent(url))
-      .then(function (res) {
-        if (!res.ok) throw new Error("The relay couldn’t fetch that page (" + res.status + ").");
-        return res.text();
-      })
-      .then(function (html) {
-        var draft = recipeFromHtml(html);
-        if (!draft) {
-          throw new Error(
-            "That page loaded, but it doesn’t publish recipe data this site can " +
-            "read. Try the photo option, or type it in."
-          );
-        }
+    fetchViaRelays(url)
+      .then(function (result) {
+        var draft = result.draft;
         draft.source = url;
-        draft.flagged.push("Imported from a link — check it against the original.");
+        draft.flagged.push(
+          result.guessed
+            ? "Read from the page as plain text — the split between ingredients " +
+              "and steps was guessed. Check both lists against the original."
+            : "Imported from a link — check it against the original."
+        );
         S.addDraft = draft;
         S.addStep = "review";
         S.addBusy = "";
@@ -1557,9 +1640,7 @@
       })
       .catch(function (err) {
         S.addBusy = "";
-        S.addError = /Failed to fetch|NetworkError|Load failed/i.test(err.message)
-          ? "Couldn’t reach the relay. Check the connection and try again, or type the recipe in."
-          : err.message;
+        S.addError = err.message;
         render();
       });
   }
@@ -1988,11 +2069,21 @@
     var changedRecipe = next.name !== "recipe" || next.id !== S.route.id;
     var changedRoute = routeKey(next) !== routeKey(S.route);
 
-    if (next.name === "menu" &&
-        (next.who.length || next.cats.length || next.tags.length)) {
-      S.who = next.who;
-      S.cats = next.cats;
-      S.tags = next.tags;
+    if (next.name === "menu") {
+      if (next.who.length || next.cats.length || next.tags.length) {
+        S.who = next.who;
+        S.cats = next.cats;
+        S.tags = next.tags;
+      } else if (S.route.name !== "recipe") {
+        /* A bare #menu means the whole menu. Without this, arriving from
+           #menu?who=Lindsay leaves the filter applied while the address bar
+           claims otherwise. Coming back from a recipe is the exception — that
+           should return the list as you left it, which is why the scroll
+           position is restored too. */
+        S.who = [];
+        S.cats = [];
+        S.tags = [];
+      }
     }
 
     /* Arriving at Add from elsewhere starts a fresh one. Staying on it keeps
@@ -2003,6 +2094,7 @@
       S.addError = "";
       S.addBusy = "";
       S.addUrl = "";
+      S.addPaste = "";
       S.addPhoto = null;
     }
 
@@ -2135,13 +2227,31 @@
       if (it > -1) S.tags.splice(it, 1); else S.tags.push(key);
       render(); return;
     }
-    if (act === "reset-filters") { S.who = []; S.cats = []; S.tags = []; render(); return; }
+    /* Clearing filters has to drop them from the address too. Otherwise the
+       list shows everything while the URL still says ?who=…, and a reload or a
+       shared link quietly re-applies it. */
+    function dropFilterParams() {
+      if (/^#menu\?/.test(location.hash)) {
+        location.hash = "#menu";
+        return true;
+      }
+      return false;
+    }
+    if (act === "reset-filters") {
+      S.who = []; S.cats = []; S.tags = [];
+      if (!dropFilterParams()) render();
+      return;
+    }
     if (act === "clear-filters") {
-      S.who = []; S.cats = []; S.tags = []; S.menuQ = ""; render(); return;
+      S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
+      if (!dropFilterParams()) render();
+      return;
     }
     if (act === "show-all") {
       S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
-      S.searchOpen = false; render(); return;
+      S.searchOpen = false;
+      if (!dropFilterParams()) render();
+      return;
     }
     if (act === "toggle-remove") { S.removing = !S.removing; render(); return; }
     if (act === "reset-local") { resetLocal(); return; }
@@ -2172,6 +2282,18 @@
       return;
     }
     if (act === "add-fetch") { importFromLink(); return; }
+    if (act === "add-paste") {
+      var text = (S.addPaste || "").trim();
+      if (!text) return;
+      var draft = draftFromText(text);
+      draft.source = (S.addUrl || "").trim() || "Pasted text";
+      S.addDraft = draft;
+      S.addStep = "review";
+      S.addError = "";
+      S.addBusy = "";
+      render();
+      return;
+    }
     if (act === "add-ocr") { importFromPhoto(); return; }
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
@@ -2235,6 +2357,14 @@
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
     if (act === "a-url") { S.addUrl = el.value; return; }
+    if (act === "a-paste") {
+      var had = !!(S.addPaste || "").trim();
+      S.addPaste = el.value;
+      /* Re-render only when the button's enabled state actually flips, so
+         typing doesn't rebuild the textarea on every keystroke. */
+      if (had !== !!el.value.trim()) render();
+      return;
+    }
     if (act === "e-photo-act" || act === "a-photo-act") {
       var file = el.files && el.files[0];
       if (!file) return;
