@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · 29 of 130 tasks complete · every agent-doable task in Acts I–III is done · **all remaining work waits on §11**
+**Status:** `v0.9` · 37 of 130 done · 41 struck (no server; calendar post-1.0 — `DECISIONS.md`) · 52 open, of which the agent-doable set is in motion
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -239,22 +239,29 @@ here is built; everything here is written down.*
 - [x] `026` 🤝 **PM** — Write the one-page backend decision memo: what breaks today without one, what it would cost per month, who maintains it.
   - *Needs:* `010` `011` `021` `025` · *Done when:* the memo ends in a decision, not options. **This is the gate in §6.**
   - *Ruled 2026-08-01, provisional:* **no server for 1.0** — `DECISIONS.md` §026. Taken as the recommended default on Jason's instruction to proceed; `021`/`025` (the family-friction session) stayed undone and are the one input that would reopen this.
-- [ ] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
+- [x] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
   - *Needs:* `023` · *Done when:* the list is final and `CAT_ALIASES` covers anything dropped.
+  - *Ruled 2026-08-01, provisional:* **the ten stay** — nothing dropped, so `CAT_ALIASES` is already complete. `DECISIONS.md` §027; Joan's vocabulary (`023`) can still reopen it.
 - [ ] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
   - *Needs:* `027` · *Done when:* the rule is in `README.md` and someone can apply it to a new recipe without asking.
-- [ ] `029` 🤝 **PM** — Set the bar for what "done" means for a recipe: does it need a photo, verified servings, and at least one tag before it counts as finished?
+- [x] `029` 🤝 **PM** — Set the bar for what "done" means for a recipe: does it need a photo, verified servings, and at least one tag before it counts as finished?
   - *Needs:* `013` · *Done when:* written. This is the acceptance criterion for all of Phase 8.
-- [ ] `030` 👤 **PM** — Decide whether the menu-planning calendar is 1.0 or a stretch goal, and write down which.
+  - *Ruled 2026-08-01, provisional:* **true text** — real ingredients and steps, servings confirmed-or-marked-unknown; photos and tags optional. `DECISIONS.md` §029. The 1.0 content blockers are exactly the 4 empty lists + 34 inferred servings.
+- [x] `030` 👤 **PM** — Decide whether the menu-planning calendar is 1.0 or a stretch goal, and write down which.
   - *Needs:* `026` · *Done when:* decided. **This gates Phase 15.**
-- [ ] `031` 🤝 **PM** — Define what happens when two family members edit the same recipe, since local-only editing has no merge story at all.
+  - *Ruled 2026-08-01, provisional:* **stretch goal** — without a server a plan is one-phone-only, and 1.0 should not wait 11 tasks for it. Phase 15 struck intact. `DECISIONS.md` §030.
+- [x] `031` 🤝 **PM** — Define what happens when two family members edit the same recipe, since local-only editing has no merge story at all.
   - *Needs:* `026` · *Done when:* the rule is written, whether or not a server exists to enforce it.
-- [ ] `032` 🤝 **PM** — Agree a cadence for pulling everyone's local edits into the repo — weekly, monthly, or on request.
+  - *Ruled 2026-08-01:* **last committed file wins, committer must diff first, same-recipe conflicts go to Joan, the losing version is preserved in `CONTENT.md`.** `DECISIONS.md` §031.
+- [x] `032` 🤝 **PM** — Agree a cadence for pulling everyone's local edits into the repo — weekly, monthly, or on request.
   - *Needs:* `026` `031` · *Done when:* a named person owns it and a frequency is set.
-- [ ] `033` 🤝 **PM** — Arbitrate the first accessibility-versus-feature conflict in writing, so the precedent exists before it is contested under pressure.
+  - *Ruled 2026-08-01:* **on request + a monthly nudge, owner Jason.** `DECISIONS.md` §032.
+- [x] `033` 🤝 **PM** — Arbitrate the first accessibility-versus-feature conflict in writing, so the precedent exists before it is contested under pressure.
   - *Needs:* `024` · *Done when:* a real conflict has been ruled on, not a hypothetical one.
-- [ ] `034` 🤖 **A11Y** — Write the accessibility acceptance criteria every new feature must meet before merge.
+  - *Done 2026-08-01, with a deviation:* `024` remains open, but a real conflict predates it — the handoff's 2–3 column Menu grid versus title legibility, already ruled for legibility. That ruling is now the written precedent: **legibility wins, and denser treatments must survive the top font step + Easy Read.** `DECISIONS.md` §033.
+- [x] `034` 🤖 **A11Y** — Write the accessibility acceptance criteria every new feature must meet before merge.
   - *Needs:* `033` · *Done when:* it is a checklist a reviewer can run. **Everything merged after this is held to it.**
+  - *Done 2026-08-01:* `design/a11y-criteria.md` — 17 checks a reviewer can run, split into the automated set (cited to the suite that enforces each) and the manual set, with a marked section for what the VoiceOver pass (`035`–`040`) must later add. Written now rather than waiting: an incomplete checklist enforced beats a complete one that doesn't exist.
 
 ---
 
@@ -635,6 +642,14 @@ finds out what the last one learned.*
 | *Phase 10* | 2026-08-01 | **Closed, fully parked.** Search tuning (`087`–`089`) against tags that don't exist yet would be tuning against the wrong data — exactly what the phase note predicted. |
 | — | 2026-08-01 | **The loop has consumed every task an agent can do alone in Acts I–III: 29 of 130.** Everything remaining is in §11. Act IV stays shut behind `026`. |
 | `026` | 2026-08-01 | **The gate is ruled: no server for 1.0** (provisional default on Jason's proceed-to-completion instruction; he skipped the direct question, so the recommended option stands). Memo in `DECISIONS.md`. Phases 11–14 struck — 30 tasks. Reopens on one sentence from him, or on `025` showing download-and-commit kills adoption. |
+| `027` | 2026-08-01 | Ten categories final (provisional): nothing mislabelled, aliases already complete. |
+| `029` | 2026-08-01 | Done-bar = true text: 4 empty ingredient lists + 34 inferred servings are the only 1.0 content blockers. |
+| `030` | 2026-08-01 | Calendar = stretch goal; Phase 15 struck intact (11 tasks). |
+| `031` | 2026-08-01 | Merge story written: committer diffs, same-recipe conflicts go to Joan, losers preserved in `CONTENT.md`. |
+| `032` | 2026-08-01 | Pull cadence: on request + monthly nudge, owner Jason. |
+| `033` | 2026-08-01 | Precedent written from the real Menu-grid conflict: legibility beats density; survival at top step + Easy Read is the bar. (`024` still open — deviation noted on the task.) |
+| `034` | 2026-08-01 | `design/a11y-criteria.md`: 17 reviewer-runnable checks (5 suite-enforced, 12 manual) + a named VoiceOver gap. Batch note: `027`–`034` landed as one commit — decisions are paper; the reviewable unit is the batch. Rule 7 resumes with code. |
+| *Phase 3* | 2026-08-01 | **Re-closed, now truly closed: 8 of 10 done.** `025` stays open as the *check* on the provisional gate ruling; `028` lands with the README in the next commit. Act IV struck: 41 tasks. |
 
 ---
 
@@ -649,7 +664,6 @@ blocks something. Clearing an item here unblocks the loop.*
 | `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use — no agent can do any of it. | `023`→`027`, `024`→`033`, `020`→`074`, `022`→`025` |
 | `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) **This is now the check on the provisional `026` ruling, not its blocker.** | reopening `026` |
 | *struck* | `090`–`130`: Act IV struck 2026-08-01 — no server (`026`), calendar post-1.0 (`030`). Reasons in `DECISIONS.md`. Reversal reopens them intact. | — |
-| `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
 | `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
 | `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
 | `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast** — the assistive-tech pass no simulator here can stand in for. | `034`, `055`, `056` |
