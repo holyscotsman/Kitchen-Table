@@ -1110,6 +1110,12 @@ img {
   margin-bottom: 12px;
 }
 
+/* Grid items default to min-width auto, which lets a wide card stretch the
+   whole column past the viewport at 320px — the 200%-zoom reflow case. */
+.topgrid > * {
+  min-width: 0;
+}
+
 @media (min-width: 640px) {
   .topgrid {
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -1119,6 +1125,10 @@ img {
 .servcard {
   display: flex;
   align-items: center;
+  /* Wraps rather than overflows: at 320px with Easy Read at the top font
+     step, the − / + pair drops beneath the label instead of pushing the card
+     off the screen. */
+  flex-wrap: wrap;
   gap: 12px;
   padding: 16px 18px;
   border-radius: var(--r-card);
@@ -1220,6 +1230,12 @@ img {
   gap: 32px;
 }
 
+/* Same reflow guard as .topgrid: without it a long ingredient word at the
+   top font step stretches the column past a 320px viewport. */
+.bodygrid > * {
+  min-width: 0;
+}
+
 @media (min-width: 900px) {
   .bodygrid {
     grid-template-columns: minmax(280px, 0.85fr) 1.15fr;
@@ -1236,6 +1252,11 @@ img {
   font-size: 1.2em;
   font-weight: 700;
   margin-bottom: 6px;
+  /* At 320px (200% zoom) with the top font step, "Instructions" is wider than
+     the screen as a single word. Hyphenate at the extreme rather than scroll
+     sideways; at every ordinary size these never engage. */
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .hint {
@@ -1314,9 +1335,14 @@ img {
 
 .checkrow__text {
   flex: 1;
+  /* min-width lets the row shrink; hyphens break "Worcestershire" at 40px on
+     a 320px screen instead of scrolling the page sideways. */
+  min-width: 0;
   font-size: 1.02em;
   line-height: 1.45;
   text-wrap: pretty;
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .checkrow[aria-pressed="true"] .checkrow__text {

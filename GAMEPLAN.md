@@ -280,7 +280,7 @@ checks cannot tell you whether a screen reader announces anything useful.*
   - *Needs:* `035` · *Done when:* the change is spoken without re-navigating to it.
 - [ ] `040` 👤 **A11Y** — Verify every category icon is correctly hidden from assistive technology and never read as content.
   - *Needs:* `035` · *Done when:* all ten are silent. This feeds `056`.
-- [ ] `041` 🤖 **A11Y** — Audit at 200% browser zoom on top of Easy Read — the compounding case nobody tests.
+- [x] `041` 🤖 **A11Y** — Audit at 200% browser zoom on top of Easy Read — the compounding case nobody tests.
   - *Needs:* — · *Done when:* no horizontal scroll and no clipped text at any of the five font steps.
 - [ ] `042` 👤 **A11Y** — Test with iOS Reduce Motion and Increase Contrast both on.
   - *Needs:* `004` · *Done when:* every animation is off and nothing has lost a border.
@@ -600,6 +600,7 @@ finds out what the last one learned.*
 | *Phase 1* | 2026-08-01 | **Closed.** 10 of 14 done; `004`–`007` parked on a physical iPhone (§11). 214 functional checks + perf budget green, contrast 0 failures, README gained the Checks section and the new files. One real bug found and fixed (invisible quota notice). |
 | *Phase 2* | 2026-08-01 | **Closed, fully parked.** All ten tasks are watching Joan and one other family member use the app — §11 says exactly what is needed. Nothing an agent can substitute for. |
 | *Phase 3* | 2026-08-01 | **Closed, fully parked.** Nine rulings for Jason (§11), led by `026`, the gate — its measured inputs are ready in this log. `034` waits on the VoiceOver findings it should cite. |
+| `041` | 2026-08-01 | **Found three reflow failures** at 320px (200% zoom) + Easy Read + top step: the servings card and body columns stretched past the viewport (grid `min-width:auto`), and "Instructions"/"Worcestershire"-length words could not break. Fixed: grid guards, servcard wraps, headings and checklist text hyphenate at the extreme. `tests/zoom.js` now holds all nine screens to it, in CI. |
 
 ---
 
