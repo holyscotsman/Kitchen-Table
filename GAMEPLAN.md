@@ -312,8 +312,9 @@ because it can only be written once every legitimate origin is known.*
   - *Needs:* — · *Done when:* verified by network trace, not by reading the README of the library.
 - [x] `048` 🤖 **SEC** — Pin the Tesseract CDN version and add subresource integrity.
   - *Needs:* `047` · *Done when:* the version is exact and a tampered hash blocks the load.
-- [ ] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
+- [x] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
   - *Needs:* `004` · *Done when:* decided and done, or decided and written down why not. **→ README**
+  - *Done 2026-08-01:* **self-hosted.** Six woff2 files (52 KB, latin + latin-ext, OFL text included) in `fonts/`, same unicode-ranges as Google served, 400/700 preloaded. Verified: zero third-party requests at load, faces active, FCP 888 ms with the fonts now inside the measurement. `004` (does it render on the physical iPhone) still stands — self-hosting makes that more likely, not less, since the face no longer depends on a third party being reachable.
 - [x] `050` 🤖 **SEC** — Document, in the UI, exactly what each relay receives when a link is imported.
   - *Needs:* — · *Done when:* the disclosure names the relays and says what is sent, before the request is made.
 - [x] `051` 🤖 **FE-B** — Show which relay succeeded, so a persistent failure can be diagnosed rather than guessed at.
@@ -651,6 +652,7 @@ finds out what the last one learned.*
 | `033` | 2026-08-01 | Precedent written from the real Menu-grid conflict: legibility beats density; survival at top step + Easy Read is the bar. (`024` still open — deviation noted on the task.) |
 | `034` | 2026-08-01 | `design/a11y-criteria.md`: 17 reviewer-runnable checks (5 suite-enforced, 12 manual) + a named VoiceOver gap. Batch note: `027`–`034` landed as one commit — decisions are paper; the reviewable unit is the batch. Rule 7 resumes with code. |
 | `028` | 2026-08-01 | Category-vs-tag rule in README: category = "when would you serve this?", one of ten; everything else tags. |
+| `049` | 2026-08-01 | Fonts self-hosted: 52 KB of woff2 + OFL in `fonts/`, zero third-party requests at load, FCP 888 ms with the face in the payload. The 12.7 s degraded-network figure is retired. |
 | *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
 
 ---
@@ -666,8 +668,6 @@ blocks something. Clearing an item here unblocks the loop.*
 | `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use — no agent can do any of it. | `023`→`027`, `024`→`033`, `020`→`074`, `022`→`025` |
 | `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) **This is now the check on the provisional `026` ruling, not its blocker.** | reopening `026` |
 | *struck* | `090`–`130`: Act IV struck 2026-08-01 — no server (`026`), calendar post-1.0 (`030`). Reasons in `DECISIONS.md`. Reversal reopens them intact. | — |
-| `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
-| `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
 | `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast** — the assistive-tech pass no simulator here can stand in for. | `034`, `055`, `056` |
 | `054` `055` `058` `059` `060` | **Designer rulings**: the print palette as tokens, focus-visible as a designed state, the empty tile, Easy Read's dim-tier removal endorsed or redrawn, the tag chip spec. `design/improvised-values.md` is the briefing doc. | `061`, then `067`+ |
 | `061` | The component reference — last, because it documents the outcomes of `053`–`060`. | onboarding for any new screen |

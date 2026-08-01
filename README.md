@@ -22,6 +22,7 @@ bundler, no server.
 | `tokens.css` | **The palette.** Copied verbatim from the design handoff |
 | `style.css` | Layout and components; every colour is a `var(--*)` |
 | `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
+| `fonts/` | Atkinson Hyperlegible, self-hosted (OFL licence included) — no third-party request on any page load |
 | `recipe.html` | Redirect stub for bookmarks from the previous build |
 | `tests/` | Every check the app must pass — see *Checks* below |
 | `CLAUDE.md` | Build rules and the colour contract — **read first** |

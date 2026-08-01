@@ -16,9 +16,9 @@ const BUDGET = parseInt(process.env.KT_FCP_BUDGET || '4000', 10);
   const ctx = await br.newContext({ ...devices['iPhone 13'] });
 
   /* Hermetic: third-party hosts are dropped so the number measures the bytes
-     this repo ships, on every machine the same. The Google Fonts stylesheet is
-     render-blocking in real life — that cost is task 049's evidence, not this
-     budget's noise. Atkinson falls back to the system font for the run. */
+     this repo ships, on every machine the same. Since 049 the fonts are
+     self-hosted, so — unlike the Google Fonts era — the face is part of the
+     measured payload, not an aborted third-party request. */
   await ctx.route(/fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net/,
     route => route.abort('failed'));
 
