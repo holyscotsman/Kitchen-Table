@@ -229,14 +229,17 @@ mode from.
 
 ### Known limits
 
-- **OCR quality is untested against real photographs.** The pipeline is
-  verified end to end against a stubbed recogniser, and the parser is tested,
-  but the sandbox this was built in cannot reach the Tesseract CDN. Accuracy on
-  real pages will be imperfect — the handoff accepts that, and every OCR import
-  is flagged for line-by-line checking.
-- **`api.allorigins.win` is a third-party dependency** for link import only.
-  When it is down, that one path fails with a plain message; nothing else in
-  the app touches the network after load.
+- **OCR accuracy on real photographs is still unmeasured.** The real
+  Tesseract now runs end to end (`tests/ocr-live.js` — it reads a synthetic
+  card and the network trace confirms the photo never leaves the device), and
+  the library is pinned with subresource integrity. What remains untested is
+  accuracy against actual photos of Joan's cards — gameplan task `081`. Every
+  OCR import stays flagged for line-by-line checking either way.
+- **The CORS relays are third-party dependencies** for link import only. All
+  are named in the UI before a request is made, the chain falls through them
+  in turn, and each imported draft records which one answered. When all are
+  down, that one path fails with a plain message and the paste box still
+  works; nothing else in the app touches the network after load.
 
 ### Contributor names are labels, not authentication
 

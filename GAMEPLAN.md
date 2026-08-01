@@ -609,6 +609,7 @@ finds out what the last one learned.*
 | `048` | 2026-08-01 | Pinned to `tesseract.js@5.1.1` with sha384 SRI on the entry script. Both directions proven: clean bytes load and OCR completes; tampered bytes are refused and the app shows its plain fallback message. SRI reaches the entry script only — noted in code. |
 | `050` | 2026-08-01 | The link-import disclosure now names every relay by name, drawn from the live `RELAYS` list so text and code can't drift, and says exactly what is sent (the pasted address, nothing else) before any request is made. |
 | `051` | 2026-08-01 | Every imported draft's flagged entry now says which route answered — "fetched directly from the site" or "fetched through allorigins.win" — so a persistent failure is diagnosable. Asserted in add.js. |
+| *Phase 5* | 2026-08-01 | **Closed.** 4 of 6 done; `049` and `052` parked on the iPhone font check (§11). CLAUDE.md's known-limits brought current — the "sandbox cannot reach the Tesseract CDN" limit no longer holds. |
 
 ---
 
@@ -628,6 +629,8 @@ blocks something. Clearing an item here unblocks the loop.*
 | `030` | Calendar in 1.0 or not — decide after `026`. | Phase 15 (11 tasks) |
 | `031`–`033` | Merge story, pull cadence, first a11y-vs-feature ruling — all writing that follows `026`/`024`. | `034`, `110`, `111` |
 | `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
+| `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
+| `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
 
 ---
 
