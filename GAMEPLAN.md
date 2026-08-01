@@ -236,8 +236,9 @@ here is built; everything here is written down.*
 
 - [ ] `025` 👤 **PM** — Get a real answer from the family on whether "download and commit" is acceptable friction, or the thing that kills adoption.
   - *Needs:* `022` · *Done when:* an actual person has said yes or no.
-- [ ] `026` 🤝 **PM** — Write the one-page backend decision memo: what breaks today without one, what it would cost per month, who maintains it.
+- [x] `026` 🤝 **PM** — Write the one-page backend decision memo: what breaks today without one, what it would cost per month, who maintains it.
   - *Needs:* `010` `011` `021` `025` · *Done when:* the memo ends in a decision, not options. **This is the gate in §6.**
+  - *Ruled 2026-08-01, provisional:* **no server for 1.0** — `DECISIONS.md` §026. Taken as the recommended default on Jason's instruction to proceed; `021`/`025` (the family-friction session) stayed undone and are the one input that would reopen this.
 - [ ] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
   - *Needs:* `023` · *Done when:* the list is final and `CAT_ALIASES` covers anything dropped.
 - [ ] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
@@ -441,6 +442,13 @@ or straight to the release checklist if `030` also says no.*
 > is 30 tasks, a monthly bill, and a database that becomes the only copy of 48
 > irreplaceable recipes.
 
+> ⛔ **THE GATE CLOSED THIS ACT — 2026-08-01.** `026` ruled **no server** and
+> `030` ruled **calendar is a stretch goal** (both provisional defaults,
+> `DECISIONS.md`). All 41 tasks below are **struck from the 1.0 checklist**:
+> tasks `090`–`119` because there is no server to build, run, or back up, and
+> `120`–`130` because the calendar ships after 1.0 if at all. They are struck,
+> not deleted — the phases read intact for the day either ruling is reversed.
+
 ## Phase 11 — Prove the ground *(gated on `026`)*
 
 *8 tasks. The architecture doc's own warning first: a host that resets its
@@ -626,6 +634,7 @@ finds out what the last one learned.*
 | *Phase 9* | 2026-08-01 | **Closed.** 2 of 6 done. `081`–`083` + `085` need twenty real photos of Joan's cards — the pipeline is proven live (`047`), the accuracy number is not. |
 | *Phase 10* | 2026-08-01 | **Closed, fully parked.** Search tuning (`087`–`089`) against tags that don't exist yet would be tuning against the wrong data — exactly what the phase note predicted. |
 | — | 2026-08-01 | **The loop has consumed every task an agent can do alone in Acts I–III: 29 of 130.** Everything remaining is in §11. Act IV stays shut behind `026`. |
+| `026` | 2026-08-01 | **The gate is ruled: no server for 1.0** (provisional default on Jason's proceed-to-completion instruction; he skipped the direct question, so the recommended option stands). Memo in `DECISIONS.md`. Phases 11–14 struck — 30 tasks. Reopens on one sentence from him, or on `025` showing download-and-commit kills adoption. |
 
 ---
 
@@ -638,12 +647,8 @@ blocks something. Clearing an item here unblocks the loop.*
 | --- | --- | --- |
 | `004`–`007` | **A physical iPhone.** Font rendering, Save-to-Notes through the real share sheet, a 40-minute wake-lock bake, a print to paper. | `015`, `035`, `042`, `049`, `054` |
 | `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use — no agent can do any of it. | `023`→`027`, `024`→`033`, `020`→`074`, `022`→`025` |
-| `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) | `026` |
-| `026` | **The backend decision — the gate.** Jason writes/settles the one-page memo. The measured inputs are ready: photo ceiling (12), quota behaviour, FCP numbers. Missing: `021`/`025`, the human half. | all 41 tasks of Act IV, `031`, `032` |
-| `027` | Ruling on Sides + Drinks staying in the category list (needs Joan's vocabulary from `023`). | `028`→`060`/`067`/`076`/`079` |
-| `029` | The "done recipe" bar — photo? verified servings? a tag? Jason's call; `CONTENT.md` is the input. | `071`→`072` |
-| `030` | Calendar in 1.0 or not — decide after `026`. | Phase 15 (11 tasks) |
-| `031`–`033` | Merge story, pull cadence, first a11y-vs-feature ruling — all writing that follows `026`/`024`. | `034`, `110`, `111` |
+| `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) **This is now the check on the provisional `026` ruling, not its blocker.** | reopening `026` |
+| *struck* | `090`–`130`: Act IV struck 2026-08-01 — no server (`026`), calendar post-1.0 (`030`). Reasons in `DECISIONS.md`. Reversal reopens them intact. | — |
 | `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
 | `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
 | `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
