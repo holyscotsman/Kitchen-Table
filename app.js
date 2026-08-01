@@ -829,7 +829,8 @@
        you at a glance whether this is a breakfast or a dessert. Either way
        there is always exactly one thing in that slot, so the rows line up. */
     var lead = src
-      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" />'
+      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" ' +
+        'width="64" height="64" decoding="async" />'
       : '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>";
     var tags = tagsOf(r).slice(0, 2);
     return (

@@ -49,11 +49,65 @@ const BUDGET = parseInt(process.env.KT_FCP_BUDGET || '4000', 10);
 
   console.log('FCP on fast-3G, three runs (ms):', runs.join(', '));
   console.log('Median: ' + median + ' ms   Budget: ' + BUDGET + ' ms');
-  if (median === null || median > BUDGET) {
-    console.log('FAIL: first contentful paint over budget');
-    process.exit(1);
-  }
-  console.log('PASS');
+  const fcpOk = median !== null && median <= BUDGET;
+  if (!fcpOk) console.log('FAIL: first contentful paint over budget');
+
+  /* Task 063 — the list must not reflow as photos decode. Every recipe gets
+     a photo, then the Menu loads under a layout-shift observer. Boxes are
+     fixed (64×64 attrs + CSS) so the score should be ~0; the gate is 0.02
+     to allow browser noise, far under the 0.1 "good" threshold. */
+  const p2 = await ctx.newPage();
+  await p2.goto(B + '/index.html');
+  await p2.waitForSelector('.main__title');
+  await p2.evaluate(() => new Promise(res => {
+    function photo(hue) {
+      var c = document.createElement('canvas');
+      c.width = 300; c.height = 200;
+      var g = c.getContext('2d');
+      g.fillStyle = 'hsl(' + hue + ',40%,45%)';
+      g.fillRect(0, 0, 300, 200);
+      return c.toDataURL('image/jpeg', 0.7);
+    }
+    var req = indexedDB.open('kt', 1);
+    req.onupgradeneeded = function () { req.result.createObjectStore('images'); };
+    req.onsuccess = function () {
+      fetch('recipes.json').then(r => r.json()).then(list => {
+        var tx = req.result.transaction('images', 'readwrite');
+        list.forEach((r, i) => tx.objectStore('images').put(photo(i * 7), r.id));
+        tx.oncomplete = () => res();
+      });
+    };
+  }));
+  /* The cache is filled at boot, so the seeded photos need a fresh boot. */
+  await p2.goto(B + '/index.html#menu');
+  await p2.reload();
+  await p2.evaluate(() => {
+    window.__cls = 0;
+    new PerformanceObserver(l => {
+      for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
+  await p2.waitForSelector('.rcard__thumb');
+  /* The claim under test is "the list does not reflow as photos decode" —
+     zero the counter once the list exists, so the boot transition (loading
+     text → app, a legitimate one-time swap) stays out of the score. */
+  await p2.evaluate(() => { window.__cls = 0; });
+  await p2.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await p2.waitForTimeout(1500);
+  const cls = await p2.evaluate(() => window.__cls);
+  await p2.evaluate(() => new Promise(res => {
+    const r = indexedDB.open('kt', 1);
+    r.onsuccess = () => {
+      const tx = r.result.transaction('images', 'readwrite');
+      tx.objectStore('images').clear();
+      tx.oncomplete = () => res();
+    };
+  }));
+  console.log('CLS with 48 thumbnails, full scroll: ' + cls.toFixed(4) + '   Gate: 0.02');
+  const clsOk = cls < 0.02;
+  if (!clsOk) console.log('FAIL: the list reflows as photos decode');
+
+  if (fcpOk && clsOk) console.log('PASS');
   await br.close();
-  process.exit(0);
+  process.exit(fcpOk && clsOk ? 0 : 1);
 })();
