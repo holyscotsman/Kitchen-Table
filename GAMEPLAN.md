@@ -178,7 +178,7 @@ of content in Act III cites something measured here.*
   - *Needs:* — · *Done when:* a full history scan is clean, and the result is written down. **Do this first.** If something leaked, everything else waits.
 - [x] `002` 🤖 **QA** — Commit the six test suites into the repo so the whole set runs from one command.
   - *Needs:* — · *Done when:* a clean clone runs all 210 checks plus the contrast audit with one command.
-- [ ] `003` 🤖 **OPS** — Wire GitHub Actions to run those suites on every pull request.
+- [x] `003` 🤖 **OPS** — Wire GitHub Actions to run those suites on every pull request.
   - *Needs:* `002` · *Done when:* a deliberately broken PR goes red before merge.
 - [ ] `004` 👤 **QA** — Open every screen on a physical iPhone and confirm Atkinson Hyperlegible actually renders.
   - *Needs:* — · *Done when:* confirmed by eye against a fallback screenshot. **If this fails, the typographic contract is broken and Phase 6 changes shape.**
@@ -589,6 +589,7 @@ finds out what the last one learned.*
 | — | 2026-08-01 | Gameplan written. 130 tasks sequenced, 15 phases, 1 gate at `026`. Nothing started. |
 | `001` | 2026-08-01 | Full-history scan clean: zero credential patterns; the removed publish flow read its token from localStorage at runtime, never from code. |
 | `002` | 2026-08-01 | Six suites + contrast audit now live in `tests/`, one command (`tests/run.sh`), hermetic — every relay stubbed, so no test waits on a real network. Wake-lock check needs full Chromium; the runner finds it. |
+| `003` | 2026-08-01 | CI runs `tests/run.sh` on every PR. Red path proven locally: a deliberately broken `app.js` exits the runner non-zero. The green path shows on this PR's own checks. |
 
 ---
 
