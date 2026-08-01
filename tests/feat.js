@@ -100,6 +100,33 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('preview gone', await p.locator('.photorow__img').count()===0);
 
   chk('kt.images cleared for that recipe', await p.evaluate(()=>!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
+  console.log('\n== Quota exhaustion fails loudly (task 011) ==');
+  /* Jam localStorage down to a few KB of headroom, then attach a real-sized
+     photo through the actual input — the app must say so, never silently drop
+     the photo. */
+  await p.evaluate(async ()=>{
+    for (const size of [512*1024, 64*1024, 4*1024]) {
+      const chunk='x'.repeat(size);
+      let i=0;
+      try { for(;;i++) localStorage.setItem('kt.__fill'+size+'_'+i, chunk); } catch(e){}
+    }
+    const c=document.createElement('canvas'); c.width=1200; c.height=900;
+    const g=c.getContext('2d');
+    const img=g.createImageData(1200,900);
+    for(let i=0;i<img.data.length;i+=4){img.data[i]=Math.random()*255|0;img.data[i+1]=Math.random()*255|0;img.data[i+2]=Math.random()*255|0;img.data[i+3]=255;}
+    g.putImageData(img,0,0);
+    const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.72));
+    const input=document.getElementById('e-photo');
+    const dt=new DataTransfer();
+    dt.items.add(new File([blob],'big.jpg',{type:'image/jpeg'}));
+    input.files=dt.files;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  await p.waitForTimeout(1500);
+  const quotaMsg = await p.locator('.notice').first().textContent().catch(()=> '');
+  chk('quota message shown in edit mode', /room on this phone/.test(quotaMsg), quotaMsg.slice(0,60));
+  chk('photo was not silently stored', await p.evaluate(()=>!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
+  await p.evaluate(()=>{ Object.keys(localStorage).forEach(k=>{ if(k.startsWith('kt.__fill')) localStorage.removeItem(k); }); });
 
   console.log('\n== Tap targets ==');
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});

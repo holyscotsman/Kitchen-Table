@@ -1106,6 +1106,12 @@
 
     if (S.editing) {
       h += editBody(r);
+      /* Notices must reach edit mode too — the quota failure on attaching a
+         photo happens here, and a warning nobody can see is a silent loss. */
+      if (S.notice) {
+        h += '<p class="notice" role="status" style="margin-top:16px">' +
+             esc(S.notice) + "</p>";
+      }
       h += "</div>";
       return h;
     }
