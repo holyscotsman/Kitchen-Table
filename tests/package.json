@@ -1,0 +1,11 @@
+{
+  "name": "kitchen-table-tests",
+  "private": true,
+  "description": "Playwright checks for the Kitchen Table static site. The app itself has no build step and no dependencies — this package exists only so the tests can be installed and run from a clean clone.",
+  "scripts": {
+    "test": "bash run.sh"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
