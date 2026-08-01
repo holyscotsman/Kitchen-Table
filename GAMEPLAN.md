@@ -357,7 +357,7 @@ bulk tagging exists before anyone is asked to tag.*
   - *Needs:* `012` `057` · *Done when:* cumulative layout shift is zero with a full list of photos.
 - [x] `064` 🤖 **FE-A** — Handle a recipe whose photo has been committed but whose local copy is gone, without flashing a broken state.
   - *Needs:* `062` · *Done when:* the fallback to the category icon is silent.
-- [ ] `065` 🤖 **FE-A** — Add a photo lightbox on the recipe page, since a hero at 280px is not enough to read a handwritten card.
+- [x] `065` 🤖 **FE-A** — Add a photo lightbox on the recipe page, since a hero at 280px is not enough to read a handwritten card.
   - *Needs:* `057` · *Done when:* it opens, traps focus, closes on Escape and returns focus — same contract as every other sheet.
 - [ ] `066` 🤖 **FE-B** — Support importing several photos into one recipe, since a long recipe spans two cards.
   - *Needs:* `062` `057` · *Done when:* two cards produce one recipe with both pages retained.
@@ -617,6 +617,7 @@ finds out what the last one learned.*
 | `062` | 2026-08-01 | Photos live in IndexedDB: sync reads from a boot-filled cache, writes persist behind it and un-cache on failure, legacy `kt.images` migrates at boot, and a browser with no IndexedDB falls back to localStorage — where the quota message still fires (proven in feat.js). All 48 photos stored and read back (`measure-quota.js`). |
 | `063` | 2026-08-01 | Thumbs carry `width/height/loading=lazy/decoding=async`; hero reserved by `aspect-ratio` (057). Measured with all 48 recipes photographed and a full scroll: **CLS 0.0000**, gated at 0.02 in CI (`tests/perf.js`). |
 | `064` | 2026-08-01 | A referenced-but-absent `images/<id>.jpg` never shows a broken glyph: capture-phase error handler swaps thumbs to their category icon, drops heroes, restores the Main blank. Asserted in feat.js. |
+| `065` | 2026-08-01 | The hero taps open the whole photograph — the writing a 3:2 crop loses is the point. Full dialog contract (trap, Escape, focus return) by joining the sheets' machinery; native pinch-zoom preserved on the image. |
 
 ---
 

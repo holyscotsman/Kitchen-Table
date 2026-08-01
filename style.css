@@ -1779,6 +1779,54 @@ input[type="file"].input {
   font-weight: 700;
 }
 
+/* ============================================================== lightbox
+
+   The hero is a deliberate 3:2 crop; this is the whole photograph, one tap
+   away — which matters when the photo is a handwritten card and the writing
+   is what got cropped. Same dialog contract as the sheets: focus trapped,
+   Escape closes, focus returns. */
+
+.herobtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: inherit;
+  margin-bottom: 16px;
+}
+
+.herobtn .r-hero {
+  margin-bottom: 0;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+
+.lightbox__img {
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  border-radius: var(--r-card);
+  /* Native pinch-to-zoom keeps working on the photo itself. */
+  touch-action: pinch-zoom;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+}
+
+#app.sheet-in .lightbox {
+  animation: kt-fade 0.2s ease-out both;
+}
+
 /* ====================================================== Artwork and motion
 
    Two rules govern everything below.
@@ -1997,6 +2045,7 @@ input[type="file"].input {
   .themebtn--spin > svg,
   #app.sheet-in .sheet,
   #app.sheet-in .scrim,
+  #app.sheet-in .lightbox,
   .boot {
     animation: none;
   }

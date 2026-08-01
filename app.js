@@ -313,6 +313,7 @@
     checkedStep: {},
     awake: false,
     dlOpen: false,
+    lbOpen: false,
     draft: null,
     saved: false,
 
@@ -1015,6 +1016,7 @@
     S.filterOpen = false;
     S.textOpen = false;
     S.dlOpen = false;
+    S.lbOpen = false;
     S.sortOpen = false;
     S[flag] = true;
     openSheetId = null;
@@ -1034,7 +1036,8 @@
   }
 
   function activeSheet() {
-    return document.querySelector('.sheet[role="dialog"]');
+    /* The lightbox is a dialog on the same trap/Escape/return contract. */
+    return document.querySelector('.sheet[role="dialog"], .lightbox[role="dialog"]');
   }
 
   /* Called after every render: move focus into a sheet the first time it
@@ -1243,8 +1246,13 @@
 
     var hero = imageFor(r);
     if (hero) {
-      h += '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) +
-           '" decoding="async" />';
+      /* The hero is a 3:2 crop; the tap opens the whole photograph — which
+         matters when the photo is a handwritten card and the writing is what
+         got cropped. */
+      h += '<button type="button" class="herobtn press" data-act="open-lb" ' +
+           'aria-label="Show the photo full screen">' +
+           '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) +
+           '" decoding="async" /></button>';
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
@@ -1360,6 +1368,14 @@
 
     h += "</div>";
     if (S.dlOpen) h += downloadSheetHtml(r);
+    if (S.lbOpen && hero) {
+      h += '<div class="lightbox" role="dialog" aria-modal="true" ' +
+           'aria-label="Photo of ' + esc(r.title) + '" id="lightbox">' +
+           '<button type="button" class="iconbtn lightbox__close press" ' +
+           'data-act="close-lb" aria-label="Close photo">' + I.x() + "</button>" +
+           '<img class="lightbox__img" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />' +
+           "</div>";
+    }
     return h;
   }
 
@@ -2622,6 +2638,8 @@
     if (act === "share") { shareRecipe(r); return; }
     if (act === "open-dl") { openSheet("dlOpen", el); return; }
     if (act === "close-dl") { closeSheet("dlOpen"); return; }
+    if (act === "open-lb") { openSheet("lbOpen", el); return; }
+    if (act === "close-lb") { closeSheet("lbOpen"); return; }
     if (act === "dl-txt") {
       downloadBlob(recipeText(r), r.id + ".txt", "text/plain;charset=utf-8");
       S.dlOpen = false; render(); return;
@@ -2724,6 +2742,7 @@
     if (S.filterOpen) closeSheet("filterOpen");
     else if (S.textOpen) closeSheet("textOpen");
     else if (S.dlOpen) closeSheet("dlOpen");
+    else if (S.lbOpen) closeSheet("lbOpen");
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 

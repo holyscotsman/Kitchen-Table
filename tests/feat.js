@@ -91,6 +91,17 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('thumbnail on the menu card', await p.locator('.rcard__thumb').count()===1);
   chk('other cards have no thumb placeholder', await p.locator('.rcard__thumb').count()===1);
 
+  console.log('\n== Photo lightbox (task 065) ==');
+  await p.goto(B+'/index.html#chicken-cordon-bleu'); await p.waitForSelector('.r-title');
+  chk('hero is tappable', await p.locator('.herobtn .r-hero').count()===1);
+  await p.click('.herobtn'); await p.waitForTimeout(400);
+  chk('lightbox opens as a dialog', await p.locator('.lightbox[role="dialog"][aria-modal="true"]').count()===1);
+  chk('full image shown', await p.locator('.lightbox__img').count()===1);
+  chk('focus lands inside', await p.evaluate(()=>!!document.activeElement.closest('.lightbox')));
+  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+  chk('Escape closes it', await p.locator('.lightbox').count()===0);
+  chk('focus returns to the hero', await p.evaluate(()=>document.activeElement.classList.contains('herobtn')));
+
   console.log('\n== Photo lands in the downloaded JSON as a path ==');
   await p.goto(B+'/index.html#chicken-cordon-bleu'); await p.waitForSelector('.r-title');
   await p.click('[data-act="toggle-edit"]'); await p.waitForTimeout(300);
