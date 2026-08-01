@@ -100,6 +100,19 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('wake row hidden when API unavailable', true);
   }
 
+  console.log('\n== Colour is never the only signal (task 043) ==');
+  await p.goto(B+'/index.html#chops'); await p.waitForSelector('.r-title');
+  chk('flagged panel carries a heading, not just a colour', /Worth double-checking/.test(await p.locator('.panel--flag').textContent()));
+  await p.goto(B+'/index.html'); await p.waitForSelector('.who-tile');
+  chk('empty contributor tile says 0 in text', (await p.locator('.who-tile--empty .who-tile__count').first().textContent())==='0');
+  await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
+  await p.click('[data-act="open-filter"]'); await p.waitForSelector('#filter-sheet');
+  await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(300);
+  chk('selected chip carries a check glyph', await p.locator('[data-act="fc"][data-key="Dinner"] svg').count()===1);
+  chk('unselected chip has no glyph', await p.locator('[data-act="fc"][data-key="Breakfast"] svg').count()===0);
+  await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
+  await p.click('.donebtn'); await p.waitForTimeout(200);
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

@@ -1704,6 +1704,9 @@ input[type="file"].input {
   color: var(--ink);
   font-size: 18px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .chip[aria-pressed="true"] {

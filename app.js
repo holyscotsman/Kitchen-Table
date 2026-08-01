@@ -979,8 +979,11 @@
       WHO.filter(function (n) { return countBy(S.recipes, "contributor", n); })
         .map(function (name) {
           var on = S.who.indexOf(name) > -1;
+          /* The check is the non-colour half of the selected state — a filled
+             background alone fails anyone who can't rely on colour. */
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fw" data-key="' + esc(name) + '">' +
+                 (on ? I.check(15) : "") +
                  esc(name) + " (" + countWho(name) + ")</button>";
         }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
@@ -989,6 +992,7 @@
           var on = S.cats.indexOf(cat) > -1;
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fc" data-key="' + esc(cat) + '">' +
+                 (on ? I.check(15) : "") +
                  esc(cat) + " (" + countCat(cat) + ")</button>";
         }).join("") + "</div>" +
       tagGroupHtml() +
@@ -1052,6 +1056,7 @@
         var on = S.tags.indexOf(tag) > -1;
         return '<button type="button" class="chip press" aria-pressed="' + on +
                '" data-act="ft" data-key="' + esc(tag) + '">' +
+               (on ? I.check(15) : "") +
                esc(tag) + " (" + countTag(tag) + ")</button>";
       }).join("") + "</div>";
   }
