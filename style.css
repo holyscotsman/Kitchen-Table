@@ -836,6 +836,7 @@ img {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .minitag {
@@ -847,6 +848,18 @@ img {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
+  /* 060: a chip never wraps internally, and on the one surface where space is
+     truly fixed (the card row) a marathon tag truncates rather than pushing
+     the title around. Everywhere else the row wraps and the chip stays whole. */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.rcard .minitag {
+  max-width: 22ch;
 }
 
 /* On a --card surface, --tag-bg is the wrong tier in light mode, so the chip
@@ -1722,6 +1735,17 @@ input[type="file"].input {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  /* 060: a chip is one line always; a marathon tag ellipsizes at the sheet's
+     width instead of folding the pill into two storeys. The label span does
+     the ellipsizing — a flex container can't truncate a bare text node. */
+  max-width: 100%;
+}
+
+.chip__label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chip[aria-pressed="true"] {

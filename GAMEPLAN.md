@@ -345,10 +345,12 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 - [x] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
   - *Needs:* `043` · *Done when:* it reads as an invitation rather than a zero, without colour being the only signal.
   - *Done 2026-08-01:* the zero is gone. Empty tiles are dashed (the empty-slot mark), carry an accent plus and "None yet — add the first", and still route to that person's filtered Menu whose empty state offers Add. Three non-colour signals: dash, glyph, words. Verified by screenshot, zoom suite, contrast audit.
-- [ ] `059` 🤝 **UI** — Review Easy Read against the design intent — it currently removes the dim tier, which was an engineering decision about contrast.
+- [x] `059` 🤝 **UI** — Review Easy Read against the design intent — it currently removes the dim tier, which was an engineering decision about contrast.
   - *Needs:* `017` `041` · *Done when:* the mode is either endorsed as-is or redrawn, in writing.
-- [ ] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.
+  - *Done 2026-08-01:* **endorsed as built**, in writing — `DECISIONS.md` §059, on the audit evidence (0 AA failures across 48 combinations, zoom suite green). Reopens if Joan's sessions (`017`/`020`) contradict it.
+- [x] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.
   - *Needs:* `028` · *Done when:* one spec covers all three, including a chip with a long tag in it.
+  - *Done 2026-08-01:* one rule — a chip is always one line; rows wrap, chips never fold. Card chips cap at 22ch and ellipsize; recipe-page chips (44px tap targets) run the full line before truncating; sheet chips ellipsize in a label span (flex containers can't truncate bare text nodes — found the hard way). Spec prose lands in `design/components.md` with `061`. Verified with a marathon tag at 390px on all three surfaces.
 - [ ] `061` 🤖 **UI** — Produce a one-page component reference so the next person to add a screen has something to build from.
   - *Needs:* `053`–`060` · *Done when:* it is in the repo and linked from the README. **→ README**
 

@@ -1143,7 +1143,7 @@
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fw" data-key="' + esc(name) + '">' +
                  (on ? I.check(15) : "") +
-                 esc(name) + " (" + countWho(name) + ")</button>";
+                 '<span class="chip__label">' + esc(name) + " (" + countWho(name) + ")</span></button>";
         }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
       CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
@@ -1152,7 +1152,7 @@
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fc" data-key="' + esc(cat) + '">' +
                  (on ? I.check(15) : "") +
-                 esc(cat) + " (" + countCat(cat) + ")</button>";
+                 '<span class="chip__label">' + esc(cat) + " (" + countCat(cat) + ")</span></button>";
         }).join("") + "</div>" +
       tagGroupHtml() +
       '<div class="sheet__foot">' +
@@ -1216,7 +1216,7 @@
         return '<button type="button" class="chip press" aria-pressed="' + on +
                '" data-act="ft" data-key="' + esc(tag) + '">' +
                (on ? I.check(15) : "") +
-               esc(tag) + " (" + countTag(tag) + ")</button>";
+               '<span class="chip__label">' + esc(tag) + " (" + countTag(tag) + ")</span></button>";
       }).join("") + "</div>";
   }
 
