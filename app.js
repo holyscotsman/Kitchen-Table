@@ -104,7 +104,14 @@
     { url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
   ];
   var RELAY_TIMEOUT = 12000;
-  var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+  /* Pinned to the exact version, with subresource integrity: a tampered CDN
+     copy refuses to load rather than running (gameplan 048). The hash is the
+     sha384 of this one file — bumping the version means recomputing it:
+       curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A
+     SRI covers this entry script; the worker and wasm it then fetches are
+     version-pinned by it in turn, which is as far as the mechanism reaches. */
+  var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+  var TESSERACT_SRI = "sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F";
 
   function load(key, fallback) {
     try {
@@ -1898,6 +1905,8 @@
       var done = false;
       var s = document.createElement("script");
       s.src = TESSERACT_CDN;
+      s.integrity = TESSERACT_SRI;
+      s.crossOrigin = "anonymous";
       s.async = true;
       s.onload = function () {
         done = true;

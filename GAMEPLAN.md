@@ -299,9 +299,9 @@ checks cannot tell you whether a screen reader announces anything useful.*
 that sees something, and none is documented for the family. The CSP goes last,
 because it can only be written once every legitimate origin is known.*
 
-- [ ] `047` 🤖 **SEC** — Confirm the OCR library genuinely runs locally and uploads nothing.
+- [x] `047` 🤖 **SEC** — Confirm the OCR library genuinely runs locally and uploads nothing.
   - *Needs:* — · *Done when:* verified by network trace, not by reading the README of the library.
-- [ ] `048` 🤖 **SEC** — Pin the Tesseract CDN version and add subresource integrity.
+- [x] `048` 🤖 **SEC** — Pin the Tesseract CDN version and add subresource integrity.
   - *Needs:* `047` · *Done when:* the version is exact and a tampered hash blocks the load.
 - [ ] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
   - *Needs:* `004` · *Done when:* decided and done, or decided and written down why not. **→ README**
@@ -605,6 +605,8 @@ finds out what the last one learned.*
 | `044` | 2026-08-01 | Static scan of all 51 bare interpolations: every user/imported string goes through `esc()`; the bare ones are numbers, booleans, internal constants, or icon markup. The rule is now documented at `esc()` itself. |
 | `045` | 2026-08-01 | `tests/sec.js`: a page whose title/ingredient/step are live XSS payloads imports as inert text on the review form, recipe page, menu card, and edit field — nothing executes anywhere. |
 | `046` | 2026-08-01 | `capDraft()` bounds every imported field (title 300, lines 500/2000, lists 100/60, notes 5000) on both the JSON-LD and text/OCR paths, and discloses each trim in `flagged`. Asserted with a 60 KB hostile page. |
+| `047` | 2026-08-01 | **Real Tesseract ran for the first time** (the CDN block noted in CLAUDE.md's known limits no longer holds; bridged through the sandbox proxy). Trace: 4 requests, all bodyless GETs to cdn.jsdelivr.net — the photo never leaves the device. Read a synthetic card's title correctly. Tool: `tests/ocr-live.js`. |
+| `048` | 2026-08-01 | Pinned to `tesseract.js@5.1.1` with sha384 SRI on the entry script. Both directions proven: clean bytes load and OCR completes; tampered bytes are refused and the app shows its plain fallback message. SRI reaches the entry script only — noted in code. |
 
 ---
 
