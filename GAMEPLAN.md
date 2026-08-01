@@ -198,7 +198,7 @@ of content in Act III cites something measured here.*
   - *Needs:* `010` · *Done when:* the quota message is asserted by a test.
 - [x] `012` 🤖 **FE-A** — Benchmark first contentful paint on a throttled 3G profile and set a budget.
   - *Needs:* — · *Done when:* a number and a budget are recorded, and CI can fail against the budget.
-- [ ] `013` 🤖 **PM** — Start the visible list of known-wrong data, so it is never mistaken for polish work.
+- [x] `013` 🤖 **PM** — Start the visible list of known-wrong data, so it is never mistaken for polish work.
   - *Needs:* — · *Done when:* every inferred serving, empty ingredient list and truncated step is enumerated in one place. This is the input to Phase 8.
 - [ ] `014` 🤖 **SEC** — Write down explicitly that contributor names are not authentication, so nobody builds on them later.
   - *Needs:* — · *Done when:* it is in `CLAUDE.md`, not in a chat message.
@@ -595,6 +595,7 @@ finds out what the last one learned.*
 | `010` | 2026-08-01 | **The ceiling: 12 photos.** A noisy 1200px/0.72 JPEG data URL is ~425 KB; Chromium's localStorage quota threw at #13 (~5 MB stored). 48 photos cannot fit — `062` must move photos to IndexedDB. Tool: `tests/measure-quota.js`. |
 | `011` | 2026-08-01 | **Found and fixed a real bug:** the quota message was set but never rendered in edit mode — the one place photos get attached. Edit mode now renders notices; test asserts both the message and that nothing was silently stored. |
 | `012` | 2026-08-01 | FCP on fast-3G, hermetic (repo bytes only): **720 ms median**; budget 4000 ms, enforced in CI (`tests/perf.js`). With the render-blocking Google Fonts CSS through this sandbox's proxy it was 12.7 s — that cost is `049`'s evidence for self-hosting the font. |
+| `013` | 2026-08-01 | `CONTENT.md` created: 34 inferred servings (ids recovered from the pre-handoff file at `9d6ae5c`), 4 empty ingredient lists, 6 mid-sentence truncations, 3 unshown quantities, 2 faithful oddities, and the collection-wide gaps. Phase 8's worklist. |
 
 ---
 
