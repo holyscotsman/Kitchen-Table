@@ -342,8 +342,9 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
   - *Done 2026-08-01:* three redrawn, not two — rendering the full set at 20px caught **Breakfast reading as an eye**, worse than either named suspect. Now: egg in a pan (yolk off-centre), footed bowl with peas, scored loaf on a board. All ten verified by rendered strip at 20px and 44px. (`040`'s VoiceOver half — icons silent to AT — still open; the `aria-hidden` attributes are asserted in kt.js.)
 - [x] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
   - *Needs:* — · *Done when:* a portrait photo, a landscape photo and a square photo all look deliberate in both slots.
-- [ ] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
+- [x] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
   - *Needs:* `043` · *Done when:* it reads as an invitation rather than a zero, without colour being the only signal.
+  - *Done 2026-08-01:* the zero is gone. Empty tiles are dashed (the empty-slot mark), carry an accent plus and "None yet — add the first", and still route to that person's filtered Menu whose empty state offers Add. Three non-colour signals: dash, glyph, words. Verified by screenshot, zoom suite, contrast audit.
 - [ ] `059` 🤝 **UI** — Review Easy Read against the design intent — it currently removes the dim tier, which was an engineering decision about contrast.
   - *Needs:* `017` `041` · *Done when:* the mode is either endorsed as-is or redrawn, in writing.
 - [ ] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.

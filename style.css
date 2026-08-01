@@ -482,16 +482,26 @@ img {
   box-shadow: var(--hi-card);
 }
 
-/* An empty section: outlined rather than filled, so the people who have
-   contributed carry the visual weight and the rest read as room to grow. */
+/* An empty section: outlined — dashed, the classic empty-slot mark — so the
+   people who have contributed carry the visual weight and the rest read as
+   room to grow. The plus glyph and the invite line say it in shape and words,
+   never colour alone (058). */
 .who-tile--empty {
   background: none;
-  border: var(--bw) solid var(--line);
+  border: var(--bw) dashed var(--line);
   color: var(--ink);
   box-shadow: none;
 }
 
-.who-tile--empty .who-tile__count {
+.who-tile__plus {
+  display: flex;
+  color: var(--acc);
+}
+
+.who-tile__invite {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.35;
   color: var(--dim);
 }
 

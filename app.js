@@ -816,10 +816,18 @@
            var n = countBy(S.recipes, "contributor", name);
            /* A section with nothing in it yet recedes rather than shouting a
               zero — it is a place to put something, not a result. */
-           return '<a class="who-tile press' + (n ? "" : " who-tile--empty") +
-                  '" href="#menu?who=' + encodeURIComponent(name) + '">' +
-                  '<span class="who-tile__count">' + n + "</span>" +
-                  '<span class="who-tile__name">' + esc(name) + "</span></a>";
+           /* 058: an empty section is an invitation, not a zero. The plus and
+              the words are the signal, so it never rests on colour alone. */
+           return n
+             ? '<a class="who-tile press" href="#menu?who=' +
+               encodeURIComponent(name) + '">' +
+               '<span class="who-tile__count">' + n + "</span>" +
+               '<span class="who-tile__name">' + esc(name) + "</span></a>"
+             : '<a class="who-tile who-tile--empty press" href="#menu?who=' +
+               encodeURIComponent(name) + '">' +
+               '<span class="who-tile__plus" aria-hidden="true">' + I.plus(26) + "</span>" +
+               '<span class="who-tile__name">' + esc(name) + "</span>" +
+               '<span class="who-tile__invite">None yet — add the first</span></a>';
          }).join("") +
          "</div></section>";
 
