@@ -238,6 +238,18 @@ mode from.
   When it is down, that one path fails with a plain message; nothing else in
   the app touches the network after load.
 
+### Contributor names are labels, not authentication
+
+Stated here so nobody builds on the wrong assumption later: **the
+`contributor` field is a byline, nothing more.** There is no login, no
+identity, and no access control anywhere in this app, and the contributor
+name must never quietly become one — no "only Joan can edit Joan's recipes",
+no per-person visibility, no trust decisions keyed off that string. Anyone
+holding the device can edit anything; that is the designed trade-off of the
+no-login model, not an oversight. If real access control is ever wanted, that
+is a new architecture conversation (the gameplan's backend gate), not a
+feature to hang off this field.
+
 ### Verified
 
 81 functional checks in Chromium at iPhone and desktop widths, covering both
