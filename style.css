@@ -2161,3 +2161,34 @@ input[type="file"].input {
     margin-bottom: 24px;
   }
 }
+
+/* ==================================================== Focus, as designed
+
+   054's sibling (task 055): the ring is a designed state, not a browser
+   default. Three parts:
+   - 3px, not 2 — the primary reader has low vision, and the ring is an
+     indicator, not an ornament. Offset 2 so it never fuses with a border.
+   - One ring colour — accent — everywhere, because the ring is judged
+     against the page background it sits over (10.5:1 dark, 8.7:1 light),
+     not against the control it wraps.
+   - On accent-filled controls the ring would touch a fill of its own colour,
+     so those gain a 2px page-coloured gap (box-shadow) between fill and
+     ring. The gap contrasts with the fill exactly as well as the ring does
+     with the page — same pair, reversed. No new colours anywhere. */
+
+:focus-visible {
+  outline: 3px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.bigbtn:focus-visible,
+.actbtn--primary:focus-visible,
+.iconbtn[aria-pressed="true"]:focus-visible,
+.iconbtn.is-on:focus-visible,
+.sheetbtn--acc:focus-visible,
+.donebtn:focus-visible,
+.switch[aria-checked="true"]:focus-visible,
+.skip-link:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg);
+}

@@ -334,8 +334,9 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 - [x] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
   - *Needs:* `007` `053` · *Done when:* the `@media print` block's literal black, white and grey are tokens, and the file's hex count outside it is still zero. **Any new value is asked for, never invented.**
   - *Done 2026-08-01:* `--print-ink/-paper/-line` appended to `tokens.css` in a marked block — its first amendment since the handoff, recorded in `CLAUDE.md`. `style.css` now carries zero hex anywhere. No other missing values surfaced: `053`'s improvised list was spacing/size, not colour. (`007`, printing on paper, still stands as the physical check.)
-- [ ] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
+- [x] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
   - *Needs:* `035`–`043` · *Done when:* it is drawn, and it clears AA against every surface it lands on.
+  - *Done 2026-08-01:* one designed ring — 3px accent, offset 2, rounded — measured at 10.5:1 (dark) / 8.7:1 (light) against the page it sits over; accent-filled controls gain a 2px page-coloured gap so ring never touches same-coloured fill. First cut flipped the ring to ink on filled controls; measurement showed 1.6:1 and killed it — the gap, not a colour change, is what works. (`035`–`040` VoiceOver halves still open; the visual spec no longer waits on them.)
 - [ ] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
   - *Needs:* `040` · *Done when:* all ten are identifiable at 20px on a phone.
 - [x] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
