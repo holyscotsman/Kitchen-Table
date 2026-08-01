@@ -351,7 +351,7 @@ act builds the instruments first, then does the work, then makes it findable.*
 somewhere to put things. Tagging 48 recipes one at a time will not happen, so
 bulk tagging exists before anyone is asked to tag.*
 
-- [ ] `062` 🤖 **FE-A** — Move photo storage to IndexedDB if the ceiling from `010` proves too low for the collection.
+- [x] `062` 🤖 **FE-A** — Move photo storage to IndexedDB if the ceiling from `010` proves too low for the collection.
   - *Needs:* `010` `011` · *Done when:* 48 photos fit, or it is written down why the current store is enough.
 - [ ] `063` 🤖 **FE-A** — Add lazy loading and explicit dimensions to thumbnails so the list does not reflow as photos decode.
   - *Needs:* `012` `057` · *Done when:* cumulative layout shift is zero with a full list of photos.
@@ -614,6 +614,7 @@ finds out what the last one learned.*
 | `057` | 2026-08-01 | `design/photo-treatment.md`: one deliberate box per slot, centre-crop only, reserved before decode. Recipe hero now declares 3:2 (was content-height). Verified: portrait, landscape and square all land at identical 358×239 hero / 64×64 thumb. |
 | *Phase 4* | 2026-08-01 | **Closed.** 5 of 12 done (`041` `043`–`046`); `035`–`040` + `042` parked on VoiceOver/iOS (§11). Close-gate contrast audit green. |
 | *Phase 6* | 2026-08-01 | **Closed.** 2 of 9 done; the rest are designer rulings (`054` `055` `058` `059` `060`), a redraw gated on the VoiceOver check (`056`), and the reference that needs all of them (`061`). §11 holds each. |
+| `062` | 2026-08-01 | Photos live in IndexedDB: sync reads from a boot-filled cache, writes persist behind it and un-cache on failure, legacy `kt.images` migrates at boot, and a browser with no IndexedDB falls back to localStorage — where the quota message still fires (proven in feat.js). All 48 photos stored and read back (`measure-quota.js`). |
 
 ---
 

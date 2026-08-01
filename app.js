@@ -501,34 +501,135 @@
     save(K.recipes, S.recipes);
   }
 
-  /* ---- photos ---- */
+  /* ---- photos ----
+
+     Photos live in IndexedDB (database "kt", store "images"), because
+     localStorage tops out around twelve of them — task 010 measured ~425 KB
+     per 1200px photo against a ~5 MB quota, and the collection is 48.
+
+     Reads stay synchronous against an in-memory cache filled once at boot,
+     so every call site keeps its shape. Writes update the cache immediately
+     and persist behind it; a persist failure removes the cache entry again
+     and reports, so the screen never shows a photo that isn't really kept.
+
+     A browser with no usable IndexedDB falls back to the old localStorage
+     store, whose smaller ceiling still fails loudly. Legacy kt.images data
+     migrates into the database at boot and the old key is removed. */
+
+  var IMG = {};
+  var imgDb = null;
+  var IMG_FULL_MSG =
+    "There isn’t room on this phone for another photo. Download your " +
+    "photos and recipes.json, commit them, then remove some here.";
+
+  function idbOpen() {
+    return new Promise(function (resolve) {
+      if (!window.indexedDB) return resolve(null);
+      var req;
+      try { req = indexedDB.open("kt", 1); } catch (e) { return resolve(null); }
+      req.onupgradeneeded = function () {
+        req.result.createObjectStore("images");
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { resolve(null); };
+      req.onblocked = function () { resolve(null); };
+    });
+  }
+
+  function idbPut(id, val) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var tx = imgDb.transaction("images", "readwrite");
+        tx.objectStore("images").put(val, id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = tx.onabort = function () { reject(tx.error); };
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function idbDelete(id) {
+    return new Promise(function (resolve) {
+      try {
+        var tx = imgDb.transaction("images", "readwrite");
+        tx.objectStore("images").delete(id);
+        tx.oncomplete = tx.onerror = tx.onabort = function () { resolve(); };
+      } catch (e) { resolve(); }
+    });
+  }
+
+  function idbAll() {
+    return new Promise(function (resolve) {
+      var out = {};
+      try {
+        var tx = imgDb.transaction("images", "readonly");
+        var store = tx.objectStore("images");
+        var req = store.openCursor();
+        req.onsuccess = function () {
+          var cur = req.result;
+          if (!cur) return resolve(out);
+          out[cur.key] = cur.value;
+          cur.continue();
+        };
+        req.onerror = function () { resolve(out); };
+      } catch (e) { resolve(out); }
+    });
+  }
+
+  /* Runs once at boot, before the first render. Never rejects. */
+  function initImages() {
+    return idbOpen().then(function (db) {
+      imgDb = db;
+      if (!db) {
+        IMG = load(K.images, {}) || {};
+        return;
+      }
+      return idbAll().then(function (map) {
+        IMG = map;
+        var legacy = load(K.images, null);
+        if (!legacy || typeof legacy !== "object") return;
+        var puts = Object.keys(legacy).map(function (k) {
+          IMG[k] = legacy[k];
+          return idbPut(k, legacy[k]);
+        });
+        return Promise.all(puts).then(function () {
+          try { localStorage.removeItem(K.images); } catch (e) {}
+        }, function () { /* keep the legacy key until it migrates */ });
+      });
+    });
+  }
 
   function images() {
-    return load(K.images, {}) || {};
+    return IMG;
   }
 
   /* A local photo wins over the published path, so a freshly attached picture
      shows before anyone has committed the file. */
   function imageFor(recipe) {
-    return images()[recipe.id] || recipe.image || "";
+    return IMG[recipe.id] || recipe.image || "";
   }
 
+  /* Resolves to "" on success or a user-facing message on failure. */
   function setImage(id, dataUrl) {
-    var map = images();
-    map[id] = dataUrl;
+    IMG[id] = dataUrl;
+    if (imgDb) {
+      return idbPut(id, dataUrl).then(
+        function () { return ""; },
+        function () { delete IMG[id]; return IMG_FULL_MSG; }
+      );
+    }
     try {
-      localStorage.setItem(K.images, JSON.stringify(map));
-      return "";
+      localStorage.setItem(K.images, JSON.stringify(IMG));
+      return Promise.resolve("");
     } catch (e) {
-      return "There isn’t room on this phone for another photo. Download your " +
-             "photos and recipes.json, commit them, then remove some here.";
+      delete IMG[id];
+      return Promise.resolve(IMG_FULL_MSG);
     }
   }
 
   function removeImage(id) {
-    var map = images();
-    delete map[id];
-    save(K.images, map);
+    delete IMG[id];
+    if (imgDb) idbDelete(id);
+    else save(K.images, IMG);
   }
 
   /* Downscaled in the browser: a phone photo is several megabytes and
@@ -1639,10 +1740,11 @@
     if (newTags.length) recipe.tags = newTags;
 
     /* The photo was staged under a placeholder key because the id only exists
-       once the title is known. Move it across now. */
+       once the title is known. Move it across now; if the persist fails the
+       recipe still saves and the failure is said out loud. */
     var staged = images()["__new__"];
     if (staged) {
-      setImage(id, staged);
+      setImage(id, staged).then(function (err) { if (err) setNotice(err); });
       removeImage("__new__");
     }
 
@@ -2570,8 +2672,8 @@
       if (!file) return;
       var target = el.getAttribute("data-key");
       readPhoto(file)
-        .then(function (dataUrl) {
-          var err = setImage(target, dataUrl);
+        .then(function (dataUrl) { return setImage(target, dataUrl); })
+        .then(function (err) {
           if (err) { S.addError = err; setNotice(err); }
           else { S.addError = ""; render(); }
         })
@@ -2626,13 +2728,18 @@
 
   applyTheme();
 
-  fetch("recipes.json", { cache: "no-cache" })
-    .then(function (res) {
+  /* Photos load alongside the recipes so the first paint already knows every
+     thumbnail — initImages never rejects, so the only failure mode here is
+     the recipes themselves. */
+  Promise.all([
+    fetch("recipes.json", { cache: "no-cache" }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
-    })
-    .then(function (data) {
-      S.base = data;
+    }),
+    initImages()
+  ])
+    .then(function (both) {
+      S.base = both[0];
       applyOverlay();
       S.loaded = true;
       onRoute();

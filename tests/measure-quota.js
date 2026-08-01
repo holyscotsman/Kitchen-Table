@@ -60,7 +60,50 @@ const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
   console.log('Photos stored before quota: ' + result.stored + (result.quotaAt ? ' (failed at #' + result.quotaAt + ')' : ' (all 48 fit)'));
   console.log('Bytes held at that point: ~' + result.totalKB + ' KB');
   console.log(result.quotaAt
-    ? 'CEILING: localStorage cannot hold the collection — task 062 must move photos to IndexedDB.'
-    : 'CEILING: 48 photos of this size fit — 062 can be a written justification.');
+    ? 'localStorage CEILING: cannot hold the collection — which is why photos live in IndexedDB (task 062).'
+    : 'localStorage CEILING: 48 photos of this size fit.');
+
+  /* The store photos actually use since 062: write the same 48 through
+     IndexedDB and read them back. */
+  const idb = await p.evaluate(() => new Promise(res => {
+    function photo() {
+      var c = document.createElement('canvas');
+      c.width = 1200; c.height = 900;
+      var g = c.getContext('2d');
+      var img = g.createImageData(1200, 900);
+      for (var i = 0; i < img.data.length; i += 4) {
+        img.data[i] = 120 + ((Math.random() * 120) | 0);
+        img.data[i + 1] = 90 + ((Math.random() * 100) | 0);
+        img.data[i + 2] = 60 + ((Math.random() * 80) | 0);
+        img.data[i + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      return c.toDataURL('image/jpeg', 0.72);
+    }
+    var req = indexedDB.open('kt', 1);
+    req.onupgradeneeded = function () { req.result.createObjectStore('images'); };
+    req.onerror = function () { res({ error: 'no IndexedDB' }); };
+    req.onsuccess = function () {
+      var db = req.result;
+      var url = photo();
+      var tx = db.transaction('images', 'readwrite');
+      var store = tx.objectStore('images');
+      for (var n = 1; n <= 48; n++) store.put(url, 'probe-' + n);
+      tx.oncomplete = function () {
+        var rd = db.transaction('images', 'readonly').objectStore('images').getAllKeys();
+        rd.onsuccess = function () {
+          var stored = rd.result.filter(k => String(k).indexOf('probe-') === 0).length;
+          var del = db.transaction('images', 'readwrite');
+          rd.result.forEach(k => { if (String(k).indexOf('probe-') === 0) del.objectStore('images').delete(k); });
+          del.oncomplete = function () { res({ stored: stored, perKB: Math.round(url.length / 1024) }); };
+        };
+      };
+      tx.onerror = tx.onabort = function () { res({ error: String(tx.error) }); };
+    };
+  }));
+  console.log(idb.error
+    ? 'IndexedDB probe failed: ' + idb.error
+    : 'IndexedDB: all ' + idb.stored + ' photos (~' + idb.perKB + ' KB each) stored and read back.');
   await br.close();
+  process.exit(idb.error || idb.stored !== 48 ? 1 : 0);
 })();

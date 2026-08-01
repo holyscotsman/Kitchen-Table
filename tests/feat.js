@@ -70,8 +70,20 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('photo field present', await p.locator('#e-photo').count()===1);
   await p.setInputFiles('#e-photo',{name:'p.jpg',mimeType:'image/jpeg',buffer:Buffer.from(JPG,'base64')});
   await p.waitForTimeout(900);
+  // Photos live in IndexedDB since task 062; kt.images is only the legacy key.
+  const inIdb = id => p.evaluate(id => new Promise(res => {
+    const r = indexedDB.open('kt', 1);
+    r.onsuccess = () => {
+      try {
+        const g = r.result.transaction('images').objectStore('images').get(id);
+        g.onsuccess = () => res(g.result !== undefined);
+        g.onerror = () => res(false);
+      } catch (e) { res(false); }
+    };
+    r.onerror = () => res(false);
+  }), id);
   chk('preview appears after upload', await p.locator('.photorow__img').count()===1);
-  chk('stored under kt.images', await p.evaluate(()=>!!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
+  chk('stored in the images database', await inIdb('chicken-cordon-bleu'));
   chk('Download photos button appears', await p.locator('[data-act="dl-photos"]').count()===1);
   await p.click('[data-act="toggle-edit"]'); await p.waitForTimeout(400);
   chk('hero photo on the recipe', await p.locator('.r-hero').count()===1);
@@ -99,12 +111,29 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   await p.click('[data-act="rm-photo"]'); await p.waitForTimeout(400);
   chk('preview gone', await p.locator('.photorow__img').count()===0);
 
-  chk('kt.images cleared for that recipe', await p.evaluate(()=>!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
-  console.log('\n== Quota exhaustion fails loudly (task 011) ==');
-  /* Jam localStorage down to a few KB of headroom, then attach a real-sized
-     photo through the actual input — the app must say so, never silently drop
-     the photo. */
-  await p.evaluate(async ()=>{
+  chk('images database cleared for that recipe', !(await inIdb('chicken-cordon-bleu')));
+
+  console.log('\n== Legacy kt.images migrates into the database (task 062) ==');
+  await p.evaluate(J=>{ localStorage.setItem('kt.images', JSON.stringify({'chicken-cordon-bleu':'data:image/jpeg;base64,'+J})); }, JPG);
+  await p.reload(); await p.waitForSelector('.r-title, #e-title');
+  await p.waitForTimeout(600);
+  chk('migrated photo lands in the database', await inIdb('chicken-cordon-bleu'));
+  chk('legacy key removed after migration', await p.evaluate(()=>localStorage.getItem('kt.images')===null));
+  await p.evaluate(()=>new Promise(res=>{const r=indexedDB.open('kt',1);r.onsuccess=()=>{const tx=r.result.transaction('images','readwrite');tx.objectStore('images').delete('chicken-cordon-bleu');tx.oncomplete=()=>res();};}));
+  console.log('\n== Quota exhaustion fails loudly (task 011, via the 062 fallback) ==');
+  /* Photos normally go to IndexedDB, whose quota is effectively out of reach
+     for a test. The loud-failure contract is exercised through the designed
+     fallback: a context with no IndexedDB uses the localStorage store, which
+     is jammed to a few KB of headroom before a real-sized photo is attached
+     through the actual input. The app must say so, never silently drop it. */
+  const ctxNoIdb = await br.newContext({ ...devices['iPhone 13'] });
+  await ctxNoIdb.addInitScript(() => {
+    Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: false });
+  });
+  const pq = await ctxNoIdb.newPage();
+  await pq.goto(B+'/index.html#chicken-cordon-bleu'); await pq.waitForSelector('.r-title');
+  await pq.click('[data-act="toggle-edit"]'); await pq.waitForTimeout(300);
+  await pq.evaluate(async ()=>{
     for (const size of [512*1024, 64*1024, 4*1024]) {
       const chunk='x'.repeat(size);
       let i=0;
@@ -122,11 +151,12 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     input.files=dt.files;
     input.dispatchEvent(new Event('input',{bubbles:true}));
   });
-  await p.waitForTimeout(1500);
-  const quotaMsg = await p.locator('.notice').first().textContent().catch(()=> '');
+  await pq.waitForTimeout(1500);
+  const quotaMsg = await pq.locator('.notice').first().textContent().catch(()=> '');
   chk('quota message shown in edit mode', /room on this phone/.test(quotaMsg), quotaMsg.slice(0,60));
-  chk('photo was not silently stored', await p.evaluate(()=>!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
-  await p.evaluate(()=>{ Object.keys(localStorage).forEach(k=>{ if(k.startsWith('kt.__fill')) localStorage.removeItem(k); }); });
+  chk('photo was not silently stored', await pq.evaluate(()=>!JSON.parse(localStorage.getItem('kt.images')||'{}')['chicken-cordon-bleu']));
+  chk('preview not shown for the failed photo', await pq.locator('.photorow__img').count()===0);
+  await ctxNoIdb.close();
 
   console.log('\n== Tap targets ==');
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
