@@ -70,9 +70,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('no JS errors', errs.length===0, errs.join(' | '));
 
   await p.goto(B+'/index.html'); await p.waitForSelector('.main__title'); await p.waitForTimeout(300);
-  await p.screenshot({path:'q1-main.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','q1-main.png')});
   await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard'); await p.waitForTimeout(300);
-  await p.screenshot({path:'q2-menu.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','q2-menu.png')});
 
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

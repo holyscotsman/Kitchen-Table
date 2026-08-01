@@ -35,7 +35,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('all 48 are Joan\'s, others empty', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48,0,0,0,0');
   chk('category rows present', await p.locator('.cat-row').count()===6);
   chk('View all button', (await p.locator('.bigbtn').textContent()).includes('View all 48 recipes'));
-  await p.screenshot({path:'kt-1-main-dark.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','kt-1-main-dark.png')});
 
   console.log('\n== Main search replaces browse stack ==');
   await p.fill('#main-search','chicken');
@@ -60,7 +60,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('data-theme=light', l.attr==='light', String(l.attr));
   chk('light card #1B4F39', l.card==='rgb(27, 79, 57)', l.card);
   chk('persisted to kt.theme', l.ls==='"light"', String(l.ls));
-  await p.screenshot({path:'kt-2-main-light.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','kt-2-main-light.png')});
   await p.reload(); await p.waitForSelector('.main__title');
   chk('theme survives reload', await p.evaluate(()=>document.documentElement.getAttribute('data-theme'))==='light');
   await p.click('[data-act="theme"]'); await p.waitForTimeout(200);
@@ -76,7 +76,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('no viewer/edit toggle on Menu', await p.locator('[data-act="toggle-edit"]').count()===0);
   const longMeta = await p.evaluate(()=>[...document.querySelectorAll('.rcard__meta')].map(e=>e.textContent).filter(x=>x.includes('44 min (chicken)')).length);
   chk('long time strings omitted, not truncated', longMeta===0, 'found '+longMeta);
-  await p.screenshot({path:'kt-3-menu-dark.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','kt-3-menu-dark.png')});
 
   console.log('\n== Filter sheet ==');
   await p.click('[data-act="open-filter"]');
@@ -143,7 +143,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('ingredients are check buttons', await p.locator('.checklist .checkrow').count()>0);
   chk('wake lock row present', await p.locator('[data-act="toggle-wake"]').count()===1);
   chk('flagged panel hidden when none', await p.locator('.panel--flag').count()===0);
-  await p.screenshot({path:'kt-4-recipe-dark.png'});
+  await p.screenshot({path:require('path').join(__dirname,'shots','kt-4-recipe-dark.png')});
 
   console.log('\n== Servings rescaling ==');
   const before = await p.locator('.checkrow__text').first().textContent();

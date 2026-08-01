@@ -1,4 +1,5 @@
 const { chromium, devices } = require('playwright');
+const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 const CONTRAST = `(() => {
   function lum(c){const [r,g,b]=c.map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});return 0.2126*r+0.7152*g+0.0722*b;}
   function parse(s){const m=s.match(/rgba?\\(([^)]+)\\)/);if(!m)return null;const p=m[1].split(',').map(parseFloat);if(p.length>3&&p[3]===0)return null;return [p[0],p[1],p[2]];}
