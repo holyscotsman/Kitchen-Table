@@ -30,6 +30,8 @@ bundler, no server.
 | `GAMEPLAN.md` | The 1.0 plan: 130 tasks in dependency order, and the loop that works through them |
 | `CONTENT.md` | What is known-wrong in the recipe data, awaiting answers from the family |
 | `design/` | Styleguide, screenshots, and the `.dc.html` design references |
+| [`design/components.md`](design/components.md) | The component reference — build new screens from this vocabulary |
+| [`design/a11y-criteria.md`](design/a11y-criteria.md) | The accessibility bar every merged feature must clear |
 
 ## Screens
 

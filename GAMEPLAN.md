@@ -351,8 +351,9 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 - [x] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.
   - *Needs:* `028` · *Done when:* one spec covers all three, including a chip with a long tag in it.
   - *Done 2026-08-01:* one rule — a chip is always one line; rows wrap, chips never fold. Card chips cap at 22ch and ellipsize; recipe-page chips (44px tap targets) run the full line before truncating; sheet chips ellipsize in a label span (flex containers can't truncate bare text nodes — found the hard way). Spec prose lands in `design/components.md` with `061`. Verified with a marathon tag at 390px on all three surfaces.
-- [ ] `061` 🤖 **UI** — Produce a one-page component reference so the next person to add a screen has something to build from.
+- [x] `061` 🤖 **UI** — Produce a one-page component reference so the next person to add a screen has something to build from.
   - *Needs:* `053`–`060` · *Done when:* it is in the repo and linked from the README. **→ README**
+  - *Done 2026-08-01:* `design/components.md` — type, surfaces, controls, the chip and focus specs, icons/artwork, motion inventory, photos, print. Linked from the README beside the a11y criteria. Deliberately one page: a vocabulary, not a framework.
 
 ---
 
@@ -662,6 +663,14 @@ finds out what the last one learned.*
 | `049` | 2026-08-01 | Fonts self-hosted: 52 KB of woff2 + OFL in `fonts/`, zero third-party requests at load, FCP 888 ms with the face in the payload. The 12.7 s degraded-network figure is retired. |
 | `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
 | *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |
+| `054` | 2026-08-01 | Print palette became tokens — tokens.css's first sanctioned amendment; style.css now zero hex anywhere. |
+| `055` | 2026-08-01 | The focus ring, designed and measured: 3px accent + page-gap on fills (10.5/8.7:1). The ink-flip alternative measured 1.6:1 and died. |
+| `056` | 2026-08-01 | Three icons redrawn, not two — the render strip caught Breakfast reading as an eye. All ten verified at 20px. |
+| `058` | 2026-08-01 | Empty tiles: dashed + plus + "None yet — add the first". Invitation in shape and words. |
+| `059` | 2026-08-01 | Easy Read endorsed as built (`DECISIONS.md`), on the audit numbers. |
+| `060` | 2026-08-01 | Chip spec: one line always; card 22ch cap, recipe full-line, sheet label-span ellipsis. Flex can't truncate bare text — span added at all three call sites. |
+| `061` | 2026-08-01 | `design/components.md` — the one-page vocabulary, linked from the README. |
+| *Phase 6* | 2026-08-01 | **Closed for real: 9 of 9.** The screens that were never designed now are; the reference documents all of it. |
 | *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
 
 ---
