@@ -39,11 +39,13 @@ Repeat until the release checklist in §9 is clear. **One task per pass.**
  1. READ      Open this file. Read §3 (rules) and §6 (the gate).
  2. PICK      Take the lowest-numbered unticked task in the current phase
               whose "Needs" are all ticked. Never reach into a later phase.
+              A task whose "Needs" include a parked task is parked too —
+              note in §11 what it is transitively waiting on.
  3. TRIAGE    Check the marker:
                 🤖  do it now
-                🤝  do it now if the one answer it needs is already in §8;
-                    otherwise write the question into §8 and pick again
-                👤  you cannot do this. Write what you need into §8 and
+                🤝  do it now if the one answer it needs is already in §11;
+                    otherwise write the question into §11 and pick again
+                👤  you cannot do this. Write what you need into §11 and
                     pick again.
  4. DO        That one task. Not the adjacent one that looks related.
  5. VERIFY    Against its "Done when". If you cannot verify it, it is not done.
@@ -92,7 +94,7 @@ Repeat until the release checklist in §9 is clear. **One task per pass.**
 
 Before starting the next phase, all five:
 
-- [ ] Every task in the phase is `[x]` or listed in §8 with what it is waiting for.
+- [ ] Every task in the phase is `[x]` or listed in §11 with what it is waiting for.
 - [ ] The six suites and the contrast audit are green.
 - [ ] `README.md` reflects anything a reader would now experience differently.
 - [ ] One line in §10 summarising the phase.
@@ -172,7 +174,7 @@ of content in Act III cites something measured here.*
 
 *14 tasks. Nothing in this phase depends on anything. It can start today.*
 
-- [ ] `001` 🤖 **SEC** — Re-check that no GitHub token remains anywhere in the codebase or its history, after the publish flow was removed.
+- [x] `001` 🤖 **SEC** — Re-check that no GitHub token remains anywhere in the codebase or its history, after the publish flow was removed.
   - *Needs:* — · *Done when:* a full history scan is clean, and the result is written down. **Do this first.** If something leaked, everything else waits.
 - [ ] `002` 🤖 **QA** — Commit the six test suites into the repo so the whole set runs from one command.
   - *Needs:* — · *Done when:* a clean clone runs all 210 checks plus the contrast audit with one command.
@@ -562,7 +564,7 @@ bar is that shipping a change stays a normal push.*
 
 Every one of these, after the last phase closes:
 
-- [ ] All 130 tasks are `[x]`, or struck with a written reason under §8.
+- [ ] All 130 tasks are `[x]`, or struck with a written reason under §11.
 - [ ] The six suites and the contrast audit are green, both themes.
 - [ ] `tokens.css` still holds every colour. Zero hardcoded hex outside `@media print`.
 - [ ] Atkinson Hyperlegible confirmed rendering on a physical iPhone (`004`).
@@ -585,6 +587,7 @@ finds out what the last one learned.*
 | Task | Date | One line |
 | --- | --- | --- |
 | — | 2026-08-01 | Gameplan written. 130 tasks sequenced, 15 phases, 1 gate at `026`. Nothing started. |
+| `001` | 2026-08-01 | Full-history scan clean: zero credential patterns; the removed publish flow read its token from localStorage at runtime, never from code. |
 
 ---
 
