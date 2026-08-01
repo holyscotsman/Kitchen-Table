@@ -31,6 +31,11 @@
      1. Constants + storage
      ====================================================================== */
 
+  /* Rendered in the bottom corner of every screen. The 1.0 gameplan in
+     GAMEPLAN.md is what closes the gap: when its 130 tasks are done this
+     becomes "1.0" and nothing else about the stamp changes. */
+  var VERSION = "0.9";
+
   var FS = [20, 24, 29, 34, 40]; // px; index 1 (24px) is the default
   var DEFAULT_FS = 1;
   /* Meal order, so the "Course" sort reads like a day rather than an
@@ -219,6 +224,40 @@
     return svg(paths, size || 22, size || 22);
   }
 
+  /* Artwork, as opposed to icons. These fill a slot that would otherwise be
+     blank — a recipe with no photograph, a search that found nothing — so they
+     are decorative by definition and always aria-hidden. Same stroke language
+     as the icons above, same currentColor, no new palette. The steam drifts;
+     the CSS turns that off under prefers-reduced-motion. */
+  var ART = {
+    /* Bowl on a table with three wisps of steam. Stands in for a hero photo. */
+    steam: function () {
+      return (
+        '<svg class="art art--steam" viewBox="0 0 120 92" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.6" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<path class="wisp wisp--a" d="M44 48c-6-6 6-10 0-16s6-10 0-16"/>' +
+        '<path class="wisp wisp--b" d="M60 44c-6-7 6-11 0-19s6-11 0-19"/>' +
+        '<path class="wisp wisp--c" d="M76 48c-6-6 6-10 0-16s6-10 0-16"/>' +
+        '<path d="M26 58q34 26 68 0"/>' +
+        '<path d="M20 58h80"/>' +
+        '<path d="M12 80h96"/>' +
+        "</svg>"
+      );
+    },
+    /* An empty plate, for the states where there is genuinely nothing. */
+    empty: function () {
+      return (
+        '<svg class="art art--empty" viewBox="0 0 120 92" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.6" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<ellipse cx="60" cy="48" rx="34" ry="26"/>' +
+        '<ellipse cx="60" cy="48" rx="21" ry="15"/>' +
+        "</svg>"
+      );
+    }
+  };
+
   /* ======================================================================
      3. State
      ====================================================================== */
@@ -270,7 +309,18 @@
     draft: null,
     saved: false,
 
-    notice: ""
+    notice: "",
+
+    /* Motion cues. Rendering is a full rebuild, so a CSS animation attached to
+       an element replays on every re-render unless something says which change
+       caused it. These flags are set by the action that earned the animation
+       and cleared the moment they are read, so a filter tap never re-plays a
+       tick that was checked ten renders ago. */
+    pulseRow: "",      // "i:3" / "s:0" — the row just checked
+    pulseScale: false, // servings just changed
+    pulseTheme: false, // theme just toggled
+    pulseSheet: false, // a sheet just opened
+    paintedRoute: ""   // last route actually painted, for the enter animation
   };
 
   function applyTheme() {
@@ -304,6 +354,7 @@
   function toggleTheme() {
     S.theme = S.theme === "light" ? "dark" : "light";
     save(K.theme, S.theme);
+    S.pulseTheme = true;
     applyTheme();
     render();
   }
@@ -394,9 +445,10 @@
   }
 
   function themeBtn(extraClass) {
+    var spin = S.pulseTheme ? " themebtn--spin" : "";
     return (
-      '<button type="button" class="iconbtn press ' + (extraClass || "") + '" ' +
-      'data-act="theme" aria-label="Switch to ' +
+      '<button type="button" class="iconbtn press themebtn' + spin + " " +
+      (extraClass || "") + '" data-act="theme" aria-label="Switch to ' +
       (S.theme === "light" ? "dark" : "light") + ' mode">' +
       (S.theme === "light" ? I.moon() : I.sun()) + "</button>"
     );
@@ -584,7 +636,8 @@
       h += '<h2 class="results__h">' + hits.length +
            (hits.length === 1 ? " match" : " matches") + "</h2>";
       if (!hits.length) {
-        h += '<p class="emptystate">No recipes match. Try a different word.</p>';
+        h += '<div class="emptystate">' + ART.empty() +
+             "<p>No recipes match. Try a different word.</p></div>";
       } else {
         h += '<div class="cardgrid">' +
              hits.slice(0, 12).map(cardHtml).join("") + "</div>";
@@ -602,7 +655,7 @@
            (imageFor(pick)
              ? '<img class="hero__img" src="' + esc(imageFor(pick)) +
                '" alt="' + esc(pick.title) + '" />'
-             : '<div class="hero__blank"></div>') +
+             : '<div class="hero__blank">' + ART.steam() + "</div>") +
            '<div class="hero__body">' +
            '<p class="hero__meta">' + esc(pick.contributor) +
            (pick.cookTime ? " · " + esc(pick.cookTime) : "") + "</p>" +
@@ -768,7 +821,7 @@
          contributed anything yet — say what is actually true. */
       var lonePerson = S.who.length === 1 && !S.cats.length && !S.tags.length &&
         !S.menuQ && !countBy(S.recipes, "contributor", S.who[0]) ? S.who[0] : "";
-      h += '<div class="emptystate"><p>' +
+      h += '<div class="emptystate">' + ART.empty() + "<p>" +
            (lonePerson
              ? esc(lonePerson) + " hasn’t added any recipes yet."
              : "No recipes match. Try a different word, or clear the filters.") +
@@ -845,6 +898,7 @@
     S.sortOpen = false;
     S[flag] = true;
     openSheetId = null;
+    S.pulseSheet = true;
     render();
   }
 
@@ -1110,12 +1164,18 @@
 
     h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients</h2>' +
          '<p class="hint">Tap to check off as you go</p>';
+    /* A rescale changes the numbers in place, which is easy to miss at any font
+       size and very easy to miss at 40px. The list flashes once so the change
+       is seen rather than merely made. */
+    var scaled = S.pulseScale ? " is-rescaled" : "";
+
     if ((r.ingredients || []).length) {
-      h += '<ul class="checklist">' + r.ingredients.map(function (line, i) {
+      h += '<ul class="checklist' + scaled + '">' + r.ingredients.map(function (line, i) {
         var done = !!S.checkedIng[i];
+        var pop = S.pulseRow === "i:" + i ? " is-ticked" : "";
         return '<li><button type="button" class="checkrow press" aria-pressed="' +
                done + '" data-act="chk-i" data-i="' + i + '">' +
-               '<span class="checkbox">' + (done ? I.check(18) : "") + "</span>" +
+               '<span class="checkbox' + pop + '">' + (done ? I.check(18) : "") + "</span>" +
                '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
                "</span></button></li>";
       }).join("") + "</ul>";
@@ -1125,11 +1185,13 @@
     h += "</section>";
 
     h += "<section><h2 class=\"r-h2\">Instructions</h2>";
-    h += '<ol class="checklist checklist--steps">' + (r.steps || []).map(function (line, i) {
+    h += '<ol class="checklist checklist--steps' + scaled + '">' +
+         (r.steps || []).map(function (line, i) {
       var done = !!S.checkedStep[i];
+      var pop = S.pulseRow === "s:" + i ? " is-ticked" : "";
       return '<li><button type="button" class="checkrow press" aria-pressed="' +
              done + '" data-act="chk-s" data-i="' + i + '">' +
-             '<span class="stepnum">' + (done ? I.check(16) : i + 1) + "</span>" +
+             '<span class="stepnum' + pop + '">' + (done ? I.check(16) : i + 1) + "</span>" +
              '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
              "</span></button></li>";
     }).join("") + "</ol></section>";
@@ -2162,12 +2224,40 @@
       var r = byId(S.route.id);
       html = r
         ? viewRecipe(r)
-        : '<div class="main"><p class="emptystate">That recipe isn’t here.</p>' +
-          '<a class="bigbtn press" href="#menu">See all recipes</a></div>';
+        : '<div class="main"><div class="emptystate">' + ART.empty() +
+          "<p>That recipe isn’t here.</p>" +
+          '<a class="bigbtn press" href="#menu">See all recipes</a></div></div>';
     } else {
       html = viewMain();
     }
+
+    /* Version, bottom corner of every screen. Outside the screen wrapper so it
+       never inherits the recipe's reading size — this is chrome, and chrome
+       does not scale with A−/A+. */
+    if (S.loaded) {
+      html += '<p class="vstamp">v' + VERSION + "</p>";
+    }
+
     app.innerHTML = html;
+
+    /* Every flag is consumed by exactly one paint. A sheet slides up when it
+       opens and then stays put, so ticking a filter chip inside it does not
+       re-play the slide. */
+    app.classList.toggle("sheet-in", S.pulseSheet);
+    S.pulseRow = "";
+    S.pulseScale = false;
+    S.pulseTheme = false;
+    S.pulseSheet = false;
+
+    /* The enter animation belongs to a change of screen, not to every state
+       change — otherwise tapping a filter chip re-plays the whole page. */
+    var painted = routeKey(S.route);
+    if (S.loaded && painted !== S.paintedRoute) {
+      S.paintedRoute = painted;
+      app.classList.remove("screen-in");
+      void app.offsetWidth; // restart, rather than continue, the animation
+      app.classList.add("screen-in");
+    }
 
     if (focusId) {
       var el = document.getElementById(focusId);
@@ -2301,10 +2391,27 @@
 
     if (!r) return;
 
-    if (act === "serv-") { S.serves = Math.max(1, S.serves - 1); render(); return; }
-    if (act === "serv+") { S.serves = Math.min(40, S.serves + 1); render(); return; }
-    if (act === "chk-i") { S.checkedIng[idx] = !S.checkedIng[idx]; render(); return; }
-    if (act === "chk-s") { S.checkedStep[idx] = !S.checkedStep[idx]; render(); return; }
+    if (act === "serv-" || act === "serv+") {
+      var before = S.serves;
+      S.serves = act === "serv-"
+        ? Math.max(1, S.serves - 1)
+        : Math.min(40, S.serves + 1);
+      S.pulseScale = S.serves !== before;
+      render();
+      return;
+    }
+    /* Only a newly-ticked row animates. Un-ticking is a correction, and a
+       correction should not be celebrated. */
+    if (act === "chk-i") {
+      S.checkedIng[idx] = !S.checkedIng[idx];
+      S.pulseRow = S.checkedIng[idx] ? "i:" + idx : "";
+      render(); return;
+    }
+    if (act === "chk-s") {
+      S.checkedStep[idx] = !S.checkedStep[idx];
+      S.pulseRow = S.checkedStep[idx] ? "s:" + idx : "";
+      render(); return;
+    }
     if (act === "toggle-wake") { toggleWake(); return; }
     if (act === "share") { shareRecipe(r); return; }
     if (act === "open-dl") { openSheet("dlOpen", el); return; }
