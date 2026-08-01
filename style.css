@@ -2108,8 +2108,8 @@ input[type="file"].input {
 
   html,
   body {
-    background: #fff !important;
-    color: #000 !important;
+    background: var(--print-paper) !important;
+    color: var(--print-ink) !important;
   }
 
   .recipe {
@@ -2123,8 +2123,8 @@ input[type="file"].input {
   .servcard,
   .statcard {
     background: none !important;
-    color: #000 !important;
-    border: 1px solid #999 !important;
+    color: var(--print-ink) !important;
+    border: 1px solid var(--print-line) !important;
     box-shadow: none !important;
     break-inside: avoid;
   }
@@ -2137,7 +2137,7 @@ input[type="file"].input {
   .scalednote,
   .servcard__value,
   .statcard__value {
-    color: #000 !important;
+    color: var(--print-ink) !important;
   }
 
   .checkbox,
@@ -2148,8 +2148,8 @@ input[type="file"].input {
 
   .stepnum {
     background: none !important;
-    color: #000 !important;
-    border: 1px solid #999;
+    color: var(--print-ink) !important;
+    border: 1px solid var(--print-line);
   }
 
   .bodygrid {

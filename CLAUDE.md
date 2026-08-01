@@ -101,12 +101,16 @@ this section only records decisions and gaps.
 - **`recipe.html` is a redirect stub**, kept only so bookmarks from the previous
   `recipe.html?id=…` build land on the right hash route instead of a 404.
 
-### The one hardcoded-colour exception
+### The hardcoded-colour exception, retired
 
-The `@media print` block in `style.css` uses literal black, white, and grey.
-Printed output must be black on white regardless of the active theme, and
-`tokens.css` defines no print palette. Every other colour in the file is a
-`var(--*)`.
+The `@media print` block in `style.css` used literal black, white, and grey,
+because printed output must be black on white regardless of theme and
+`tokens.css` defined no print palette. Gameplan task `054` closed the gap the
+sanctioned way: a clearly-marked **print palette block appended to
+`tokens.css`** (`--print-ink`, `--print-paper`, `--print-line`) — the first
+and only amendment to that file since the handoff. `style.css` now contains
+**zero hex values anywhere**. The rule stands stronger than before: any colour
+not in `tokens.css` is a question, never a value to invent.
 
 ### Built after the first pass
 

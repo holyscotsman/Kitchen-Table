@@ -331,8 +331,9 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 
 - [x] `053` 🤖 **UI** — Audit the Add and Import screens against `styleguide.html` and mark every value that was improvised.
   - *Needs:* — · *Done when:* a list exists of every size, space and radius that is not in the styleguide.
-- [ ] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
+- [x] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
   - *Needs:* `007` `053` · *Done when:* the `@media print` block's literal black, white and grey are tokens, and the file's hex count outside it is still zero. **Any new value is asked for, never invented.**
+  - *Done 2026-08-01:* `--print-ink/-paper/-line` appended to `tokens.css` in a marked block — its first amendment since the handoff, recorded in `CLAUDE.md`. `style.css` now carries zero hex anywhere. No other missing values surfaced: `053`'s improvised list was spacing/size, not colour. (`007`, printing on paper, still stands as the physical check.)
 - [ ] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
   - *Needs:* `035`–`043` · *Done when:* it is drawn, and it clears AA against every surface it lands on.
 - [ ] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.

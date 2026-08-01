@@ -124,3 +124,15 @@ button { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; transform: none !important; }
 }
+
+/* ==========================================================================
+   Print palette — appended 2026-08-01 under gameplan task 054, the first
+   sanctioned amendment to this file since the handoff (recorded in
+   CLAUDE.md). Printed output is black on white regardless of theme; these
+   three exist so style.css can finally hold zero literal colours anywhere.
+   ========================================================================== */
+:root {
+  --print-ink: #000;
+  --print-paper: #fff;
+  --print-line: #999;
+}
