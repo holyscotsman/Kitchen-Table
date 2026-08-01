@@ -288,8 +288,8 @@ img {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 26px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
 .main__title {
@@ -313,10 +313,58 @@ img {
   line-height: 1.35;
 }
 
-/* The theme button on Main is 52×52 rather than the standard 48. */
+.main__marks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* The app mark. Decorative — the h1 beside it already names the app.
+   Kept small, and the theme button beside it trimmed to the 44px floor, so the
+   pair still leaves "Kitchen Table" room to sit on one line. */
+.appmark {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-input);
+  background: var(--card);
+  color: var(--card-ink);
+  box-shadow: var(--hi-card);
+}
+
+.main__intro {
+  margin: 0 0 26px;
+  color: var(--dim);
+  font-size: 17px;
+  line-height: 1.55;
+  max-width: 52ch;
+  text-wrap: pretty;
+}
+
+.band--spaced {
+  margin-top: 32px;
+}
+
+.cat-row__label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cat-row__icon {
+  flex: none;
+  display: flex;
+  color: var(--acc);
+}
+
 .themebtn--main {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
 }
 
 .searchwrap {
@@ -676,31 +724,23 @@ img {
   color: var(--bg);
 }
 
+/* One recipe per line at every width. The multi-column grid the handoff
+   specified was denser, but a single column keeps the titles on one line and
+   the rows scannable, which matters more here. */
 .cardgrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
   padding-bottom: 24px;
-}
-
-@media (min-width: 720px) {
-  .cardgrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1180px) {
-  .cardgrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  max-width: 760px;
 }
 
 .rcard {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 88px;
-  padding: 16px;
+  gap: 16px;
+  min-height: 92px;
+  padding: 18px 20px;
   border-radius: var(--r-card);
   background: var(--card);
   color: var(--card-ink);
@@ -708,23 +748,44 @@ img {
   box-shadow: var(--hi-card);
 }
 
+/* Title and meta are separate blocks so the line-height below actually
+   applies — inline spans would collapse against each other. */
 .rcard__body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .rcard__title {
+  display: block;
   font-size: 21px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
   text-wrap: pretty;
 }
 
 .rcard__meta {
+  display: block;
   font-size: 15px;
-  line-height: 1.3;
+  line-height: 1.45;
   color: var(--card-dim);
-  margin-top: 4px;
+}
+
+/* The category icon, shown when a recipe has no photo. Same 64px footprint as
+   the thumbnail so rows stay aligned either way. */
+.rcard__icon {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-input);
+  border: 1px solid var(--card-dim);
+  color: var(--card-ink);
 }
 
 .rcard__chev {
@@ -1507,9 +1568,11 @@ input[type="file"].input {
   color: var(--danger);
 }
 
-/* Route headings take focus on navigation; they should not draw a ring for a
-   mouse user who never asked for one. */
-#app h1:focus:not(:focus-visible) {
+/* Route headings are given focus on navigation so screen readers and keyboards
+   land on the new screen. They aren't interactive and nobody tabbed to them, so
+   they should never draw a ring — :focus-visible isn't enough here, because
+   Chromium treats programmatic focus after a click as visible. */
+#app h1[tabindex="-1"]:focus {
   outline: none;
 }
 
