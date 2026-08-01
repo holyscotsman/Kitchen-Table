@@ -36,7 +36,7 @@
     "id": "bbq-steak-times",
     "title": "BBQ Steak Times",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 2,
     "ingredients": [
       "Steak (cut of your choice)"
@@ -53,7 +53,7 @@
     "id": "boiled-eggs-in-ninja",
     "title": "Boiled Eggs in Ninja",
     "category": "Breakfast",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "Eggs",
@@ -162,7 +162,7 @@
     "id": "chops",
     "title": "Air Fryer Chops",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 2,
     "cookTime": "14 min (7 min per side)",
     "ingredients": [],
@@ -183,7 +183,7 @@
     "id": "corn-on-the-cob",
     "title": "Corn on the Cob (Air Fryer)",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "2 ears of corn (husks and silks removed, tips trimmed) — plus more for additional batches",
@@ -465,7 +465,7 @@
     "id": "frozen-lemonade",
     "title": "Frozen Lemonade",
     "category": "Drinks",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 2,
     "ingredients": [
       "1 cup Fresh Squeezed Lemon Juice (Sunkist brand recommended)",
@@ -489,7 +489,7 @@
     "id": "frozen-steak-and-mashed-potatoes",
     "title": "Frozen Steak and Mashed Potatoes",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "5 Russet potatoes, peeled, cut in 1/2-inch pieces",
@@ -521,7 +521,7 @@
     "id": "fries-in-ninja",
     "title": "Fries in Ninja",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [],
     "steps": [
@@ -539,7 +539,7 @@
     "id": "grilled-potatoes-and-peppers",
     "title": "Grilled Potatoes & Peppers",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 10,
     "ingredients": [
       "8 medium red potatoes, cut into wedges",
@@ -564,7 +564,7 @@
     "id": "grilled-zucchini",
     "title": "Grilled Zucchini with Garlic Parmesan Butter",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "prepTime": "12 min",
     "cookTime": "8 min",
@@ -592,7 +592,7 @@
     "id": "hibachi-fried-rice",
     "title": "Hibachi Style Fried Rice",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "4 cups cooked short grain rice (preferably leftover, cold)",
@@ -632,7 +632,7 @@
     "id": "honey-glazed-parsnips",
     "title": "Honey Glazed Parsnips",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "250 g parsnips",
@@ -732,7 +732,7 @@
     "id": "ninja-cookies",
     "title": "Ninja Cookies (Chocolate Chip Cookies)",
     "category": "Desserts",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 8,
     "cookTime": "10 min per batch",
     "ingredients": [
@@ -761,7 +761,7 @@
     "id": "ninja-frozen-meatballs",
     "title": "Ninja Frozen Meatballs",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "Frozen meatballs of your choice"
@@ -778,7 +778,7 @@
     "id": "parsnips",
     "title": "Parsnips (Air Fryer)",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [],
     "steps": [
@@ -958,7 +958,7 @@
     "id": "rice-in-ninja",
     "title": "Rice in Ninja Foodi",
     "category": "Sides",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 4,
     "ingredients": [
       "2 cups brown or white rice",
@@ -981,7 +981,7 @@
     "id": "salmon-in-ninja",
     "title": "Perfect Air Fryer Salmon",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 2,
     "prepTime": "5 min",
     "cookTime": "7 min",
@@ -1026,7 +1026,7 @@
     "id": "scone-in-ninja",
     "title": "Scone in Ninja (Air Fryer Scones)",
     "category": "Breakfast",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 8,
     "ingredients": [
       "175 g Self Raising Flour",
@@ -1235,7 +1235,7 @@
     "id": "steak-time-to-cook",
     "title": "Steak Time to Cook",
     "category": "Dinner",
-    "contributor": "Me",
+    "contributor": "Jason",
     "servings": 2,
     "cookTime": "20 min",
     "ingredients": [],

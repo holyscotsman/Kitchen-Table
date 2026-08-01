@@ -166,6 +166,20 @@ These came from Jason directly and supersede the corresponding parts of
   `#menu?tag=…`. Nothing ships pre-tagged.
 - **Photos.** See below.
 - The Main subtitle is "A Simmonds Styled Menu"; the Add pill is smaller.
+- **"Me" is now "Jason"** across the data, the WHO list, and the filter.
+  `normalizeRecipe` maps the old value so a saved overlay still resolves.
+- **An app mark sits in Main's top-right**, beside the theme button. Both were
+  trimmed (40px and 44px) so "Kitchen Table" still fits on one line at 390px —
+  it wraps below about 340px, which is unavoidable at 34px type.
+- **A one-line explanation** sits under the Main title.
+- **"View all recipes" moved directly under "Whose recipe?"**, ahead of the
+  course rows, so the whole list is reachable without scrolling past them.
+- **The Menu list is one recipe per line at every width.** The handoff's 2- and
+  3-column grids were denser but broke titles across lines; a single column
+  keeps them scannable. Card padding and line-height were opened up to match.
+- **Each recipe shows a category icon** when it has no photo, in the same 64px
+  slot the thumbnail uses, so rows stay aligned either way. The ten icons are
+  hand-drawn stroke SVG in `CAT_ICON`, per the assets rule — no icon library.
 
 ### Photos live outside the recipe records
 
