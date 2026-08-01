@@ -192,7 +192,7 @@ of content in Act III cites something measured here.*
   - *Needs:* — · *Done when:* covered by an automated check, not a manual pass.
 - [x] `009` 🤖 **QA** — Test "Undo all my changes" from the Menu empty state — the only route back when everything is removed.
   - *Needs:* — · *Done when:* automated, from a state with zero recipes.
-- [ ] `010` 🤖 **FE-A** — Measure localStorage headroom with 48 photos attached and document the ceiling.
+- [x] `010` 🤖 **FE-A** — Measure localStorage headroom with 48 photos attached and document the ceiling.
   - *Needs:* — · *Done when:* a number is written into §10. This decides task `062`.
 - [ ] `011` 🤖 **QA** — Fill localStorage to the quota with photos and confirm the failure message appears rather than a silent loss.
   - *Needs:* `010` · *Done when:* the quota message is asserted by a test.
@@ -592,6 +592,7 @@ finds out what the last one learned.*
 | `003` | 2026-08-01 | CI runs `tests/run.sh` on every PR. Red path proven locally: a deliberately broken `app.js` exits the runner non-zero. The green path shows on this PR's own checks. |
 | `008` | 2026-08-01 | Removal persistence now asserted across reload, theme change, and a fresh browser context carrying only stored state — the closest a test gets to quitting Safari. |
 | `009` | 2026-08-01 | Already covered when the suites moved in: polish.js empties the collection, recovers via the Menu empty state's undo, and counts 48 back. No new code — verified, ticked. |
+| `010` | 2026-08-01 | **The ceiling: 12 photos.** A noisy 1200px/0.72 JPEG data URL is ~425 KB; Chromium's localStorage quota threw at #13 (~5 MB stored). 48 photos cannot fit — `062` must move photos to IndexedDB. Tool: `tests/measure-quota.js`. |
 
 ---
 
