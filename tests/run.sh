@@ -31,7 +31,7 @@ for i in $(seq 1 40); do
   sleep 0.25
 done
 
-SUITES="${KT_ONLY:-kt feat add relay quick polish perf zoom contrast}"
+SUITES="${KT_ONLY:-kt feat add relay quick polish sec perf zoom contrast}"
 FAILED=0
 for s in $SUITES; do
   echo

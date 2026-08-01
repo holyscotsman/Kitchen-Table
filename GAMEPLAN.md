@@ -286,11 +286,11 @@ checks cannot tell you whether a screen reader announces anything useful.*
   - *Needs:* `004` · *Done when:* every animation is off and nothing has lost a border.
 - [x] `043` 🤖 **A11Y** — Check colour is never the only signal — the flagged panel and the empty-contributor tile are the two risks.
   - *Needs:* — · *Done when:* both carry a shape or a word as well as a colour. Feeds `058`.
-- [ ] `044` 🤖 **SEC** — Audit every render path for unescaped interpolation, especially in imported fields.
+- [x] `044` 🤖 **SEC** — Audit every render path for unescaped interpolation, especially in imported fields.
   - *Needs:* — · *Done when:* every path is either escaped or explicitly justified in a comment.
-- [ ] `045` 🤖 **SEC** — Import a page containing a script tag and confirm it is inert everywhere it appears.
+- [x] `045` 🤖 **SEC** — Import a page containing a script tag and confirm it is inert everywhere it appears.
   - *Needs:* `044` · *Done when:* a test asserts it, in the card, the recipe page and the edit field.
-- [ ] `046` 🤖 **SEC** — Cap the size of imported fields so a hostile page cannot exhaust storage.
+- [x] `046` 🤖 **SEC** — Cap the size of imported fields so a hostile page cannot exhaust storage.
   - *Needs:* `044` · *Done when:* a cap exists, is enforced, and says so when it truncates.
 
 ## Phase 5 — Close the third-party surface
@@ -602,6 +602,9 @@ finds out what the last one learned.*
 | *Phase 3* | 2026-08-01 | **Closed, fully parked.** Nine rulings for Jason (§11), led by `026`, the gate — its measured inputs are ready in this log. `034` waits on the VoiceOver findings it should cite. |
 | `041` | 2026-08-01 | **Found three reflow failures** at 320px (200% zoom) + Easy Read + top step: the servings card and body columns stretched past the viewport (grid `min-width:auto`), and "Instructions"/"Worcestershire"-length words could not break. Fixed: grid guards, servcard wraps, headings and checklist text hyphenate at the extreme. `tests/zoom.js` now holds all nine screens to it, in CI. |
 | `043` | 2026-08-01 | The two named risks pass (flagged panel has its heading; empty tile says "0"). The audit found a third: **selected filter chips signalled by colour alone** — they now carry a check glyph, matching the sort menu. Asserted in polish.js. |
+| `044` | 2026-08-01 | Static scan of all 51 bare interpolations: every user/imported string goes through `esc()`; the bare ones are numbers, booleans, internal constants, or icon markup. The rule is now documented at `esc()` itself. |
+| `045` | 2026-08-01 | `tests/sec.js`: a page whose title/ingredient/step are live XSS payloads imports as inert text on the review form, recipe page, menu card, and edit field — nothing executes anywhere. |
+| `046` | 2026-08-01 | `capDraft()` bounds every imported field (title 300, lines 500/2000, lists 100/60, notes 5000) on both the JSON-LD and text/OCR paths, and discloses each trim in `flagged`. Asserted with a 60 KB hostile page. |
 
 ---
 

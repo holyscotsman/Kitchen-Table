@@ -414,6 +414,16 @@
      5. Helpers
      ====================================================================== */
 
+  /* The escaping rule, audited across every render path (gameplan 044):
+     anything that can carry user or imported text — titles, ingredients,
+     steps, notes, tags, contributor, source, flagged entries, error
+     messages — goes through esc() at the point of interpolation. What is
+     interpolated bare is only ever one of: a number (counts, servings, font
+     px), a boolean into an ARIA attribute, an internal constant (sort keys,
+     element ids, class fragments), or markup built by the icon helpers.
+     recipe ids reach hrefs escaped and are slugified [a-z0-9-] besides.
+     Plain-text sinks — recipeText, confirm(), fetch URLs — are not HTML and
+     need no escaping. */
   function esc(v) {
     return String(v == null ? "" : v)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -704,6 +714,7 @@
     /* Long time strings are omitted rather than truncated. */
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
+    /* meta is pre-escaped here — it is interpolated bare below. */
     var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
     var src = imageFor(r);
     /* A photo replaces the category icon; without one, the icon is what tells
@@ -1808,6 +1819,54 @@
     d.cookTime = dur(node.cookTime || node.totalTime);
     d.category = guessCategory(text(node.recipeCategory));
     d.notes = text(node.description);
+    return capDraft(d);
+  }
+
+  /* Import fields are bounded (gameplan 046). A hostile or broken page can
+     emit fields of any size; unchecked they exhaust the few MB localStorage
+     offers and make every later render crawl. The caps are far above any real
+     recipe, and every trim is disclosed in flagged rather than silent. */
+  var CAPS = {
+    title: 300, time: 60, notes: 5000, source: 300,
+    line: 500, step: 2000, ingredients: 100, steps: 60
+  };
+
+  function capDraft(d) {
+    var trimmed = [];
+    function capText(key, max, label) {
+      if (typeof d[key] === "string" && d[key].length > max) {
+        d[key] = d[key].slice(0, max);
+        trimmed.push(label);
+      }
+    }
+    function capList(key, maxItems, maxLen, label) {
+      if (!Array.isArray(d[key])) return;
+      if (d[key].length > maxItems) {
+        d[key] = d[key].slice(0, maxItems);
+        trimmed.push(label + " list");
+      }
+      var cut = false;
+      d[key] = d[key].map(function (s) {
+        s = String(s);
+        if (s.length > maxLen) { cut = true; return s.slice(0, maxLen); }
+        return s;
+      });
+      if (cut) trimmed.push("a " + label + " line");
+    }
+    capText("title", CAPS.title, "the title");
+    capText("prepTime", CAPS.time, "the prep time");
+    capText("cookTime", CAPS.time, "the cook time");
+    capText("notes", CAPS.notes, "the notes");
+    capText("source", CAPS.source, "the source");
+    capList("ingredients", CAPS.ingredients, CAPS.line, "ingredient");
+    capList("steps", CAPS.steps, CAPS.step, "step");
+    if (trimmed.length) {
+      d.flagged = (d.flagged || []).concat(
+        "Trimmed unusually long content from this import (" +
+        trimmed.filter(function (t, i) { return trimmed.indexOf(t) === i; }).join(", ") +
+        ") — check nothing important was cut."
+      );
+    }
     return d;
   }
 
@@ -1951,7 +2010,7 @@
     if (!d.steps.length) { d.steps = [""]; d.flagged.push("No steps were picked up."); }
     d.notes = notes.join(" ");
     d.source = "Read from a photo";
-    return d;
+    return capDraft(d);
   }
 
   /* ======================================================================
