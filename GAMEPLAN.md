@@ -367,7 +367,7 @@ bulk tagging exists before anyone is asked to tag.*
   - *Needs:* `067` · *Done when:* ten recipes can be tagged in one pass. **→ README**
 - [ ] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
   - *Needs:* `067` · *Done when:* merging "italian" into "Italian" leaves no recipe pointing at the old one. **→ README**
-- [ ] `070` 🤖 **FE-B** — Detect a likely duplicate on save by comparing title and ingredients against the collection.
+- [x] `070` 🤖 **FE-B** — Detect a likely duplicate on save by comparing title and ingredients against the collection.
   - *Needs:* — · *Done when:* it warns and offers a comparison, and never blocks the save.
 - [ ] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.
   - *Needs:* `029` · *Done when:* the prompt says what is missing and opens the right field, in Viewer mode as well as Edit.
@@ -619,6 +619,7 @@ finds out what the last one learned.*
 | `064` | 2026-08-01 | A referenced-but-absent `images/<id>.jpg` never shows a broken glyph: capture-phase error handler swaps thumbs to their category icon, drops heroes, restores the Main blank. Asserted in feat.js. |
 | `065` | 2026-08-01 | The hero taps open the whole photograph — the writing a 3:2 crop loses is the point. Full dialog contract (trap, Escape, focus return) by joining the sheets' machinery; native pinch-zoom preserved on the image. |
 | `066` | 2026-08-01 | Photos accumulate on the Add path; all are OCR'd in sequence into one draft, and the cards are kept as the recipe's pages — page 1 is the hero, later cards render whole, Download photos writes `<id>-2.jpg`, and the flag says the join may sit mid-list. |
+| `070` | 2026-08-01 | Saving something that looks like an existing recipe warns once — names it, links to it — and "Save anyway" is one tap. Detector is deliberately conservative: exact normalized title, or ≥50% title-word + ≥40% ingredient-line overlap. |
 
 ---
 

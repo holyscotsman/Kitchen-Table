@@ -136,6 +136,19 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.waitForTimeout(250);
   chk('back works', await p.locator('.pathbtn').count()===3);
 
+  console.log('\n== Likely duplicates warn, never block (task 070) ==');
+  await p.goto(B+'/index.html#add'); await p.waitForSelector('.pathbtn');
+  await p.click('[data-key="review"]'); await p.waitForSelector('#a-title');
+  await p.fill('#a-title','Scottish Tablet');
+  await p.click('[data-act="add-save"]'); await p.waitForTimeout(400);
+  chk('warning names the existing recipe', /Scottish Tablet/.test(await p.locator('.panel--flag').textContent()));
+  chk('not saved yet', p.url().endsWith('#add'));
+  chk('offers to open the existing one', await p.locator('.panel--flag a[href="#scottish-tablet"]').count()===1);
+  await p.click('[data-act="add-save-anyway"]'); await p.waitForTimeout(500);
+  chk('save anyway saves', /#scottish-tablet-2$/.test(p.url()), p.url());
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
+
   console.log('\n== Two cards, one recipe (task 066) ==');
   /* A stub recogniser stands in for Tesseract (the real one runs in
      tests/ocr-live.js); what's under test is the multi-photo flow. */

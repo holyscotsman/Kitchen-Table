@@ -294,6 +294,8 @@
     addUrl: "",
     addPaste: "",
     addPhotos: [],
+    addDupe: null,     // id of the likely duplicate, when one was found
+    addDupeOk: false,  // "Save anyway" pressed
 
     mainQ: "",
 
@@ -1759,12 +1761,56 @@
     h += tagsFieldHtml("a-tags", parseTags(d.tags), "ad");
     h += photoFieldHtml("a-photo-file", "__new__", "a-photo-act");
 
+    if (S.addDupe) {
+      var existing = byId(S.addDupe);
+      h += '<div class="panel panel--flag" role="alert" style="margin-top:18px">' +
+           "<h2>This might already be in the book</h2>" +
+           "<p>It looks a lot like <strong>" +
+           esc(existing ? existing.title : S.addDupe) + "</strong>. " +
+           "Open it to compare, or save this one anyway — two versions is " +
+           "allowed, it just shouldn’t be an accident.</p>" +
+           '<a class="outlinebtn press" style="text-align:center; line-height:60px" href="#' +
+           esc(S.addDupe) + '">Open ' + esc(existing ? existing.title : "the existing recipe") + "</a>" +
+           '<button type="button" class="savebtn press" data-act="add-save-anyway">' +
+           "Save anyway</button></div>";
+    }
+
     h += '<button type="button" class="savebtn press" data-act="add-save">' +
          "Save to my recipes</button>";
     h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
          "Start over</button>";
     h += "</div>";
     return h;
+  }
+
+  /* Likely-duplicate check (gameplan 070): normalized-title match, or strong
+     overlap of both title words and ingredient lines. Conservative on
+     purpose — a false "duplicate" on every casserole would teach people to
+     ignore the warning. */
+  function findDuplicate(d) {
+    function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, "").trim(); }
+    function tokens(s) { return norm(s).split(/\s+/).filter(Boolean); }
+    function overlap(a, b) {
+      if (!a.length || !b.length) return 0;
+      var seen = {};
+      a.forEach(function (t) { seen[t] = true; });
+      var hit = 0;
+      b.forEach(function (t) { if (seen[t]) hit++; });
+      return hit / Math.max(a.length, b.length);
+    }
+    var dTitle = norm(d.title);
+    var dTok = tokens(d.title);
+    var dIng = (d.ingredients || []).map(norm).filter(Boolean);
+    for (var i = 0; i < S.recipes.length; i++) {
+      var r = S.recipes[i];
+      if (norm(r.title) === dTitle) return r;
+      var tScore = overlap(dTok, tokens(r.title));
+      if (tScore >= 0.5) {
+        var iScore = overlap(dIng, (r.ingredients || []).map(norm));
+        if (iScore >= 0.4) return r;
+      }
+    }
+    return null;
   }
 
   function saveNewRecipe() {
@@ -1777,6 +1823,19 @@
       if (f) f.focus();
       return;
     }
+
+    /* A likely duplicate warns once and never blocks — "Save anyway" is one
+       tap. Two of the same recipe is the family's call, not the app's. */
+    if (!S.addDupeOk) {
+      var dup = findDuplicate(d);
+      if (dup) {
+        S.addDupe = dup.id;
+        render();
+        return;
+      }
+    }
+    S.addDupe = null;
+    S.addDupeOk = false;
 
     var base = slugify(title) || "recipe";
     var id = base;
@@ -1817,6 +1876,8 @@
     S.addUrl = "";
     S.addPaste = "";
     S.addPhotos = [];
+    S.addDupe = null;
+    S.addDupeOk = false;
     location.hash = "#" + id;
   }
 
@@ -2444,6 +2505,8 @@
       S.addUrl = "";
       S.addPaste = "";
       S.addPhotos = [];
+      S.addDupe = null;
+      S.addDupeOk = false;
     }
 
     if (changedRecipe) {
@@ -2678,6 +2741,7 @@
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
     if (act === "add-save") { saveNewRecipe(); return; }
+    if (act === "add-save-anyway") { S.addDupeOk = true; saveNewRecipe(); return; }
 
     if (!r) return;
 
