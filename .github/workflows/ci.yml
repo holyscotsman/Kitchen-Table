@@ -1,0 +1,30 @@
+# Gameplan task 003: every pull request runs the full check suite before merge.
+# The app has no build step — CI serves the repo root exactly as GitHub Pages
+# would and drives it with the suites in tests/.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        working-directory: tests
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run all suites
+        working-directory: tests
+        run: bash run.sh

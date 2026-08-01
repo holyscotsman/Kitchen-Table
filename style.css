@@ -435,6 +435,10 @@ img {
 .hero__blank {
   height: 200px;
   background: var(--tag-bg);
+  color: var(--tag-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero__body {
@@ -854,6 +858,10 @@ img {
 
 .r-hero {
   width: 100%;
+  /* One deliberate box for any input: 3:2, capped at 280px tall, centre-crop.
+     A portrait phone photo, a landscape one and a square all land identically
+     — and the box is reserved before the image decodes, so nothing reflows. */
+  aspect-ratio: 3 / 2;
   max-height: 280px;
   object-fit: cover;
   border-radius: var(--r-card);
@@ -923,6 +931,10 @@ img {
   color: var(--dim);
   font-size: 18px;
   line-height: 1.5;
+}
+
+.emptystate .art {
+  margin: 0 auto 16px;
 }
 
 .emptystate .bigbtn {
@@ -1102,6 +1114,12 @@ img {
   margin-bottom: 12px;
 }
 
+/* Grid items default to min-width auto, which lets a wide card stretch the
+   whole column past the viewport at 320px — the 200%-zoom reflow case. */
+.topgrid > * {
+  min-width: 0;
+}
+
 @media (min-width: 640px) {
   .topgrid {
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -1111,6 +1129,10 @@ img {
 .servcard {
   display: flex;
   align-items: center;
+  /* Wraps rather than overflows: at 320px with Easy Read at the top font
+     step, the − / + pair drops beneath the label instead of pushing the card
+     off the screen. */
+  flex-wrap: wrap;
   gap: 12px;
   padding: 16px 18px;
   border-radius: var(--r-card);
@@ -1212,6 +1234,12 @@ img {
   gap: 32px;
 }
 
+/* Same reflow guard as .topgrid: without it a long ingredient word at the
+   top font step stretches the column past a 320px viewport. */
+.bodygrid > * {
+  min-width: 0;
+}
+
 @media (min-width: 900px) {
   .bodygrid {
     grid-template-columns: minmax(280px, 0.85fr) 1.15fr;
@@ -1228,6 +1256,11 @@ img {
   font-size: 1.2em;
   font-weight: 700;
   margin-bottom: 6px;
+  /* At 320px (200% zoom) with the top font step, "Instructions" is wider than
+     the screen as a single word. Hyphenate at the extreme rather than scroll
+     sideways; at every ordinary size these never engage. */
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .hint {
@@ -1306,9 +1339,14 @@ img {
 
 .checkrow__text {
   flex: 1;
+  /* min-width lets the row shrink; hyphens break "Worcestershire" at 40px on
+     a 320px screen instead of scrolling the page sideways. */
+  min-width: 0;
   font-size: 1.02em;
   line-height: 1.45;
   text-wrap: pretty;
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .checkrow[aria-pressed="true"] .checkrow__text {
@@ -1566,7 +1604,8 @@ input[type="file"].input {
 .outlinebtn {
   display: block;
   width: 100%;
-  min-height: 58px;
+  /* 60, matching the styleguide's secondary button — 58 belongs to fields. */
+  min-height: 60px;
   border: var(--bw) solid var(--line);
   border-radius: var(--r-row);
   background: var(--surf);
@@ -1670,6 +1709,9 @@ input[type="file"].input {
   color: var(--ink);
   font-size: 18px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .chip[aria-pressed="true"] {
@@ -1737,6 +1779,308 @@ input[type="file"].input {
   font-weight: 700;
 }
 
+/* Later cards of a multi-photo recipe, shown whole. */
+.r-page {
+  width: 100%;
+  border-radius: var(--r-card);
+  margin-bottom: 12px;
+}
+
+/* Chosen photos on the Add path. */
+.pagelist {
+  margin-bottom: 14px;
+}
+
+.pagelist__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 0 6px 14px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-input);
+  background: var(--surf);
+  margin-bottom: 8px;
+  font-size: 17px;
+}
+
+.pagelist__row .delbtn {
+  margin-right: 6px;
+}
+
+/* ============================================================== lightbox
+
+   The hero is a deliberate 3:2 crop; this is the whole photograph, one tap
+   away — which matters when the photo is a handwritten card and the writing
+   is what got cropped. Same dialog contract as the sheets: focus trapped,
+   Escape closes, focus returns. */
+
+.herobtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: inherit;
+  margin-bottom: 16px;
+}
+
+.herobtn .r-hero {
+  margin-bottom: 0;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+
+.lightbox__img {
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  border-radius: var(--r-card);
+  /* Native pinch-to-zoom keeps working on the photo itself. */
+  touch-action: pinch-zoom;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+}
+
+#app.sheet-in .lightbox {
+  animation: kt-fade 0.2s ease-out both;
+}
+
+/* ====================================================== Artwork and motion
+
+   Two rules govern everything below.
+
+   One: the artwork is decorative. It fills a slot that would otherwise be
+   blank — a recipe with no photograph, a search that found nothing — and it
+   carries no information, so it is aria-hidden in the markup and it uses
+   currentColor rather than a palette of its own.
+
+   Two: the motion is short, it is never on the critical path, and it is
+   entirely off under prefers-reduced-motion. Nothing here animates a font
+   size, a layout, or anything a reader is trying to read. The longest thing
+   in this section is 600ms and it is a background flash on a list that just
+   changed underneath the reader. */
+
+.art {
+  width: 120px;
+  height: 92px;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.hero__blank .art {
+  width: 150px;
+  height: 115px;
+  opacity: 1;
+}
+
+/* Steam. transform-origin sits at the bottom so a wisp grows upward out of the
+   bowl rather than scaling about its middle. */
+.wisp {
+  transform-origin: 50% 100%;
+  animation: kt-drift 3.6s ease-in-out infinite;
+}
+
+.wisp--b {
+  animation-duration: 4.2s;
+  animation-delay: -1.3s;
+}
+
+.wisp--c {
+  animation-delay: -2.4s;
+}
+
+@keyframes kt-drift {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scaleY(0.9);
+  }
+  30% {
+    opacity: 0.95;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-9px) scaleY(1.08);
+  }
+}
+
+/* Screen entry. Applied to #app's children on a change of route only — see
+   render() — so tapping a filter chip never re-plays the page. */
+@keyframes kt-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+#app.screen-in > * {
+  animation: kt-enter 0.26s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+/* Cards settle in sequence rather than all at once. Capped at ten so a list of
+   48 does not crawl in — everything past the tenth arrives with the tenth. */
+#app.screen-in .cardgrid > * {
+  animation: kt-enter 0.3s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+#app.screen-in .cardgrid > *:nth-child(1) { animation-delay: 0ms; }
+#app.screen-in .cardgrid > *:nth-child(2) { animation-delay: 26ms; }
+#app.screen-in .cardgrid > *:nth-child(3) { animation-delay: 52ms; }
+#app.screen-in .cardgrid > *:nth-child(4) { animation-delay: 78ms; }
+#app.screen-in .cardgrid > *:nth-child(5) { animation-delay: 104ms; }
+#app.screen-in .cardgrid > *:nth-child(6) { animation-delay: 130ms; }
+#app.screen-in .cardgrid > *:nth-child(7) { animation-delay: 156ms; }
+#app.screen-in .cardgrid > *:nth-child(8) { animation-delay: 182ms; }
+#app.screen-in .cardgrid > *:nth-child(9) { animation-delay: 208ms; }
+#app.screen-in .cardgrid > *:nth-child(n + 10) { animation-delay: 234ms; }
+
+/* A tick lands. Only on the row that was just checked — un-ticking is a
+   correction and does not get celebrated. */
+@keyframes kt-pop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.checkbox.is-ticked > svg,
+.stepnum.is-ticked > svg {
+  animation: kt-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* A rescale rewrites numbers in place, which is easy to miss and easier still
+   at 40px. The list flashes once so the change is seen, not just made. */
+@keyframes kt-flash {
+  from {
+    background-color: var(--tag-bg);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.checklist.is-rescaled .checkrow__text {
+  border-radius: 6px;
+  animation: kt-flash 0.6s ease-out both;
+}
+
+/* Sun and moon swap places. */
+@keyframes kt-spin {
+  from {
+    transform: rotate(-80deg) scale(0.55);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.themebtn--spin > svg {
+  animation: kt-spin 0.3s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+/* Sheets rise from the edge they are attached to. Applied on open only. */
+@keyframes kt-rise {
+  from {
+    transform: translateY(14%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes kt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+#app.sheet-in .sheet {
+  animation: kt-rise 0.24s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+#app.sheet-in .scrim {
+  animation: kt-fade 0.24s ease-out both;
+}
+
+/* The one thing on screen before the recipes arrive. */
+.boot {
+  animation: kt-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes kt-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ===================================================== Version stamp
+
+   Bottom corner of every screen. Rendered outside the screen wrapper so it
+   never inherits the recipe's reading size — this is chrome, and chrome does
+   not scale with A−/A+. Easy Read raises it along with everything else. */
+
+.vstamp {
+  margin: 0;
+  padding: 28px var(--pad) calc(20px + env(safe-area-inset-bottom));
+  text-align: right;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+[data-easy="on"] .vstamp {
+  font-size: 18px;
+}
+
+/* Motion is a courtesy, never a requirement. Everything above is off here —
+   the artwork stays, it simply holds still. */
+@media (prefers-reduced-motion: reduce) {
+  .wisp,
+  #app.screen-in > *,
+  #app.screen-in .cardgrid > *,
+  .checkbox.is-ticked > svg,
+  .stepnum.is-ticked > svg,
+  .checklist.is-rescaled .checkrow__text,
+  .themebtn--spin > svg,
+  #app.sheet-in .sheet,
+  #app.sheet-in .scrim,
+  #app.sheet-in .lightbox,
+  .boot {
+    animation: none;
+  }
+}
+
 /* ================================================================== print */
 
 /* The PDF path prints from here — black on white, no site chrome, never a
@@ -1756,7 +2100,9 @@ input[type="file"].input {
   .sheet,
   .sortmenu,
   .skip-link,
-  .hint {
+  .hint,
+  .vstamp,
+  .art {
     display: none !important;
   }
 

@@ -31,6 +31,11 @@
      1. Constants + storage
      ====================================================================== */
 
+  /* Rendered in the bottom corner of every screen. The 1.0 gameplan in
+     GAMEPLAN.md is what closes the gap: when its 130 tasks are done this
+     becomes "1.0" and nothing else about the stamp changes. */
+  var VERSION = "0.9";
+
   var FS = [20, 24, 29, 34, 40]; // px; index 1 (24px) is the default
   var DEFAULT_FS = 1;
   /* Meal order, so the "Course" sort reads like a day rather than an
@@ -72,7 +77,11 @@
     fs: "kt.fsIndex",
     easyRead: "kt.easyRead",
     recipes: "kt.recipes",
-    images: "kt.images"
+    images: "kt.images",
+    /* sessionStorage, not localStorage: an accidental refresh mid-import
+       keeps the work, closing the tab lets it go. Nothing here is "saved" —
+       the draft only becomes a recipe when Save is pressed. */
+    addDraft: "kt.addDraft"
   };
 
   /* Photos are held apart from the recipe records, keyed by id. Inlining data
@@ -93,13 +102,20 @@
      rather than HTML, which the photo parser can still make sense of. If every
      one of them fails there is always the paste box, which needs no network. */
   var RELAYS = [
-    { url: function (u) { return u; }, kind: "html" },
-    { url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
-    { url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
-    { url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
+    { name: "directly", url: function (u) { return u; }, kind: "html" },
+    { name: "allorigins.win", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
+    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
+    { name: "r.jina.ai", url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
   ];
   var RELAY_TIMEOUT = 12000;
-  var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+  /* Pinned to the exact version, with subresource integrity: a tampered CDN
+     copy refuses to load rather than running (gameplan 048). The hash is the
+     sha384 of this one file — bumping the version means recomputing it:
+       curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A
+     SRI covers this entry script; the worker and wasm it then fetches are
+     version-pinned by it in turn, which is as far as the mechanism reaches. */
+  var TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+  var TESSERACT_SRI = "sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F";
 
   function load(key, fallback) {
     try {
@@ -219,6 +235,40 @@
     return svg(paths, size || 22, size || 22);
   }
 
+  /* Artwork, as opposed to icons. These fill a slot that would otherwise be
+     blank — a recipe with no photograph, a search that found nothing — so they
+     are decorative by definition and always aria-hidden. Same stroke language
+     as the icons above, same currentColor, no new palette. The steam drifts;
+     the CSS turns that off under prefers-reduced-motion. */
+  var ART = {
+    /* Bowl on a table with three wisps of steam. Stands in for a hero photo. */
+    steam: function () {
+      return (
+        '<svg class="art art--steam" viewBox="0 0 120 92" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.6" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<path class="wisp wisp--a" d="M44 48c-6-6 6-10 0-16s6-10 0-16"/>' +
+        '<path class="wisp wisp--b" d="M60 44c-6-7 6-11 0-19s6-11 0-19"/>' +
+        '<path class="wisp wisp--c" d="M76 48c-6-6 6-10 0-16s6-10 0-16"/>' +
+        '<path d="M26 58q34 26 68 0"/>' +
+        '<path d="M20 58h80"/>' +
+        '<path d="M12 80h96"/>' +
+        "</svg>"
+      );
+    },
+    /* An empty plate, for the states where there is genuinely nothing. */
+    empty: function () {
+      return (
+        '<svg class="art art--empty" viewBox="0 0 120 92" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.6" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' +
+        '<ellipse cx="60" cy="48" rx="34" ry="26"/>' +
+        '<ellipse cx="60" cy="48" rx="21" ry="15"/>' +
+        "</svg>"
+      );
+    }
+  };
+
   /* ======================================================================
      3. State
      ====================================================================== */
@@ -247,7 +297,9 @@
     addDraft: null,
     addUrl: "",
     addPaste: "",
-    addPhoto: null,
+    addPhotos: [],
+    addDupe: null,     // id of the likely duplicate, when one was found
+    addDupeOk: false,  // "Save anyway" pressed
 
     mainQ: "",
 
@@ -267,10 +319,22 @@
     checkedStep: {},
     awake: false,
     dlOpen: false,
+    lbOpen: false,
     draft: null,
     saved: false,
 
-    notice: ""
+    notice: "",
+
+    /* Motion cues. Rendering is a full rebuild, so a CSS animation attached to
+       an element replays on every re-render unless something says which change
+       caused it. These flags are set by the action that earned the animation
+       and cleared the moment they are read, so a filter tap never re-plays a
+       tick that was checked ten renders ago. */
+    pulseRow: "",      // "i:3" / "s:0" — the row just checked
+    pulseScale: false, // servings just changed
+    pulseTheme: false, // theme just toggled
+    pulseSheet: false, // a sheet just opened
+    paintedRoute: ""   // last route actually painted, for the enter animation
   };
 
   function applyTheme() {
@@ -304,6 +368,7 @@
   function toggleTheme() {
     S.theme = S.theme === "light" ? "dark" : "light";
     save(K.theme, S.theme);
+    S.pulseTheme = true;
     applyTheme();
     render();
   }
@@ -363,6 +428,16 @@
      5. Helpers
      ====================================================================== */
 
+  /* The escaping rule, audited across every render path (gameplan 044):
+     anything that can carry user or imported text — titles, ingredients,
+     steps, notes, tags, contributor, source, flagged entries, error
+     messages — goes through esc() at the point of interpolation. What is
+     interpolated bare is only ever one of: a number (counts, servings, font
+     px), a boolean into an ARIA attribute, an internal constant (sort keys,
+     element ids, class fragments), or markup built by the icon helpers.
+     recipe ids reach hrefs escaped and are slugified [a-z0-9-] besides.
+     Plain-text sinks — recipeText, confirm(), fetch URLs — are not HTML and
+     need no escaping. */
   function esc(v) {
     return String(v == null ? "" : v)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -394,9 +469,10 @@
   }
 
   function themeBtn(extraClass) {
+    var spin = S.pulseTheme ? " themebtn--spin" : "";
     return (
-      '<button type="button" class="iconbtn press ' + (extraClass || "") + '" ' +
-      'data-act="theme" aria-label="Switch to ' +
+      '<button type="button" class="iconbtn press themebtn' + spin + " " +
+      (extraClass || "") + '" data-act="theme" aria-label="Switch to ' +
       (S.theme === "light" ? "dark" : "light") + ' mode">' +
       (S.theme === "light" ? I.moon() : I.sun()) + "</button>"
     );
@@ -432,34 +508,143 @@
     save(K.recipes, S.recipes);
   }
 
-  /* ---- photos ---- */
+  /* ---- photos ----
+
+     Photos live in IndexedDB (database "kt", store "images"), because
+     localStorage tops out around twelve of them — task 010 measured ~425 KB
+     per 1200px photo against a ~5 MB quota, and the collection is 48.
+
+     Reads stay synchronous against an in-memory cache filled once at boot,
+     so every call site keeps its shape. Writes update the cache immediately
+     and persist behind it; a persist failure removes the cache entry again
+     and reports, so the screen never shows a photo that isn't really kept.
+
+     A browser with no usable IndexedDB falls back to the old localStorage
+     store, whose smaller ceiling still fails loudly. Legacy kt.images data
+     migrates into the database at boot and the old key is removed. */
+
+  var IMG = {};
+  var imgDb = null;
+  var IMG_FULL_MSG =
+    "There isn’t room on this phone for another photo. Download your " +
+    "photos and recipes.json, commit them, then remove some here.";
+
+  function idbOpen() {
+    return new Promise(function (resolve) {
+      if (!window.indexedDB) return resolve(null);
+      var req;
+      try { req = indexedDB.open("kt", 1); } catch (e) { return resolve(null); }
+      req.onupgradeneeded = function () {
+        req.result.createObjectStore("images");
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { resolve(null); };
+      req.onblocked = function () { resolve(null); };
+    });
+  }
+
+  function idbPut(id, val) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var tx = imgDb.transaction("images", "readwrite");
+        tx.objectStore("images").put(val, id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = tx.onabort = function () { reject(tx.error); };
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function idbDelete(id) {
+    return new Promise(function (resolve) {
+      try {
+        var tx = imgDb.transaction("images", "readwrite");
+        tx.objectStore("images").delete(id);
+        tx.oncomplete = tx.onerror = tx.onabort = function () { resolve(); };
+      } catch (e) { resolve(); }
+    });
+  }
+
+  function idbAll() {
+    return new Promise(function (resolve) {
+      var out = {};
+      try {
+        var tx = imgDb.transaction("images", "readonly");
+        var store = tx.objectStore("images");
+        var req = store.openCursor();
+        req.onsuccess = function () {
+          var cur = req.result;
+          if (!cur) return resolve(out);
+          out[cur.key] = cur.value;
+          cur.continue();
+        };
+        req.onerror = function () { resolve(out); };
+      } catch (e) { resolve(out); }
+    });
+  }
+
+  /* Runs once at boot, before the first render. Never rejects. */
+  function initImages() {
+    return idbOpen().then(function (db) {
+      imgDb = db;
+      if (!db) {
+        IMG = load(K.images, {}) || {};
+        return;
+      }
+      return idbAll().then(function (map) {
+        IMG = map;
+        var legacy = load(K.images, null);
+        if (!legacy || typeof legacy !== "object") return;
+        var puts = Object.keys(legacy).map(function (k) {
+          IMG[k] = legacy[k];
+          return idbPut(k, legacy[k]);
+        });
+        return Promise.all(puts).then(function () {
+          try { localStorage.removeItem(K.images); } catch (e) {}
+        }, function () { /* keep the legacy key until it migrates */ });
+      });
+    });
+  }
 
   function images() {
-    return load(K.images, {}) || {};
+    return IMG;
+  }
+
+  /* A stored value is one data URL, or an array of them when a recipe spans
+     several cards — the first page is the recipe's face everywhere. */
+  function pagesOf(id) {
+    var v = IMG[id];
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
   }
 
   /* A local photo wins over the published path, so a freshly attached picture
      shows before anyone has committed the file. */
   function imageFor(recipe) {
-    return images()[recipe.id] || recipe.image || "";
+    return pagesOf(recipe.id)[0] || recipe.image || "";
   }
 
+  /* Resolves to "" on success or a user-facing message on failure. */
   function setImage(id, dataUrl) {
-    var map = images();
-    map[id] = dataUrl;
+    IMG[id] = dataUrl;
+    if (imgDb) {
+      return idbPut(id, dataUrl).then(
+        function () { return ""; },
+        function () { delete IMG[id]; return IMG_FULL_MSG; }
+      );
+    }
     try {
-      localStorage.setItem(K.images, JSON.stringify(map));
-      return "";
+      localStorage.setItem(K.images, JSON.stringify(IMG));
+      return Promise.resolve("");
     } catch (e) {
-      return "There isn’t room on this phone for another photo. Download your " +
-             "photos and recipes.json, commit them, then remove some here.";
+      delete IMG[id];
+      return Promise.resolve(IMG_FULL_MSG);
     }
   }
 
   function removeImage(id) {
-    var map = images();
-    delete map[id];
-    save(K.images, map);
+    delete IMG[id];
+    if (imgDb) idbDelete(id);
+    else save(K.images, IMG);
   }
 
   /* Downscaled in the browser: a phone photo is several megabytes and
@@ -533,19 +718,26 @@
       setNotice("There are no photos on this phone yet.");
       return;
     }
-    ids.forEach(function (id, i) {
+    /* Multi-page recipes save as <id>.jpg, <id>-2.jpg, … */
+    var files = [];
+    ids.forEach(function (id) {
+      pagesOf(id).forEach(function (url, page) {
+        files.push({ name: id + (page ? "-" + (page + 1) : "") + ".jpg", url: url });
+      });
+    });
+    files.forEach(function (f, i) {
       setTimeout(function () {
-        var parts = map[id].split(",");
+        var parts = f.url.split(",");
         var bin = atob(parts[1]);
         var bytes = new Uint8Array(bin.length);
         for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-        downloadBlob(bytes, id + ".jpg", "image/jpeg");
+        downloadBlob(bytes, f.name, "image/jpeg");
       }, i * 350);
     });
     setNotice(
-      ids.length === 1
+      files.length === 1
         ? "Saving 1 photo. Put it in the images folder and commit it."
-        : "Saving " + ids.length + " photos. Put them in the images folder and commit them."
+        : "Saving " + files.length + " photos. Put them in the images folder and commit them."
     );
   }
 
@@ -584,7 +776,8 @@
       h += '<h2 class="results__h">' + hits.length +
            (hits.length === 1 ? " match" : " matches") + "</h2>";
       if (!hits.length) {
-        h += '<p class="emptystate">No recipes match. Try a different word.</p>';
+        h += '<div class="emptystate">' + ART.empty() +
+             "<p>No recipes match. Try a different word.</p></div>";
       } else {
         h += '<div class="cardgrid">' +
              hits.slice(0, 12).map(cardHtml).join("") + "</div>";
@@ -602,7 +795,7 @@
            (imageFor(pick)
              ? '<img class="hero__img" src="' + esc(imageFor(pick)) +
                '" alt="' + esc(pick.title) + '" />'
-             : '<div class="hero__blank"></div>') +
+             : '<div class="hero__blank">' + ART.steam() + "</div>") +
            '<div class="hero__body">' +
            '<p class="hero__meta">' + esc(pick.contributor) +
            (pick.cookTime ? " · " + esc(pick.cookTime) : "") + "</p>" +
@@ -651,13 +844,15 @@
     /* Long time strings are omitted rather than truncated. */
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
+    /* meta is pre-escaped here — it is interpolated bare below. */
     var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
     var src = imageFor(r);
     /* A photo replaces the category icon; without one, the icon is what tells
        you at a glance whether this is a breakfast or a dessert. Either way
        there is always exactly one thing in that slot, so the rows line up. */
     var lead = src
-      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" />'
+      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" ' +
+        'width="64" height="64" decoding="async" data-cat="' + esc(r.category) + '" />'
       : '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>";
     var tags = tagsOf(r).slice(0, 2);
     return (
@@ -768,7 +963,7 @@
          contributed anything yet — say what is actually true. */
       var lonePerson = S.who.length === 1 && !S.cats.length && !S.tags.length &&
         !S.menuQ && !countBy(S.recipes, "contributor", S.who[0]) ? S.who[0] : "";
-      h += '<div class="emptystate"><p>' +
+      h += '<div class="emptystate">' + ART.empty() + "<p>" +
            (lonePerson
              ? esc(lonePerson) + " hasn’t added any recipes yet."
              : "No recipes match. Try a different word, or clear the filters.") +
@@ -842,9 +1037,11 @@
     S.filterOpen = false;
     S.textOpen = false;
     S.dlOpen = false;
+    S.lbOpen = false;
     S.sortOpen = false;
     S[flag] = true;
     openSheetId = null;
+    S.pulseSheet = true;
     render();
   }
 
@@ -860,7 +1057,8 @@
   }
 
   function activeSheet() {
-    return document.querySelector('.sheet[role="dialog"]');
+    /* The lightbox is a dialog on the same trap/Escape/return contract. */
+    return document.querySelector('.sheet[role="dialog"], .lightbox[role="dialog"]');
   }
 
   /* Called after every render: move focus into a sheet the first time it
@@ -925,8 +1123,11 @@
       WHO.filter(function (n) { return countBy(S.recipes, "contributor", n); })
         .map(function (name) {
           var on = S.who.indexOf(name) > -1;
+          /* The check is the non-colour half of the selected state — a filled
+             background alone fails anyone who can't rely on colour. */
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fw" data-key="' + esc(name) + '">' +
+                 (on ? I.check(15) : "") +
                  esc(name) + " (" + countWho(name) + ")</button>";
         }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
@@ -935,6 +1136,7 @@
           var on = S.cats.indexOf(cat) > -1;
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fc" data-key="' + esc(cat) + '">' +
+                 (on ? I.check(15) : "") +
                  esc(cat) + " (" + countCat(cat) + ")</button>";
         }).join("") + "</div>" +
       tagGroupHtml() +
@@ -998,6 +1200,7 @@
         var on = S.tags.indexOf(tag) > -1;
         return '<button type="button" class="chip press" aria-pressed="' + on +
                '" data-act="ft" data-key="' + esc(tag) + '">' +
+               (on ? I.check(15) : "") +
                esc(tag) + " (" + countTag(tag) + ")</button>";
       }).join("") + "</div>";
   }
@@ -1052,13 +1255,25 @@
 
     if (S.editing) {
       h += editBody(r);
+      /* Notices must reach edit mode too — the quota failure on attaching a
+         photo happens here, and a warning nobody can see is a silent loss. */
+      if (S.notice) {
+        h += '<p class="notice" role="status" style="margin-top:16px">' +
+             esc(S.notice) + "</p>";
+      }
       h += "</div>";
       return h;
     }
 
     var hero = imageFor(r);
     if (hero) {
-      h += '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />';
+      /* The hero is a 3:2 crop; the tap opens the whole photograph — which
+         matters when the photo is a handwritten card and the writing is what
+         got cropped. */
+      h += '<button type="button" class="herobtn press" data-act="open-lb" ' +
+           'aria-label="Show the photo full screen">' +
+           '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) +
+           '" decoding="async" /></button>';
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
@@ -1110,12 +1325,18 @@
 
     h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients</h2>' +
          '<p class="hint">Tap to check off as you go</p>';
+    /* A rescale changes the numbers in place, which is easy to miss at any font
+       size and very easy to miss at 40px. The list flashes once so the change
+       is seen rather than merely made. */
+    var scaled = S.pulseScale ? " is-rescaled" : "";
+
     if ((r.ingredients || []).length) {
-      h += '<ul class="checklist">' + r.ingredients.map(function (line, i) {
+      h += '<ul class="checklist' + scaled + '">' + r.ingredients.map(function (line, i) {
         var done = !!S.checkedIng[i];
+        var pop = S.pulseRow === "i:" + i ? " is-ticked" : "";
         return '<li><button type="button" class="checkrow press" aria-pressed="' +
                done + '" data-act="chk-i" data-i="' + i + '">' +
-               '<span class="checkbox">' + (done ? I.check(18) : "") + "</span>" +
+               '<span class="checkbox' + pop + '">' + (done ? I.check(18) : "") + "</span>" +
                '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
                "</span></button></li>";
       }).join("") + "</ul>";
@@ -1125,16 +1346,29 @@
     h += "</section>";
 
     h += "<section><h2 class=\"r-h2\">Instructions</h2>";
-    h += '<ol class="checklist checklist--steps">' + (r.steps || []).map(function (line, i) {
+    h += '<ol class="checklist checklist--steps' + scaled + '">' +
+         (r.steps || []).map(function (line, i) {
       var done = !!S.checkedStep[i];
+      var pop = S.pulseRow === "s:" + i ? " is-ticked" : "";
       return '<li><button type="button" class="checkrow press" aria-pressed="' +
              done + '" data-act="chk-s" data-i="' + i + '">' +
-             '<span class="stepnum">' + (done ? I.check(16) : i + 1) + "</span>" +
+             '<span class="stepnum' + pop + '">' + (done ? I.check(16) : i + 1) + "</span>" +
              '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
              "</span></button></li>";
     }).join("") + "</ol></section>";
 
     h += "</div>";
+
+    /* Later cards of a multi-photo recipe, uncropped — the transcription's
+       source, kept in sight. */
+    var extraPages = pagesOf(r.id).slice(1);
+    if (extraPages.length) {
+      h += '<section class="r-section"><h2 class="r-h2">Recipe card photos</h2>' +
+           extraPages.map(function (u, i) {
+             return '<img class="r-page" src="' + esc(u) + '" alt="' +
+                    esc(r.title) + " — card " + (i + 2) + '" decoding="async" />';
+           }).join("") + "</section>";
+    }
 
     if (r.notes) {
       h += '<section class="r-section"><h2 class="r-h2">Notes</h2>' +
@@ -1166,6 +1400,14 @@
 
     h += "</div>";
     if (S.dlOpen) h += downloadSheetHtml(r);
+    if (S.lbOpen && hero) {
+      h += '<div class="lightbox" role="dialog" aria-modal="true" ' +
+           'aria-label="Photo of ' + esc(r.title) + '" id="lightbox">' +
+           '<button type="button" class="iconbtn lightbox__close press" ' +
+           'data-act="close-lb" aria-label="Close photo">' + I.x() + "</button>" +
+           '<img class="lightbox__img" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />' +
+           "</div>";
+    }
     return h;
   }
 
@@ -1280,12 +1522,16 @@
   }
 
   function photoFieldHtml(id, recipeId, act) {
-    var src = images()[recipeId];
+    var pages = pagesOf(recipeId);
     return '<div class="field">' +
       '<label class="field__label" for="' + id + '">Photo</label>' +
-      (src
-        ? '<div class="photorow"><img class="photorow__img" src="' + esc(src) +
-          '" alt="" /><button type="button" class="delbtn press" ' +
+      (pages.length
+        ? '<div class="photorow"><img class="photorow__img" src="' + esc(pages[0]) +
+          '" alt="" />' +
+          (pages.length > 1
+            ? '<span class="fieldhint">' + pages.length + " pages</span>"
+            : "") +
+          '<button type="button" class="delbtn press" ' +
           'data-act="rm-photo" data-key="' + esc(recipeId) +
           '" aria-label="Remove photo">' + I.x() + "</button></div>"
         : "") +
@@ -1383,11 +1629,18 @@
            "Recipe address</label>" +
            '<input class="input" id="a-url" type="url" placeholder="https://…" ' +
            'data-act="a-url" value="' + esc(S.addUrl || "") + '" /></div>';
+      /* Full disclosure before the request (gameplan 050): exactly who can
+         see the pasted address, by name, drawn from the live relay list so
+         the text can never drift from the code. */
       h += '<p class="addscreen__note">Most recipe sites stop other sites reading ' +
-           "their pages directly, so this goes through a free public relay. The " +
-           "address you paste is sent to that relay; nothing else about you is. " +
-           "Relays go down sometimes — if it can’t get through, use the box " +
-           "below.</p>";
+           "their pages directly, so this tries the site itself first, then " +
+           "free public relays in turn: " +
+           RELAYS.filter(function (r) { return r.name !== "directly"; })
+             .map(function (r) { return r.name; }).join(", ") +
+           ". The address you paste is sent to each service tried until one " +
+           "answers, and the page comes back through it; nothing else about " +
+           "you is sent. Relays go down sometimes — if none get through, use " +
+           "the box below, which needs no network at all.</p>";
       h += '<button type="button" class="savebtn press" data-act="add-fetch"' +
            (S.addBusy ? " disabled" : "") + ">Fetch the recipe</button>";
 
@@ -1409,8 +1662,20 @@
     }
 
     if (S.addStep === "photo") {
+      /* A long recipe spans two cards — photos accumulate, and all of them
+         are read into one draft and kept as the recipe's pages. */
+      if (S.addPhotos.length) {
+        h += '<ul class="pagelist">' + S.addPhotos.map(function (f, i) {
+          return '<li class="pagelist__row"><span>Photo ' + (i + 1) +
+                 " · " + esc(f.name || "picture") + "</span>" +
+                 '<button type="button" class="delbtn press" data-act="a-photo-rm" ' +
+                 'data-i="' + i + '" aria-label="Remove photo ' + (i + 1) + '">' +
+                 I.x() + "</button></li>";
+        }).join("") + "</ul>";
+      }
       h += '<div class="field"><label class="field__label" for="a-photo">' +
-           "Photo of the recipe</label>" +
+           (S.addPhotos.length ? "Add another photo" : "Photo of the recipe") +
+           "</label>" +
            '<input class="input" id="a-photo" type="file" accept="image/*" ' +
            'data-act="a-photo" /></div>';
       h += '<p class="addscreen__note">The text is read on this phone — the ' +
@@ -1418,7 +1683,8 @@
            "printed text, and it will get some things wrong; anything it isn’t " +
            "sure about gets flagged for you on the next screen.</p>";
       h += '<button type="button" class="savebtn press" data-act="add-ocr"' +
-           (S.addBusy || !S.addPhoto ? " disabled" : "") + ">Read the photo</button>";
+           (S.addBusy || !S.addPhotos.length ? " disabled" : "") + ">Read the photo" +
+           (S.addPhotos.length > 1 ? "s" : "") + "</button>";
       h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
       h += "</div>";
       return h;
@@ -1499,12 +1765,56 @@
     h += tagsFieldHtml("a-tags", parseTags(d.tags), "ad");
     h += photoFieldHtml("a-photo-file", "__new__", "a-photo-act");
 
+    if (S.addDupe) {
+      var existing = byId(S.addDupe);
+      h += '<div class="panel panel--flag" role="alert" style="margin-top:18px">' +
+           "<h2>This might already be in the book</h2>" +
+           "<p>It looks a lot like <strong>" +
+           esc(existing ? existing.title : S.addDupe) + "</strong>. " +
+           "Open it to compare, or save this one anyway — two versions is " +
+           "allowed, it just shouldn’t be an accident.</p>" +
+           '<a class="outlinebtn press" style="text-align:center; line-height:60px" href="#' +
+           esc(S.addDupe) + '">Open ' + esc(existing ? existing.title : "the existing recipe") + "</a>" +
+           '<button type="button" class="savebtn press" data-act="add-save-anyway">' +
+           "Save anyway</button></div>";
+    }
+
     h += '<button type="button" class="savebtn press" data-act="add-save">' +
          "Save to my recipes</button>";
     h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
          "Start over</button>";
     h += "</div>";
     return h;
+  }
+
+  /* Likely-duplicate check (gameplan 070): normalized-title match, or strong
+     overlap of both title words and ingredient lines. Conservative on
+     purpose — a false "duplicate" on every casserole would teach people to
+     ignore the warning. */
+  function findDuplicate(d) {
+    function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, "").trim(); }
+    function tokens(s) { return norm(s).split(/\s+/).filter(Boolean); }
+    function overlap(a, b) {
+      if (!a.length || !b.length) return 0;
+      var seen = {};
+      a.forEach(function (t) { seen[t] = true; });
+      var hit = 0;
+      b.forEach(function (t) { if (seen[t]) hit++; });
+      return hit / Math.max(a.length, b.length);
+    }
+    var dTitle = norm(d.title);
+    var dTok = tokens(d.title);
+    var dIng = (d.ingredients || []).map(norm).filter(Boolean);
+    for (var i = 0; i < S.recipes.length; i++) {
+      var r = S.recipes[i];
+      if (norm(r.title) === dTitle) return r;
+      var tScore = overlap(dTok, tokens(r.title));
+      if (tScore >= 0.5) {
+        var iScore = overlap(dIng, (r.ingredients || []).map(norm));
+        if (iScore >= 0.4) return r;
+      }
+    }
+    return null;
   }
 
   function saveNewRecipe() {
@@ -1517,6 +1827,19 @@
       if (f) f.focus();
       return;
     }
+
+    /* A likely duplicate warns once and never blocks — "Save anyway" is one
+       tap. Two of the same recipe is the family's call, not the app's. */
+    if (!S.addDupeOk) {
+      var dup = findDuplicate(d);
+      if (dup) {
+        S.addDupe = dup.id;
+        render();
+        return;
+      }
+    }
+    S.addDupe = null;
+    S.addDupeOk = false;
 
     var base = slugify(title) || "recipe";
     var id = base;
@@ -1541,10 +1864,11 @@
     if (newTags.length) recipe.tags = newTags;
 
     /* The photo was staged under a placeholder key because the id only exists
-       once the title is known. Move it across now. */
+       once the title is known. Move it across now; if the persist fails the
+       recipe still saves and the failure is said out loud. */
     var staged = images()["__new__"];
     if (staged) {
-      setImage(id, staged);
+      setImage(id, staged).then(function (err) { if (err) setNotice(err); });
       removeImage("__new__");
     }
 
@@ -1555,7 +1879,10 @@
     S.addError = "";
     S.addUrl = "";
     S.addPaste = "";
-    S.addPhoto = null;
+    S.addPhotos = [];
+    S.addDupe = null;
+    S.addDupeOk = false;
+    clearAddDraft();
     location.hash = "#" + id;
   }
 
@@ -1601,10 +1928,10 @@
       .then(function (body) {
         if (!body || body.length < 200) throw new Error("empty response");
         var draft = relay.kind === "html" ? recipeFromHtml(body) : null;
-        if (draft) return { draft: draft, guessed: false };
+        if (draft) return { draft: draft, guessed: false, via: relay.name };
         /* r.jina.ai hands back readable text rather than markup — no JSON-LD to
            find, but the photo parser handles exactly this shape. */
-        if (relay.kind === "text") return { draft: draftFromText(body), guessed: true };
+        if (relay.kind === "text") return { draft: draftFromText(body), guessed: true, via: relay.name };
         throw new Error("no recipe data");
       })
       .catch(function () {
@@ -1627,11 +1954,18 @@
       .then(function (result) {
         var draft = result.draft;
         draft.source = url;
+        /* Naming the route in (gameplan 051): when one relay is persistently
+           the one answering — or failing — that fact is diagnosable rather
+           than a guess. */
+        var via = result.via === "directly"
+          ? "fetched directly from the site"
+          : "fetched through " + result.via;
         draft.flagged.push(
           result.guessed
-            ? "Read from the page as plain text — the split between ingredients " +
-              "and steps was guessed. Check both lists against the original."
-            : "Imported from a link — check it against the original."
+            ? "Read from the page as plain text (" + via + ") — the split " +
+              "between ingredients and steps was guessed. Check both lists " +
+              "against the original."
+            : "Imported from a link (" + via + ") — check it against the original."
         );
         S.addDraft = draft;
         S.addStep = "review";
@@ -1735,6 +2069,54 @@
     d.cookTime = dur(node.cookTime || node.totalTime);
     d.category = guessCategory(text(node.recipeCategory));
     d.notes = text(node.description);
+    return capDraft(d);
+  }
+
+  /* Import fields are bounded (gameplan 046). A hostile or broken page can
+     emit fields of any size; unchecked they exhaust the few MB localStorage
+     offers and make every later render crawl. The caps are far above any real
+     recipe, and every trim is disclosed in flagged rather than silent. */
+  var CAPS = {
+    title: 300, time: 60, notes: 5000, source: 300,
+    line: 500, step: 2000, ingredients: 100, steps: 60
+  };
+
+  function capDraft(d) {
+    var trimmed = [];
+    function capText(key, max, label) {
+      if (typeof d[key] === "string" && d[key].length > max) {
+        d[key] = d[key].slice(0, max);
+        trimmed.push(label);
+      }
+    }
+    function capList(key, maxItems, maxLen, label) {
+      if (!Array.isArray(d[key])) return;
+      if (d[key].length > maxItems) {
+        d[key] = d[key].slice(0, maxItems);
+        trimmed.push(label + " list");
+      }
+      var cut = false;
+      d[key] = d[key].map(function (s) {
+        s = String(s);
+        if (s.length > maxLen) { cut = true; return s.slice(0, maxLen); }
+        return s;
+      });
+      if (cut) trimmed.push("a " + label + " line");
+    }
+    capText("title", CAPS.title, "the title");
+    capText("prepTime", CAPS.time, "the prep time");
+    capText("cookTime", CAPS.time, "the cook time");
+    capText("notes", CAPS.notes, "the notes");
+    capText("source", CAPS.source, "the source");
+    capList("ingredients", CAPS.ingredients, CAPS.line, "ingredient");
+    capList("steps", CAPS.steps, CAPS.step, "step");
+    if (trimmed.length) {
+      d.flagged = (d.flagged || []).concat(
+        "Trimmed unusually long content from this import (" +
+        trimmed.filter(function (t, i) { return trimmed.indexOf(t) === i; }).join(", ") +
+        ") — check nothing important was cut."
+      );
+    }
     return d;
   }
 
@@ -1766,6 +2148,8 @@
       var done = false;
       var s = document.createElement("script");
       s.src = TESSERACT_CDN;
+      s.integrity = TESSERACT_SRI;
+      s.crossOrigin = "anonymous";
       s.async = true;
       s.onload = function () {
         done = true;
@@ -1787,36 +2171,61 @@
   }
 
   function importFromPhoto() {
-    if (!S.addPhoto) return;
+    if (!S.addPhotos.length) return;
+    var photos = S.addPhotos.slice();
+    var many = photos.length > 1;
     S.addError = "";
     S.addBusy = "Getting ready…";
     render();
 
     loadTesseract()
       .then(function (T) {
-        S.addBusy = "Reading the photo… this can take a minute.";
-        render();
-        return T.recognize(S.addPhoto, "eng", {
-          logger: function (m) {
-            if (m.status === "recognizing text" && typeof m.progress === "number") {
-              S.addBusy = "Reading the photo… " + Math.round(m.progress * 100) + "%";
-              var n = document.querySelector(".notice");
-              if (n) n.textContent = S.addBusy;
-            }
-          }
+        /* Sequential, one card at a time — the texts join into one draft. */
+        var texts = [];
+        var chain = Promise.resolve();
+        photos.forEach(function (file, i) {
+          chain = chain.then(function () {
+            S.addBusy = many
+              ? "Reading photo " + (i + 1) + " of " + photos.length + "…"
+              : "Reading the photo… this can take a minute.";
+            render();
+            return T.recognize(file, "eng", {
+              logger: function (m) {
+                if (m.status === "recognizing text" && typeof m.progress === "number") {
+                  S.addBusy = (many ? "Photo " + (i + 1) + " of " + photos.length + " — " : "") +
+                    "reading… " + Math.round(m.progress * 100) + "%";
+                  var n = document.querySelector(".notice");
+                  if (n) n.textContent = S.addBusy;
+                }
+              }
+            }).then(function (res) {
+              texts.push((res && res.data && res.data.text) || "");
+            });
+          });
         });
+        return chain.then(function () { return texts; });
       })
-      .then(function (res) {
-        var text = (res && res.data && res.data.text) || "";
+      .then(function (texts) {
+        var text = texts.join("\n\n");
         if (!text.trim()) {
           throw new Error("No readable text was found in that picture. Try a clearer, flatter photo.");
         }
         var draft = draftFromText(text);
-        draft.flagged.push("Read from a photo — the text will have mistakes. Check every line.");
-        S.addDraft = draft;
-        S.addStep = "review";
-        S.addBusy = "";
-        render();
+        draft.flagged.push(many
+          ? "Read from " + photos.length + " photos — the text will have mistakes, " +
+            "and the join between cards may sit mid-list. Check every line."
+          : "Read from a photo — the text will have mistakes. Check every line.");
+        /* The cards themselves are kept as the recipe's pages, so the source
+           is always one tap away from the transcription. */
+        return Promise.all(photos.map(readPhoto)).then(function (pages) {
+          return setImage("__new__", many ? pages : pages[0]).then(function (err) {
+            if (err) draft.flagged.push("The photos couldn’t be kept on this phone (" + err + ")");
+            S.addDraft = draft;
+            S.addStep = "review";
+            S.addBusy = "";
+            render();
+          });
+        });
       })
       .catch(function (err) {
         S.addBusy = "";
@@ -1878,7 +2287,7 @@
     if (!d.steps.length) { d.steps = [""]; d.flagged.push("No steps were picked up."); }
     d.notes = notes.join(" ");
     d.source = "Read from a photo";
-    return d;
+    return capDraft(d);
   }
 
   /* ======================================================================
@@ -2028,6 +2437,11 @@
   var scrollPos = {};
   var scrollTick = null;
 
+  /* The app restores scroll itself per hash route; left on "auto" the
+     browser races it with its own restore on back/forward and one of the
+     two loses on a slow machine. */
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
   function routeKey(route) {
     return route.name + ":" + (route.id || "");
   }
@@ -2086,8 +2500,10 @@
       }
     }
 
-    /* Arriving at Add from elsewhere starts a fresh one. Staying on it keeps
-       the draft, so "Start over" is the only thing that discards work. */
+    /* Arriving at Add resets the transient state, then restores whatever the
+       session snapshot holds — so a refresh (or a detour to check a recipe)
+       lands back in the half-finished import. Save and choosing a new path
+       are what discard work, never navigation. */
     if (next.name === "add" && S.route.name !== "add") {
       S.addStep = "choose";
       S.addDraft = null;
@@ -2095,7 +2511,10 @@
       S.addBusy = "";
       S.addUrl = "";
       S.addPaste = "";
-      S.addPhoto = null;
+      S.addPhotos = [];
+      S.addDupe = null;
+      S.addDupeOk = false;
+      restoreAddDraft();
     }
 
     if (changedRecipe) {
@@ -2108,6 +2527,10 @@
       S.dlOpen = false;
       releaseWake();
     }
+
+    /* A scroll sample still queued for the old route must not be filed under
+       the new one — cancel it before the key changes. */
+    if (scrollTick) { clearTimeout(scrollTick); scrollTick = null; }
 
     S.route = next;
     S.notice = "";
@@ -2122,7 +2545,13 @@
     document.title = screenTitle();
 
     if (changedRoute) {
-      window.scrollTo(0, scrollPos[routeKey(next)] || 0);
+      /* After the frame, so the fresh screen's full height exists — a
+         same-tick scrollTo can clamp against a layout that hasn't settled. */
+      var backTo = scrollPos[routeKey(next)] || 0;
+      window.scrollTo(0, backTo);
+      if (backTo && window.requestAnimationFrame) {
+        requestAnimationFrame(function () { window.scrollTo(0, backTo); });
+      }
       /* Move focus to the new screen's heading so a screen reader and a
          keyboard both land somewhere sensible after navigating. */
       var head = document.querySelector("#app h1");
@@ -2132,6 +2561,56 @@
       }
       announce(document.title);
     }
+  }
+
+  /* Gameplan 084 — a half-finished import survives an accidental refresh.
+     Snapshotted on every Add-screen render (the cheapest "on change" there
+     is when every change renders), restored at boot, cleared by Save and by
+     Start over. Chosen photo files can't be serialised; everything typed or
+     parsed can, and is. */
+  function persistAddDraft() {
+    try {
+      if (S.route.name !== "add") return;
+      if (S.addStep === "choose" && !S.addDraft && !S.addUrl && !S.addPaste) {
+        sessionStorage.removeItem(K.addDraft);
+        return;
+      }
+      sessionStorage.setItem(K.addDraft, JSON.stringify({
+        step: S.addStep === "photo" ? "choose" : S.addStep,
+        draft: S.addDraft,
+        url: S.addUrl,
+        paste: S.addPaste
+      }));
+    } catch (e) { /* private browsing — the draft just won't survive */ }
+  }
+
+  function restoreAddDraft() {
+    try {
+      var raw = sessionStorage.getItem(K.addDraft);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d && (d.draft || d.url || d.paste)) {
+        S.addStep = d.step || "choose";
+        S.addDraft = d.draft || null;
+        S.addUrl = d.url || "";
+        S.addPaste = d.paste || "";
+      }
+    } catch (e) {}
+  }
+
+  function clearAddDraft() {
+    try { sessionStorage.removeItem(K.addDraft); } catch (e) {}
+  }
+
+  /* Typing deliberately doesn't re-render, so the snapshot is scheduled off
+     the input handlers instead — debounced to one write per pause. */
+  var addPersistTick = null;
+  function scheduleAddPersist() {
+    if (addPersistTick) clearTimeout(addPersistTick);
+    addPersistTick = setTimeout(function () {
+      addPersistTick = null;
+      persistAddDraft();
+    }, 250);
   }
 
   function render() {
@@ -2162,12 +2641,40 @@
       var r = byId(S.route.id);
       html = r
         ? viewRecipe(r)
-        : '<div class="main"><p class="emptystate">That recipe isn’t here.</p>' +
-          '<a class="bigbtn press" href="#menu">See all recipes</a></div>';
+        : '<div class="main"><div class="emptystate">' + ART.empty() +
+          "<p>That recipe isn’t here.</p>" +
+          '<a class="bigbtn press" href="#menu">See all recipes</a></div></div>';
     } else {
       html = viewMain();
     }
+
+    /* Version, bottom corner of every screen. Outside the screen wrapper so it
+       never inherits the recipe's reading size — this is chrome, and chrome
+       does not scale with A−/A+. */
+    if (S.loaded) {
+      html += '<p class="vstamp">v' + VERSION + "</p>";
+    }
+
     app.innerHTML = html;
+
+    /* Every flag is consumed by exactly one paint. A sheet slides up when it
+       opens and then stays put, so ticking a filter chip inside it does not
+       re-play the slide. */
+    app.classList.toggle("sheet-in", S.pulseSheet);
+    S.pulseRow = "";
+    S.pulseScale = false;
+    S.pulseTheme = false;
+    S.pulseSheet = false;
+
+    /* The enter animation belongs to a change of screen, not to every state
+       change — otherwise tapping a filter chip re-plays the whole page. */
+    var painted = routeKey(S.route);
+    if (S.loaded && painted !== S.paintedRoute) {
+      S.paintedRoute = painted;
+      app.classList.remove("screen-in");
+      void app.offsetWidth; // restart, rather than continue, the animation
+      app.classList.add("screen-in");
+    }
 
     if (focusId) {
       var el = document.getElementById(focusId);
@@ -2180,6 +2687,7 @@
     }
 
     syncSheetFocus();
+    persistAddDraft();
   }
 
   /* One delegated listener for every action in the app. */
@@ -2298,17 +2806,37 @@
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
     if (act === "add-save") { saveNewRecipe(); return; }
+    if (act === "add-save-anyway") { S.addDupeOk = true; saveNewRecipe(); return; }
 
     if (!r) return;
 
-    if (act === "serv-") { S.serves = Math.max(1, S.serves - 1); render(); return; }
-    if (act === "serv+") { S.serves = Math.min(40, S.serves + 1); render(); return; }
-    if (act === "chk-i") { S.checkedIng[idx] = !S.checkedIng[idx]; render(); return; }
-    if (act === "chk-s") { S.checkedStep[idx] = !S.checkedStep[idx]; render(); return; }
+    if (act === "serv-" || act === "serv+") {
+      var before = S.serves;
+      S.serves = act === "serv-"
+        ? Math.max(1, S.serves - 1)
+        : Math.min(40, S.serves + 1);
+      S.pulseScale = S.serves !== before;
+      render();
+      return;
+    }
+    /* Only a newly-ticked row animates. Un-ticking is a correction, and a
+       correction should not be celebrated. */
+    if (act === "chk-i") {
+      S.checkedIng[idx] = !S.checkedIng[idx];
+      S.pulseRow = S.checkedIng[idx] ? "i:" + idx : "";
+      render(); return;
+    }
+    if (act === "chk-s") {
+      S.checkedStep[idx] = !S.checkedStep[idx];
+      S.pulseRow = S.checkedStep[idx] ? "s:" + idx : "";
+      render(); return;
+    }
     if (act === "toggle-wake") { toggleWake(); return; }
     if (act === "share") { shareRecipe(r); return; }
     if (act === "open-dl") { openSheet("dlOpen", el); return; }
     if (act === "close-dl") { closeSheet("dlOpen"); return; }
+    if (act === "open-lb") { openSheet("lbOpen", el); return; }
+    if (act === "close-lb") { closeSheet("lbOpen"); return; }
     if (act === "dl-txt") {
       downloadBlob(recipeText(r), r.id + ".txt", "text/plain;charset=utf-8");
       S.dlOpen = false; render(); return;
@@ -2356,10 +2884,11 @@
 
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
-    if (act === "a-url") { S.addUrl = el.value; return; }
+    if (act === "a-url") { S.addUrl = el.value; scheduleAddPersist(); return; }
     if (act === "a-paste") {
       var had = !!(S.addPaste || "").trim();
       S.addPaste = el.value;
+      scheduleAddPersist();
       /* Re-render only when the button's enabled state actually flips, so
          typing doesn't rebuild the textarea on every keystroke. */
       if (had !== !!el.value.trim()) render();
@@ -2370,8 +2899,8 @@
       if (!file) return;
       var target = el.getAttribute("data-key");
       readPhoto(file)
-        .then(function (dataUrl) {
-          var err = setImage(target, dataUrl);
+        .then(function (dataUrl) { return setImage(target, dataUrl); })
+        .then(function (err) {
           if (err) { S.addError = err; setNotice(err); }
           else { S.addError = ""; render(); }
         })
@@ -2379,17 +2908,26 @@
       return;
     }
     if (act === "a-photo") {
-      S.addPhoto = (el.files && el.files[0]) || null;
+      var picked = el.files && el.files[0];
+      if (picked) S.addPhotos.push(picked);
+      el.value = "";
       S.addError = "";
+      render();
+      return;
+    }
+    if (act === "a-photo-rm") {
+      S.addPhotos.splice(idx, 1);
       render();
       return;
     }
     if (act === "ad") {
       S.addDraft[el.getAttribute("data-k")] = el.value;
+      scheduleAddPersist();
       return;
     }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
+      scheduleAddPersist();
       return;
     }
     if (act === "d") {
@@ -2411,6 +2949,7 @@
     if (S.filterOpen) closeSheet("filterOpen");
     else if (S.textOpen) closeSheet("textOpen");
     else if (S.dlOpen) closeSheet("dlOpen");
+    else if (S.lbOpen) closeSheet("lbOpen");
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 
@@ -2422,17 +2961,48 @@
     render();
   }, true);
 
+  /* A recipe can reference images/<id>.jpg that was downloaded but never
+     actually committed — its local copy gone, the published file absent. The
+     broken-image glyph must never be the fallback: the thumbnail degrades to
+     its category icon and heroes disappear, silently. Error events don't
+     bubble, hence the capture phase. */
+  document.addEventListener("error", function (ev) {
+    var el = ev.target;
+    if (!el || el.tagName !== "IMG") return;
+    if (el.classList.contains("rcard__thumb")) {
+      var span = document.createElement("span");
+      span.className = "rcard__icon";
+      span.setAttribute("aria-hidden", "true");
+      span.innerHTML = catIcon(el.getAttribute("data-cat") || "", 24);
+      el.replaceWith(span);
+    } else if (el.classList.contains("r-hero")) {
+      el.remove();
+    } else if (el.classList.contains("hero__img")) {
+      var blank = document.createElement("div");
+      blank.className = "hero__blank";
+      blank.innerHTML = ART.steam();
+      el.replaceWith(blank);
+    } else if (el.classList.contains("photorow__img")) {
+      el.remove();
+    }
+  }, true);
+
   window.addEventListener("hashchange", onRoute);
 
   applyTheme();
 
-  fetch("recipes.json", { cache: "no-cache" })
-    .then(function (res) {
+  /* Photos load alongside the recipes so the first paint already knows every
+     thumbnail — initImages never rejects, so the only failure mode here is
+     the recipes themselves. */
+  Promise.all([
+    fetch("recipes.json", { cache: "no-cache" }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
-    })
-    .then(function (data) {
-      S.base = data;
+    }),
+    initImages()
+  ])
+    .then(function (both) {
+      S.base = both[0];
       applyOverlay();
       S.loaded = true;
       onRoute();

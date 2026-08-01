@@ -229,20 +229,64 @@ mode from.
 
 ### Known limits
 
-- **OCR quality is untested against real photographs.** The pipeline is
-  verified end to end against a stubbed recogniser, and the parser is tested,
-  but the sandbox this was built in cannot reach the Tesseract CDN. Accuracy on
-  real pages will be imperfect — the handoff accepts that, and every OCR import
-  is flagged for line-by-line checking.
-- **`api.allorigins.win` is a third-party dependency** for link import only.
-  When it is down, that one path fails with a plain message; nothing else in
-  the app touches the network after load.
+- **OCR accuracy on real photographs is still unmeasured.** The real
+  Tesseract now runs end to end (`tests/ocr-live.js` — it reads a synthetic
+  card and the network trace confirms the photo never leaves the device), and
+  the library is pinned with subresource integrity. What remains untested is
+  accuracy against actual photos of Joan's cards — gameplan task `081`. Every
+  OCR import stays flagged for line-by-line checking either way.
+- **The CORS relays are third-party dependencies** for link import only. All
+  are named in the UI before a request is made, the chain falls through them
+  in turn, and each imported draft records which one answered. When all are
+  down, that one path fails with a plain message and the paste box still
+  works; nothing else in the app touches the network after load.
+
+### Contributor names are labels, not authentication
+
+Stated here so nobody builds on the wrong assumption later: **the
+`contributor` field is a byline, nothing more.** There is no login, no
+identity, and no access control anywhere in this app, and the contributor
+name must never quietly become one — no "only Joan can edit Joan's recipes",
+no per-person visibility, no trust decisions keyed off that string. Anyone
+holding the device can edit anything; that is the designed trade-off of the
+no-login model, not an oversight. If real access control is ever wanted, that
+is a new architecture conversation (the gameplan's backend gate), not a
+feature to hang off this field.
+
+### The gameplan era (v0.9 →)
+
+`GAMEPLAN.md` is now the working plan: all 130 team-plan tasks in dependency
+order, worked one at a time, one commit each. Decisions taken while looping
+it, each with its task number in the log there:
+
+- **A version stamp** (`VERSION` in `app.js`, rendered bottom-corner) reads
+  `0.9`; flipping it to `1.0` is the release checklist's last line.
+- **Motion and artwork**: every animation is armed by the action that earned
+  it and consumed by one paint; all of it off under reduced-motion. The
+  artwork (steam bowl, empty plate) is decorative, aria-hidden, currentColor.
+- **Photos live in IndexedDB** (`062`) behind a boot-filled in-memory cache —
+  localStorage held only 12 of the 48. Legacy `kt.images` migrates at boot;
+  no-IndexedDB browsers fall back to localStorage and its loud quota message.
+  A store value is one data URL or an array of pages (`066`).
+- **The tests live in `tests/`** and run in CI on every PR (`002`/`003`).
+  The suites are hermetic — relays stubbed, full Chromium pinned for the
+  wake-lock check, screenshots to a gitignored dir.
+- **Tesseract is pinned with SRI** (`048`) and proven local by network trace
+  (`047`); the import chain disclosure names every relay (`050`) and each
+  import records which answered (`051`). Imported fields are capped, trims
+  disclosed (`046`).
+- **Reflow at 320px** (200% zoom) + Easy Read + top step is enforced by
+  `tests/zoom.js` (`041`); scroll restoration is app-owned
+  (`history.scrollRestoration = manual`).
+- **`CONTENT.md`** is the known-wrong-data ledger (`013`); nothing on it may
+  be resolved by inference.
 
 ### Verified
 
-81 functional checks in Chromium at iPhone and desktop widths, covering both
-themes, the filter and sort behaviour, quantity rescaling, check-off reset,
-the font stepper and its persistence, edit-mode save and reload, and the
-download outputs. WCAG AA contrast audited across all three screens plus the
-filter, sort, and download sheets in **both** themes — zero failures. Nothing
-interactive measures under 44px.
+The suite as of the gameplan era: **278 functional checks** across eight
+suites (kt 83, feat 49, add 58, relay 16, quick 21, polish 26, sec 16,
+zoom 9, plus the perf budget: FCP 720 ms median on throttled 3G against a
+4000 ms gate, CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
+zero failures across all 48 screen × theme × Easy-Read combinations.
+Nothing interactive measures under 44px. All of it runs on every pull
+request via `tests/run.sh`.
