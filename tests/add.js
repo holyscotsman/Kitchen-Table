@@ -85,7 +85,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="add-fetch"]');
   await p.waitForTimeout(400);
   chk('rejects a non-URL clearly', (await p.locator('.notice--bad').textContent()).includes('web address'));
-  chk('relay is disclosed to the user', (await p.locator('.addscreen__note').textContent()).includes('relay'));
+  const disclosure = await p.locator('.addscreen__note').textContent();
+  chk('every relay is named in the disclosure, pre-request',
+      ['allorigins.win','corsproxy.io','r.jina.ai'].every(n=>disclosure.includes(n)), disclosure.slice(0,80));
 
   console.log('\n== Link import: JSON-LD parsing (mocked relay) ==');
   await ctx.route('**/api.allorigins.win/**', route => route.fulfill({
@@ -109,6 +111,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('3 ingredients', await p.locator('[data-k="ingredients"][data-act="adl"]').count()===3);
   chk('2 steps', await p.locator('[data-k="steps"][data-act="adl"]').count()===2);
   chk('flagged for review', (await p.locator('.panel--flag').textContent()).includes('check it against the original'));
+  chk('names which relay answered', (await p.locator('.panel--flag').textContent()).includes('allorigins.win'), (await p.locator('.panel--flag').textContent()).slice(0,90));
 
   console.log('\n== Link import: page without recipe data ==');
   await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');

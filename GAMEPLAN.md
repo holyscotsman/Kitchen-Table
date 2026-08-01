@@ -305,9 +305,9 @@ because it can only be written once every legitimate origin is known.*
   - *Needs:* `047` · *Done when:* the version is exact and a tampered hash blocks the load.
 - [ ] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
   - *Needs:* `004` · *Done when:* decided and done, or decided and written down why not. **→ README**
-- [ ] `050` 🤖 **SEC** — Document, in the UI, exactly what each relay receives when a link is imported.
+- [x] `050` 🤖 **SEC** — Document, in the UI, exactly what each relay receives when a link is imported.
   - *Needs:* — · *Done when:* the disclosure names the relays and says what is sent, before the request is made.
-- [ ] `051` 🤖 **FE-B** — Show which relay succeeded, so a persistent failure can be diagnosed rather than guessed at.
+- [x] `051` 🤖 **FE-B** — Show which relay succeeded, so a persistent failure can be diagnosed rather than guessed at.
   - *Needs:* `050` · *Done when:* the review screen names the relay that answered.
 - [ ] `052` 🤖 **SEC** — Add a Content-Security-Policy and confirm it does not break the lazily-loaded OCR library.
   - *Needs:* `047` `048` `049` `050` · *Done when:* the policy is as tight as the known origin list allows, and every path still works.
@@ -607,6 +607,8 @@ finds out what the last one learned.*
 | `046` | 2026-08-01 | `capDraft()` bounds every imported field (title 300, lines 500/2000, lists 100/60, notes 5000) on both the JSON-LD and text/OCR paths, and discloses each trim in `flagged`. Asserted with a 60 KB hostile page. |
 | `047` | 2026-08-01 | **Real Tesseract ran for the first time** (the CDN block noted in CLAUDE.md's known limits no longer holds; bridged through the sandbox proxy). Trace: 4 requests, all bodyless GETs to cdn.jsdelivr.net — the photo never leaves the device. Read a synthetic card's title correctly. Tool: `tests/ocr-live.js`. |
 | `048` | 2026-08-01 | Pinned to `tesseract.js@5.1.1` with sha384 SRI on the entry script. Both directions proven: clean bytes load and OCR completes; tampered bytes are refused and the app shows its plain fallback message. SRI reaches the entry script only — noted in code. |
+| `050` | 2026-08-01 | The link-import disclosure now names every relay by name, drawn from the live `RELAYS` list so text and code can't drift, and says exactly what is sent (the pasted address, nothing else) before any request is made. |
+| `051` | 2026-08-01 | Every imported draft's flagged entry now says which route answered — "fetched directly from the site" or "fetched through allorigins.win" — so a persistent failure is diagnosable. Asserted in add.js. |
 
 ---
 

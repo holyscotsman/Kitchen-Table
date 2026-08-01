@@ -98,10 +98,10 @@
      rather than HTML, which the photo parser can still make sense of. If every
      one of them fails there is always the paste box, which needs no network. */
   var RELAYS = [
-    { url: function (u) { return u; }, kind: "html" },
-    { url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
-    { url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
-    { url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
+    { name: "directly", url: function (u) { return u; }, kind: "html" },
+    { name: "allorigins.win", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
+    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
+    { name: "r.jina.ai", url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
   ];
   var RELAY_TIMEOUT = 12000;
   /* Pinned to the exact version, with subresource integrity: a tampered CDN
@@ -1474,11 +1474,18 @@
            "Recipe address</label>" +
            '<input class="input" id="a-url" type="url" placeholder="https://…" ' +
            'data-act="a-url" value="' + esc(S.addUrl || "") + '" /></div>';
+      /* Full disclosure before the request (gameplan 050): exactly who can
+         see the pasted address, by name, drawn from the live relay list so
+         the text can never drift from the code. */
       h += '<p class="addscreen__note">Most recipe sites stop other sites reading ' +
-           "their pages directly, so this goes through a free public relay. The " +
-           "address you paste is sent to that relay; nothing else about you is. " +
-           "Relays go down sometimes — if it can’t get through, use the box " +
-           "below.</p>";
+           "their pages directly, so this tries the site itself first, then " +
+           "free public relays in turn: " +
+           RELAYS.filter(function (r) { return r.name !== "directly"; })
+             .map(function (r) { return r.name; }).join(", ") +
+           ". The address you paste is sent to each service tried until one " +
+           "answers, and the page comes back through it; nothing else about " +
+           "you is sent. Relays go down sometimes — if none get through, use " +
+           "the box below, which needs no network at all.</p>";
       h += '<button type="button" class="savebtn press" data-act="add-fetch"' +
            (S.addBusy ? " disabled" : "") + ">Fetch the recipe</button>";
 
@@ -1692,10 +1699,10 @@
       .then(function (body) {
         if (!body || body.length < 200) throw new Error("empty response");
         var draft = relay.kind === "html" ? recipeFromHtml(body) : null;
-        if (draft) return { draft: draft, guessed: false };
+        if (draft) return { draft: draft, guessed: false, via: relay.name };
         /* r.jina.ai hands back readable text rather than markup — no JSON-LD to
            find, but the photo parser handles exactly this shape. */
-        if (relay.kind === "text") return { draft: draftFromText(body), guessed: true };
+        if (relay.kind === "text") return { draft: draftFromText(body), guessed: true, via: relay.name };
         throw new Error("no recipe data");
       })
       .catch(function () {
@@ -1718,11 +1725,18 @@
       .then(function (result) {
         var draft = result.draft;
         draft.source = url;
+        /* Naming the route in (gameplan 051): when one relay is persistently
+           the one answering — or failing — that fact is diagnosable rather
+           than a guess. */
+        var via = result.via === "directly"
+          ? "fetched directly from the site"
+          : "fetched through " + result.via;
         draft.flagged.push(
           result.guessed
-            ? "Read from the page as plain text — the split between ingredients " +
-              "and steps was guessed. Check both lists against the original."
-            : "Imported from a link — check it against the original."
+            ? "Read from the page as plain text (" + via + ") — the split " +
+              "between ingredients and steps was guessed. Check both lists " +
+              "against the original."
+            : "Imported from a link (" + via + ") — check it against the original."
         );
         S.addDraft = draft;
         S.addStep = "review";
