@@ -24,7 +24,13 @@ const { runJob } = require("./lib/pipeline");
 const PORT = parseInt(process.env.PORT, 10) || 8787;
 const MAX_QUEUE = 8;
 
-const sql = db.getSql();
+/* Boot without the database rather than crash-looping the deploy: a service
+ * waiting on its env vars shows a green deploy and a health endpoint that
+ * says exactly what's missing, instead of a red dashboard and a stack
+ * trace. Every import route answers 503 with the same plain sentence. */
+let sql = null;
+try { sql = db.getSql(); }
+catch (e) { console.error("boot: " + e.message + " Imports are off until it is set."); }
 const queue = serialQueue();
 
 let anthropic = null;
@@ -201,11 +207,16 @@ const server = http.createServer((req, res) => {
   const route = (async () => {
     if (req.method === "GET" && (p === "/" || p === "/api/health")) {
       return send(res, 200, {
-        ok: true,
+        ok: !!(sql && anthropic),
         service: "kitchen-table import server",
         uptime_s: Math.round(process.uptime()),
-        queue_pending: queue.size()
+        queue_pending: queue.size(),
+        missing: [!sql && "KT_DB", !anthropic && "ANTHROPIC_API_KEY",
+          !ctx.groqKey && "GROQ_API_KEY (optional)"].filter(Boolean)
       });
+    }
+    if (!sql && p.indexOf("/api/import") === 0) {
+      return send(res, 503, { error: "The kitchen server isn’t fully set up yet — its database connection (KT_DB) is missing." });
     }
     let m;
     if (req.method === "POST" && p === "/api/import/video") return postVideo(req, res);
@@ -229,15 +240,18 @@ const server = http.createServer((req, res) => {
 process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e));
 
 (async () => {
-  await db.ensureSchema(sql);
-  const { failedIds, queuedIds } = await db.recoverStuckJobs(sql);
-  if (failedIds.length) console.log("boot: failed mid-flight jobs " + failedIds.join(", "));
-  for (const id of queuedIds) queue.push(() => runJob(ctx, id));
-  if (queuedIds.length) console.log("boot: re-queued jobs " + queuedIds.join(", "));
-  const pruned = await db.pruneOldJobs(sql);
-  if (pruned) console.log("boot: pruned " + pruned + " old finished jobs");
+  if (sql) {
+    await db.ensureSchema(sql);
+    const { failedIds, queuedIds } = await db.recoverStuckJobs(sql);
+    if (failedIds.length) console.log("boot: failed mid-flight jobs " + failedIds.join(", "));
+    for (const id of queuedIds) queue.push(() => runJob(ctx, id));
+    if (queuedIds.length) console.log("boot: re-queued jobs " + queuedIds.join(", "));
+    const pruned = await db.pruneOldJobs(sql);
+    if (pruned) console.log("boot: pruned " + pruned + " old finished jobs");
+  }
   server.listen(PORT, () => {
     console.log("kitchen-table import server listening on :" + PORT +
+      (sql ? "" : "  (WARNING: no KT_DB — imports are off until it is set)") +
       (anthropic ? "" : "  (WARNING: no ANTHROPIC_API_KEY — imports will be refused)") +
       (ctx.groqKey ? "" : "  (note: no GROQ_API_KEY — caption-less videos will be frames-only)"));
   });
