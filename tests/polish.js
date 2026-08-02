@@ -5,6 +5,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
   const ctx=await br.newContext({...devices['iPhone 13']});
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.on('dialog',d=>d.accept());
@@ -83,6 +86,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
      closest a test can get to quitting and reopening Safari. */
   const state = await ctx.storageState();
   const ctx2 = await br.newContext({ ...devices['iPhone 13'], storageState: state });
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
   const p2 = await ctx2.newPage();
   await p2.goto(B+'/index.html#menu'); await p2.waitForSelector('.rcard');
   chk('still 47 after a browser restart', await p2.locator('.rcard').count()===47, String(await p2.locator('.rcard').count()));

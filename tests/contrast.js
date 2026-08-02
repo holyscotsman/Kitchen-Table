@@ -41,8 +41,12 @@ const CONTRAST = `(() => {
       ['Add review form','#add','[data-key="review"]'],
       ['Add from a link','#add','[data-key="link"]'],
       ['Add from a photo','#add','[data-key="photo"]'],
+      ['Add from a video','#add','[data-key="video"]'],
     ]){
       const ctx=await br.newContext({...devices['iPhone 13']});
+      /* Hermetic: the kitchen server is never poked from CI — the app's
+         ready-list fetch on #add fails silently, exactly like offline. */
+      await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
       const p=await ctx.newPage();
       await p.addInitScript(a=>{localStorage.setItem('kt.theme',JSON.stringify(a.t));if(a.e)localStorage.setItem('kt.easyRead','true');},{t:theme,e:mode==='easyread'});
       await p.goto(''+B+'/index.html'+hash);
