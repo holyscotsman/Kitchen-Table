@@ -433,8 +433,9 @@ of one of Joan's cards.*
 - [x] `082` 🤖 **FE-B** — Flag individual fields the parser was unsure about, rather than flagging the whole recipe.
   - *Needs:* `081` · *Done when:* `flagged` names fields, and the recipe page shows the flag beside the field it belongs to.
   - *Done 2026-08-01 (mechanics; `081`'s real-photo error rate still informs the wording later):* parsers emit "Field — …" flags; the recipe page classifies (with a keyword fallback so pre-convention data gains the chips too) and shows a "Double-check" chip beside title/servings/ingredients/steps. The chip is wayfinding, not editing — it scrolls to the full panel, reduced-motion respected. `flagged` stays an array of strings, so no stored data breaks.
-- [ ] `083` 🤖 **FE-B** — Let a user correct the ingredients-versus-steps split with one control when the parser guessed wrong.
+- [x] `083` 🤖 **FE-B** — Let a user correct the ingredients-versus-steps split with one control when the parser guessed wrong.
   - *Needs:* `081` · *Done when:* a misplaced line moves between the two lists in one tap.
+  - *Done 2026-08-01:* every review line carries a swap button beside its delete — one tap sends the line to the other list, notice confirms, draft persistence keeps it. Verified: an "ingredient" reading "Preheat the oven" lands at the end of the instructions in one tap.
 - [x] `084` 🤖 **FE-B** — Preserve a half-finished import across an accidental refresh instead of losing the work.
   - *Needs:* — · *Done when:* a refresh mid-review returns to the same draft, and the draft is still never saved until Save is pressed.
 - [ ] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.

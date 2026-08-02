@@ -214,6 +214,13 @@
     },
     flag: function (s) {
       return svg('<path d="M6 21V4"/><path d="M6 4h11l-2.5 4L17 12H6"/>', s || 16, s || 16);
+    },
+    swap: function (s) {
+      return svg(
+        '<path d="M8 7h11"/><path d="M15.5 3.5L19 7l-3.5 3.5"/>' +
+        '<path d="M16 17H5"/><path d="M8.5 13.5L5 17l3.5 3.5"/>',
+        s || 20, s || 20
+      );
     }
   };
 
@@ -1984,6 +1991,10 @@
          '<input class="input" id="a-cook" data-act="ad" data-k="cookTime" value="' +
          esc(d.cookTime) + '" /></div></div>';
 
+    /* 083 — parsers guess the ingredients/steps split, and on a photographed
+       card they guess it wrong often. Every review line carries a one-tap
+       "send to the other list" beside its delete, so a misplaced line is a
+       correction, not a retype. */
     h += '<h2 class="r-h2" style="margin-top:22px">Ingredients</h2>';
     h += d.ingredients.map(function (line, i) {
       return '<div class="editline">' +
@@ -1991,6 +2002,9 @@
              '<textarea class="textarea" id="a-ing-' + i + '" rows="2" ' +
              'data-act="adl" data-k="ingredients" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="amove" ' +
+             'data-key="ingredients" data-i="' + i + '" aria-label="Move ingredient ' +
+             (i + 1) + ' to the steps">' + I.swap() + "</button>" +
              '<button type="button" class="delbtn press" data-act="adel" ' +
              'data-key="ingredients" data-i="' + i + '" aria-label="Remove ingredient ' +
              (i + 1) + '">' + I.x() + "</button></div>";
@@ -2005,6 +2019,9 @@
              '<textarea class="textarea" id="a-step-' + i + '" rows="3" ' +
              'data-act="adl" data-k="steps" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="amove" ' +
+             'data-key="steps" data-i="' + i + '" aria-label="Move step ' +
+             (i + 1) + ' to the ingredients">' + I.swap() + "</button>" +
              '<button type="button" class="delbtn press" data-act="adel" ' +
              'data-key="steps" data-i="' + i + '" aria-label="Remove step ' +
              (i + 1) + '">' + I.x() + "</button></div>";
@@ -3141,6 +3158,15 @@
     if (act === "add-ocr") { importFromPhoto(); return; }
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
+    if (act === "amove") {
+      var other = key === "ingredients" ? "steps" : "ingredients";
+      var moved = S.addDraft[key].splice(idx, 1)[0];
+      S.addDraft[other].push(moved);
+      scheduleAddPersist();
+      setNotice("Moved to " + (other === "steps" ? "the instructions." : "the ingredients."));
+      render();
+      return;
+    }
     if (act === "add-save") { saveNewRecipe(); return; }
     if (act === "add-save-anyway") { S.addDupeOk = true; saveNewRecipe(); return; }
 
