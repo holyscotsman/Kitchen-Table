@@ -1,0 +1,11 @@
+{
+  "name": "kitchen-table",
+  "private": true,
+  "description": "The site is static (GitHub Pages serves this directory as-is). This file exists only so the Render service — which runs `yarn` then `yarn start` from the repo root — installs and starts the import server in backend/ without any settings changes.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "postinstall": "bash -c 'if [ -n \"${RENDER:-}\" ]; then cd backend && npm install && bash get-tools.sh; fi'",
+    "start": "node backend/server.js",
+    "test": "bash tests/run.sh"
+  }
+}
