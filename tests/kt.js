@@ -84,7 +84,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.waitForSelector('#filter-sheet');
   chk('sheet is a modal dialog', await p.getAttribute('#filter-sheet','aria-modal')==='true');
   chk('scrim is a labelled button', await p.getAttribute('.scrim','aria-label')==='Close filters');
-  chk('two groups', await p.locator('.grouph').count()===2);
+  chk('three groups now the collection ships tagged', await p.locator('.grouph').count()===3);
   await p.click('[data-act="fw"][data-key="Joan"]');
   await p.waitForTimeout(200);
   chk('chip becomes pressed', await p.getAttribute('[data-act="fw"][data-key="Joan"]','aria-pressed')==='true');

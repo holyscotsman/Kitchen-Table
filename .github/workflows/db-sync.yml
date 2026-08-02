@@ -1,0 +1,51 @@
+# Keeps recipes.json and the Neon database telling the same story.
+#
+# Nightly (and on demand from the Actions tab): if the database has drifted
+# from the file, regenerate recipes.json from the database and commit it —
+# the database is the canonical shared copy (DECISIONS.md 026, as reversed).
+#
+# Needs one repository secret: KT_DB — the Postgres connection string.
+# Settings → Secrets and variables → Actions → New repository secret.
+
+name: db-sync
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save @neondatabase/serverless
+      - name: Compare database and file
+        id: check
+        env:
+          KT_DB: ${{ secrets.KT_DB }}
+        run: |
+          if [ -z "$KT_DB" ]; then
+            echo "KT_DB secret is not set — add it in Settings → Secrets. Skipping."
+            echo "drift=skip" >> "$GITHUB_OUTPUT"
+          elif node db/export.js --check; then
+            echo "drift=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Export and commit
+        if: steps.check.outputs.drift == 'yes'
+        env:
+          KT_DB: ${{ secrets.KT_DB }}
+        run: |
+          node db/export.js
+          git config user.name "kitchen-table-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add recipes.json
+          git commit -m "Sync recipes.json from the database"
+          git push

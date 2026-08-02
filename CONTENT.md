@@ -79,8 +79,9 @@ Transcribed exactly as the source showed, flagged rather than corrected:
 ## 6. Collection-wide gaps
 
 - **No recipe has a photo.** Task `077` collects at least one per course.
-- **No recipe has a tag.** Task `076` seeds nationality tags by asking, not
-  inferring.
+- ~~No recipe has a tag.~~ **37 now carry research-traceable tags** (see the
+  research pass below); Joan-memory tags for the ambiguous eleven stay open
+  under `076`.
 - **Every recipe is Joan's.** Jason, Jennifer, Lindsay and Siobhan have empty
   sections — task `078`.
 - `hibachi-fried-rice` — the servings count was partly visible but cut off by
@@ -105,6 +106,38 @@ pair already does). New candidates get a row here — the app's save-time
 duplicate warning is the intake.
 
 ---
+
+## The research pass (Jason's request, 2026-08-02)
+
+Instruction: research the existing recipes — what might be wrong, where they
+come from for tagging — with no major changes; major issues go to Jason first.
+
+**Content scan:** temperatures and times across all 48 checked programmatically;
+the four flagged values (125/135/145°F) are correct internal doneness
+temperatures for steak and pork, not errors. **No defensible content errors
+found.** The known gaps (4 empty ingredient lists, the parsnips truncation)
+remain the content pass's worklist — nothing new joined them.
+
+**Tags applied — 38, all traceable:** origin tags only where the dish name has
+one established answer (Cranachan, tablet, tattie scones and square sausage are
+Scottish; étouffée is Cajun; schnitzel is German; stroganoff is Russian;
+lasagne and risotto are Italian; and so on), plus method tags the titles state
+outright ("in Ninja" → *air fryer*) and *keto* where the title says so.
+Eleven recipes stay untagged because their origin is genuinely ambiguous
+(chops, corn on the cob, frosting, sponge cake, the grilled sides, the steak
+timing charts, chicken fritters, pork chops in white wine) — guessing is
+exactly what this ledger exists to prevent.
+
+**Minor fix, disclosed:** `grilled-potatoes-and-peppers` had the literal word
+"Ingredients" as its source — a parser artifact from the original screenshot —
+now matching the title-line pattern every other source follows.
+
+### Needs Jason (major-change gate)
+
+| Item | Question |
+| --- | --- |
+| `empinada` | The dish is conventionally spelled **empanada**. Is "Empinada" Joan's own spelling (keep it — it's her book) or a transcription slip (I'll fix title + id with a redirect)? |
+| `satay-sauce` | Tagged *Southeast Asian*; if the family knows it specifically as Malaysian/Thai-style, say so and I'll sharpen the tag. |
 
 ## Resolved
 
