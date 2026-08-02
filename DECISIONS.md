@@ -5,17 +5,34 @@ or reversed — later. Newest at the bottom. Every decision here that was taken
 as a **provisional default** says so, names who can overturn it, and what
 overturning it costs.
 
+> **2026-08-02 — Jason answered.** The provisional era is over for four of
+> these: `026` is **reversed** (a database, on Neon), `030` is **reversed**
+> (calendar ships in 1.0), `027` is **settled as ruled** (he delegated;
+> the ten stay), and `029` is **settled with his own bar** (ingredients +
+> steps + original source). Each section below carries its update in place.
+
 ---
 
 ## 026 — The backend question: no server for 1.0
 
-**Decision: Kitchen Table ships 1.0 as a static site. No Express, no SQLite,
-no hosting bill. Phases 11–14 of the gameplan (30 tasks) are struck.**
+**⟲ REVERSED by Jason, 2026-08-02** — he supplied a Neon Postgres instance
+("the database I was using for Sift") and asked for the recipes stored
+there, with shared logins as a later possibility. The reversal cost exactly
+what this file predicted: nothing. Landed the same day: the `kitchen` schema
+(recipes, contributors, tags as a join table, menu_plan), all 48 recipes
+migrated with a clean round-trip back to `recipes.json`, and `db/` tooling
+reading the credential from the environment only. Open architecture
+question, his to make in the Neon console: **Data API (browser-safe keys +
+row-level security) versus a small worker holding the secret** — until one
+of those exists, the static site still runs from `recipes.json` and the
+database is the canonical shared copy, synced by the two `db/` commands.
+The paragraphs below record the original default and its basis, kept for
+the reasoning.
 
-*Status: provisional default, taken 2026-08-01 on Jason's instruction to
-proceed to completion. He can overturn it with one sentence, at any time —
-nothing built today makes a server harder to add later, and the export
-tooling was kept precisely so that door stays open.*
+*Original (superseded): Kitchen Table ships 1.0 as a static site. No
+Express, no SQLite, no hosting bill. Phases 11–14 of the gameplan (30
+tasks) are struck. Provisional default, taken 2026-08-01 on Jason's
+instruction to proceed to completion.*
 
 ### What breaks today without a server
 
@@ -59,7 +76,8 @@ change the answer.
 **Decision: Breakfast, Brunch, Lunch, Dinner, Sides, Snacks, Baking,
 Desserts, Cocktails, Drinks — final for 1.0.**
 
-*Provisional default, same date, same basis.* Jason's original list had eight;
+*✓ Settled 2026-08-02: Jason delegated ("whatever you think is best") and
+the ruling stands as written.* Jason's original list had eight;
 Sides and Drinks were added because the collection holds ten side dishes and a
 lemonade, and folding those into Dinner and Cocktails would mislabel about a
 fifth of the recipes. `CAT_ALIASES` already maps the old names, so reversing
@@ -67,13 +85,22 @@ this later costs one small migration and nothing else. Task `023` (Joan's own
 words for the categories) remains open and is the strongest reason this could
 still change.
 
-## 029 — What "done" means for a recipe: true text
+## 029 — What "done" means for a recipe: Jason's bar
 
-**Decision: a recipe is done for 1.0 when its ingredients and steps are real
-(not reconstructed) and its servings are either confirmed by Joan or
-explicitly marked unknown. Photos and tags are encouraged, never required.**
+**✓ Settled by Jason, 2026-08-02, in his words: a recipe is done when its
+ingredients are listed properly, its steps are listed properly, and it
+carries its original source — a link or a screenshot.**
 
-*Provisional default.* The alternatives (requiring tags, or tags + photos)
+Where the collection stands against that bar today: sources — all 48 have
+one already; ingredients — four are empty (`chops`, `parsnips`,
+`fries-in-ninja`, `steak-time-to-cook`); steps — one truncation
+(`parsnips`) plus the smaller oddities in `CONTENT.md`. Servings
+confirmation (the old draft bar) is no longer *required* for done, but the
+34 inferred counts stay flagged on their recipes until checked — a flag is
+information, not a blocker.
+
+*Original draft bar (superseded): true text — real ingredients and steps,
+servings confirmed or marked unknown.* The alternatives (requiring tags, or tags + photos)
 make the content pass with Joan longer, and 1.0 should not be hostage to 48
 photographs. The app treats the missing pieces gently either way: no
 placeholder images, no empty-tag nagging.
@@ -84,10 +111,13 @@ with inferred servings are the 1.0 content blockers, and nothing else is.
 
 ## 030 — The calendar: stretch goal, not 1.0
 
-**Decision: the menu-planning calendar is not part of 1.0. Phase 15
-(11 tasks) is struck from the 1.0 checklist and revisited afterwards.**
+**⟲ REVERSED by Jason, 2026-08-02: the calendar ships in 1.0.** Phase 15
+is un-struck and is now the active build queue. The original objection — a
+plan only one phone can see — dissolves once the database wiring lands,
+which is why the `kitchen.menu_plan` table already exists with per-meal
+servings and deletion-survival designed in.
 
-*Provisional default.* Without a server a meal plan is visible only on the
+*Original (superseded): not part of 1.0; Phase 15 struck.* Without a server a meal plan is visible only on the
 phone that made it, which guts most of its value; building it anyway would put
 eleven tasks between the family and 1.0. The tasks are struck, not deleted —
 the phase reads intact in the gameplan for whenever it is picked back up.

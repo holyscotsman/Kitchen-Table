@@ -55,8 +55,8 @@
 
   /* Everyone with a section, whether or not they have recipes yet. Joan holds
      the whole collection today; the rest are here so there is somewhere to put
-     a recipe when they contribute one. */
-  var WHO = ["Joan", "Jason", "Jennifer", "Lindsay", "Siobhan"];
+     a recipe when they contribute one. Jessica joined 2026-08-02. */
+  var WHO = ["Joan", "Jason", "Jennifer", "Lindsay", "Siobhan", "Jessica"];
 
   /* Earlier names, mapped so a device holding a saved overlay keeps resolving. */
   var WHO_ALIASES = { Mom: "Joan", Me: "Jason" };
@@ -220,6 +220,15 @@
         '<path d="M8 7h11"/><path d="M15.5 3.5L19 7l-3.5 3.5"/>' +
         '<path d="M16 17H5"/><path d="M8.5 13.5L5 17l3.5 3.5"/>',
         s || 20, s || 20
+      );
+    },
+    /* The mark: the steam bowl, the same drawing the empty hero uses — one
+       identity, not a generic book. */
+    logo: function (s) {
+      return svg(
+        '<path d="M9.5 9.5c-3-3 3-5 0-8"/><path d="M14.5 9.5c-3-3 3-5 0-8"/>' +
+        '<path d="M4 13q8 7 16 0"/><path d="M3 13h18"/><path d="M7.5 20h9"/>',
+        s || 26, s || 26
       );
     }
   };
@@ -419,19 +428,31 @@
      correct: "Salt and pepper to taste" should not acquire a number.
      ====================================================================== */
 
-  var VULGAR = [[0.25, "¼"], [0.333, "⅓"], [0.5, "½"],
-                [0.667, "⅔"], [0.75, "¾"]];
+  /* Every fraction a kitchen measure actually has: halves, thirds, quarters,
+     and eighths. A scaled quantity SNAPS to the nearest one instead of ever
+     printing a decimal — "0.83 cup" was Jason's bug report, and no recipe
+     card in history has said 0.83. Worst-case snap error is 1/16 (~4% of a
+     cup), and the "Amounts adjusted" note already tells the cook the numbers
+     have been rescaled. */
+  var VULGAR = [
+    [0.125, "⅛"], [0.25, "¼"], [0.333, "⅓"], [0.375, "⅜"], [0.5, "½"],
+    [0.625, "⅝"], [0.667, "⅔"], [0.75, "¾"], [0.875, "⅞"]
+  ];
 
   function fmtQty(n) {
+    if (n <= 0) return "0";
     var whole = Math.floor(n + 1e-9);
     var frac = n - whole;
-    var f = "";
+    /* Snap to the nearest kitchen fraction (or to 0 / 1). */
+    var best = null, bestD = frac; // distance to 0
     for (var i = 0; i < VULGAR.length; i++) {
-      if (Math.abs(frac - VULGAR[i][0]) < 0.03) f = VULGAR[i][1];
+      var d = Math.abs(frac - VULGAR[i][0]);
+      if (d < bestD) { bestD = d; best = VULGAR[i][1]; }
     }
-    if (!f && frac > 0.03) return String(Math.round(n * 100) / 100);
-    if (whole === 0) return f || "0";
-    return f ? whole + f : String(whole);
+    if (1 - frac < bestD) { whole += 1; best = null; } // closer to the next whole
+    if (whole === 0 && !best) best = "⅛"; // a nonzero amount never rounds to nothing
+    if (whole === 0) return best;
+    return best ? whole + best : String(whole);
   }
 
   function scaleLine(text, mult) {
@@ -838,13 +859,17 @@
     var h = "";
 
     h += '<div class="main" id="main-content">';
-    h += '<div class="main__top"><div>' +
+    /* The mark sits with the name — a logo lockup on the left — and the one
+       control (theme) keeps the right. The logo is a link home: pressing a
+       logo should never do nothing. */
+    h += '<div class="main__top"><div class="main__brand">' +
+         '<a class="applogo press" href="#" aria-label="Kitchen Table — home">' +
+         I.logo(30) + "</a>" +
+         "<div>" +
          '<h1 class="main__title">Kitchen Table</h1>' +
          '<p class="main__sub">A Simmonds Styled Menu</p>' +
-         "</div>" +
-         '<div class="main__marks">' +
-         '<span class="appmark" aria-hidden="true">' + I.book(30) + "</span>" +
-         themeBtn("themebtn--main") + "</div></div>";
+         "</div></div>" +
+         themeBtn("themebtn--main") + "</div>";
 
     h += '<p class="main__intro">Every recipe the family cooks, in one place — ' +
          "search it, scale it to however many you're feeding, and tick off the " +
@@ -2591,12 +2616,83 @@
   var QTY_START = /^(\d|½|⅓|¼|¾|⅔|⅛|a |an |one |two |three |four |half )/i;
   var MEASURE = /\b(cups?|tbsp|tsp|tablespoons?|teaspoons?|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|litres?|liters?|cloves?|cans?|packets?|packages?|pinch|dash|sticks?|slices?|quarts?|pints?)\b/i;
 
+  /* Levenshtein capped at 2 — enough to recognise "1NGRED1ENTS" as a heading
+     without a full distance matrix. */
+  function lev2(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 3;
+    var prev = [], cur = [];
+    for (var j = 0; j <= b.length; j++) prev[j] = j;
+    for (var i = 1; i <= a.length; i++) {
+      cur = [i];
+      var rowMin = i;
+      for (var k = 1; k <= b.length; k++) {
+        cur[k] = Math.min(
+          prev[k] + 1, cur[k - 1] + 1,
+          prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1)
+        );
+        if (cur[k] < rowMin) rowMin = cur[k];
+      }
+      if (rowMin > 2) return 3;
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  /* A heading survives OCR noise: "lngredients", "1NGRED1ENTS", "D1RECTIONS"
+     all land within two edits of the real word once case is folded. */
+  var HEADING_WORDS = {
+    ingredients: ["ingredients", "ingredient"],
+    steps: ["instructions", "instruction", "directions", "direction", "steps",
+            "method", "preparation"],
+    notes: ["notes", "note", "tips", "tip"]
+  };
+
+  function fuzzyHeading(line) {
+    var w = line.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/[01]/g, function (c) {
+      return c === "0" ? "o" : "i"; // the two digits OCR loves to substitute
+    });
+    if (!w || w.length > 16) return null;
+    var hit = null;
+    Object.keys(HEADING_WORDS).forEach(function (k) {
+      HEADING_WORDS[k].forEach(function (word) {
+        if (lev2(w, word) <= (word.length > 6 ? 2 : 1)) hit = k;
+      });
+    });
+    return hit;
+  }
+
+  var STEP_VERB = /^(mix|stir|add|bake|preheat|heat|combine|pour|whisk|cook|simmer|place|remove|serve|season|cover|bring|drain|fold|beat|chill|roll|cut|slice|grease|sprinkle|transfer|return|reduce|boil|melt|mash|fry|roast|grill|blend|knead|let|set|repeat|garnish|arrange|spread|top|turn|flip|rest|allow|divide|shape|form|brush|line|wrap|refrigerate|freeze|thaw|toss|marinate)\b/i;
+
   function draftFromText(raw) {
-    var lines = raw.split(/\r?\n/)
-      .map(function (l) {
-        return l.replace(/^[\s•\-*–—]+/, "").replace(/^\d+[.)]\s*/, "").trim();
-      })
-      .filter(Boolean);
+    var rough = raw.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+
+    /* Bullet ghosts: OCR reads • as a letter — "e 2 cups flour". If three or
+       more lines open with the same one-character token, that token is a
+       bullet, whatever letter it pretends to be. */
+    var leadCount = {};
+    rough.forEach(function (l) {
+      var m = l.match(/^(\S)\s+\S/);
+      if (m) leadCount[m[1]] = (leadCount[m[1]] || 0) + 1;
+    });
+    var bullets = Object.keys(leadCount).filter(function (t) {
+      return leadCount[t] >= 3 && /[^A-Za-z0-9]|[eoO°©®«»·¤§*+~-]/.test(t);
+    });
+
+    var stepNumbered = {};
+    var lines = [];
+    rough.forEach(function (l) {
+      bullets.forEach(function (t) {
+        if (l.indexOf(t + " ") === 0) l = l.slice(2);
+      });
+      l = l.replace(/^[\s•·▪‣◦\-*–—]+/, "");
+      /* An original "3." or "3)" is the strongest step signal there is —
+         remember it before stripping it. */
+      var wasNumbered = /^\d{1,2}[.)]\s/.test(l);
+      l = l.replace(/^\d{1,2}[.)]\s*/, "").trim();
+      if (!l || /^[^A-Za-z0-9]{1,3}$/.test(l)) return;
+      if (wasNumbered) stepNumbered[lines.length] = true;
+      lines.push(l);
+    });
 
     var d = blankDraft();
     d.flagged = [];
@@ -2605,20 +2701,62 @@
     var notes = [];
     var section = null;
     var sawHeadings = false;
+    var sawServings = false;
+
+    /* Meta lines claim their field and leave the flow: serves, times. */
+    function claimMeta(line) {
+      var m = line.match(/^(?:serves?|servings?|yields?|makes|portions?|feeds)\s*:?\s*(\d{1,2})\b/i);
+      if (m) {
+        d.servings = Math.min(40, Math.max(1, parseInt(m[1], 10)));
+        sawServings = true;
+        return true;
+      }
+      /* A time claim needs the word "time" or a colon — "Bake at 400 for 15
+         minutes" is a step, "Bake: 40 min" and "Cook time 1 hr" are meta. */
+      m = line.match(/^prep(?:\s*time\s*:?|\s*:)\s*(.+)$/i);
+      if (m && m[1].length < 25) { d.prepTime = m[1].trim(); return true; }
+      m = line.match(/^(?:cook|bake|total)(?:\s*time\s*:?|\s*:)\s*(.+)$/i);
+      if (m && m[1].length < 25) { d.cookTime = m[1].trim(); return true; }
+      return false;
+    }
+
+    /* Screenshot chrome is never a title: clock readings, "< Back", URLs,
+       bare single words in a sea of content. */
+    function junkTitle(line) {
+      return /^\d{1,2}:\d{2}/.test(line) || /^[<‹«]/.test(line) ||
+             /https?:\/\//i.test(line) || /^\d+%/.test(line) ||
+             /^(back|menu|search|share|save|home)$/i.test(line);
+    }
+
+    function looksLikeIngredient(line) {
+      if (QTY_START.test(line)) return true;
+      var head = line.slice(0, 26);
+      return MEASURE.test(head) && line.length < 90;
+    }
 
     lines.forEach(function (line, index) {
-      var matched = null;
-      Object.keys(HEADINGS).forEach(function (k) {
-        if (HEADINGS[k].test(line)) matched = k;
-      });
+      var matched = fuzzyHeading(line);
       if (matched) { section = matched; sawHeadings = true; return; }
-      if (!d.title && index === 0) { d.title = line; return; }
+      if (claimMeta(line)) return;
+      /* Screenshot chrome above the first real section is dropped outright —
+         a clock reading is not an ingredient. Inside a section everything is
+         kept: better a junk line a human deletes than a real one lost. */
+      if (!section && junkTitle(line)) return;
+      /* Only before any heading, and only when the line doesn't read as a
+         measured quantity — "Two Card Scones" is a title, "2 cups flour"
+         never is. */
+      if (!d.title && !section &&
+          !/^[\d½⅓¼¾⅔⅛]/.test(line) && !MEASURE.test(line.slice(0, 26)) &&
+          line.length < 70 && index < 6) {
+        d.title = line;
+        return;
+      }
       if (section === "ingredients") d.ingredients.push(line);
       else if (section === "steps") d.steps.push(line);
       else if (section === "notes") notes.push(line);
-      else if ((QTY_START.test(line) || MEASURE.test(line)) && line.length < 90) {
-        d.ingredients.push(line);
-      } else if (line.length > 40) d.steps.push(line);
+      else if (stepNumbered[index] || STEP_VERB.test(line)) d.steps.push(line);
+      else if (looksLikeIngredient(line)) d.ingredients.push(line);
+      else if (line.length > 55) d.steps.push(line);
       else d.ingredients.push(line);
     });
 
@@ -2631,6 +2769,9 @@
         "There were no “Ingredients” / “Instructions” headings, so the split " +
         "between the two lists was guessed. Check both."
       );
+    }
+    if (!sawServings) {
+      d.flagged.push("Servings — no count was found; 4 was assumed.");
     }
     if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("Ingredients — none were picked up."); }
     if (!d.steps.length) { d.steps = [""]; d.flagged.push("Steps — none were picked up."); }

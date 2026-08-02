@@ -31,8 +31,8 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('search placeholder counts recipes', (await p.getAttribute('#main-search','placeholder'))==='Search 48 recipes');
   chk("Tonight's idea hero present", await p.locator('.hero').count()===1);
   chk('hero falls back to flat panel (no image)', await p.locator('.hero__blank').count()===1);
-  chk('5 contributor sections', await p.locator('.who-tile').count()===5);
-  chk('all 48 are Joan\'s, others invite (058)', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48' && await p.locator('.who-tile--empty').count()===4 && (await p.locator('.who-tile--empty').first().textContent()).includes('None yet'));
+  chk('6 contributor sections', await p.locator('.who-tile').count()===6);
+  chk('all 48 are Joan\'s, others invite (058)', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48' && await p.locator('.who-tile--empty').count()===5 && (await p.locator('.who-tile--empty').first().textContent()).includes('None yet'));
   chk('category rows present', await p.locator('.cat-row').count()===6);
   chk('View all button', (await p.locator('.bigbtn').textContent()).includes('View all 48 recipes'));
   await p.screenshot({path:require('path').join(__dirname,'shots','kt-1-main-dark.png')});
@@ -152,6 +152,10 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const after = await p.locator('.checkrow__text').first().textContent();
   chk('ingredient quantity rescaled', before!==after, before+' -> '+after);
   chk('scaled note appears', await p.locator('.scalednote').count()===1);
+  /* Jason's bug: a scaled amount must read like a recipe card, never a
+     calculator — kitchen fractions only, at every multiplier. */
+  const allScaled = await p.evaluate(()=>[...document.querySelectorAll('.checkrow__text')].map(e=>e.textContent));
+  chk('no decimal quantities after rescale', !allScaled.some(l=>/\d\.\d/.test(l)), allScaled.filter(l=>/\d\.\d/.test(l)).join(' | '));
   await p.click('[data-act="serv-"]');
   await p.waitForTimeout(200);
   chk('back to original clears the note', await p.locator('.scalednote').count()===0);
