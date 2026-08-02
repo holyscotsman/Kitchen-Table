@@ -419,19 +419,31 @@
      correct: "Salt and pepper to taste" should not acquire a number.
      ====================================================================== */
 
-  var VULGAR = [[0.25, "¼"], [0.333, "⅓"], [0.5, "½"],
-                [0.667, "⅔"], [0.75, "¾"]];
+  /* Every fraction a kitchen measure actually has: halves, thirds, quarters,
+     and eighths. A scaled quantity SNAPS to the nearest one instead of ever
+     printing a decimal — "0.83 cup" was Jason's bug report, and no recipe
+     card in history has said 0.83. Worst-case snap error is 1/16 (~4% of a
+     cup), and the "Amounts adjusted" note already tells the cook the numbers
+     have been rescaled. */
+  var VULGAR = [
+    [0.125, "⅛"], [0.25, "¼"], [0.333, "⅓"], [0.375, "⅜"], [0.5, "½"],
+    [0.625, "⅝"], [0.667, "⅔"], [0.75, "¾"], [0.875, "⅞"]
+  ];
 
   function fmtQty(n) {
+    if (n <= 0) return "0";
     var whole = Math.floor(n + 1e-9);
     var frac = n - whole;
-    var f = "";
+    /* Snap to the nearest kitchen fraction (or to 0 / 1). */
+    var best = null, bestD = frac; // distance to 0
     for (var i = 0; i < VULGAR.length; i++) {
-      if (Math.abs(frac - VULGAR[i][0]) < 0.03) f = VULGAR[i][1];
+      var d = Math.abs(frac - VULGAR[i][0]);
+      if (d < bestD) { bestD = d; best = VULGAR[i][1]; }
     }
-    if (!f && frac > 0.03) return String(Math.round(n * 100) / 100);
-    if (whole === 0) return f || "0";
-    return f ? whole + f : String(whole);
+    if (1 - frac < bestD) { whole += 1; best = null; } // closer to the next whole
+    if (whole === 0 && !best) best = "⅛"; // a nonzero amount never rounds to nothing
+    if (whole === 0) return best;
+    return best ? whole + best : String(whole);
   }
 
   function scaleLine(text, mult) {
