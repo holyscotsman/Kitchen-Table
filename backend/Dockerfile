@@ -11,7 +11,7 @@
 FROM node:22-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates \
+ && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates git \
  && curl -fsSL -o /usr/local/bin/yt-dlp \
       https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
  && chmod +x /usr/local/bin/yt-dlp \
@@ -23,6 +23,9 @@ COPY backend/package.json backend/package.json
 RUN cd backend && npm install --omit=dev
 
 COPY backend backend
+# System yt-dlp/ffmpeg exist, so this fetches only the PO-token pair
+# (plugin zip + token server, same release tag).
+RUN cd backend && bash get-tools.sh
 
 ENV PORT=8787
 EXPOSE 8787

@@ -46,7 +46,7 @@ async function runJob(ctx, jobId) {
   try {
     /* ---- downloading ---- */
     await setStage("downloading");
-    const metaRun = await media.run(ytdlp,
+    const metaRun = await media.runYtdlp(ytdlp,
       ["-J", "--no-download", "--no-playlist", "--no-warnings", job.url],
       { timeoutMs: 120000 });
     if (!metaRun.ok || !metaRun.stdout) {
@@ -77,7 +77,7 @@ async function runJob(ctx, jobId) {
     } else {
       const track = media.pickCaptionTrack(info);
       if (track) {
-        const subRun = await media.run(ytdlp,
+        const subRun = await media.runYtdlp(ytdlp,
           ["--skip-download", track.auto ? "--write-auto-subs" : "--write-subs",
             "--sub-langs", track.lang, "--sub-format", "vtt",
             "--no-playlist", "--no-warnings", "-o", "sub.%(ext)s", job.url],
@@ -92,7 +92,7 @@ async function runJob(ctx, jobId) {
         /* No written recipe, no usable captions: fetch the smallest real
          * copy of the video and read it both ways. */
         transcript = "";
-        const dl = await media.run(ytdlp,
+        const dl = await media.runYtdlp(ytdlp,
           ["-f", "worst[height>=240]/worst", "--max-filesize", "300m",
             "--no-playlist", "--no-warnings", "-o", "media.%(ext)s", job.url],
           { cwd: tmp, timeoutMs: 300000 });

@@ -11,6 +11,12 @@ let pass = 0, fail = 0;
 const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
   : (fail++, console.log('  FAIL ' + n + (e ? ' :: ' + e : '')));
 
+/* The PO-token pair may or may not be fetched in the environment running
+ * this suite (get-tools.sh puts it in backend/bin). Every yt-dlp arg
+ * assertion below expects the bare calls, so tokens are switched off for
+ * the whole suite and switched on only inside their own shape check. */
+process.env.KT_NO_POT = '1';
+
 const lib = p => require(path.join(__dirname, '..', 'backend', 'lib', p));
 const { parseVideoUrl, validateRecipe } = lib('validate');
 const { LABEL, estimate } = lib('eta');
@@ -113,6 +119,55 @@ const { runJob, computeFps } = lib('pipeline');
   chk('deleted video named', /unavailable or deleted/.test(media.friendlyDownloadError('ERROR: Video unavailable', 'youtube')));
   chk('instagram gets the screen-record advice', /screen-record/.test(media.friendlyDownloadError('some login wall nonsense', 'instagram')));
   chk('youtube default is plain', /couldn’t be fetched/.test(media.friendlyDownloadError('???', 'youtube')));
+  /* The robot check is about the SERVER, and must never read as a fact
+     about the video — the first live import hit exactly this mislabel. */
+  const botErr = "ERROR: [youtube] abc: Sign in to confirm you’re not a bot. Use --cookies for the authentication.";
+  chk('the robot check is named as a robot check, not age restriction',
+    /treats cloud servers as robots/.test(media.friendlyDownloadError(botErr, 'youtube')) &&
+    !/age-restricted/.test(media.friendlyDownloadError(botErr, 'youtube')));
+  chk('a real age gate still reads as one',
+    /age-restricted/.test(media.friendlyDownloadError('ERROR: Sign in to confirm your age. This video may be inappropriate', 'youtube')));
+  chk('isBotCheck spots both quote spellings',
+    media.isBotCheck("Sign in to confirm you're not a bot") && media.isBotCheck('confirm that you’re not a bot'));
+
+  console.log('\n== runYtdlp retries the robot check as other clients ==');
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-bot-'));
+    const log = path.join(dir, 'log');
+    /* Fails as the web client, succeeds the moment the TV client is asked. */
+    fs.writeFileSync(path.join(dir, 'yt'),
+      '#!/usr/bin/env bash\necho "$@" >> ' + JSON.stringify(log) + '\n' +
+      'if [[ " $* " == *"player_client=tv"* ]]; then echo OK; exit 0; fi\n' +
+      'echo "ERROR: Sign in to confirm you’re not a bot" >&2; exit 1\n');
+    fs.chmodSync(path.join(dir, 'yt'), 0o755);
+    const res = await media.runYtdlp(path.join(dir, 'yt'), ['-J', 'https://youtu.be/x'], {});
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n');
+    chk('bot check falls through to the tv client and succeeds', res.ok && /OK/.test(res.stdout));
+    chk('exactly one retry was needed', calls.length === 2 && /player_client=tv/.test(calls[1]));
+    chk('the retry keeps the original arguments', /-J https:\/\/youtu\.be\/x$/.test(calls[1]));
+
+    fs.writeFileSync(path.join(dir, 'yt'),
+      '#!/usr/bin/env bash\necho "$@" >> ' + JSON.stringify(log) + '\n' +
+      'echo "ERROR: Private video" >&2; exit 1\n');
+    fs.writeFileSync(log, '');
+    const res2 = await media.runYtdlp(path.join(dir, 'yt'), ['-J', 'u'], {});
+    chk('a non-bot failure never retries', !res2.ok &&
+      fs.readFileSync(log, 'utf8').trim().split('\n').length === 1);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  console.log('\n== PO-token plumbing ==');
+  chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
+  {
+    delete process.env.KT_NO_POT;
+    const a = media.potArgs();
+    chk('when installed, exactly the plugin dir + provider address (else nothing)',
+      a.length === 0 ||
+      (a.length === 4 && a[0] === '--plugin-dirs' && /bin[\\/]plugins$/.test(a[1]) &&
+        a[2] === '--extractor-args' && /^youtubepot-bgutilhttp:base_url=http:\/\/127\.0\.0\.1:\d+$/.test(a[3])),
+      JSON.stringify(a));
+    process.env.KT_NO_POT = '1';
+  }
 
   console.log('\n== extraction shaping ==');
   {

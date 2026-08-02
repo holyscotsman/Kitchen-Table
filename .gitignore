@@ -16,8 +16,9 @@ node_modules/
 *.log
 
 # Media tools the import server's build fetches (backend/get-tools.sh) —
-# binaries, never committed
+# binaries and the cloned PO-token server, never committed
 backend/bin/
+backend/potserver/
 
 # Source material, not site assets: the original recipe screenshots each
 # recipe was transcribed from. Hundreds of files, none of them needed at
