@@ -104,6 +104,13 @@ categories, pick when it's most often served and add the other as a tag;
 "Baking" is for things whose point is the baking (bread, scones), not for
 anything that touches an oven.
 
+Three things keep tags from drifting into near-duplicates: **as you type, the
+app suggests tags that already exist** (tap the suggestion — it uses the
+canonical spelling); **Tag on the All-recipes screen tags many recipes in one
+pass**, with the same suggestions; and **Rename or merge** (beside the tag
+filters) renames a tag everywhere at once — renaming onto an existing name
+merges the two, so "italian" can be folded into "Italian" after the fact.
+
 ## Editing
 
 The switch in the mode strip on any recipe turns on Edit mode. Viewer mode shows
@@ -165,6 +172,10 @@ a local server. `tests/measure-quota.js` is a measuring tool rather than a
 suite — it reports how many photos this browser's storage can actually hold.
 
 ## Adding a recipe
+
+**The family-facing walkthrough is [`ADDING.md`](ADDING.md)** — written for
+someone who has never used GitHub, including how an addition becomes visible
+to everyone. The short version for this README:
 
 The **Add recipe** pill on the Menu opens three ways in:
 

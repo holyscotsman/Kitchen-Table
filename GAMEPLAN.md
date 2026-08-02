@@ -415,8 +415,9 @@ here may be inferred.** Rule 5 in §3 exists for this phase.*
   - *Needs:* `062` `063` `057` · *Done when:* all ten categories have at least one, committed to `images/`.
 - [ ] `078` 👤 **TW** — Chase Jason, Jennifer, Lindsay and Siobhan for their first recipe each.
   - *Needs:* — · *Done when:* four empty contributor tiles are no longer empty, or a real reason is recorded for each that stays.
-- [ ] `079` 🤖 **TW** — Write the one-page "how to add a recipe" guide aimed at someone who has never used GitHub.
+- [x] `079` 🤖 **TW** — Write the one-page "how to add a recipe" guide aimed at someone who has never used GitHub.
   - *Needs:* `028` `067` `068` · *Done when:* someone non-technical follows it start to finish without asking a question. **→ README**
+  - *Done 2026-08-01:* `ADDING.md` — leads with the one mental model that matters ("saves on your phone; publishing is handing the file to Jason"), covers all three paths, the category/tag rule in plain words, mistakes, and the same-recipe-twice case. Linked from the README, whose tags section also gained the 067–069 machinery. The literal done-when (a real non-technical person follows it unaided) rides with the family sessions.
 - [ ] `080` 🤖 **TW** — Bring `CLAUDE.md`'s build-state section current, and cross-check `README.md` against it.
   - *Needs:* `072`–`079` · *Done when:* every decision taken in Acts I–III appears in one of the two, and neither contradicts the other. **→ README**
 
