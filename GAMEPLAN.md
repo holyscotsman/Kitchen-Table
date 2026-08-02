@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 79 of 130 done · 19 struck-as-superseded · 32 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
+**Status:** `v0.9` · calendar + database shipped 2026-08-02 · **Phase 16, the video importer (Jason's spec), shipped 2026-08-02** — `V01`–`V05` all done; only the video conversion lives on Render, the app stays static · of the original 130: 79 done · 20 struck-as-superseded (`096` joined the list — the Render server *is* the small worker) · 31 open, nearly all needing a person (§11) · **to light the kitchen server up: three env vars in Render + one deploy (`backend/README.md`)**
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -650,6 +650,34 @@ own design-first rule.*
   - *Needs:* `125` `076` · *Done when:* the failure modes are written down. **This is a spike. Shipping it is a separate decision, not part of 1.0.**
   - *Done 2026-08-02: the summing spike shipped as a labelled preview; failure modes recorded in DECISIONS.md 130. Promoting it past preview is a separate decision, as the task warned.*
 
+## Phase 16 — The video importer *(addendum arc, 2026-08-02 — from Jason's spec, not the original 130)*
+
+*Jason supplied a written spec (video-import-spec) and the ruling that shapes
+it: **only the video conversion lives on Render — the app stays static and
+instant.** Five tasks, adapted to this repo per the Stage-0 report: `KT_DB`
+not `DATABASE_URL`, `kitchen.contributors` not `people`, the existing review
+screen as the landing point, vanilla node http instead of Express (four
+routes), a contributor NAME on the job row (names are labels, never keys).
+Side effect worth naming: the accept endpoint is the first live app→database
+write — the "small worker" `096` was waiting for now exists.*
+
+- [x] `V01` 🤖 **DB** — `kitchen.import_jobs` as schema v2: the six-state walk, ETA inputs, the draft in `result_json`, plain-language `error_message`.
+  - *Done 2026-08-02: applied live to Neon; ledger reads 1, 2. The re-run also synced the 38 research-tag links.*
+- [x] `V02` 🤖 **BE** — The import server: four routes + health, concurrency-1 queue, yt-dlp/ffmpeg as fetched static builds, cheap paths first (description → captions → media), Groq Whisper, one Claude call (`claude-opus-5`, structured output, flag-don't-guess), 30-minute cap, media deleted on every exit, restart recovery per the spec's wording.
+  - *Done 2026-08-02: `backend/` + the repo-root package.json that makes Render's existing `yarn` / `yarn start` service work unchanged. Booted against live Neon.*
+- [x] `V03` 🤖 **FE** — The fourth Add path: progress card (three human stages, ETA that says "taking a bit longer" at 2× rather than freezing), the close-this-page promise, the waking state, the Ready-to-check-over list, review handoff, accept-on-save.
+  - *Done 2026-08-02: disclosure names Render, Groq and Claude before anything is sent (050 discipline); the local save never waits on the server.*
+- [x] `V04` 🤖 **FE** — `manifest.json` with `share_target` so Android shares land in the importer and submit themselves; icons from the existing mark; the two-minute iPhone Shortcut recipe in `ADDING.md`.
+  - *Done 2026-08-02: boot consumes the shared query once, strips the address bar, routes video links to the kitchen and other links to the link importer.*
+- [x] `V05` 🤖 **QA** — Both suites: the server's logic with tools faked and no network (75), the browser flow with the kitchen stubbed (36); every hermetic suite that visits `#add` aborts the Render origin so CI never pokes the real server.
+  - *Done 2026-08-02: full battery 450 functional checks, 0 failures; the video form is in the contrast matrix, AA clean.*
+
+*Still needed to light it up, and only Jason can: the three env vars in
+Render's dashboard, then a deploy — `backend/README.md` is the two-minute
+checklist. The spec's live checklist (real YouTube/Instagram videos, the
+cold-start path, a restart mid-job) runs after that, since it needs the
+real server.*
+
 ---
 
 ## 9. Release checklist — what makes it 1.0
@@ -757,6 +785,13 @@ finds out what the last one learned.*
 | `061` | 2026-08-01 | `design/components.md` — the one-page vocabulary, linked from the README. |
 | *Phase 6* | 2026-08-01 | **Closed for real: 9 of 9.** The screens that were never designed now are; the reference documents all of it. |
 | *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
+| `V01` | 2026-08-02 | `kitchen.import_jobs` live as schema v2. A job's whole life is one row; contributor is a name, never a key. |
+| `V02` | 2026-08-02 | The import server, Render-shaped: Jason's failed deploy diagnosed (no backend existed; `yarn start` was right all along) — the repo-root package.json makes his existing service work with zero settings changes, just the three env vars. |
+| `V03` | 2026-08-02 | The fourth way in: progress card, waking state, waiting list, review handoff, accept-on-save. The phone never waits on the server. |
+| `V04` | 2026-08-02 | Android share sheet lands in the importer and submits itself; iPhone gets the two-minute Shortcut recipe in ADDING.md. |
+| `V05` | 2026-08-02 | 111 new checks (backend 75 with tools faked, browser 36 with the kitchen stubbed). Full battery 450 green; CI never pokes the real server. |
+| `096` | 2026-08-02 | **Struck as superseded**: the Render import server *is* the small worker — it holds `KT_DB` server-side and `accept` is the first live app→database write. The Data-API/browser-key question no longer blocks anything. |
+| `031` `032` | 2026-08-02 | Refreshed for the live-write era in DECISIONS.md: video-accept inserts reach the file through the nightly export; id collisions suffix, never overwrite. |
 
 ---
 
@@ -779,9 +814,10 @@ agent task — the agent queue is empty.*
 | `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast.** Findings amend `design/a11y-criteria.md` and may reopen `055`/`056`. | the deferred section of `034` |
 | `072`–`074`, `076`–`078` | **The content truth pass — sit-downs with Joan.** `CONTENT.md` is the worklist: 4 ingredient lists, the `parsnips` truncation, 34 servings, first tags, first photos, chasing the other four contributors. Rule 5: nothing inferred. | the `029` done-bar for 1.0; re-running `080` after |
 | `081` | **Twenty real photos of Joan's recipe cards** through the proven pipeline; write down the honest error rate. | final wording of the `082` flags |
-| `096` | **Jason's Neon console call: enable the Data API (browser-safe keys + row-level security) or ask for a small worker instead.** This is the one decision between the live site and the database. | the app↔DB wiring, live shared edits, logins, the calendar syncing across phones |
-| *rotate the credential* | The Postgres password transited a chat; rotate it in the Neon console once the wiring lands (env vars and Actions secrets update in one place each). | hygiene, not function |
-| `031` `032` | Merge story and pull cadence were written for the file era; once live DB writes exist they need a one-paragraph refresh. | post-wiring |
+| *light the kitchen* | **Three env vars in Render's dashboard** (`KT_DB`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`) + one Manual Deploy — `backend/README.md` is the checklist. After this branch merges: flip the service's Branch to `main`. Then the spec's live checklist (real videos, cold start, restart mid-job) can run. | the whole Phase 16 arc going live |
+| *`KT_DB` Actions secret* | Same value, repo Settings → Secrets → Actions, so the nightly `db-sync` keeps `recipes.json` telling the database's story — including recipes accepted from video imports. | accepted imports reaching the published file |
+| *rotate the credential* | The Postgres password transited a chat; rotate it in the Neon console once the env vars are placed (the two spots above are the only two places it lives). | hygiene, not function |
+| *(struck)* `096` | ~~Neon Data API decision~~ — superseded 2026-08-02: the Render import server is the small worker; see §10. | — |
 
 ---
 
