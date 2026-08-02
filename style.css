@@ -2250,3 +2250,48 @@ input[type="file"].input {
   font-size: 16px;
   font-weight: 700;
 }
+
+/* 069 — the tag rename/merge sheet. */
+.grouph-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managelist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.managerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 16px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surf);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.managerow__count {
+  flex: none;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+}
+
+.managerow--edit {
+  flex-wrap: wrap;
+}
+
+.managerow--edit .input {
+  flex: 1 1 160px;
+}

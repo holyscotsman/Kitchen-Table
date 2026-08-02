@@ -385,8 +385,9 @@ bulk tagging exists before anyone is asked to tag.*
 - [x] `068` 🤖 **FE-B** — Add bulk tagging from the Menu.
   - *Needs:* `067` · *Done when:* ten recipes can be tagged in one pass. **→ README**
   - *Done 2026-08-01:* a "Tag" mode beside "Remove" — tap recipes, the pill counts them, one sheet applies the list to all. Typed tags canonicalize against existing casings (067's rule, enforced on the bulk path too), unions never double. Proven at exactly ten in feat.js (now 52).
-- [ ] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
+- [x] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
   - *Needs:* `067` · *Done when:* merging "italian" into "Italian" leaves no recipe pointing at the old one. **→ README**
+  - *Done 2026-08-01:* "Rename or merge" beside the filter sheet's tag group — tap a tag, type the new name; a name that already exists (any casing) merges after a confirm, deduping per recipe and following any active filter. The exact done-when case is the feat.js fixture (now 54).
 - [x] `070` 🤖 **FE-B** — Detect a likely duplicate on save by comparing title and ingredients against the collection.
   - *Needs:* — · *Done when:* it warns and offers a comparison, and never blocks the save.
 - [ ] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.

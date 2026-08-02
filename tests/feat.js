@@ -208,6 +208,19 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('re-tagging in another casing does not duplicate', await p.evaluate(()=>{const t=JSON.parse(localStorage.getItem('kt.recipes'))[0].tags;return t.filter(x=>x.toLowerCase()==='family favourite').length===1&&t.includes('Family favourite');}));
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== 069: tag rename and merge ==');
+  await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].tags=['italian'];l[1].tags=['Italian','quick'];l[2].tags=['italian','Sunday'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="open-filter"]'); await p.waitForSelector('[data-act="tag-manage"]');
+  await p.click('[data-act="tag-manage"]'); await p.waitForSelector('[data-act="tag-edit"][data-key="italian"]');
+  await p.click('[data-act="tag-edit"][data-key="italian"]'); await p.waitForSelector('#tag-rename');
+  await p.fill('#tag-rename','Italian');
+  await p.click('[data-act="tag-rename-apply"]');
+  await p.waitForFunction(()=>!JSON.parse(localStorage.getItem('kt.recipes')).some(r=>(r.tags||[]).includes('italian')));
+  chk('merge leaves no recipe on the old name', true);
+  chk('merged recipes carry the target exactly once', await p.evaluate(()=>{const l=JSON.parse(localStorage.getItem('kt.recipes'));return l[0].tags.join()==='Italian'&&l[1].tags.join()==='Italian,quick'&&l[2].tags.join()==='Italian,Sunday';}));
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

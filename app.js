@@ -327,6 +327,11 @@
     tagSheetOpen: false,
     bulkTags: "",
 
+    /* 069 — the rename/merge sheet. */
+    tagManageOpen: false,
+    tagEditing: "",
+    tagEditVal: "",
+
     editing: false,
     serves: null,
     checkedIng: {},
@@ -1050,6 +1055,7 @@
     if (S.filterOpen) h += filterSheetHtml();
     if (S.textOpen) h += textSheetHtml();
     if (S.tagSheetOpen) h += bulkTagSheetHtml(selCount);
+    if (S.tagManageOpen) h += tagManageSheetHtml();
     return h;
   }
 
@@ -1116,6 +1122,7 @@
     S.lbOpen = false;
     S.sortOpen = false;
     S.tagSheetOpen = false;
+    S.tagManageOpen = false;
     S[flag] = true;
     openSheetId = null;
     S.pulseSheet = true;
@@ -1272,7 +1279,9 @@
         return true;
       }).length;
     }
-    return '<h3 class="grouph">Tags</h3><div class="chiprow">' +
+    return '<div class="grouph-row"><h3 class="grouph">Tags</h3>' +
+      '<button type="button" class="textbtn" data-act="tag-manage">Rename or merge</button></div>' +
+      '<div class="chiprow">' +
       tags.map(function (tag) {
         var on = S.tags.indexOf(tag) > -1;
         return '<button type="button" class="chip press" aria-pressed="' + on +
@@ -1280,6 +1289,84 @@
                (on ? I.check(15) : "") +
                '<span class="chip__label">' + esc(tag) + " (" + countTag(tag) + ")</span></button>";
       }).join("") + "</div>";
+  }
+
+  /* 069 — rename and merge. Renaming onto a name that already exists (any
+     casing) is a merge: every recipe carrying the old tag carries the target
+     once, and the old name is gone everywhere. There is no partial version of
+     that — which is the entire point of doing it here rather than by hand. */
+  function tagManageSheetHtml() {
+    var tags = allTags();
+    function usage(tag) {
+      return S.recipes.filter(function (r) { return tagsOf(r).indexOf(tag) > -1; }).length;
+    }
+    return (
+      '<button type="button" class="scrim" data-act="close-tag-manage" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tm-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="tm-title">Tags</h2>' +
+      '<button type="button" class="donebtn press" data-act="close-tag-manage">Done</button></div>' +
+      '<p class="hint" style="margin-top:0">Tap a tag to rename it. Renaming it to ' +
+      "another tag’s name merges the two.</p>" +
+      '<div class="managelist">' +
+      tags.map(function (tag) {
+        if (S.tagEditing === tag) {
+          return '<div class="managerow managerow--edit">' +
+            '<label class="vh" for="tag-rename">New name for ' + esc(tag) + "</label>" +
+            '<input class="input" id="tag-rename" data-act="tag-rename-input" value="' +
+            esc(S.tagEditVal) + '" autocomplete="off" />' +
+            '<button type="button" class="donebtn press" data-act="tag-rename-apply" ' +
+            'data-key="' + esc(tag) + '">Save</button>' +
+            '<button type="button" class="textbtn" data-act="tag-edit" data-key="">Cancel</button>' +
+            "</div>";
+        }
+        return '<button type="button" class="managerow press" data-act="tag-edit" ' +
+               'data-key="' + esc(tag) + '">' +
+               '<span class="chip__label">' + esc(tag) + "</span>" +
+               '<span class="managerow__count">' + usage(tag) +
+               (usage(tag) === 1 ? " recipe" : " recipes") + "</span></button>";
+      }).join("") +
+      "</div></div></div>"
+    );
+  }
+
+  function renameTag(oldTag, nextRaw) {
+    var next = String(nextRaw || "").trim().replace(/\s+/g, " ");
+    if (!next || next === oldTag) return "";
+    /* Same letters, new casing is a plain rename; a different existing tag
+       (any casing) is a merge and says so before it happens. */
+    var target = null;
+    allTags().forEach(function (t) {
+      if (t !== oldTag && t.toLowerCase() === next.toLowerCase()) target = t;
+    });
+    if (target) {
+      if (!window.confirm('Merge "' + oldTag + '" into "' + target + '"? Every recipe tagged "' +
+          oldTag + '" will carry "' + target + '" instead.')) return "";
+      next = target;
+    }
+    var touched = 0;
+    S.recipes = S.recipes.map(function (r) {
+      var have = tagsOf(r);
+      if (have.indexOf(oldTag) === -1) return r;
+      var out = {};
+      Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+      var seen = {};
+      out.tags = have.map(function (t) { return t === oldTag ? next : t; })
+        .filter(function (t) {
+          var lt = t.toLowerCase();
+          if (seen[lt]) return false;
+          seen[lt] = true;
+          return true;
+        });
+      touched++;
+      return out;
+    });
+    persistRecipes();
+    /* An active filter on the old name follows the rename. */
+    S.tags = S.tags.map(function (t) { return t === oldTag ? next : t; })
+      .filter(function (t, i, a) { return a.indexOf(t) === i; });
+    return (target ? "Merged into “" + next + "”" : "Renamed to “" + next + "”") +
+           " — " + touched + (touched === 1 ? " recipe updated." : " recipes updated.");
   }
 
   function downloadSheetHtml(r) {
@@ -2908,6 +2995,28 @@
     }
     if (act === "open-bulk") { openSheet("tagSheetOpen", el); return; }
     if (act === "close-bulk") { closeSheet("tagSheetOpen"); return; }
+    if (act === "tag-manage") { openSheet("tagManageOpen", el); return; }
+    if (act === "close-tag-manage") {
+      S.tagEditing = ""; S.tagEditVal = "";
+      closeSheet("tagManageOpen"); return;
+    }
+    if (act === "tag-edit") {
+      S.tagEditing = key || "";
+      S.tagEditVal = key || "";
+      render();
+      if (key) {
+        var f = document.getElementById("tag-rename");
+        if (f) { f.focus(); f.select(); }
+      }
+      return;
+    }
+    if (act === "tag-rename-apply") {
+      var msg = renameTag(key, S.tagEditVal);
+      S.tagEditing = ""; S.tagEditVal = "";
+      if (msg) setNotice(msg);
+      render();
+      return;
+    }
     if (act === "bulk-apply") {
       var toAdd = parseTags(S.bulkTags);
       if (!toAdd.length) { closeSheet("tagSheetOpen"); return; }
@@ -3107,6 +3216,7 @@
       syncTagSuggestions(el);
       return;
     }
+    if (act === "tag-rename-input") { S.tagEditVal = el.value; return; }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
       scheduleAddPersist();
@@ -3134,6 +3244,7 @@
     else if (S.dlOpen) closeSheet("dlOpen");
     else if (S.lbOpen) closeSheet("lbOpen");
     else if (S.tagSheetOpen) closeSheet("tagSheetOpen");
+    else if (S.tagManageOpen) { S.tagEditing = ""; S.tagEditVal = ""; closeSheet("tagManageOpen"); }
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 
