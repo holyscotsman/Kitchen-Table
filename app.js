@@ -4281,6 +4281,24 @@
   /* Photos load alongside the recipes so the first paint already knows every
      thumbnail — initImages never rejects, so the only failure mode here is
      the recipes themselves. */
+  /* A link arriving through the share sheet (manifest.json share_target)
+     lands as ?url=… / ?text=… on the page itself. Consumed once at boot:
+     a video link goes straight into the video importer and submits itself;
+     any other address pre-fills the link importer. The query is stripped
+     from the address bar either way so a reload doesn't re-import. */
+  function consumeSharedLink() {
+    if (!location.search || location.search.length < 2) return null;
+    var sp = new URLSearchParams(location.search);
+    var text = [sp.get("url"), sp.get("text"), sp.get("title")]
+      .filter(Boolean).join(" ");
+    if (!text) return null;
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
+    var m = text.match(/https?:\/\/[^\s"'<>]+/i);
+    if (!m) return null;
+    var url = m[0].replace(/[),.;!?]+$/, "");
+    return { url: url, video: /youtube\.com|youtu\.be|instagram\.com|instagr\.am/i.test(url) };
+  }
+
   Promise.all([
     fetch("recipes.json", { cache: "no-cache" }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
@@ -4293,7 +4311,26 @@
       applyOverlay();
       loadPlan();
       S.loaded = true;
+      var shared = consumeSharedLink();
+      if (shared) {
+        /* replaceState, not location.hash — hashchange fires as a later
+           task and would re-enter the route AFTER the prefill, wiping it. */
+        if (location.hash !== "#add") {
+          try { history.replaceState(null, "", location.pathname + "#add"); } catch (e) {}
+        }
+      }
       onRoute();
+      if (shared) {
+        if (shared.video) {
+          S.addStep = "video";
+          S.videoUrl = shared.url;
+          submitVideo();
+        } else {
+          S.addStep = "link";
+          S.addUrl = shared.url;
+          render();
+        }
+      }
     })
     .catch(function (err) {
       S.error = "The recipes could not be loaded (" + err.message +
