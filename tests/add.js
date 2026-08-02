@@ -247,6 +247,23 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
 
+  console.log('\n== 067: tag autocomplete ==');
+  await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].tags=['Italian','comfort food'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+  const rid=await p.evaluate(async()=>(await(await fetch('recipes.json')).json())[1].id);
+  await p.goto(B+'/index.html#'+rid); await p.reload(); await p.waitForSelector('.modestrip');
+  await p.click('[data-act="toggle-edit"]'); await p.waitForSelector('#e-tags');
+  await p.fill('#e-tags',''); await p.type('#e-tags','ital');
+  await p.waitForSelector('.sugchip');
+  chk('typing "ital" offers the existing Italian, canonical case', (await p.locator('.sugchip').first().textContent())==='Italian');
+  await p.click('.sugchip');
+  chk('tap completes the segment with the existing tag', (await p.inputValue('#e-tags'))==='Italian, ');
+  chk('suggestion row clears once the segment is taken', await p.evaluate(()=>document.querySelector('.sugrow').innerHTML===''));
+  await p.type('#e-tags','Italian');
+  chk('an exact, already-present tag is not re-offered', await p.evaluate(()=>document.querySelector('.sugrow').innerHTML===''));
+  await p.click('[data-act="save"]');
+  chk('saved through the normal path', JSON.stringify(await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes'))[1].tags))==='["Italian"]');
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

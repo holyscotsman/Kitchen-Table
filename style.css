@@ -2226,3 +2226,27 @@ input[type="file"].input {
 .skip-link:focus-visible {
   box-shadow: 0 0 0 2px var(--bg);
 }
+
+/* 067 — tag suggestions. Chips of existing tags under the field while a
+   segment is being typed. Real buttons at the tap floor, in the tag tint so
+   they read as "these exist already", not as new inventions. */
+.sugrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sugrow:not(:empty) {
+  margin-top: 8px;
+}
+
+.sugchip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+  border: 1px solid var(--tag-ink);
+  font-size: 16px;
+  font-weight: 700;
+}

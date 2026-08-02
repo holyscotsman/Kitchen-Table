@@ -1530,10 +1530,60 @@
     return '<div class="field">' +
       '<label class="field__label" for="' + id + '">Tags</label>' +
       '<input class="input" id="' + id + '" data-act="' + act + '" data-k="tags" ' +
-      'value="' + esc(value) + '" ' +
+      'value="' + esc(value) + '" autocomplete="off" ' +
       'placeholder="Italian, vegetarian, quick" />' +
+      /* 067: existing tags surface as the user types, so "ital" becomes the
+         Italian that already exists instead of a new lowercase twin. The row
+         is rebuilt in place on input — a full render would steal the caret. */
+      '<div class="sugrow" id="' + id + '-sug" data-for="' + id + '"></div>' +
       '<span class="fieldhint">Separate with commas. Include where the dish is ' +
       "from — those become filters.</span></div>";
+  }
+
+  /* The segment being typed is everything after the last comma. Matches are
+     existing tags only, the already-listed ones excluded, canonical casing
+     preserved — prefix matches outrank substring ones. */
+  function tagSuggestions(raw) {
+    var parts = String(raw || "").split(",");
+    var seg = parts.pop().trim().toLowerCase();
+    if (!seg) return [];
+    var have = parts.map(function (p) { return p.trim().toLowerCase(); });
+    return allTags()
+      .filter(function (t) {
+        var lt = t.toLowerCase();
+        return lt.indexOf(seg) > -1 && lt !== seg && have.indexOf(lt) === -1;
+      })
+      .sort(function (a, b) {
+        var pa = a.toLowerCase().indexOf(seg) === 0 ? 0 : 1;
+        var pb = b.toLowerCase().indexOf(seg) === 0 ? 0 : 1;
+        return pa - pb || a.localeCompare(b);
+      })
+      .slice(0, 5);
+  }
+
+  function syncTagSuggestions(input) {
+    var row = document.getElementById(input.id + "-sug");
+    if (!row) return;
+    row.innerHTML = tagSuggestions(input.value).map(function (t) {
+      return '<button type="button" class="sugchip press" data-act="tag-sug" ' +
+             'data-key="' + esc(t) + '" data-input="' + esc(input.id) + '">' +
+             esc(t) + "</button>";
+    }).join("");
+  }
+
+  /* Tapping a suggestion completes the segment with the canonical tag. */
+  function applyTagSuggestion(el) {
+    var input = document.getElementById(el.getAttribute("data-input"));
+    if (!input) return;
+    var parts = input.value.split(",");
+    parts.pop();
+    parts.push(" " + el.getAttribute("data-key"));
+    var next = parts.join(",").replace(/^\s+/, "") + ", ";
+    input.value = next;
+    if (S.route.name === "recipe" && S.draft) { S.draft.tags = next; S.saved = false; }
+    else if (S.addDraft) { S.addDraft.tags = next; scheduleAddPersist(); }
+    syncTagSuggestions(input);
+    input.focus();
   }
 
   function photoFieldHtml(id, recipeId, act) {
@@ -2715,6 +2765,7 @@
     var r = S.route.name === "recipe" ? byId(S.route.id) : null;
 
     if (act === "theme") { toggleTheme(); return; }
+    if (act === "tag-sug") { applyTagSuggestion(el); return; }
     if (act === "open-text") { openSheet("textOpen", el); return; }
     if (act === "close-text") { closeSheet("textOpen"); return; }
     if (act === "toggle-easy") { toggleEasy(); return; }
@@ -2937,6 +2988,7 @@
     }
     if (act === "ad") {
       S.addDraft[el.getAttribute("data-k")] = el.value;
+      if (el.getAttribute("data-k") === "tags") syncTagSuggestions(el);
       scheduleAddPersist();
       return;
     }
@@ -2948,6 +3000,7 @@
     if (act === "d") {
       S.draft[el.getAttribute("data-k")] = el.value;
       S.saved = false;
+      if (el.getAttribute("data-k") === "tags") syncTagSuggestions(el);
       var btn = document.querySelector('[data-act="save"]');
       if (btn) btn.textContent = "Save changes";
       return;

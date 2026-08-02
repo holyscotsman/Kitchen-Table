@@ -379,8 +379,9 @@ bulk tagging exists before anyone is asked to tag.*
   - *Needs:* `057` · *Done when:* it opens, traps focus, closes on Escape and returns focus — same contract as every other sheet.
 - [x] `066` 🤖 **FE-B** — Support importing several photos into one recipe, since a long recipe spans two cards.
   - *Needs:* `062` `057` · *Done when:* two cards produce one recipe with both pages retained.
-- [ ] `067` 🤖 **FE-B** — Add tag autocomplete drawing on tags already in use, to stop near-duplicates being created.
+- [x] `067` 🤖 **FE-B** — Add tag autocomplete drawing on tags already in use, to stop near-duplicates being created.
   - *Needs:* `060` `028` · *Done when:* typing "ital" offers "Italian" before it offers to create "italian". **→ README**
+  - *Done 2026-08-01:* suggestion chips under both tag fields (Edit + Add), built from tags in use, canonical casing, prefix-first, already-listed excluded, capped at five. DOM-patched on input so the caret is never stolen by a render. Five checks in add.js (now 63).
 - [ ] `068` 🤖 **FE-B** — Add bulk tagging from the Menu.
   - *Needs:* `067` · *Done when:* ten recipes can be tagged in one pass. **→ README**
 - [ ] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
