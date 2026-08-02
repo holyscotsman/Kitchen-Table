@@ -22,7 +22,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const tiles=await p.locator('.who-tile__name').allTextContents();
   chk('sections read Joan / Jason / Jennifer / Lindsay / Siobhan', tiles.join(',')==='Joan,Jason,Jennifer,Lindsay,Siobhan', tiles.join(','));
   const counts=await p.locator('.who-tile__count').allTextContents();
-  chk('Joan has all 48, others empty', counts.join(',')==='48,0,0,0,0', counts.join(','));
+  chk('Joan has all 48, others invite (058)', counts.join(',')==='48' && await p.locator('.who-tile--empty').count()===4, counts.join(','));
   chk('no "Me" or "Mom" on Main', !(await p.locator('.main').textContent()).match(/\bMe\b|\bMom\b/));
 
   console.log('\n== View all recipes sits below Whose recipe ==');

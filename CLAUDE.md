@@ -285,12 +285,55 @@ it, each with its task number in the log there:
 - **`CONTENT.md`** is the known-wrong-data ledger (`013`); nothing on it may
   be resolved by inference.
 
+### The completion push (Jason's "get the other 101 done")
+
+On 2026-08-01 Jason instructed completion and skipped the direct gate
+questions, so the recommended defaults were taken as **provisional PM
+rulings — every one reversible, recorded with its basis in `DECISIONS.md`**:
+no server for 1.0 (`026`, striking gameplan Phases 11–14), calendar post-1.0
+(`030`, striking Phase 15), the ten categories stay (`027`), and the done-bar
+is "true text" (`029`). Rules that follow from them — the merge story (`031`),
+pull cadence (`032`), the legibility precedent (`033`) — are written there
+too. What that unlocked, all verified in the suites:
+
+- **Zero third parties at page load.** Atkinson Hyperlegible is self-hosted
+  (`fonts/`, OFL text included, 400/700 preloaded) (`049`), and a meta CSP
+  admits scripts only from self, jsdelivr, and the hashed pre-paint snippet —
+  which needed `wasm-unsafe-eval` for OCR, proven live either side (`052`).
+  Writing that hash exposed a real bug: the pre-paint theme script compared
+  raw against JSON-quoted storage and had **never fired** — light-mode users
+  had a dark flash from day one. Fixed, proven with app.js blocked.
+- **Tag hygiene is machinery, not discipline**: suggestions with canonical
+  casing while typing (`067`), a bulk Tag mode on the Menu (`068`), and
+  rename-onto-existing-merges with per-recipe dedupe (`069`).
+- **Flags name their field** ("Servings — …") and surface beside that field
+  as a Double-check chip that scrolls to the panel (`082`); review lines move
+  between ingredients and steps in one tap (`083`); a noise photo through the
+  real Tesseract yields flags, never fiction, gated in `ocr-live` (`085`).
+- **Search folds diacritics and forgives one typo** on 5+ letter terms,
+  exact-first, and cards say "matches ingredient/tag" when the hit isn't the
+  title (`087`/`088`). The Menu stays deliberately unvirtualised at 48
+  recipes (`089`, ruling at `menuMatches`).
+- **Design debt paid on paper and in pixels**: print colours are tokens
+  (`054`), one measured focus ring (`055`), three icons redrawn after the
+  20px strip caught Breakfast reading as an eye (`056`), empty tiles invite
+  in words (`058`), Easy Read endorsed (`059`), the chip spec (`060`), all
+  bound into `design/components.md` (`061`) and `design/a11y-criteria.md`
+  (`034`). `ADDING.md` (`079`) is the family-facing walkthrough.
+
+What remains is exactly the work only people can do: the iPhone checks, the
+VoiceOver pass, the sessions with Joan, the content truth pass, twenty real
+photos of her cards — and the family confirmations that turn the provisional
+rulings into settled ones. `GAMEPLAN.md` §11 is the authoritative list.
+
 ### Verified
 
-The suite as of the gameplan era: **278 functional checks** across eight
-suites (kt 83, feat 49, add 58, relay 16, quick 21, polish 26, sec 16,
-zoom 9, plus the perf budget: FCP 720 ms median on throttled 3G against a
-4000 ms gate, CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
-zero failures across all 48 screen × theme × Easy-Read combinations.
-Nothing interactive measures under 44px. All of it runs on every pull
-request via `tests/run.sh`.
+The suite after the completion push: **299 functional checks** across eight
+suites (kt 83, feat 58, add 63, relay 16, quick 21, polish 26, sec 23,
+zoom 9), plus the perf budget (FCP ~900 ms median on throttled 3G — now
+*including* the self-hosted fonts — against a 4000 ms gate; CLS 0.0000 with
+48 photos against 0.02). WCAG AA contrast: zero failures across all 48
+screen × theme × Easy-Read combinations. Nothing interactive measures under
+44px. All of it runs on every pull request via `tests/run.sh`. Off-CI, the
+live-OCR gate (`tests/ocr-live.js`) proves the pipeline device-local and,
+in its `KT_OCR_NOISE=1` variant, that garbage flags rather than invents.

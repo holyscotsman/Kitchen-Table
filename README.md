@@ -13,6 +13,10 @@ bundler, no server.
 
 **Live:** https://holyscotsman.github.io/Kitchen-Table/
 
+**Status:** `v0.9` — the [1.0 gameplan](GAMEPLAN.md) has consumed every task a
+machine can do. What stands between this and `v1.0` is human work: sessions
+with Joan, a physical iPhone, and the content truth pass (`GAMEPLAN.md` §11).
+
 ## Files
 
 | File | What it is |
