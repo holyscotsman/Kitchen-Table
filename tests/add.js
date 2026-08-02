@@ -247,6 +247,26 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
 
+  console.log('\n== The screenshot parser survives OCR reality (Jason bug) ==');
+  await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
+  await p.evaluate(()=>sessionStorage.clear());
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
+  await p.click('[data-key="link"]'); await p.waitForSelector('#a-paste');
+  const nasty=['9:41','< Back',"Granny's Shortbread",'Serves 8','Prep: 10 min',
+    '1NGRED1ENTS','e 250 g butter','e 125 g caster sugar','e 375 g plain flour',
+    'D1RECT1ONS','1. Preheat the oven to 160C.','2. Cream butter and sugar.',
+    '3. Work in the flour and press into a tin.','4. Bake 40 minutes until pale gold.'].join('\n');
+  await p.fill('#a-paste', nasty);
+  await p.click('[data-act="add-paste"]'); await p.waitForSelector('#a-title');
+  chk('title skips the screenshot chrome', (await p.inputValue('#a-title'))==="Granny's Shortbread");
+  chk('Serves 8 claimed from the text', (await p.inputValue('#a-serves'))==='8');
+  chk('prep time claimed', (await p.inputValue('#a-prep'))==='10 min');
+  const nIngs=await p.locator('[id^=a-ing-]').count();
+  chk('bullet ghosts (e-as-•) stripped; 3 clean ingredients', nIngs===3 && (await p.inputValue('#a-ing-0'))==='250 g butter', String(nIngs));
+  chk('digit-substituted headings recognised; 4 steps', await p.locator('[id^=a-step-]').count()===4);
+  chk('clock and Back never became ingredients', !(await p.evaluate(()=>[...document.querySelectorAll('[id^=a-ing-]')].some(e=>/9:41|Back/.test(e.value)))));
+  await p.click('[data-act="add-back"]');
+
   console.log('\n== 067: tag autocomplete ==');
   await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].tags=['Italian','comfort food'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
   const rid=await p.evaluate(async()=>(await(await fetch('recipes.json')).json())[1].id);
