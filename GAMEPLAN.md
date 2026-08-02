@@ -390,8 +390,9 @@ bulk tagging exists before anyone is asked to tag.*
   - *Done 2026-08-01:* "Rename or merge" beside the filter sheet's tag group — tap a tag, type the new name; a name that already exists (any casing) merges after a confirm, deduping per recipe and following any active filter. The exact done-when case is the feat.js fixture (now 54).
 - [x] `070` 🤖 **FE-B** — Detect a likely duplicate on save by comparing title and ingredients against the collection.
   - *Needs:* — · *Done when:* it warns and offers a comparison, and never blocks the save.
-- [ ] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.
+- [x] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.
   - *Needs:* `029` · *Done when:* the prompt says what is missing and opens the right field, in Viewer mode as well as Edit.
+  - *Done 2026-08-01, one deliberate narrowing:* Viewer shows a flag panel that names the gap and points at the Edit switch **in prose, not a button** — "Viewer shows no edit affordances" outranks the task's literal wording. Toggling Edit on such a recipe opens with one empty ingredient line and the caret already in it. Verified on `chops`.
 
 ## Phase 8 — The content truth pass
 

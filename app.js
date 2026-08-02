@@ -1505,7 +1505,14 @@
                "</span></button></li>";
       }).join("") + "</ul>";
     } else {
-      h += '<p class="hint">No ingredient list was captured for this recipe.</p>';
+      /* 071: four recipes arrived with no ingredient list at all. Say so
+         loudly — this is missing content, not an empty section — and say how
+         it gets fixed. The pointer is prose, not a button: Viewer mode shows
+         no edit affordances, and that rule outranks convenience. */
+      h += '<div class="panel panel--flag"><h2>No ingredients were captured</h2>' +
+           "<p>This recipe’s list didn’t survive transcription. If you have " +
+           "Joan’s original, turn on <strong>Edit</strong> at the top of this " +
+           "page and type the ingredients in — the field will be waiting.</p></div>";
     }
     h += "</section>";
 
@@ -3137,8 +3144,19 @@
 
     if (act === "toggle-edit") {
       S.editing = !S.editing;
-      if (S.editing) startDraft(r);
-      else { S.draft = null; S.saved = false; }
+      if (S.editing) {
+        startDraft(r);
+        /* 071: a recipe with no ingredients opens Edit with one empty line
+           ready and the caret already in it — the missing thing is the first
+           thing the keyboard touches. */
+        if (r && !(r.ingredients || []).filter(function (x) { return x.trim(); }).length) {
+          if (!S.draft.ingredients.length) S.draft.ingredients.push("");
+          render();
+          var firstIng = document.getElementById("e-ing-0");
+          if (firstIng) firstIng.focus();
+          return;
+        }
+      } else { S.draft = null; S.saved = false; }
       render(); return;
     }
     if (act === "add") {
