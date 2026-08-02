@@ -55,8 +55,8 @@
 
   /* Everyone with a section, whether or not they have recipes yet. Joan holds
      the whole collection today; the rest are here so there is somewhere to put
-     a recipe when they contribute one. */
-  var WHO = ["Joan", "Jason", "Jennifer", "Lindsay", "Siobhan"];
+     a recipe when they contribute one. Jessica joined 2026-08-02. */
+  var WHO = ["Joan", "Jason", "Jennifer", "Lindsay", "Siobhan", "Jessica"];
 
   /* Earlier names, mapped so a device holding a saved overlay keeps resolving. */
   var WHO_ALIASES = { Mom: "Joan", Me: "Jason" };
@@ -220,6 +220,15 @@
         '<path d="M8 7h11"/><path d="M15.5 3.5L19 7l-3.5 3.5"/>' +
         '<path d="M16 17H5"/><path d="M8.5 13.5L5 17l3.5 3.5"/>',
         s || 20, s || 20
+      );
+    },
+    /* The mark: the steam bowl, the same drawing the empty hero uses — one
+       identity, not a generic book. */
+    logo: function (s) {
+      return svg(
+        '<path d="M9.5 9.5c-3-3 3-5 0-8"/><path d="M14.5 9.5c-3-3 3-5 0-8"/>' +
+        '<path d="M4 13q8 7 16 0"/><path d="M3 13h18"/><path d="M7.5 20h9"/>',
+        s || 26, s || 26
       );
     }
   };
@@ -850,13 +859,17 @@
     var h = "";
 
     h += '<div class="main" id="main-content">';
-    h += '<div class="main__top"><div>' +
+    /* The mark sits with the name — a logo lockup on the left — and the one
+       control (theme) keeps the right. The logo is a link home: pressing a
+       logo should never do nothing. */
+    h += '<div class="main__top"><div class="main__brand">' +
+         '<a class="applogo press" href="#" aria-label="Kitchen Table — home">' +
+         I.logo(30) + "</a>" +
+         "<div>" +
          '<h1 class="main__title">Kitchen Table</h1>' +
          '<p class="main__sub">A Simmonds Styled Menu</p>' +
-         "</div>" +
-         '<div class="main__marks">' +
-         '<span class="appmark" aria-hidden="true">' + I.book(30) + "</span>" +
-         themeBtn("themebtn--main") + "</div></div>";
+         "</div></div>" +
+         themeBtn("themebtn--main") + "</div>";
 
     h += '<p class="main__intro">Every recipe the family cooks, in one place — ' +
          "search it, scale it to however many you're feeding, and tick off the " +

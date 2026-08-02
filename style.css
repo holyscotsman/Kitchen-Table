@@ -320,12 +320,20 @@ img {
   flex: none;
 }
 
-/* The app mark. Decorative — the h1 beside it already names the app.
-   Kept small, and the theme button beside it trimmed to the 44px floor, so the
-   pair still leaves "Kitchen Table" room to sit on one line. */
-.appmark {
-  width: 40px;
-  height: 40px;
+/* The logo lockup: mark + name on the left, per Jason. The mark is the steam
+   bowl (the app's one identity, shared with the empty hero), on a card-green
+   tile, and it links home — a logo that does nothing when pressed reads as
+   broken. 44px: it is interactive now. */
+.main__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.applogo {
+  width: 44px;
+  height: 44px;
   flex: none;
   display: flex;
   align-items: center;
@@ -334,6 +342,10 @@ img {
   background: var(--card);
   color: var(--card-ink);
   box-shadow: var(--hi-card);
+}
+
+a.applogo:hover {
+  color: var(--card-ink);
 }
 
 .main__intro {

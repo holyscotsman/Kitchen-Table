@@ -9,20 +9,23 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.on('dialog',d=>d.accept());
 
-  console.log('\n== Main: app icon + intro sentence ==');
+  console.log('\n== Main: logo lockup + intro sentence ==');
   await p.goto(B+'/index.html'); await p.waitForSelector('.main__title');
-  chk('app icon in the upper right', await p.locator('.main__marks .appmark svg').count()===1);
-  const marks=await p.locator('.main__marks').boundingBox();
+  /* Jason moved the mark: it is a logo now — left of the name, and it works. */
+  chk('logo mark beside the name', await p.locator('.main__brand .applogo svg').count()===1);
+  const logoBox=await p.locator('.applogo').boundingBox();
   const vw=await p.evaluate(()=>window.innerWidth);
-  chk('icon sits on the right half', marks.x > vw/2, 'x='+marks.x.toFixed(0)+' of '+vw);
+  chk('logo sits on the left', logoBox.x < vw/4, 'x='+logoBox.x.toFixed(0)+' of '+vw);
+  chk('logo is a home link, not a dead tile', (await p.getAttribute('.applogo','href'))==='#');
+  chk('theme button keeps the right', (await p.locator('.themebtn--main').boundingBox()).x > vw/2);
   chk('intro sentence present', (await p.locator('.main__intro').textContent()).length>40);
   chk('subtitle unchanged', (await p.locator('.main__sub').textContent()).trim()==='A Simmonds Styled Menu');
 
   console.log('\n== Jason, not Me ==');
   const tiles=await p.locator('.who-tile__name').allTextContents();
-  chk('sections read Joan / Jason / Jennifer / Lindsay / Siobhan', tiles.join(',')==='Joan,Jason,Jennifer,Lindsay,Siobhan', tiles.join(','));
+  chk('sections read Joan / Jason / Jennifer / Lindsay / Siobhan / Jessica', tiles.join(',')==='Joan,Jason,Jennifer,Lindsay,Siobhan,Jessica', tiles.join(','));
   const counts=await p.locator('.who-tile__count').allTextContents();
-  chk('Joan has all 48, others invite (058)', counts.join(',')==='48' && await p.locator('.who-tile--empty').count()===4, counts.join(','));
+  chk('Joan has all 48, others invite (058)', counts.join(',')==='48' && await p.locator('.who-tile--empty').count()===5, counts.join(','));
   chk('no "Me" or "Mom" on Main', !(await p.locator('.main').textContent()).match(/\bMe\b|\bMom\b/));
 
   console.log('\n== View all recipes sits below Whose recipe ==');
