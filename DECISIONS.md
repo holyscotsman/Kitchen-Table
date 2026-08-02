@@ -163,6 +163,34 @@ primary user reads at 24–40px and the app exists for her. A denser or
 prettier treatment is acceptable only when it survives the largest font step
 and Easy Read without loss. Future conflicts get argued against this line.
 
+## 120 — The calendar's meal slots: dinner-first, all three available
+
+**Decision: every day shows its Dinner slot; Breakfast and Lunch exist on
+every day but sit behind a quiet "+ Breakfast / + Lunch" until used.**
+
+The evidence for dinner-first is already in the product: the Main screen's
+one planning feature is "Tonight's idea", the collection is 23 dinners
+against 7 breakfasts, and family planning conversations are dinner
+conversations. Making all three slots always-visible would triple the grid's
+height with mostly-empty boxes — exactly what collapses at Easy Read sizes.
+The database schema and the plan entries carry all three slots identically,
+so promoting breakfast/lunch to always-visible later is a UI change, not a
+migration. Weeks start on Monday.
+
+## 130 — Ingredient summing: shipped as a preview, with its failure modes named
+
+The week view carries a **"Shopping list (preview)"**. What it does honestly:
+sums lines whose leading quantity and unit parse and whose remaining text
+matches exactly (case- and accent-folded), scaled to each meal's own
+servings; everything else appears under "as written, not summed" — nothing
+is guessed. The measured failure modes, for the record: unit synonyms are
+not converted (2 tbsp + 1 tablespoon stay separate), containers don't
+reconcile ("1 can" + "400 g"), prose quantities don't parse ("a knob of
+butter"), and ingredient phrasing must match exactly ("chicken breast" ≠
+"chicken breasts"). Fixing those means a units-and-synonyms table and a
+singulariser — worth doing only if the preview earns use. **Shipping it as
+more than a preview is a separate decision, per the task's own warning.**
+
 ## 059 — Easy Read endorsed as built
 
 **Decision: Easy Read stays as implemented — the dim tier is removed, the
