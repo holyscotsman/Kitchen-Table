@@ -61,6 +61,9 @@ function validate(list) {
   await sql`insert into kitchen.schema_version (version, notes)
             values (1, 'initial schema + recipes.json import')
             on conflict (version) do nothing`;
+  await sql`insert into kitchen.schema_version (version, notes)
+            values (2, 'import_jobs — video import runs as a server-side job')
+            on conflict (version) do nothing`;
 
   /* Contributors (the app's WHO list may exceed who has recipes — that's fine,
      sections exist ahead of content). */
