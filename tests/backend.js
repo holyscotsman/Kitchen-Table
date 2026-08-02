@@ -11,6 +11,12 @@ let pass = 0, fail = 0;
 const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
   : (fail++, console.log('  FAIL ' + n + (e ? ' :: ' + e : '')));
 
+/* The PO-token pair may or may not be fetched in the environment running
+ * this suite (get-tools.sh puts it in backend/bin). Every yt-dlp arg
+ * assertion below expects the bare calls, so tokens are switched off for
+ * the whole suite and switched on only inside their own shape check. */
+process.env.KT_NO_POT = '1';
+
 const lib = p => require(path.join(__dirname, '..', 'backend', 'lib', p));
 const { parseVideoUrl, validateRecipe } = lib('validate');
 const { LABEL, estimate } = lib('eta');
@@ -148,6 +154,19 @@ const { runJob, computeFps } = lib('pipeline');
     chk('a non-bot failure never retries', !res2.ok &&
       fs.readFileSync(log, 'utf8').trim().split('\n').length === 1);
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  console.log('\n== PO-token plumbing ==');
+  chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
+  {
+    delete process.env.KT_NO_POT;
+    const a = media.potArgs();
+    chk('when installed, exactly the plugin dir + provider address (else nothing)',
+      a.length === 0 ||
+      (a.length === 4 && a[0] === '--plugin-dirs' && /bin[\\/]plugins$/.test(a[1]) &&
+        a[2] === '--extractor-args' && /^youtubepot-bgutilhttp:base_url=http:\/\/127\.0\.0\.1:\d+$/.test(a[3])),
+      JSON.stringify(a));
+    process.env.KT_NO_POT = '1';
   }
 
   console.log('\n== extraction shaping ==');

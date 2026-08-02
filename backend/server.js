@@ -14,6 +14,9 @@
 "use strict";
 
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { spawn } = require("child_process");
 
 const { parseVideoUrl, validateRecipe } = require("./lib/validate");
 const { LABEL, estimate } = require("./lib/eta");
@@ -45,6 +48,31 @@ const ctx = {
   groqKey: process.env.GROQ_API_KEY || "",
   uptimeS: () => process.uptime()
 };
+
+/* The PO-token server (see get-tools.sh): a sibling node process that mints
+ * the proof-of-origin tokens which stop YouTube treating this datacenter
+ * address as a robot. Supervised simply — a crash respawns with backoff,
+ * and if it keeps dying, imports continue without tokens (the client-
+ * rotation fallback still applies). KT_NO_POT=1 turns it all off. */
+let potUp = false;
+function startPotServer() {
+  const main = path.join(__dirname, "potserver", "server", "build", "main.js");
+  if (process.env.KT_NO_POT || !fs.existsSync(main)) return;
+  let tries = 0;
+  (function up() {
+    const cp = spawn(process.execPath,
+      [main, "--port", String(process.env.KT_POT_PORT || 4416)],
+      { stdio: ["ignore", "inherit", "inherit"] });
+    potUp = true;
+    cp.on("exit", (code) => {
+      potUp = false;
+      tries++;
+      if (tries <= 5) setTimeout(up, 2000 * tries);
+      else console.error("pot server kept dying (last code " + code +
+        ") — imports continue without PO tokens");
+    });
+  })();
+}
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -211,6 +239,7 @@ const server = http.createServer((req, res) => {
         service: "kitchen-table import server",
         uptime_s: Math.round(process.uptime()),
         queue_pending: queue.size(),
+        pot_provider: potUp,
         missing: [!sql && "KT_DB", !anthropic && "ANTHROPIC_API_KEY",
           !ctx.groqKey && "GROQ_API_KEY (optional)"].filter(Boolean)
       });
@@ -240,6 +269,7 @@ const server = http.createServer((req, res) => {
 process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e));
 
 (async () => {
+  startPotServer();
   if (sql) {
     await db.ensureSchema(sql);
     const { failedIds, queuedIds } = await db.recoverStuckJobs(sql);

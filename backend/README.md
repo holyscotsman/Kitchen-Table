@@ -48,6 +48,16 @@ service's `KT_DB` env var, and the GitHub Actions secret `KT_DB`
   The app knows: submitting shows "waking up the kitchen…" rather than an
   error, and for background jobs the wake-up is just part of the processing
   time.
+- **YouTube treats datacenter addresses as suspects.** It answers ordinary
+  videos with "Sign in to confirm you're not a bot" — about the server,
+  never the video. The build therefore installs the community
+  [PO-token provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
+  (plugin + token server, pinned to one release tag): the server runs as a
+  supervised sibling process on port 4416 (`KT_POT_PORT` to move it,
+  `KT_NO_POT=1` to disable), mints YouTube's proof-of-origin tokens
+  locally — no login, no cookies — and every yt-dlp call presents them.
+  If it ever crashes for good, imports continue with the TV-client
+  fallback alone. `/api/health` reports it as `pot_provider`.
 - **Deploys and spin-downs restart the process.** A job caught mid-import is
   marked failed with "The server restarted mid-import — please resubmit the
   link." Queued-but-unstarted jobs simply resume. Nothing gets stuck.

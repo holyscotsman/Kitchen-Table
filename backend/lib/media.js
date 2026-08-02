@@ -119,7 +119,23 @@ function isBotCheck(stderr) {
   return /sign in to confirm (you.?re not a bot|that you.?re not a bot)|not a bot/i.test(String(stderr || ""));
 }
 
-/* When the plain call hits the robot check, retry as clients YouTube
+/* Proof-of-origin tokens: the actual cure for the robot check. get-tools.sh
+ * places the bgutil plugin beside the binary and builds its token server,
+ * which server.js keeps running on 4416; every yt-dlp call then carries
+ * the plugin dir and the server's address. When the pair isn't installed
+ * (tests, a build that skipped it) this contributes nothing and the
+ * client-rotation fallback below still applies. */
+const PLUGIN_DIR = path.join(__dirname, "..", "bin", "plugins");
+const POT_ZIP = path.join(PLUGIN_DIR, "bgutil-ytdlp-pot-provider.zip");
+const POT_BASE = "http://127.0.0.1:" + (process.env.KT_POT_PORT || 4416);
+
+function potArgs() {
+  if (process.env.KT_NO_POT || !fs.existsSync(POT_ZIP)) return [];
+  return ["--plugin-dirs", PLUGIN_DIR,
+    "--extractor-args", "youtubepot-bgutilhttp:base_url=" + POT_BASE];
+}
+
+/* When a call still hits the robot check, retry as clients YouTube
  * doesn't bot-check from datacenter addresses — the TV app interface
  * first (which also passes many genuine age gates without a login), IPv4
  * forced since the flagging is harsher on cloud IPv6 ranges. Non-YouTube
@@ -131,10 +147,11 @@ const YT_CLIENT_FALLBACKS = [
 ];
 
 async function runYtdlp(tool, args, opts) {
-  let res = await run(tool, args, opts);
+  const pot = potArgs();
+  let res = await run(tool, pot.concat(args), opts);
   if (res.ok || !isBotCheck(res.stderr)) return res;
   for (const extra of YT_CLIENT_FALLBACKS) {
-    res = await run(tool, extra.concat(args), opts);
+    res = await run(tool, pot.concat(extra, args), opts);
     if (res.ok || !isBotCheck(res.stderr)) return res;
   }
   return res;
@@ -162,6 +179,6 @@ function friendlyDownloadError(stderr, platform) {
 }
 
 module.exports = {
-  resolveTool, run, runYtdlp, isBotCheck, vttToText, looksLikeRecipeText,
+  resolveTool, run, runYtdlp, isBotCheck, potArgs, vttToText, looksLikeRecipeText,
   pickCaptionTrack, frameKeepIndices, friendlyDownloadError
 };
