@@ -105,6 +105,31 @@ const hostile = JSON.stringify({
   chk('ingredient line capped', firstIng.length <= 500, String(firstIng.length));
   chk('truncation is disclosed in flagged', (await p.locator('.panel--flag').textContent()).toLowerCase().includes('trimmed'));
 
+  /* 052 — the CSP must exist and keep its load-bearing lines. The exact
+     policy lives in index.html; this guards against it being weakened or
+     dropped in a refactor, not against every possible retune. */
+  console.log('\n== Content-Security-Policy ==');
+  const pCsp = await ctx.newPage();
+  await pCsp.goto(B + '/index.html');
+  const csp = await pCsp.evaluate(() => {
+    const m = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+    return m ? m.getAttribute('content') : '';
+  });
+  chk('CSP meta present', csp.length > 0);
+  chk('CSP: default-src self', /default-src 'self'/.test(csp));
+  chk('CSP: no unsafe-inline scripts (hash only)', /script-src [^;]*'sha256-/.test(csp) && !/script-src [^;]*'unsafe-inline'/.test(csp));
+  chk('CSP: wasm allowed for OCR', /'wasm-unsafe-eval'/.test(csp));
+  chk('CSP: objects blocked', /object-src 'none'/.test(csp));
+  chk('CSP: fonts self only', /font-src 'self'(;|$)/.test(csp));
+  /* And the page must actually boot under it — a wrong hash would strand the
+     pre-paint script and log a violation. */
+  const viol = [];
+  const pBoot = await ctx.newPage();
+  pBoot.on('console', m => { if (/Refused/i.test(m.text())) viol.push(m.text()); });
+  await pBoot.goto(B + '/index.html');
+  await pBoot.waitForSelector('.main__title');
+  chk('no CSP violations booting the app', viol.length === 0, viol[0] || '');
+
   await br.close();
   console.log('\n' + '='.repeat(50) + '\nPASS: ' + pass + '   FAIL: ' + fail + '\n' + '='.repeat(50));
   process.exit(fail ? 1 : 0);

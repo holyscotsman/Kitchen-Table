@@ -190,6 +190,51 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
 
+  console.log('\n== 068: bulk tagging from the Menu ==');
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="toggle-tagging"]'); await p.waitForSelector('[data-act="tag-pick"]');
+  for (let i=0;i<10;i++) await p.locator('[data-act="tag-pick"]').nth(i).click();
+  chk('pill counts the selection', (await p.locator('[data-act="open-bulk"]').textContent()).includes('Tag 10 recipes'));
+  await p.click('[data-act="open-bulk"]'); await p.waitForSelector('#bulk-tags');
+  await p.type('#bulk-tags','Family favourite');
+  await p.click('[data-act="bulk-apply"]'); await p.waitForSelector('.rcard');
+  chk('ten recipes tagged in one pass', await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes')).filter(r=>(r.tags||[]).includes('Family favourite')).length===10));
+  await p.click('[data-act="toggle-tagging"]');
+  await p.locator('[data-act="tag-pick"]').first().click();
+  await p.click('[data-act="open-bulk"]'); await p.waitForSelector('#bulk-tags');
+  await p.type('#bulk-tags','family favourite');
+  await p.click('[data-act="bulk-apply"]'); await p.waitForSelector('.rcard');
+  chk('re-tagging in another casing does not duplicate', await p.evaluate(()=>{const t=JSON.parse(localStorage.getItem('kt.recipes'))[0].tags;return t.filter(x=>x.toLowerCase()==='family favourite').length===1&&t.includes('Family favourite');}));
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
+  console.log('\n== 069: tag rename and merge ==');
+  await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].tags=['italian'];l[1].tags=['Italian','quick'];l[2].tags=['italian','Sunday'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="open-filter"]'); await p.waitForSelector('[data-act="tag-manage"]');
+  await p.click('[data-act="tag-manage"]'); await p.waitForSelector('[data-act="tag-edit"][data-key="italian"]');
+  await p.click('[data-act="tag-edit"][data-key="italian"]'); await p.waitForSelector('#tag-rename');
+  await p.fill('#tag-rename','Italian');
+  await p.click('[data-act="tag-rename-apply"]');
+  await p.waitForFunction(()=>!JSON.parse(localStorage.getItem('kt.recipes')).some(r=>(r.tags||[]).includes('italian')));
+  chk('merge leaves no recipe on the old name', true);
+  chk('merged recipes carry the target exactly once', await p.evaluate(()=>{const l=JSON.parse(localStorage.getItem('kt.recipes'));return l[0].tags.join()==='Italian'&&l[1].tags.join()==='Italian,quick'&&l[2].tags.join()==='Italian,Sunday';}));
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
+  console.log('\n== 087+088: search folds, tolerates a typo, and names its field ==');
+  await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].ingredients=['2 tbsp crème fraîche'].concat(l[0].ingredients||[]);l[1].tags=['Jamaïcan'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="toggle-search"]');
+  await p.fill('#menu-search','creme'); await p.waitForSelector('.matchnote');
+  chk('creme finds crème and says "matches ingredient"', (await p.locator('.matchnote').first().textContent()).includes('ingredient'));
+  await p.fill('#menu-search','jamaican'); await p.waitForSelector('.matchnote');
+  chk('jamaican finds the Jamaïcan tag and says so', (await p.locator('.matchnote').first().textContent()).includes('tag'));
+  await p.fill('#menu-search','chiken'); await p.waitForFunction(()=>document.querySelectorAll('.rcard').length>0);
+  chk('one-letter typo still finds chicken', await p.locator('.rcard').count()>0);
+  await p.fill('#menu-search','zzzzqqq'); await new Promise(r=>setTimeout(r,250));
+  chk('garbage still finds nothing', await p.locator('.rcard').count()===0);
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

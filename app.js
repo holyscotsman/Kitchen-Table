@@ -211,19 +211,36 @@
         '<path d="M20 5.5h-6a2 2 0 00-2 2V19a2 2 0 012-2h6z"/>',
         s || 26, s || 26
       );
+    },
+    flag: function (s) {
+      return svg('<path d="M6 21V4"/><path d="M6 4h11l-2.5 4L17 12H6"/>', s || 16, s || 16);
+    },
+    swap: function (s) {
+      return svg(
+        '<path d="M8 7h11"/><path d="M15.5 3.5L19 7l-3.5 3.5"/>' +
+        '<path d="M16 17H5"/><path d="M8.5 13.5L5 17l3.5 3.5"/>',
+        s || 20, s || 20
+      );
     }
   };
 
   /* One per category, drawn rather than pulled from a library — the handoff
      asks for stroke-based inline SVG in currentColor and nothing else. */
   var CAT_ICON = {
-    Breakfast: '<ellipse cx="12" cy="12" rx="8" ry="6"/><circle cx="12" cy="12" r="2.6"/>',
+    /* 056: the centred ellipse-plus-circle read as an eye, not an egg. In a
+       pan, with the yolk off-centre, it can only be breakfast. */
+    Breakfast: '<circle cx="10" cy="12" r="7"/><circle cx="8.8" cy="10.8" r="2.4"/><path d="M17 12h4.5"/>',
     Brunch: '<path d="M6 5h9v5a4.5 4.5 0 01-9 0z"/><path d="M15 6.5h1.8a2 2 0 010 4H15"/><path d="M4 19h13"/>',
     Lunch: '<path d="M3.5 15l8.5-8 8.5 8z"/><path d="M3.5 15h17"/><path d="M6 18.5h12"/>',
     Dinner: '<path d="M6 3v8a2 2 0 004 0V3"/><path d="M8 11v10"/><path d="M17 3c-1.6 1.4-2.2 3.4-2 6 .1 1.3.7 2 2 2z"/><path d="M17 11v10"/>',
-    Sides: '<path d="M3.5 11h17a8.5 8.5 0 01-17 0z"/><path d="M2.5 20h19"/>',
+    /* 056: the old lone half-dome read as a mound at 20px and shadowed the
+       Lunch cloche. A footed bowl with two peas above the rim is a side dish
+       at any size. */
+    Sides: '<path d="M4 10.5h16"/><path d="M4.5 10.5a7.5 7.5 0 0015 0"/><path d="M9.5 18h5"/><circle cx="9.5" cy="7" r="1.3"/><circle cx="14" cy="6.2" r="1.3"/>',
     Snacks: '<circle cx="12" cy="12" r="8"/><circle cx="9.5" cy="10" r="1"/><circle cx="14" cy="9.5" r="1"/><circle cx="12.5" cy="14.5" r="1"/>',
-    Baking: '<path d="M6.5 4.5l11 11"/><path d="M4.5 8.5a3 3 0 014-4l11 11a3 3 0 01-4 4z"/>',
+    /* 056: the diagonal whisk collapsed into a pill below 24px. A scored
+       loaf on a board is bread — bread is baking. */
+    Baking: '<path d="M4 14a4.5 4.5 0 014.5-4.5h7A4.5 4.5 0 0120 14v4H4z"/><path d="M9 12.2l-1.2 2.6M13.2 12.2l-1.2 2.6M17.2 12.2L16 14.8"/><path d="M2.5 21h19"/>',
     Desserts: '<path d="M7 10h10l-1.4 9.5a1.5 1.5 0 01-1.5 1.3h-4.2a1.5 1.5 0 01-1.5-1.3z"/><path d="M8 10a4 4 0 018 0"/><path d="M12 3v3"/>',
     Cocktails: '<path d="M4 5h16l-8 8z"/><path d="M12 13v7"/><path d="M8.5 20h7"/>',
     Drinks: '<path d="M7 4h10l-1.2 15a1.6 1.6 0 01-1.6 1.4h-4.4A1.6 1.6 0 018.2 19z"/><path d="M7.6 10h8.8"/>'
@@ -312,6 +329,18 @@
     tags: [],
     sort: "recent",
     removing: false,
+
+    /* 068 — bulk tagging. Its own mode, same shape as removal: enter, tap
+       recipes to select, then one sheet applies a tag list to all of them. */
+    tagging: false,
+    tagSel: {},
+    tagSheetOpen: false,
+    bulkTags: "",
+
+    /* 069 — the rename/merge sheet. */
+    tagManageOpen: false,
+    tagEditing: "",
+    tagEditVal: "",
 
     editing: false,
     serves: null,
@@ -453,13 +482,72 @@
 
   /* Title, ingredients, and tags — so "Thai" finds a dish tagged Thai even
      when the word appears nowhere in the recipe itself. */
+  /* 087 — search folds diacritics and tolerates one adjacent typo. "creme"
+     finds crème; "chiken" still finds chicken. Fold first (cheap, exact),
+     fuzz only when folding found nothing, so precision degrades gracefully
+     rather than fuzzily. */
+  function fold(s) {
+    var out = String(s).toLowerCase();
+    /* normalize+strip combining marks where the engine has it; the map keeps
+       the common cases working even without String.normalize. */
+    if (out.normalize) out = out.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var MAP = { "æ": "ae", "œ": "oe", "ø": "o", "ß": "ss", "đ": "d", "þ": "th" };
+    return out.replace(/[æœøßđþ]/g, function (c) { return MAP[c] || c; });
+  }
+
+  /* One edit (missing, extra, wrong, or swapped letter) counts as a match for
+     terms of 5+ letters — short words stay exact or they match everything. */
+  function nearWord(word, term) {
+    if (word.indexOf(term) > -1) return true;
+    if (term.length < 5) return false;
+    var la = word.length, lb = term.length;
+    if (Math.abs(la - lb) > 1) {
+      /* term may still sit inside a longer word with one typo — slide it. */
+      for (var s = 0; s + lb - 1 <= la; s++) {
+        if (editsAtMostOne(word.slice(s, s + lb + 1), term)) return true;
+      }
+      return false;
+    }
+    return editsAtMostOne(word, term);
+  }
+
+  function editsAtMostOne(a, b) {
+    if (a === b) return true;
+    var la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    var i = 0, j = 0, edits = 0;
+    while (i < la && j < lb) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++edits > 1) return false;
+      if (la === lb) {
+        /* swapped pair counts as the one edit */
+        if (a[i] === b[j + 1] && a[i + 1] === b[j]) { i += 2; j += 2; }
+        else { i++; j++; }
+      } else if (la > lb) { i++; } else { j++; }
+    }
+    return edits + (la - i) + (lb - j) <= 1;
+  }
+
+  function fieldMatches(text, q) {
+    var t = fold(text);
+    if (t.indexOf(q) > -1) return true;
+    var words = t.split(/[^a-z0-9]+/);
+    return words.some(function (w) { return w && nearWord(w, q); });
+  }
+
+  /* 088 — say which field matched, so a tag hit doesn't look like a mistake.
+     Returns "" (no match) or the field name, title first since a title hit
+     needs no explanation. */
+  function matchField(r, q) {
+    if (!q) return "title";
+    if (fieldMatches(r.title, q)) return "title";
+    if (tagsOf(r).some(function (t) { return fieldMatches(t, q); })) return "tag";
+    if ((r.ingredients || []).some(function (i) { return fieldMatches(i, q); })) return "ingredient";
+    return "";
+  }
+
   function matchesQuery(r, q) {
-    if (!q) return true;
-    if (r.title.toLowerCase().indexOf(q) > -1) return true;
-    if (tagsOf(r).some(function (t) { return t.toLowerCase().indexOf(q) > -1; })) return true;
-    return (r.ingredients || []).some(function (i) {
-      return i.toLowerCase().indexOf(q) > -1;
-    });
+    return !q || matchField(r, fold(q)) !== "";
   }
 
   function countBy(list, key, value) {
@@ -780,7 +868,10 @@
              "<p>No recipes match. Try a different word.</p></div>";
       } else {
         h += '<div class="cardgrid">' +
-             hits.slice(0, 12).map(cardHtml).join("") + "</div>";
+             hits.slice(0, 12).map(function (r) {
+               var f = matchField(r, fold(q));
+               return cardHtml(r, f === "title" ? "" : f);
+             }).join("") + "</div>";
       }
       h += "</div>";
       return h;
@@ -809,10 +900,18 @@
            var n = countBy(S.recipes, "contributor", name);
            /* A section with nothing in it yet recedes rather than shouting a
               zero — it is a place to put something, not a result. */
-           return '<a class="who-tile press' + (n ? "" : " who-tile--empty") +
-                  '" href="#menu?who=' + encodeURIComponent(name) + '">' +
-                  '<span class="who-tile__count">' + n + "</span>" +
-                  '<span class="who-tile__name">' + esc(name) + "</span></a>";
+           /* 058: an empty section is an invitation, not a zero. The plus and
+              the words are the signal, so it never rests on colour alone. */
+           return n
+             ? '<a class="who-tile press" href="#menu?who=' +
+               encodeURIComponent(name) + '">' +
+               '<span class="who-tile__count">' + n + "</span>" +
+               '<span class="who-tile__name">' + esc(name) + "</span></a>"
+             : '<a class="who-tile who-tile--empty press" href="#menu?who=' +
+               encodeURIComponent(name) + '">' +
+               '<span class="who-tile__plus" aria-hidden="true">' + I.plus(26) + "</span>" +
+               '<span class="who-tile__name">' + esc(name) + "</span>" +
+               '<span class="who-tile__invite">None yet — add the first</span></a>';
          }).join("") +
          "</div></section>";
 
@@ -840,12 +939,17 @@
      7. Menu screen
      ====================================================================== */
 
-  function cardHtml(r) {
+  function cardHtml(r, matchNote) {
     /* Long time strings are omitted rather than truncated. */
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
     /* meta is pre-escaped here — it is interpolated bare below. */
     var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
+    /* 088: a hit on something not visible on the card says so, so a tag or
+       ingredient match doesn't read as a wrong result. */
+    if (matchNote) {
+      meta += ' · <span class="matchnote">matches ' + esc(matchNote) + "</span>";
+    }
     var src = imageFor(r);
     /* A photo replaces the category icon; without one, the icon is what tells
        you at a glance whether this is a breakfast or a dessert. Either way
@@ -873,6 +977,12 @@
     );
   }
 
+  /* 089, ruled 2026-08-01: the Menu is NOT virtualised. The collection is 48
+     against the task's own ~150 threshold, the full list renders in one
+     innerHTML pass with CLS 0.0000 and FCP at a fifth of budget, and
+     virtualising would complicate scroll restoration, find-in-page, and the
+     screen-reader experience for zero measured gain. Revisit at ~150, per the
+     gameplan. */
   function menuMatches() {
     var q = S.menuQ.trim().toLowerCase();
     var list = S.recipes.filter(function (r) {
@@ -945,17 +1055,27 @@
     if (S.notice) h += '<p class="hint" role="status">' + esc(S.notice) + "</p>";
     h += "</div></header>";
 
+    var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
+
     h += '<div class="menubody" id="main-content">';
     h += '<div class="countrow"><span>' + list.length +
          (list.length === 1 ? " recipe" : " recipes") +
-         (S.removing ? " — tap a recipe to remove it" : "") + "</span>" +
+         (S.removing ? " — tap a recipe to remove it" : "") +
+         (S.tagging ? " — tap the ones to tag" : "") + "</span>" +
          '<span class="countrow__actions">' +
          (filterCount || S.menuQ
            ? '<button type="button" class="textbtn" data-act="clear-filters">Clear</button>'
            : "") +
-         '<button type="button" class="textbtn' +
-         (S.removing ? " textbtn--removing" : "") + '" data-act="toggle-remove">' +
-         (S.removing ? "Done" : "Remove") + "</button>" +
+         (S.removing
+           ? ""
+           : '<button type="button" class="textbtn' +
+             (S.tagging ? " textbtn--removing" : "") + '" data-act="toggle-tagging">' +
+             (S.tagging ? "Done" : "Tag") + "</button>") +
+         (S.tagging
+           ? ""
+           : '<button type="button" class="textbtn' +
+             (S.removing ? " textbtn--removing" : "") + '" data-act="toggle-remove">' +
+             (S.removing ? "Done" : "Remove") + "</button>") +
          "</span></div>";
 
     if (!list.length) {
@@ -988,17 +1108,66 @@
                '<span class="rcard__meta">' + esc(r.contributor) + "</span></span>" +
                '<span class="rrow__minus">' + I.minus(20) + "</span></button>";
       }).join("") + "</div>";
+    } else if (S.tagging) {
+      h += '<div class="cardgrid">' + list.map(function (r) {
+        var on = !!S.tagSel[r.id];
+        return '<button type="button" class="rrow press" data-act="tag-pick" ' +
+               'aria-pressed="' + on + '" data-id="' + esc(r.id) + '">' +
+               '<span class="checkbox">' + (on ? I.check(18) : "") + "</span>" +
+               '<span class="rcard__body"><span class="rcard__title">' +
+               esc(r.title) + "</span>" +
+               '<span class="rcard__meta">' +
+               (tagsOf(r).length ? tagsOf(r).join(", ") : "No tags yet") +
+               "</span></span></button>";
+      }).join("") + "</div>";
     } else {
-      h += '<div class="cardgrid">' + list.map(cardHtml).join("") + "</div>";
+      var mq = S.menuQ.trim() ? fold(S.menuQ.trim()) : "";
+      h += '<div class="cardgrid">' + list.map(function (r) {
+        var f = mq ? matchField(r, mq) : "";
+        return cardHtml(r, f && f !== "title" ? f : "");
+      }).join("") + "</div>";
     }
     h += "</div>";
 
-    h += '<div class="addbar"><a class="addpill press" href="#add">' +
-         I.plus(20) + "Add recipe</a></div>";
+    if (S.tagging) {
+      h += '<div class="addbar"><button type="button" class="addpill press" ' +
+           'data-act="open-bulk"' + (selCount ? "" : " disabled") + ">" +
+           I.plus(20) + "Tag " + selCount +
+           (selCount === 1 ? " recipe" : " recipes") + "</button></div>";
+    } else {
+      h += '<div class="addbar"><a class="addpill press" href="#add">' +
+           I.plus(20) + "Add recipe</a></div>";
+    }
 
     if (S.filterOpen) h += filterSheetHtml();
     if (S.textOpen) h += textSheetHtml();
+    if (S.tagSheetOpen) h += bulkTagSheetHtml(selCount);
+    if (S.tagManageOpen) h += tagManageSheetHtml();
     return h;
+  }
+
+  /* 068 — the one sheet that finishes a bulk tag. Same dialog contract as
+     every other sheet; the field reuses the 067 suggestion machinery. */
+  function bulkTagSheetHtml(selCount) {
+    return (
+      '<button type="button" class="scrim" data-act="close-bulk" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bulk-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="bulk-title">Tag ' +
+      selCount + (selCount === 1 ? " recipe" : " recipes") + "</h2>" +
+      '<button type="button" class="donebtn press" data-act="close-bulk">Cancel</button></div>' +
+      '<div class="field">' +
+      '<label class="field__label" for="bulk-tags">Tags to add</label>' +
+      '<input class="input" id="bulk-tags" data-act="bulk-tags" data-k="tags" ' +
+      'value="' + esc(S.bulkTags) + '" autocomplete="off" ' +
+      'placeholder="Italian, vegetarian, quick" />' +
+      '<div class="sugrow" id="bulk-tags-sug" data-for="bulk-tags"></div>' +
+      '<span class="fieldhint">Added to every selected recipe. Tags they ' +
+      "already have aren’t doubled.</span></div>" +
+      '<div class="sheet__foot">' +
+      '<button type="button" class="savebtn press" data-act="bulk-apply">Add tags</button>' +
+      "</div></div></div>"
+    );
   }
 
   function sortMenuHtml() {
@@ -1039,6 +1208,8 @@
     S.dlOpen = false;
     S.lbOpen = false;
     S.sortOpen = false;
+    S.tagSheetOpen = false;
+    S.tagManageOpen = false;
     S[flag] = true;
     openSheetId = null;
     S.pulseSheet = true;
@@ -1128,7 +1299,7 @@
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fw" data-key="' + esc(name) + '">' +
                  (on ? I.check(15) : "") +
-                 esc(name) + " (" + countWho(name) + ")</button>";
+                 '<span class="chip__label">' + esc(name) + " (" + countWho(name) + ")</span></button>";
         }).join("") + "</div>" +
       '<h3 class="grouph">Course</h3><div class="chiprow">' +
       CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
@@ -1137,7 +1308,7 @@
           return '<button type="button" class="chip press" aria-pressed="' + on +
                  '" data-act="fc" data-key="' + esc(cat) + '">' +
                  (on ? I.check(15) : "") +
-                 esc(cat) + " (" + countCat(cat) + ")</button>";
+                 '<span class="chip__label">' + esc(cat) + " (" + countCat(cat) + ")</span></button>";
         }).join("") + "</div>" +
       tagGroupHtml() +
       '<div class="sheet__foot">' +
@@ -1195,14 +1366,94 @@
         return true;
       }).length;
     }
-    return '<h3 class="grouph">Tags</h3><div class="chiprow">' +
+    return '<div class="grouph-row"><h3 class="grouph">Tags</h3>' +
+      '<button type="button" class="textbtn" data-act="tag-manage">Rename or merge</button></div>' +
+      '<div class="chiprow">' +
       tags.map(function (tag) {
         var on = S.tags.indexOf(tag) > -1;
         return '<button type="button" class="chip press" aria-pressed="' + on +
                '" data-act="ft" data-key="' + esc(tag) + '">' +
                (on ? I.check(15) : "") +
-               esc(tag) + " (" + countTag(tag) + ")</button>";
+               '<span class="chip__label">' + esc(tag) + " (" + countTag(tag) + ")</span></button>";
       }).join("") + "</div>";
+  }
+
+  /* 069 — rename and merge. Renaming onto a name that already exists (any
+     casing) is a merge: every recipe carrying the old tag carries the target
+     once, and the old name is gone everywhere. There is no partial version of
+     that — which is the entire point of doing it here rather than by hand. */
+  function tagManageSheetHtml() {
+    var tags = allTags();
+    function usage(tag) {
+      return S.recipes.filter(function (r) { return tagsOf(r).indexOf(tag) > -1; }).length;
+    }
+    return (
+      '<button type="button" class="scrim" data-act="close-tag-manage" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tm-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="tm-title">Tags</h2>' +
+      '<button type="button" class="donebtn press" data-act="close-tag-manage">Done</button></div>' +
+      '<p class="hint" style="margin-top:0">Tap a tag to rename it. Renaming it to ' +
+      "another tag’s name merges the two.</p>" +
+      '<div class="managelist">' +
+      tags.map(function (tag) {
+        if (S.tagEditing === tag) {
+          return '<div class="managerow managerow--edit">' +
+            '<label class="vh" for="tag-rename">New name for ' + esc(tag) + "</label>" +
+            '<input class="input" id="tag-rename" data-act="tag-rename-input" value="' +
+            esc(S.tagEditVal) + '" autocomplete="off" />' +
+            '<button type="button" class="donebtn press" data-act="tag-rename-apply" ' +
+            'data-key="' + esc(tag) + '">Save</button>' +
+            '<button type="button" class="textbtn" data-act="tag-edit" data-key="">Cancel</button>' +
+            "</div>";
+        }
+        return '<button type="button" class="managerow press" data-act="tag-edit" ' +
+               'data-key="' + esc(tag) + '">' +
+               '<span class="chip__label">' + esc(tag) + "</span>" +
+               '<span class="managerow__count">' + usage(tag) +
+               (usage(tag) === 1 ? " recipe" : " recipes") + "</span></button>";
+      }).join("") +
+      "</div></div></div>"
+    );
+  }
+
+  function renameTag(oldTag, nextRaw) {
+    var next = String(nextRaw || "").trim().replace(/\s+/g, " ");
+    if (!next || next === oldTag) return "";
+    /* Same letters, new casing is a plain rename; a different existing tag
+       (any casing) is a merge and says so before it happens. */
+    var target = null;
+    allTags().forEach(function (t) {
+      if (t !== oldTag && t.toLowerCase() === next.toLowerCase()) target = t;
+    });
+    if (target) {
+      if (!window.confirm('Merge "' + oldTag + '" into "' + target + '"? Every recipe tagged "' +
+          oldTag + '" will carry "' + target + '" instead.')) return "";
+      next = target;
+    }
+    var touched = 0;
+    S.recipes = S.recipes.map(function (r) {
+      var have = tagsOf(r);
+      if (have.indexOf(oldTag) === -1) return r;
+      var out = {};
+      Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+      var seen = {};
+      out.tags = have.map(function (t) { return t === oldTag ? next : t; })
+        .filter(function (t) {
+          var lt = t.toLowerCase();
+          if (seen[lt]) return false;
+          seen[lt] = true;
+          return true;
+        });
+      touched++;
+      return out;
+    });
+    persistRecipes();
+    /* An active filter on the old name follows the rename. */
+    S.tags = S.tags.map(function (t) { return t === oldTag ? next : t; })
+      .filter(function (t, i, a) { return a.indexOf(t) === i; });
+    return (target ? "Merged into “" + next + "”" : "Renamed to “" + next + "”") +
+           " — " + touched + (touched === 1 ? " recipe updated." : " recipes updated.");
   }
 
   function downloadSheetHtml(r) {
@@ -1227,9 +1478,36 @@
      8. Recipe screen — viewer
      ====================================================================== */
 
+  /* 082 — a flag that names its field ("Servings — …") surfaces beside that
+     field, not only in the panel at the bottom. Free-text flags (including
+     everything committed before this convention) classify by keyword, so old
+     data gains the chips too. */
+  function fieldOfFlag(f) {
+    var s = String(f).toLowerCase();
+    var m = s.match(/^(title|servings|ingredients|steps)\s*—/);
+    if (m) return m[1];
+    if (/serving/.test(s)) return "servings";
+    if (/ingredient/.test(s)) return "ingredients";
+    if (/\bsteps?\b/.test(s)) return "steps";
+    if (/title/.test(s)) return "title";
+    return "";
+  }
+
+  function fieldFlagChip(field, flags) {
+    if (!flags[field] || !flags[field].length) return "";
+    return '<button type="button" class="fieldflag press" data-act="to-flags">' +
+           I.flag(14) + "Double-check</button>";
+  }
+
   function viewRecipe(r) {
     var mult = S.serves && r.servings ? S.serves / r.servings : 1;
     var h = "";
+
+    var fieldFlags = { title: [], servings: [], ingredients: [], steps: [] };
+    (r.flagged || []).forEach(function (f) {
+      var k = fieldOfFlag(f);
+      if (k) fieldFlags[k].push(f);
+    });
 
     h += '<header class="rhead"><div class="rhead__inner">' +
          '<a class="backlink press" href="#menu">' + I.chevL() + "Menu</a>" +
@@ -1277,7 +1555,8 @@
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
-    h += '<h1 class="r-title">' + esc(r.title) + "</h1>";
+    h += '<h1 class="r-title">' + esc(r.title) +
+         fieldFlagChip("title", fieldFlags) + "</h1>";
 
     if (tagsOf(r).length) {
       h += '<p class="r-tags">' + tagsOf(r).map(function (t) {
@@ -1288,7 +1567,7 @@
 
     h += '<div class="topgrid">';
     h += '<div class="servcard"><div class="servcard__text">' +
-         '<p class="minilabel">Servings</p>' +
+         '<p class="minilabel">Servings' + fieldFlagChip("servings", fieldFlags) + "</p>" +
          '<p class="servcard__value">' + S.serves + " " +
          (S.serves === 1 ? "person" : "people") + "</p></div>" +
          '<button type="button" class="servbtn press" data-act="serv-" ' +
@@ -1323,7 +1602,8 @@
 
     h += '<div class="bodygrid">';
 
-    h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients</h2>' +
+    h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients' +
+         fieldFlagChip("ingredients", fieldFlags) + "</h2>" +
          '<p class="hint">Tap to check off as you go</p>';
     /* A rescale changes the numbers in place, which is easy to miss at any font
        size and very easy to miss at 40px. The list flashes once so the change
@@ -1341,11 +1621,19 @@
                "</span></button></li>";
       }).join("") + "</ul>";
     } else {
-      h += '<p class="hint">No ingredient list was captured for this recipe.</p>';
+      /* 071: four recipes arrived with no ingredient list at all. Say so
+         loudly — this is missing content, not an empty section — and say how
+         it gets fixed. The pointer is prose, not a button: Viewer mode shows
+         no edit affordances, and that rule outranks convenience. */
+      h += '<div class="panel panel--flag"><h2>No ingredients were captured</h2>' +
+           "<p>This recipe’s list didn’t survive transcription. If you have " +
+           "Joan’s original, turn on <strong>Edit</strong> at the top of this " +
+           "page and type the ingredients in — the field will be waiting.</p></div>";
     }
     h += "</section>";
 
-    h += "<section><h2 class=\"r-h2\">Instructions</h2>";
+    h += '<section><h2 class="r-h2">Instructions' +
+         fieldFlagChip("steps", fieldFlags) + "</h2>";
     h += '<ol class="checklist checklist--steps' + scaled + '">' +
          (r.steps || []).map(function (line, i) {
       var done = !!S.checkedStep[i];
@@ -1377,7 +1665,7 @@
 
     /* Shown in viewer mode too — it is information, not an edit affordance. */
     if (r.flagged && r.flagged.length) {
-      h += '<section class="r-section"><div class="panel panel--flag">' +
+      h += '<section class="r-section"><div class="panel panel--flag" id="flag-panel">' +
            "<h2>Worth double-checking</h2><ul>" +
            r.flagged.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") +
            "</ul></div></section>";
@@ -1515,10 +1803,61 @@
     return '<div class="field">' +
       '<label class="field__label" for="' + id + '">Tags</label>' +
       '<input class="input" id="' + id + '" data-act="' + act + '" data-k="tags" ' +
-      'value="' + esc(value) + '" ' +
+      'value="' + esc(value) + '" autocomplete="off" ' +
       'placeholder="Italian, vegetarian, quick" />' +
+      /* 067: existing tags surface as the user types, so "ital" becomes the
+         Italian that already exists instead of a new lowercase twin. The row
+         is rebuilt in place on input — a full render would steal the caret. */
+      '<div class="sugrow" id="' + id + '-sug" data-for="' + id + '"></div>' +
       '<span class="fieldhint">Separate with commas. Include where the dish is ' +
       "from — those become filters.</span></div>";
+  }
+
+  /* The segment being typed is everything after the last comma. Matches are
+     existing tags only, the already-listed ones excluded, canonical casing
+     preserved — prefix matches outrank substring ones. */
+  function tagSuggestions(raw) {
+    var parts = String(raw || "").split(",");
+    var seg = parts.pop().trim().toLowerCase();
+    if (!seg) return [];
+    var have = parts.map(function (p) { return p.trim().toLowerCase(); });
+    return allTags()
+      .filter(function (t) {
+        var lt = t.toLowerCase();
+        return lt.indexOf(seg) > -1 && lt !== seg && have.indexOf(lt) === -1;
+      })
+      .sort(function (a, b) {
+        var pa = a.toLowerCase().indexOf(seg) === 0 ? 0 : 1;
+        var pb = b.toLowerCase().indexOf(seg) === 0 ? 0 : 1;
+        return pa - pb || a.localeCompare(b);
+      })
+      .slice(0, 5);
+  }
+
+  function syncTagSuggestions(input) {
+    var row = document.getElementById(input.id + "-sug");
+    if (!row) return;
+    row.innerHTML = tagSuggestions(input.value).map(function (t) {
+      return '<button type="button" class="sugchip press" data-act="tag-sug" ' +
+             'data-key="' + esc(t) + '" data-input="' + esc(input.id) + '">' +
+             esc(t) + "</button>";
+    }).join("");
+  }
+
+  /* Tapping a suggestion completes the segment with the canonical tag. */
+  function applyTagSuggestion(el) {
+    var input = document.getElementById(el.getAttribute("data-input"));
+    if (!input) return;
+    var parts = input.value.split(",");
+    parts.pop();
+    parts.push(" " + el.getAttribute("data-key"));
+    var next = parts.join(",").replace(/^\s+/, "") + ", ";
+    input.value = next;
+    if (input.id === "bulk-tags") S.bulkTags = next;
+    else if (S.route.name === "recipe" && S.draft) { S.draft.tags = next; S.saved = false; }
+    else if (S.addDraft) { S.addDraft.tags = next; scheduleAddPersist(); }
+    syncTagSuggestions(input);
+    input.focus();
   }
 
   function photoFieldHtml(id, recipeId, act) {
@@ -1729,6 +2068,10 @@
          '<input class="input" id="a-cook" data-act="ad" data-k="cookTime" value="' +
          esc(d.cookTime) + '" /></div></div>';
 
+    /* 083 — parsers guess the ingredients/steps split, and on a photographed
+       card they guess it wrong often. Every review line carries a one-tap
+       "send to the other list" beside its delete, so a misplaced line is a
+       correction, not a retype. */
     h += '<h2 class="r-h2" style="margin-top:22px">Ingredients</h2>';
     h += d.ingredients.map(function (line, i) {
       return '<div class="editline">' +
@@ -1736,6 +2079,9 @@
              '<textarea class="textarea" id="a-ing-' + i + '" rows="2" ' +
              'data-act="adl" data-k="ingredients" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="amove" ' +
+             'data-key="ingredients" data-i="' + i + '" aria-label="Move ingredient ' +
+             (i + 1) + ' to the steps">' + I.swap() + "</button>" +
              '<button type="button" class="delbtn press" data-act="adel" ' +
              'data-key="ingredients" data-i="' + i + '" aria-label="Remove ingredient ' +
              (i + 1) + '">' + I.x() + "</button></div>";
@@ -1750,6 +2096,9 @@
              '<textarea class="textarea" id="a-step-' + i + '" rows="3" ' +
              'data-act="adl" data-k="steps" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
+             '<button type="button" class="delbtn press" data-act="amove" ' +
+             'data-key="steps" data-i="' + i + '" aria-label="Move step ' +
+             (i + 1) + ' to the ingredients">' + I.swap() + "</button>" +
              '<button type="button" class="delbtn press" data-act="adel" ' +
              'data-key="steps" data-i="' + i + '" aria-label="Remove step ' +
              (i + 1) + '">' + I.x() + "</button></div>";
@@ -2046,24 +2395,24 @@
     var d = blankDraft();
     d.flagged = [];
     d.title = text(node.name);
-    if (!d.title) d.flagged.push("No title was found on the page — add one.");
+    if (!d.title) d.flagged.push("Title — none was found on the page; add one.");
 
     d.ingredients = list(node.recipeIngredient || node.ingredients);
     if (!d.ingredients.length) {
       d.ingredients = [""];
-      d.flagged.push("No ingredients were found — check the original page.");
+      d.flagged.push("Ingredients — none were found; check the original page.");
     }
 
     d.steps = list(node.recipeInstructions);
     if (!d.steps.length) {
       d.steps = [""];
-      d.flagged.push("No steps were found — check the original page.");
+      d.flagged.push("Steps — none were found; check the original page.");
     }
 
     var y = text(node.recipeYield);
     var yn = parseInt((y.match(/\d+/) || [])[0], 10);
     if (yn) d.servings = Math.min(40, Math.max(1, yn));
-    else d.flagged.push("No serving count was found — 4 was assumed.");
+    else d.flagged.push("Servings — no count was found; 4 was assumed.");
 
     d.prepTime = dur(node.prepTime);
     d.cookTime = dur(node.cookTime || node.totalTime);
@@ -2275,7 +2624,7 @@
 
     if (!d.title) {
       d.title = "";
-      d.flagged.push("No title was obvious — add one.");
+      d.flagged.push("Title — none was obvious; add one.");
     }
     if (!sawHeadings) {
       d.flagged.push(
@@ -2283,8 +2632,8 @@
         "between the two lists was guessed. Check both."
       );
     }
-    if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("No ingredients were picked up."); }
-    if (!d.steps.length) { d.steps = [""]; d.flagged.push("No steps were picked up."); }
+    if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("Ingredients — none were picked up."); }
+    if (!d.steps.length) { d.steps = [""]; d.flagged.push("Steps — none were picked up."); }
     d.notes = notes.join(" ");
     d.source = "Read from a photo";
     return capDraft(d);
@@ -2700,6 +3049,18 @@
     var r = S.route.name === "recipe" ? byId(S.route.id) : null;
 
     if (act === "theme") { toggleTheme(); return; }
+    if (act === "tag-sug") { applyTagSuggestion(el); return; }
+    if (act === "to-flags") {
+      var fp = document.getElementById("flag-panel");
+      if (fp) {
+        fp.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto" : "smooth",
+          block: "center"
+        });
+      }
+      return;
+    }
     if (act === "open-text") { openSheet("textOpen", el); return; }
     if (act === "close-text") { closeSheet("textOpen"); return; }
     if (act === "toggle-easy") { toggleEasy(); return; }
@@ -2761,7 +3122,76 @@
       if (!dropFilterParams()) render();
       return;
     }
-    if (act === "toggle-remove") { S.removing = !S.removing; render(); return; }
+    if (act === "toggle-remove") {
+      S.removing = !S.removing;
+      S.tagging = false; S.tagSel = {};
+      render(); return;
+    }
+    if (act === "toggle-tagging") {
+      S.tagging = !S.tagging;
+      S.removing = false;
+      if (!S.tagging) { S.tagSel = {}; S.bulkTags = ""; }
+      render(); return;
+    }
+    if (act === "tag-pick") {
+      var pid = el.getAttribute("data-id");
+      S.tagSel[pid] = !S.tagSel[pid];
+      render(); return;
+    }
+    if (act === "open-bulk") { openSheet("tagSheetOpen", el); return; }
+    if (act === "close-bulk") { closeSheet("tagSheetOpen"); return; }
+    if (act === "tag-manage") { openSheet("tagManageOpen", el); return; }
+    if (act === "close-tag-manage") {
+      S.tagEditing = ""; S.tagEditVal = "";
+      closeSheet("tagManageOpen"); return;
+    }
+    if (act === "tag-edit") {
+      S.tagEditing = key || "";
+      S.tagEditVal = key || "";
+      render();
+      if (key) {
+        var f = document.getElementById("tag-rename");
+        if (f) { f.focus(); f.select(); }
+      }
+      return;
+    }
+    if (act === "tag-rename-apply") {
+      var msg = renameTag(key, S.tagEditVal);
+      S.tagEditing = ""; S.tagEditVal = "";
+      if (msg) setNotice(msg);
+      render();
+      return;
+    }
+    if (act === "bulk-apply") {
+      var toAdd = parseTags(S.bulkTags);
+      if (!toAdd.length) { closeSheet("tagSheetOpen"); return; }
+      /* A typed tag that matches an existing one in any casing becomes the
+         existing form — bulk tagging must not mint near-duplicates (067's
+         rule, enforced here too). */
+      var canon = {};
+      allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
+      toAdd = toAdd.map(function (t) { return canon[t.toLowerCase()] || t; });
+      var touched = 0;
+      S.recipes = S.recipes.map(function (r) {
+        if (!S.tagSel[r.id]) return r;
+        var out = {};
+        Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+        var have = tagsOf(r).slice();
+        var lower = have.map(function (t) { return t.toLowerCase(); });
+        toAdd.forEach(function (t) {
+          if (lower.indexOf(t.toLowerCase()) === -1) { have.push(t); lower.push(t.toLowerCase()); }
+        });
+        out.tags = have;
+        touched++;
+        return out;
+      });
+      persistRecipes();
+      S.tagSheetOpen = false;
+      S.tagging = false; S.tagSel = {}; S.bulkTags = "";
+      setNotice("Tagged " + touched + (touched === 1 ? " recipe." : " recipes."));
+      render();
+      return;
+    }
     if (act === "reset-local") { resetLocal(); return; }
     if (act === "rm-photo") { removeImage(key); render(); return; }
     if (act === "dl-photos") { downloadPhotos(); return; }
@@ -2805,6 +3235,15 @@
     if (act === "add-ocr") { importFromPhoto(); return; }
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
+    if (act === "amove") {
+      var other = key === "ingredients" ? "steps" : "ingredients";
+      var moved = S.addDraft[key].splice(idx, 1)[0];
+      S.addDraft[other].push(moved);
+      scheduleAddPersist();
+      setNotice("Moved to " + (other === "steps" ? "the instructions." : "the ingredients."));
+      render();
+      return;
+    }
     if (act === "add-save") { saveNewRecipe(); return; }
     if (act === "add-save-anyway") { S.addDupeOk = true; saveNewRecipe(); return; }
 
@@ -2852,8 +3291,19 @@
 
     if (act === "toggle-edit") {
       S.editing = !S.editing;
-      if (S.editing) startDraft(r);
-      else { S.draft = null; S.saved = false; }
+      if (S.editing) {
+        startDraft(r);
+        /* 071: a recipe with no ingredients opens Edit with one empty line
+           ready and the caret already in it — the missing thing is the first
+           thing the keyboard touches. */
+        if (r && !(r.ingredients || []).filter(function (x) { return x.trim(); }).length) {
+          if (!S.draft.ingredients.length) S.draft.ingredients.push("");
+          render();
+          var firstIng = document.getElementById("e-ing-0");
+          if (firstIng) firstIng.focus();
+          return;
+        }
+      } else { S.draft = null; S.saved = false; }
       render(); return;
     }
     if (act === "add") {
@@ -2922,9 +3372,16 @@
     }
     if (act === "ad") {
       S.addDraft[el.getAttribute("data-k")] = el.value;
+      if (el.getAttribute("data-k") === "tags") syncTagSuggestions(el);
       scheduleAddPersist();
       return;
     }
+    if (act === "bulk-tags") {
+      S.bulkTags = el.value;
+      syncTagSuggestions(el);
+      return;
+    }
+    if (act === "tag-rename-input") { S.tagEditVal = el.value; return; }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
       scheduleAddPersist();
@@ -2933,6 +3390,7 @@
     if (act === "d") {
       S.draft[el.getAttribute("data-k")] = el.value;
       S.saved = false;
+      if (el.getAttribute("data-k") === "tags") syncTagSuggestions(el);
       var btn = document.querySelector('[data-act="save"]');
       if (btn) btn.textContent = "Save changes";
       return;
@@ -2950,6 +3408,8 @@
     else if (S.textOpen) closeSheet("textOpen");
     else if (S.dlOpen) closeSheet("dlOpen");
     else if (S.lbOpen) closeSheet("lbOpen");
+    else if (S.tagSheetOpen) closeSheet("tagSheetOpen");
+    else if (S.tagManageOpen) { S.tagEditing = ""; S.tagEditVal = ""; closeSheet("tagManageOpen"); }
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 

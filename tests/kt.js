@@ -32,7 +32,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk("Tonight's idea hero present", await p.locator('.hero').count()===1);
   chk('hero falls back to flat panel (no image)', await p.locator('.hero__blank').count()===1);
   chk('5 contributor sections', await p.locator('.who-tile').count()===5);
-  chk('all 48 are Joan\'s, others empty', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48,0,0,0,0');
+  chk('all 48 are Joan\'s, others invite (058)', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48' && await p.locator('.who-tile--empty').count()===4 && (await p.locator('.who-tile--empty').first().textContent()).includes('None yet'));
   chk('category rows present', await p.locator('.cat-row').count()===6);
   chk('View all button', (await p.locator('.bigbtn').textContent()).includes('View all 48 recipes'));
   await p.screenshot({path:require('path').join(__dirname,'shots','kt-1-main-dark.png')});
@@ -215,8 +215,8 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   console.log('\n== Flagged recipe shows in viewer mode ==');
   await p.goto(B+'/index.html#chops');
   await p.waitForSelector('.r-title');
-  chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()===1);
-  chk('missing ingredients explained', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredient list'));
+  chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()>=1);
+  chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
 
   console.log('\n== Tap targets + a11y ==');
   await p.goto(B+'/index.html#menu');

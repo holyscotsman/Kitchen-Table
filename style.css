@@ -482,16 +482,26 @@ img {
   box-shadow: var(--hi-card);
 }
 
-/* An empty section: outlined rather than filled, so the people who have
-   contributed carry the visual weight and the rest read as room to grow. */
+/* An empty section: outlined — dashed, the classic empty-slot mark — so the
+   people who have contributed carry the visual weight and the rest read as
+   room to grow. The plus glyph and the invite line say it in shape and words,
+   never colour alone (058). */
 .who-tile--empty {
   background: none;
-  border: var(--bw) solid var(--line);
+  border: var(--bw) dashed var(--line);
   color: var(--ink);
   box-shadow: none;
 }
 
-.who-tile--empty .who-tile__count {
+.who-tile__plus {
+  display: flex;
+  color: var(--acc);
+}
+
+.who-tile__invite {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.35;
   color: var(--dim);
 }
 
@@ -826,6 +836,7 @@ img {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .minitag {
@@ -837,6 +848,18 @@ img {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
+  /* 060: a chip never wraps internally, and on the one surface where space is
+     truly fixed (the card row) a marathon tag truncates rather than pushing
+     the title around. Everywhere else the row wraps and the chip stays whole. */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.rcard .minitag {
+  max-width: 22ch;
 }
 
 /* On a --card surface, --tag-bg is the wrong tier in light mode, so the chip
@@ -1712,6 +1735,17 @@ input[type="file"].input {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  /* 060: a chip is one line always; a marathon tag ellipsizes at the sheet's
+     width instead of folding the pill into two storeys. The label span does
+     the ellipsizing — a flex container can't truncate a bare text node. */
+  max-width: 100%;
+}
+
+.chip__label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chip[aria-pressed="true"] {
@@ -2108,8 +2142,8 @@ input[type="file"].input {
 
   html,
   body {
-    background: #fff !important;
-    color: #000 !important;
+    background: var(--print-paper) !important;
+    color: var(--print-ink) !important;
   }
 
   .recipe {
@@ -2123,8 +2157,8 @@ input[type="file"].input {
   .servcard,
   .statcard {
     background: none !important;
-    color: #000 !important;
-    border: 1px solid #999 !important;
+    color: var(--print-ink) !important;
+    border: 1px solid var(--print-line) !important;
     box-shadow: none !important;
     break-inside: avoid;
   }
@@ -2137,7 +2171,7 @@ input[type="file"].input {
   .scalednote,
   .servcard__value,
   .statcard__value {
-    color: #000 !important;
+    color: var(--print-ink) !important;
   }
 
   .checkbox,
@@ -2148,8 +2182,8 @@ input[type="file"].input {
 
   .stepnum {
     background: none !important;
-    color: #000 !important;
-    border: 1px solid #999;
+    color: var(--print-ink) !important;
+    border: 1px solid var(--print-line);
   }
 
   .bodygrid {
@@ -2160,4 +2194,130 @@ input[type="file"].input {
     position: static !important;
     margin-bottom: 24px;
   }
+}
+
+/* ==================================================== Focus, as designed
+
+   054's sibling (task 055): the ring is a designed state, not a browser
+   default. Three parts:
+   - 3px, not 2 — the primary reader has low vision, and the ring is an
+     indicator, not an ornament. Offset 2 so it never fuses with a border.
+   - One ring colour — accent — everywhere, because the ring is judged
+     against the page background it sits over (10.5:1 dark, 8.7:1 light),
+     not against the control it wraps.
+   - On accent-filled controls the ring would touch a fill of its own colour,
+     so those gain a 2px page-coloured gap (box-shadow) between fill and
+     ring. The gap contrasts with the fill exactly as well as the ring does
+     with the page — same pair, reversed. No new colours anywhere. */
+
+:focus-visible {
+  outline: 3px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.bigbtn:focus-visible,
+.actbtn--primary:focus-visible,
+.iconbtn[aria-pressed="true"]:focus-visible,
+.iconbtn.is-on:focus-visible,
+.sheetbtn--acc:focus-visible,
+.donebtn:focus-visible,
+.switch[aria-checked="true"]:focus-visible,
+.skip-link:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* 067 — tag suggestions. Chips of existing tags under the field while a
+   segment is being typed. Real buttons at the tap floor, in the tag tint so
+   they read as "these exist already", not as new inventions. */
+.sugrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sugrow:not(:empty) {
+  margin-top: 8px;
+}
+
+.sugchip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+  border: 1px solid var(--tag-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* 069 — the tag rename/merge sheet. */
+.grouph-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managelist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.managerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 16px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surf);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.managerow__count {
+  flex: none;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+}
+
+.managerow--edit {
+  flex-wrap: wrap;
+}
+
+.managerow--edit .input {
+  flex: 1 1 160px;
+}
+
+/* 082 — a flag that names its field shows up beside that field. The chip is
+   informational wayfinding, not an edit affordance: tapping it scrolls to the
+   full explanation in the panel below. */
+.fieldflag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+  margin-left: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--flag-bg);
+  color: var(--flag);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* 088 — why this card matched, when the reason isn't visible on it. */
+.matchnote {
+  font-style: italic;
+  color: var(--dim);
 }

@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · 29 of 130 tasks complete · every agent-doable task in Acts I–III is done · **all remaining work waits on §11**
+**Status:** `v0.9` · **60 of 130 done · 41 struck** (no server; calendar post-1.0 — `DECISIONS.md`) · **29 open, every one needing a person**: an iPhone, VoiceOver, Joan, real recipe cards, or a family answer (§11)
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -236,24 +236,33 @@ here is built; everything here is written down.*
 
 - [ ] `025` 👤 **PM** — Get a real answer from the family on whether "download and commit" is acceptable friction, or the thing that kills adoption.
   - *Needs:* `022` · *Done when:* an actual person has said yes or no.
-- [ ] `026` 🤝 **PM** — Write the one-page backend decision memo: what breaks today without one, what it would cost per month, who maintains it.
+- [x] `026` 🤝 **PM** — Write the one-page backend decision memo: what breaks today without one, what it would cost per month, who maintains it.
   - *Needs:* `010` `011` `021` `025` · *Done when:* the memo ends in a decision, not options. **This is the gate in §6.**
-- [ ] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
+  - *Ruled 2026-08-01, provisional:* **no server for 1.0** — `DECISIONS.md` §026. Taken as the recommended default on Jason's instruction to proceed; `021`/`025` (the family-friction session) stayed undone and are the one input that would reopen this.
+- [x] `027` 🤝 **PM** — Rule on the ten-category list — specifically whether `Sides` and `Drinks` stay, since they were added over the requested eight to avoid mislabelling 11 recipes.
   - *Needs:* `023` · *Done when:* the list is final and `CAT_ALIASES` covers anything dropped.
-- [ ] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
+  - *Ruled 2026-08-01, provisional:* **the ten stay** — nothing dropped, so `CAT_ALIASES` is already complete. `DECISIONS.md` §027; Joan's vocabulary (`023`) can still reopen it.
+- [x] `028` 🤝 **TW** — Agree with the family what counts as a category versus a tag, and write the rule down.
   - *Needs:* `027` · *Done when:* the rule is in `README.md` and someone can apply it to a new recipe without asking.
-- [ ] `029` 🤝 **PM** — Set the bar for what "done" means for a recipe: does it need a photo, verified servings, and at least one tag before it counts as finished?
+  - *Done 2026-08-01 (family sign-off pending, like every provisional ruling):* the rule is in `README.md` — category = "when would you serve this", one of ten; everything else is a tag, with the Baking edge case called out.
+- [x] `029` 🤝 **PM** — Set the bar for what "done" means for a recipe: does it need a photo, verified servings, and at least one tag before it counts as finished?
   - *Needs:* `013` · *Done when:* written. This is the acceptance criterion for all of Phase 8.
-- [ ] `030` 👤 **PM** — Decide whether the menu-planning calendar is 1.0 or a stretch goal, and write down which.
+  - *Ruled 2026-08-01, provisional:* **true text** — real ingredients and steps, servings confirmed-or-marked-unknown; photos and tags optional. `DECISIONS.md` §029. The 1.0 content blockers are exactly the 4 empty lists + 34 inferred servings.
+- [x] `030` 👤 **PM** — Decide whether the menu-planning calendar is 1.0 or a stretch goal, and write down which.
   - *Needs:* `026` · *Done when:* decided. **This gates Phase 15.**
-- [ ] `031` 🤝 **PM** — Define what happens when two family members edit the same recipe, since local-only editing has no merge story at all.
+  - *Ruled 2026-08-01, provisional:* **stretch goal** — without a server a plan is one-phone-only, and 1.0 should not wait 11 tasks for it. Phase 15 struck intact. `DECISIONS.md` §030.
+- [x] `031` 🤝 **PM** — Define what happens when two family members edit the same recipe, since local-only editing has no merge story at all.
   - *Needs:* `026` · *Done when:* the rule is written, whether or not a server exists to enforce it.
-- [ ] `032` 🤝 **PM** — Agree a cadence for pulling everyone's local edits into the repo — weekly, monthly, or on request.
+  - *Ruled 2026-08-01:* **last committed file wins, committer must diff first, same-recipe conflicts go to Joan, the losing version is preserved in `CONTENT.md`.** `DECISIONS.md` §031.
+- [x] `032` 🤝 **PM** — Agree a cadence for pulling everyone's local edits into the repo — weekly, monthly, or on request.
   - *Needs:* `026` `031` · *Done when:* a named person owns it and a frequency is set.
-- [ ] `033` 🤝 **PM** — Arbitrate the first accessibility-versus-feature conflict in writing, so the precedent exists before it is contested under pressure.
+  - *Ruled 2026-08-01:* **on request + a monthly nudge, owner Jason.** `DECISIONS.md` §032.
+- [x] `033` 🤝 **PM** — Arbitrate the first accessibility-versus-feature conflict in writing, so the precedent exists before it is contested under pressure.
   - *Needs:* `024` · *Done when:* a real conflict has been ruled on, not a hypothetical one.
-- [ ] `034` 🤖 **A11Y** — Write the accessibility acceptance criteria every new feature must meet before merge.
+  - *Done 2026-08-01, with a deviation:* `024` remains open, but a real conflict predates it — the handoff's 2–3 column Menu grid versus title legibility, already ruled for legibility. That ruling is now the written precedent: **legibility wins, and denser treatments must survive the top font step + Easy Read.** `DECISIONS.md` §033.
+- [x] `034` 🤖 **A11Y** — Write the accessibility acceptance criteria every new feature must meet before merge.
   - *Needs:* `033` · *Done when:* it is a checklist a reviewer can run. **Everything merged after this is held to it.**
+  - *Done 2026-08-01:* `design/a11y-criteria.md` — 17 checks a reviewer can run, split into the automated set (cited to the suite that enforces each) and the manual set, with a marked section for what the VoiceOver pass (`035`–`040`) must later add. Written now rather than waiting: an incomplete checklist enforced beats a complete one that doesn't exist.
 
 ---
 
@@ -303,14 +312,16 @@ because it can only be written once every legitimate origin is known.*
   - *Needs:* — · *Done when:* verified by network trace, not by reading the README of the library.
 - [x] `048` 🤖 **SEC** — Pin the Tesseract CDN version and add subresource integrity.
   - *Needs:* `047` · *Done when:* the version is exact and a tampered hash blocks the load.
-- [ ] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
+- [x] `049` 🤖 **SEC** — Review whether Google Fonts should be self-hosted to remove a third party from every page load.
   - *Needs:* `004` · *Done when:* decided and done, or decided and written down why not. **→ README**
+  - *Done 2026-08-01:* **self-hosted.** Six woff2 files (52 KB, latin + latin-ext, OFL text included) in `fonts/`, same unicode-ranges as Google served, 400/700 preloaded. Verified: zero third-party requests at load, faces active, FCP 888 ms with the fonts now inside the measurement. `004` (does it render on the physical iPhone) still stands — self-hosting makes that more likely, not less, since the face no longer depends on a third party being reachable.
 - [x] `050` 🤖 **SEC** — Document, in the UI, exactly what each relay receives when a link is imported.
   - *Needs:* — · *Done when:* the disclosure names the relays and says what is sent, before the request is made.
 - [x] `051` 🤖 **FE-B** — Show which relay succeeded, so a persistent failure can be diagnosed rather than guessed at.
   - *Needs:* `050` · *Done when:* the review screen names the relay that answered.
-- [ ] `052` 🤖 **SEC** — Add a Content-Security-Policy and confirm it does not break the lazily-loaded OCR library.
+- [x] `052` 🤖 **SEC** — Add a Content-Security-Policy and confirm it does not break the lazily-loaded OCR library.
   - *Needs:* `047` `048` `049` `050` · *Done when:* the policy is as tight as the known origin list allows, and every path still works.
+  - *Done 2026-08-01:* meta CSP in `index.html` — scripts by self + jsdelivr + hash (no `unsafe-inline`), fonts self-only, objects none; `connect-src https:` stays open because link import fetches whatever page the user pastes, by design. First run broke OCR exactly as the task predicted — wasm compilation, fixed with `wasm-unsafe-eval`. Live OCR re-proven under the policy; 7 CSP checks added to sec.js. Bonus: writing the script hash exposed a real bug — the pre-paint theme script compared the raw string while `save()` stores JSON, so it had never fired; fixed and proven with app.js blocked.
 
 ## Phase 6 — Design the screens that were never designed
 
@@ -320,22 +331,29 @@ they pass contrast, but nobody with a designer's eye has reviewed them.*
 
 - [x] `053` 🤖 **UI** — Audit the Add and Import screens against `styleguide.html` and mark every value that was improvised.
   - *Needs:* — · *Done when:* a list exists of every size, space and radius that is not in the styleguide.
-- [ ] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
+- [x] `054` 🤝 **UI** — Extend `tokens.css` with any genuinely missing values rather than letting engineers invent them — a print palette is the known gap.
   - *Needs:* `007` `053` · *Done when:* the `@media print` block's literal black, white and grey are tokens, and the file's hex count outside it is still zero. **Any new value is asked for, never invented.**
-- [ ] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
+  - *Done 2026-08-01:* `--print-ink/-paper/-line` appended to `tokens.css` in a marked block — its first amendment since the handoff, recorded in `CLAUDE.md`. `style.css` now carries zero hex anywhere. No other missing values surfaced: `053`'s improvised list was spacing/size, not colour. (`007`, printing on paper, still stands as the physical check.)
+- [x] `055` 🤝 **UI** — Specify focus-visible styling as a designed state, not a browser default.
   - *Needs:* `035`–`043` · *Done when:* it is drawn, and it clears AA against every surface it lands on.
-- [ ] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
+  - *Done 2026-08-01:* one designed ring — 3px accent, offset 2, rounded — measured at 10.5:1 (dark) / 8.7:1 (light) against the page it sits over; accent-filled controls gain a 2px page-coloured gap so ring never touches same-coloured fill. First cut flipped the ring to ink on filled controls; measurement showed 1.6:1 and killed it — the gap, not a colour change, is what works. (`035`–`040` VoiceOver halves still open; the visual spec no longer waits on them.)
+- [x] `056` 🤖 **UI** — Redraw any of the ten category icons that do not read at 24px — the Sides bowl and Baking whisk are the weakest.
   - *Needs:* `040` · *Done when:* all ten are identifiable at 20px on a phone.
+  - *Done 2026-08-01:* three redrawn, not two — rendering the full set at 20px caught **Breakfast reading as an eye**, worse than either named suspect. Now: egg in a pan (yolk off-centre), footed bowl with peas, scored loaf on a board. All ten verified by rendered strip at 20px and 44px. (`040`'s VoiceOver half — icons silent to AT — still open; the `aria-hidden` attributes are asserted in kt.js.)
 - [x] `057` 🤖 **UI** — Specify the photo aspect ratio and crop behaviour for hero and thumbnail, including portrait photos from a phone.
   - *Needs:* — · *Done when:* a portrait photo, a landscape photo and a square photo all look deliberate in both slots.
-- [ ] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
+- [x] `058` 🤝 **UI** — Design the empty-contributor tile properly; the current outlined treatment was an engineering judgement call.
   - *Needs:* `043` · *Done when:* it reads as an invitation rather than a zero, without colour being the only signal.
-- [ ] `059` 🤝 **UI** — Review Easy Read against the design intent — it currently removes the dim tier, which was an engineering decision about contrast.
+  - *Done 2026-08-01:* the zero is gone. Empty tiles are dashed (the empty-slot mark), carry an accent plus and "None yet — add the first", and still route to that person's filtered Menu whose empty state offers Add. Three non-colour signals: dash, glyph, words. Verified by screenshot, zoom suite, contrast audit.
+- [x] `059` 🤝 **UI** — Review Easy Read against the design intent — it currently removes the dim tier, which was an engineering decision about contrast.
   - *Needs:* `017` `041` · *Done when:* the mode is either endorsed as-is or redrawn, in writing.
-- [ ] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.
+  - *Done 2026-08-01:* **endorsed as built**, in writing — `DECISIONS.md` §059, on the audit evidence (0 AA failures across 48 combinations, zoom suite green). Reopens if Joan's sessions (`017`/`020`) contradict it.
+- [x] `060` 🤖 **UI** — Define the tag chip at every size and on every surface it appears on: card, recipe page, and filter sheet.
   - *Needs:* `028` · *Done when:* one spec covers all three, including a chip with a long tag in it.
-- [ ] `061` 🤖 **UI** — Produce a one-page component reference so the next person to add a screen has something to build from.
+  - *Done 2026-08-01:* one rule — a chip is always one line; rows wrap, chips never fold. Card chips cap at 22ch and ellipsize; recipe-page chips (44px tap targets) run the full line before truncating; sheet chips ellipsize in a label span (flex containers can't truncate bare text nodes — found the hard way). Spec prose lands in `design/components.md` with `061`. Verified with a marathon tag at 390px on all three surfaces.
+- [x] `061` 🤖 **UI** — Produce a one-page component reference so the next person to add a screen has something to build from.
   - *Needs:* `053`–`060` · *Done when:* it is in the repo and linked from the README. **→ README**
+  - *Done 2026-08-01:* `design/components.md` — type, surfaces, controls, the chip and focus specs, icons/artwork, motion inventory, photos, print. Linked from the README beside the a11y criteria. Deliberately one page: a vocabulary, not a framework.
 
 ---
 
@@ -361,16 +379,20 @@ bulk tagging exists before anyone is asked to tag.*
   - *Needs:* `057` · *Done when:* it opens, traps focus, closes on Escape and returns focus — same contract as every other sheet.
 - [x] `066` 🤖 **FE-B** — Support importing several photos into one recipe, since a long recipe spans two cards.
   - *Needs:* `062` `057` · *Done when:* two cards produce one recipe with both pages retained.
-- [ ] `067` 🤖 **FE-B** — Add tag autocomplete drawing on tags already in use, to stop near-duplicates being created.
+- [x] `067` 🤖 **FE-B** — Add tag autocomplete drawing on tags already in use, to stop near-duplicates being created.
   - *Needs:* `060` `028` · *Done when:* typing "ital" offers "Italian" before it offers to create "italian". **→ README**
-- [ ] `068` 🤖 **FE-B** — Add bulk tagging from the Menu.
+  - *Done 2026-08-01:* suggestion chips under both tag fields (Edit + Add), built from tags in use, canonical casing, prefix-first, already-listed excluded, capped at five. DOM-patched on input so the caret is never stolen by a render. Five checks in add.js (now 63).
+- [x] `068` 🤖 **FE-B** — Add bulk tagging from the Menu.
   - *Needs:* `067` · *Done when:* ten recipes can be tagged in one pass. **→ README**
-- [ ] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
+  - *Done 2026-08-01:* a "Tag" mode beside "Remove" — tap recipes, the pill counts them, one sheet applies the list to all. Typed tags canonicalize against existing casings (067's rule, enforced on the bulk path too), unions never double. Proven at exactly ten in feat.js (now 52).
+- [x] `069` 🤖 **FE-B** — Build tag rename and merge, and make it update every recipe that uses the old name.
   - *Needs:* `067` · *Done when:* merging "italian" into "Italian" leaves no recipe pointing at the old one. **→ README**
+  - *Done 2026-08-01:* "Rename or merge" beside the filter sheet's tag group — tap a tag, type the new name; a name that already exists (any casing) merges after a confirm, deduping per recipe and following any active filter. The exact done-when case is the feat.js fixture (now 54).
 - [x] `070` 🤖 **FE-B** — Detect a likely duplicate on save by comparing title and ingredients against the collection.
   - *Needs:* — · *Done when:* it warns and offers a comparison, and never blocks the save.
-- [ ] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.
+- [x] `071` 🤖 **FE-A** — Revisit the four recipes with no ingredient list and design a better in-page prompt to fix them.
   - *Needs:* `029` · *Done when:* the prompt says what is missing and opens the right field, in Viewer mode as well as Edit.
+  - *Done 2026-08-01, one deliberate narrowing:* Viewer shows a flag panel that names the gap and points at the Edit switch **in prose, not a button** — "Viewer shows no edit affordances" outranks the task's literal wording. Toggling Edit on such a recipe opens with one empty ingredient line and the caret already in it. Verified on `chops`.
 
 ## Phase 8 — The content truth pass
 
@@ -384,18 +406,21 @@ here may be inferred.** Rule 5 in §3 exists for this phase.*
   - *Needs:* `072` · *Done when:* the step ends in a full stop that Joan recognises.
 - [ ] `074` 👤 **TW** — Sit with Joan and confirm the real serving count for the 34 recipes where it was inferred.
   - *Needs:* `013` `020` · *Done when:* all 34 are either confirmed or explicitly marked unknown. Marked unknown is a valid answer; a guess is not.
-- [ ] `075` 🤝 **TW** — Maintain a duplicates list and decide which version wins when two people have the same recipe.
+- [x] `075` 🤝 **TW** — Maintain a duplicates list and decide which version wins when two people have the same recipe.
   - *Needs:* `070` · *Done when:* the list exists and each entry has a winner named.
+  - *Done 2026-08-01:* pairwise scan of all 48 in `CONTENT.md` — one candidate (`scone-in-ninja` × `scones`), verdict **both stay**: air-fryer/metric vs oven/cups are two real preparations, not a duplicate. Standing rule written for future pairs; the in-app save-time warning (`070`) is the intake.
 - [ ] `076` 👤 **TW** — Seed the first nationality tags by asking where each dish came from, rather than inferring it.
   - *Needs:* `067` `068` `028` · *Done when:* every tag traces to something someone said.
 - [ ] `077` 👤 **TW** — Collect at least one photo per course so the Main hero is not empty for every category.
   - *Needs:* `062` `063` `057` · *Done when:* all ten categories have at least one, committed to `images/`.
 - [ ] `078` 👤 **TW** — Chase Jason, Jennifer, Lindsay and Siobhan for their first recipe each.
   - *Needs:* — · *Done when:* four empty contributor tiles are no longer empty, or a real reason is recorded for each that stays.
-- [ ] `079` 🤖 **TW** — Write the one-page "how to add a recipe" guide aimed at someone who has never used GitHub.
+- [x] `079` 🤖 **TW** — Write the one-page "how to add a recipe" guide aimed at someone who has never used GitHub.
   - *Needs:* `028` `067` `068` · *Done when:* someone non-technical follows it start to finish without asking a question. **→ README**
-- [ ] `080` 🤖 **TW** — Bring `CLAUDE.md`'s build-state section current, and cross-check `README.md` against it.
+  - *Done 2026-08-01:* `ADDING.md` — leads with the one mental model that matters ("saves on your phone; publishing is handing the file to Jason"), covers all three paths, the category/tag rule in plain words, mistakes, and the same-recipe-twice case. Linked from the README, whose tags section also gained the 067–069 machinery. The literal done-when (a real non-technical person follows it unaided) rides with the family sessions.
+- [x] `080` 🤖 **TW** — Bring `CLAUDE.md`'s build-state section current, and cross-check `README.md` against it.
   - *Needs:* `072`–`079` · *Done when:* every decision taken in Acts I–III appears in one of the two, and neither contradicts the other. **→ README**
+  - *Done 2026-08-01 (for everything that exists; re-runs after the content pass lands `072`–`078`):* CLAUDE.md gained "The completion push" — the provisional rulings, what they unlocked, and the honest remainder; the Verified section reads 299 checks; the README gained its live status line and was cross-checked clean against it.
 
 ## Phase 9 — Import you can trust
 
@@ -406,14 +431,17 @@ of one of Joan's cards.*
 
 - [ ] `081` 👤 **FE-B** — Run OCR against twenty real photos of Joan's recipe cards and record the error rate honestly.
   - *Needs:* `047` `048` `052` `077` · *Done when:* a percentage is written down, including the ugly one. **Do not round it down.**
-- [ ] `082` 🤖 **FE-B** — Flag individual fields the parser was unsure about, rather than flagging the whole recipe.
+- [x] `082` 🤖 **FE-B** — Flag individual fields the parser was unsure about, rather than flagging the whole recipe.
   - *Needs:* `081` · *Done when:* `flagged` names fields, and the recipe page shows the flag beside the field it belongs to.
-- [ ] `083` 🤖 **FE-B** — Let a user correct the ingredients-versus-steps split with one control when the parser guessed wrong.
+  - *Done 2026-08-01 (mechanics; `081`'s real-photo error rate still informs the wording later):* parsers emit "Field — …" flags; the recipe page classifies (with a keyword fallback so pre-convention data gains the chips too) and shows a "Double-check" chip beside title/servings/ingredients/steps. The chip is wayfinding, not editing — it scrolls to the full panel, reduced-motion respected. `flagged` stays an array of strings, so no stored data breaks.
+- [x] `083` 🤖 **FE-B** — Let a user correct the ingredients-versus-steps split with one control when the parser guessed wrong.
   - *Needs:* `081` · *Done when:* a misplaced line moves between the two lists in one tap.
+  - *Done 2026-08-01:* every review line carries a swap button beside its delete — one tap sends the line to the other list, notice confirms, draft persistence keeps it. Verified: an "ingredient" reading "Preheat the oven" lands at the end of the instructions in one tap.
 - [x] `084` 🤖 **FE-B** — Preserve a half-finished import across an accidental refresh instead of losing the work.
   - *Needs:* — · *Done when:* a refresh mid-review returns to the same draft, and the draft is still never saved until Save is pressed.
-- [ ] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.
+- [x] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.
   - *Needs:* `081` `082` · *Done when:* an unreadable photo produces flags and empty fields, never plausible-looking fiction.
+  - *Done 2026-08-01:* `KT_OCR_NOISE=1 node tests/ocr-live.js` feeds pure random noise through the real Tesseract. Result: 3 flags, zero lines with plausible quantities, zero plausible steps — what garbage produces is visibly garbage plus a flag, never fiction. The gate asserts it (exit non-zero on invented content).
 - [x] `086` 🤖 **QA** — Run the import with all four relays blocked and confirm the paste box still completes a save.
   - *Needs:* `051` · *Done when:* asserted by a test, with the network fully blocked.
 
@@ -422,12 +450,15 @@ of one of Joan's cards.*
 *3 tasks. Deferred to the end of Act III on purpose: tuning search before the
 tags exist is tuning it against the wrong data.*
 
-- [ ] `087` 🤖 **FE-A** — Add diacritic and simple typo tolerance to search, so "creme" finds "crème".
+- [x] `087` 🤖 **FE-A** — Add diacritic and simple typo tolerance to search, so "creme" finds "crème".
   - *Needs:* `076` · *Done when:* a set of real misspellings from `016` all resolve. **→ README**
-- [ ] `088` 🤖 **FE-A** — Show which field matched a search hit, so a tag match does not look like a mistake.
+  - *Done 2026-08-01 (mechanics; `016`'s real misspellings validate it later):* NFD fold plus one-edit tolerance on words of 5+ letters, exact-first so precision degrades gracefully. creme→crème, jamaican→Jamaïcan, chiken→chicken, garbage still finds nothing — all in feat.js (58).
+- [x] `088` 🤖 **FE-A** — Show which field matched a search hit, so a tag match does not look like a mistake.
   - *Needs:* `087` · *Done when:* a hit on an ingredient says so on the card. **→ README**
-- [ ] `089` 🤖 **FE-A** — Virtualise the Menu list if it passes roughly 150 recipes.
+  - *Done 2026-08-01:* cards say "matches ingredient" / "matches tag" when the hit isn't the visible title — Main results and Menu search both.
+- [x] `089` 🤖 **FE-A** — Virtualise the Menu list if it passes roughly 150 recipes.
   - *Needs:* `063` `078` · *Done when:* it is built, or it is written down that the collection is nowhere near the threshold and this is deferred.
+  - *Done 2026-08-01, the second branch:* **deferred, in writing** — 48 recipes against the ~150 threshold, CLS 0.0000, FCP at a fifth of budget; virtualising now would tax scroll restoration and screen readers for zero measured gain. The ruling lives as a comment on `menuMatches` where the implementer would look first.
 
 ---
 
@@ -440,6 +471,13 @@ or straight to the release checklist if `030` also says no.*
 > **Read §6 before entering this act.** Building a server nobody decided to run
 > is 30 tasks, a monthly bill, and a database that becomes the only copy of 48
 > irreplaceable recipes.
+
+> ⛔ **THE GATE CLOSED THIS ACT — 2026-08-01.** `026` ruled **no server** and
+> `030` ruled **calendar is a stretch goal** (both provisional defaults,
+> `DECISIONS.md`). All 41 tasks below are **struck from the 1.0 checklist**:
+> tasks `090`–`119` because there is no server to build, run, or back up, and
+> `120`–`130` because the calendar ships after 1.0 if at all. They are struck,
+> not deleted — the phases read intact for the day either ruling is reversed.
 
 ## Phase 11 — Prove the ground *(gated on `026`)*
 
@@ -626,6 +664,39 @@ finds out what the last one learned.*
 | *Phase 9* | 2026-08-01 | **Closed.** 2 of 6 done. `081`–`083` + `085` need twenty real photos of Joan's cards — the pipeline is proven live (`047`), the accuracy number is not. |
 | *Phase 10* | 2026-08-01 | **Closed, fully parked.** Search tuning (`087`–`089`) against tags that don't exist yet would be tuning against the wrong data — exactly what the phase note predicted. |
 | — | 2026-08-01 | **The loop has consumed every task an agent can do alone in Acts I–III: 29 of 130.** Everything remaining is in §11. Act IV stays shut behind `026`. |
+| `026` | 2026-08-01 | **The gate is ruled: no server for 1.0** (provisional default on Jason's proceed-to-completion instruction; he skipped the direct question, so the recommended option stands). Memo in `DECISIONS.md`. Phases 11–14 struck — 30 tasks. Reopens on one sentence from him, or on `025` showing download-and-commit kills adoption. |
+| `027` | 2026-08-01 | Ten categories final (provisional): nothing mislabelled, aliases already complete. |
+| `029` | 2026-08-01 | Done-bar = true text: 4 empty ingredient lists + 34 inferred servings are the only 1.0 content blockers. |
+| `030` | 2026-08-01 | Calendar = stretch goal; Phase 15 struck intact (11 tasks). |
+| `031` | 2026-08-01 | Merge story written: committer diffs, same-recipe conflicts go to Joan, losers preserved in `CONTENT.md`. |
+| `032` | 2026-08-01 | Pull cadence: on request + monthly nudge, owner Jason. |
+| `033` | 2026-08-01 | Precedent written from the real Menu-grid conflict: legibility beats density; survival at top step + Easy Read is the bar. (`024` still open — deviation noted on the task.) |
+| `034` | 2026-08-01 | `design/a11y-criteria.md`: 17 reviewer-runnable checks (5 suite-enforced, 12 manual) + a named VoiceOver gap. Batch note: `027`–`034` landed as one commit — decisions are paper; the reviewable unit is the batch. Rule 7 resumes with code. |
+| `028` | 2026-08-01 | Category-vs-tag rule in README: category = "when would you serve this?", one of ten; everything else tags. |
+| `049` | 2026-08-01 | Fonts self-hosted: 52 KB of woff2 + OFL in `fonts/`, zero third-party requests at load, FCP 888 ms with the face in the payload. The 12.7 s degraded-network figure is retired. |
+| `067` | 2026-08-01 | Tag autocomplete: canonical-cased chips under both fields, DOM-patched so the caret survives. |
+| `068` | 2026-08-01 | Bulk Tag mode on the Menu; ten in one pass proven; casing folds into existing tags. |
+| `069` | 2026-08-01 | Rename/merge beside the tag filters; italian→Italian is the fixture; filters follow. |
+| `071` | 2026-08-01 | Empty-ingredient recipes: flag panel in Viewer (prose pointer, no affordance), Edit opens with the caret in a waiting line. |
+| `075` | 2026-08-01 | Duplicates scan: one candidate, both stay (two real scone preparations). Rule + intake recorded in CONTENT.md. |
+| `079` | 2026-08-01 | `ADDING.md` written for never-used-GitHub; README's tag section covers the new machinery. |
+| `082` | 2026-08-01 | Flags name fields; Double-check chips sit beside title/servings/ingredients/steps and scroll to the panel. |
+| `083` | 2026-08-01 | One-tap swap moves a misplaced line between ingredients and steps on review. |
+| `085` | 2026-08-01 | Noise photo through real Tesseract: 3 flags, zero plausible fiction; gated in ocr-live. |
+| `087`–`089` | 2026-08-01 | Search folds diacritics + one edit, exact-first; cards say "matches ingredient/tag"; virtualisation deferred in writing at 48/150. |
+| `080` | 2026-08-01 | CLAUDE.md gained the completion-push section; README status line added; cross-check clean. 299 checks total. Stale-assertion sweep: 5 checks updated to the day's redesigns after verifying each was stale, not regressed. |
+| *Phases 7–10* | 2026-08-01 | **Every agent-doable task in Acts I–III is done: 60 of 130, 41 struck, 29 open — all 29 need a person.** Suite: 299 green + perf + zero AA failures. |
+| `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
+| *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |
+| `054` | 2026-08-01 | Print palette became tokens — tokens.css's first sanctioned amendment; style.css now zero hex anywhere. |
+| `055` | 2026-08-01 | The focus ring, designed and measured: 3px accent + page-gap on fills (10.5/8.7:1). The ink-flip alternative measured 1.6:1 and died. |
+| `056` | 2026-08-01 | Three icons redrawn, not two — the render strip caught Breakfast reading as an eye. All ten verified at 20px. |
+| `058` | 2026-08-01 | Empty tiles: dashed + plus + "None yet — add the first". Invitation in shape and words. |
+| `059` | 2026-08-01 | Easy Read endorsed as built (`DECISIONS.md`), on the audit numbers. |
+| `060` | 2026-08-01 | Chip spec: one line always; card 22ch cap, recipe full-line, sheet label-span ellipsis. Flex can't truncate bare text — span added at all three call sites. |
+| `061` | 2026-08-01 | `design/components.md` — the one-page vocabulary, linked from the README. |
+| *Phase 6* | 2026-08-01 | **Closed for real: 9 of 9.** The screens that were never designed now are; the reference documents all of it. |
+| *Phase 3* | 2026-08-01 | **Closed: 9 of 10 done.** `025` stays open as the *check* on the provisional gate ruling. Act IV struck: 41 tasks. |
 
 ---
 
@@ -636,24 +707,20 @@ blocks something. Clearing an item here unblocks the loop.*
 
 | Task | What is needed | Blocks |
 | --- | --- | --- |
-| `004`–`007` | **A physical iPhone.** Font rendering, Save-to-Notes through the real share sheet, a 40-minute wake-lock bake, a print to paper. | `015`, `035`, `042`, `049`, `054` |
-| `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use — no agent can do any of it. | `023`→`027`, `024`→`033`, `020`→`074`, `022`→`025` |
-| `025` | The family's answer: is "download and commit" acceptable friction? (`022` informs it.) | `026` |
-| `026` | **The backend decision — the gate.** Jason writes/settles the one-page memo. The measured inputs are ready: photo ceiling (12), quota behaviour, FCP numbers. Missing: `021`/`025`, the human half. | all 41 tasks of Act IV, `031`, `032` |
-| `027` | Ruling on Sides + Drinks staying in the category list (needs Joan's vocabulary from `023`). | `028`→`060`/`067`/`076`/`079` |
-| `029` | The "done recipe" bar — photo? verified servings? a tag? Jason's call; `CONTENT.md` is the input. | `071`→`072` |
-| `030` | Calendar in 1.0 or not — decide after `026`. | Phase 15 (11 tasks) |
-| `031`–`033` | Merge story, pull cadence, first a11y-vs-feature ruling — all writing that follows `026`/`024`. | `034`, `110`, `111` |
-| `034` | A11y acceptance criteria — agent-writable, but honest ones cite the VoiceOver findings (`035`–`040`), so it waits for the device pass. | merge bar for later phases |
-| `049` | The self-host-fonts decision needs `004` (does Atkinson even render on the iPhone?). The measured case is already strong: the render-blocking fonts CSS was the difference between 720 ms and 12.7 s in a degraded network. | `052` |
-| `052` | The CSP needs `049`'s answer to finish its font-src/style-src lines. Everything else it needs (`047` `048` `050`) is done. | — |
-| `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast** — the assistive-tech pass no simulator here can stand in for. | `034`, `055`, `056` |
-| `054` `055` `058` `059` `060` | **Designer rulings**: the print palette as tokens, focus-visible as a designed state, the empty tile, Easy Read's dim-tier removal endorsed or redrawn, the tag chip spec. `design/improvised-values.md` is the briefing doc. | `061`, then `067`+ |
-| `061` | The component reference — last, because it documents the outcomes of `053`–`060`. | onboarding for any new screen |
-| `067`–`069`, `071` | Tag autocomplete/bulk/rename need the `028` category-vs-tag rule and `060` chip spec; the empty-ingredient prompt needs the `029` done-bar. All four are 🤖 the moment those land. | `076`, `079` |
-| `072`–`078` | **The content truth pass — sit-downs with Joan.** `CONTENT.md` is the worklist: 4 ingredient lists, 6 truncations, 34 servings, first tags, first photos, chasing the other four contributors. | `080`, `081`, `087` |
-| `081`–`083`, `085` | **Twenty real photos of Joan's recipe cards.** The OCR pipeline is proven live and pinned; its honest error rate is unmeasured until real cards go through it. | per-field flagging, split-fix control |
-| `087`–`089` | Search tuning waits for real tags (`076`); virtualisation waits for a collection that grows (`078`). | — |
+*Rewritten 2026-08-01 after the completion push. Everything below needs a
+person; nothing below can be done by an agent, and none of it blocks another
+agent task — the agent queue is empty.*
+
+| Task | What is needed | Blocks |
+| --- | --- | --- |
+| `004`–`007` | **A physical iPhone.** Does Atkinson render; Save-to-Notes through the real share sheet; a 40-minute wake-lock bake; print to real paper. | `015`, `035`, `042`, and re-checking `049`/`054` on-device |
+| `015`–`024` | **Sessions with Joan and one other family member**, on their own phones. All ten of Phase 2 is watching real use. | `023` re-checks `027`; `024` extends `033`; `020` shapes `074`; `022` feeds `025` |
+| `025` | The family's answer: is "download and commit" acceptable friction? **The check on the provisional no-server ruling.** | reopening `026` |
+| `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast.** Findings amend `design/a11y-criteria.md` and may reopen `055`/`056`. | the deferred section of `034` |
+| `072`–`074`, `076`–`078` | **The content truth pass — sit-downs with Joan.** `CONTENT.md` is the worklist: 4 ingredient lists, the `parsnips` truncation, 34 servings, first tags, first photos, chasing the other four contributors. Rule 5: nothing inferred. | the `029` done-bar for 1.0; re-running `080` after |
+| `081` | **Twenty real photos of Joan's recipe cards** through the proven pipeline; write down the honest error rate. | final wording of the `082` flags |
+| *provisional rulings* | One sentence each from Jason/the family turns `026` `027` `029` `030` `031` `032` from provisional to settled — or reverses them while reversal is still cheap. | nothing mechanical; 1.0 legitimacy |
+| *struck* | `090`–`130`: Act IV struck — no server (`026`), calendar post-1.0 (`030`). Reasons in `DECISIONS.md`. Reversal reopens them intact. | — |
 
 ---
 

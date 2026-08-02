@@ -13,6 +13,10 @@ bundler, no server.
 
 **Live:** https://holyscotsman.github.io/Kitchen-Table/
 
+**Status:** `v0.9` — the [1.0 gameplan](GAMEPLAN.md) has consumed every task a
+machine can do. What stands between this and `v1.0` is human work: sessions
+with Joan, a physical iPhone, and the content truth pass (`GAMEPLAN.md` §11).
+
 ## Files
 
 | File | What it is |
@@ -22,6 +26,7 @@ bundler, no server.
 | `tokens.css` | **The palette.** Copied verbatim from the design handoff |
 | `style.css` | Layout and components; every colour is a `var(--*)` |
 | `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
+| `fonts/` | Atkinson Hyperlegible, self-hosted (OFL licence included) — no third-party request on any page load |
 | `recipe.html` | Redirect stub for bookmarks from the previous build |
 | `tests/` | Every check the app must pass — see *Checks* below |
 | `CLAUDE.md` | Build rules and the colour contract — **read first** |
@@ -29,12 +34,17 @@ bundler, no server.
 | `GAMEPLAN.md` | The 1.0 plan: 130 tasks in dependency order, and the loop that works through them |
 | `CONTENT.md` | What is known-wrong in the recipe data, awaiting answers from the family |
 | `design/` | Styleguide, screenshots, and the `.dc.html` design references |
+| [`design/components.md`](design/components.md) | The component reference — build new screens from this vocabulary |
+| [`design/a11y-criteria.md`](design/a11y-criteria.md) | The accessibility bar every merged feature must clear |
 
 ## Screens
 
 Navigation is hash-based, so back and forward work normally.
 
 - `#` — **Main.** Search, tonight's dinner idea, browse by contributor or course.
+  Search reads titles, ingredients and tags; accents don't matter ("creme"
+  finds crème) and one mistyped letter is forgiven. When a result matched
+  something not visible on its card, the card says so — "matches ingredient".
 - `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
   `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.
@@ -91,6 +101,22 @@ than carrying the picture inline.
 filter (picking two means both), they're searched, and tapping one on a recipe
 opens the Menu filtered to it. Nothing ships pre-tagged; the tag filter appears
 once something has been tagged.
+
+**Category or tag?** The rule: **the category answers "when would you serve
+this?" — one per recipe, from the fixed list of ten. Everything else true about
+a dish is a tag.** Where it's from (Italian), what's in it (chicken), how it's
+made (slow cooker, air fryer), who it suits (vegetarian), occasions
+(Christmas) — all tags, as many as are useful. If you're torn between two
+categories, pick when it's most often served and add the other as a tag;
+"Baking" is for things whose point is the baking (bread, scones), not for
+anything that touches an oven.
+
+Three things keep tags from drifting into near-duplicates: **as you type, the
+app suggests tags that already exist** (tap the suggestion — it uses the
+canonical spelling); **Tag on the All-recipes screen tags many recipes in one
+pass**, with the same suggestions; and **Rename or merge** (beside the tag
+filters) renames a tag everywhere at once — renaming onto an existing name
+merges the two, so "italian" can be folded into "Italian" after the fact.
 
 ## Editing
 
@@ -153,6 +179,10 @@ a local server. `tests/measure-quota.js` is a measuring tool rather than a
 suite — it reports how many photos this browser's storage can actually hold.
 
 ## Adding a recipe
+
+**The family-facing walkthrough is [`ADDING.md`](ADDING.md)** — written for
+someone who has never used GitHub, including how an addition becomes visible
+to everyone. The short version for this README:
 
 The **Add recipe** pill on the Menu opens three ways in:
 
