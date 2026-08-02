@@ -792,6 +792,7 @@ finds out what the last one learned.*
 | `V05` | 2026-08-02 | 111 new checks (backend 75 with tools faked, browser 36 with the kitchen stubbed). Full battery 450 green; CI never pokes the real server. |
 | `096` | 2026-08-02 | **Struck as superseded**: the Render import server *is* the small worker — it holds `KT_DB` server-side and `accept` is the first live app→database write. The Data-API/browser-key question no longer blocks anything. |
 | `031` `032` | 2026-08-02 | Refreshed for the live-write era in DECISIONS.md: video-accept inserts reach the file through the nightly export; id collisions suffix, never overwrite. |
+| `V06` | 2026-08-02 | **The first real video found the first real bug**: YouTube robot-checks Render's cloud address and the error mapping mislabelled it "age-restricted". Now: retried automatically as the TV client (which also passes many true age gates), and the message names the robot check for what it is — about the server, never the video. |
 
 ---
 

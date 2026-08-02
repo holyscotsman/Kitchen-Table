@@ -110,13 +110,49 @@ function frameKeepIndices(buf, frameBytes, threshold) {
   return keep;
 }
 
+/* YouTube answers cloud-server addresses with "Sign in to confirm you're
+ * not a bot" for perfectly ordinary videos — a robot check on the SERVER,
+ * not a fact about the video. It must never be mistaken for age
+ * restriction (that read "cooking video can't be fetched, needs a login"
+ * to the first real user). */
+function isBotCheck(stderr) {
+  return /sign in to confirm (you.?re not a bot|that you.?re not a bot)|not a bot/i.test(String(stderr || ""));
+}
+
+/* When the plain call hits the robot check, retry as clients YouTube
+ * doesn't bot-check from datacenter addresses — the TV app interface
+ * first (which also passes many genuine age gates without a login), IPv4
+ * forced since the flagging is harsher on cloud IPv6 ranges. Non-YouTube
+ * failures (private, deleted, Instagram) never retry — their answer
+ * wouldn't change. */
+const YT_CLIENT_FALLBACKS = [
+  ["-4", "--extractor-args", "youtube:player_client=tv"],
+  ["-4", "--extractor-args", "youtube:player_client=tv_embedded,android"]
+];
+
+async function runYtdlp(tool, args, opts) {
+  let res = await run(tool, args, opts);
+  if (res.ok || !isBotCheck(res.stderr)) return res;
+  for (const extra of YT_CLIENT_FALLBACKS) {
+    res = await run(tool, extra.concat(args), opts);
+    if (res.ok || !isBotCheck(res.stderr)) return res;
+  }
+  return res;
+}
+
 /* yt-dlp's stderr → a sentence a person can act on. The Instagram wording is
  * a spec requirement: scraping IG breaks periodically, and the workaround
  * (screen-record it) deserves to be said every time. */
 function friendlyDownloadError(stderr, platform) {
   const s = String(stderr || "");
+  if (isBotCheck(s)) {
+    return "YouTube blocked the kitchen server’s connection for this video — " +
+      "it sometimes treats cloud servers as robots. It’s nothing about the " +
+      "video itself. Try it again in a few minutes; if it keeps happening, " +
+      "screen-record the recipe and use From a photo.";
+  }
   if (/private/i.test(s)) return "That video is private, so it can’t be fetched.";
-  if (/age.?restrict|sign in to confirm/i.test(s)) return "That video is age-restricted, so it can’t be fetched without a login.";
+  if (/age.?restrict|confirm your age/i.test(s)) return "That video is age-restricted, so it can’t be fetched without a login.";
   if (/unavailable|removed|does not exist|404/i.test(s)) return "That video seems to be unavailable or deleted — check the link still opens.";
   if (/not available in your country|geo/i.test(s)) return "That video isn’t available from the server’s region.";
   if (platform === "instagram") {
@@ -126,6 +162,6 @@ function friendlyDownloadError(stderr, platform) {
 }
 
 module.exports = {
-  resolveTool, run, vttToText, looksLikeRecipeText,
+  resolveTool, run, runYtdlp, isBotCheck, vttToText, looksLikeRecipeText,
   pickCaptionTrack, frameKeepIndices, friendlyDownloadError
 };
