@@ -88,6 +88,24 @@ Transcribed exactly as the source showed, flagged rather than corrected:
 
 ---
 
+## Duplicates (task `075`)
+
+The whole collection was scanned pairwise — exact normalized titles, plus
+fuzzy title-word × ingredient-line overlap (the same conservative thresholds
+the in-app save-time detector uses). One candidate pair surfaced:
+
+| Pair | Verdict | Why |
+| --- | --- | --- |
+| `scone-in-ninja` × `scones` | **Both stay — not duplicates** | Same word, different recipes: air fryer at 200°C with metric self-raising flour versus a greased-tray oven bake in cups; 8 steps vs 4. Two preparations Joan actually uses. |
+
+**The standing rule for future duplicates:** when the same dish genuinely
+appears twice, the version Joan cooks is the one that keeps the plain id and
+the other is either removed or retitled to say how it differs (as the scone
+pair already does). New candidates get a row here — the app's save-time
+duplicate warning is the intake.
+
+---
+
 ## Resolved
 
 | Item | Resolved on | How |

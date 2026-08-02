@@ -406,8 +406,9 @@ here may be inferred.** Rule 5 in §3 exists for this phase.*
   - *Needs:* `072` · *Done when:* the step ends in a full stop that Joan recognises.
 - [ ] `074` 👤 **TW** — Sit with Joan and confirm the real serving count for the 34 recipes where it was inferred.
   - *Needs:* `013` `020` · *Done when:* all 34 are either confirmed or explicitly marked unknown. Marked unknown is a valid answer; a guess is not.
-- [ ] `075` 🤝 **TW** — Maintain a duplicates list and decide which version wins when two people have the same recipe.
+- [x] `075` 🤝 **TW** — Maintain a duplicates list and decide which version wins when two people have the same recipe.
   - *Needs:* `070` · *Done when:* the list exists and each entry has a winner named.
+  - *Done 2026-08-01:* pairwise scan of all 48 in `CONTENT.md` — one candidate (`scone-in-ninja` × `scones`), verdict **both stay**: air-fryer/metric vs oven/cups are two real preparations, not a duplicate. Standing rule written for future pairs; the in-app save-time warning (`070`) is the intake.
 - [ ] `076` 👤 **TW** — Seed the first nationality tags by asking where each dish came from, rather than inferring it.
   - *Needs:* `067` `068` `028` · *Done when:* every tag traces to something someone said.
 - [ ] `077` 👤 **TW** — Collect at least one photo per course so the Main hero is not empty for every category.
