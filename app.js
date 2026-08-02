@@ -482,13 +482,72 @@
 
   /* Title, ingredients, and tags — so "Thai" finds a dish tagged Thai even
      when the word appears nowhere in the recipe itself. */
+  /* 087 — search folds diacritics and tolerates one adjacent typo. "creme"
+     finds crème; "chiken" still finds chicken. Fold first (cheap, exact),
+     fuzz only when folding found nothing, so precision degrades gracefully
+     rather than fuzzily. */
+  function fold(s) {
+    var out = String(s).toLowerCase();
+    /* normalize+strip combining marks where the engine has it; the map keeps
+       the common cases working even without String.normalize. */
+    if (out.normalize) out = out.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var MAP = { "æ": "ae", "œ": "oe", "ø": "o", "ß": "ss", "đ": "d", "þ": "th" };
+    return out.replace(/[æœøßđþ]/g, function (c) { return MAP[c] || c; });
+  }
+
+  /* One edit (missing, extra, wrong, or swapped letter) counts as a match for
+     terms of 5+ letters — short words stay exact or they match everything. */
+  function nearWord(word, term) {
+    if (word.indexOf(term) > -1) return true;
+    if (term.length < 5) return false;
+    var la = word.length, lb = term.length;
+    if (Math.abs(la - lb) > 1) {
+      /* term may still sit inside a longer word with one typo — slide it. */
+      for (var s = 0; s + lb - 1 <= la; s++) {
+        if (editsAtMostOne(word.slice(s, s + lb + 1), term)) return true;
+      }
+      return false;
+    }
+    return editsAtMostOne(word, term);
+  }
+
+  function editsAtMostOne(a, b) {
+    if (a === b) return true;
+    var la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    var i = 0, j = 0, edits = 0;
+    while (i < la && j < lb) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++edits > 1) return false;
+      if (la === lb) {
+        /* swapped pair counts as the one edit */
+        if (a[i] === b[j + 1] && a[i + 1] === b[j]) { i += 2; j += 2; }
+        else { i++; j++; }
+      } else if (la > lb) { i++; } else { j++; }
+    }
+    return edits + (la - i) + (lb - j) <= 1;
+  }
+
+  function fieldMatches(text, q) {
+    var t = fold(text);
+    if (t.indexOf(q) > -1) return true;
+    var words = t.split(/[^a-z0-9]+/);
+    return words.some(function (w) { return w && nearWord(w, q); });
+  }
+
+  /* 088 — say which field matched, so a tag hit doesn't look like a mistake.
+     Returns "" (no match) or the field name, title first since a title hit
+     needs no explanation. */
+  function matchField(r, q) {
+    if (!q) return "title";
+    if (fieldMatches(r.title, q)) return "title";
+    if (tagsOf(r).some(function (t) { return fieldMatches(t, q); })) return "tag";
+    if ((r.ingredients || []).some(function (i) { return fieldMatches(i, q); })) return "ingredient";
+    return "";
+  }
+
   function matchesQuery(r, q) {
-    if (!q) return true;
-    if (r.title.toLowerCase().indexOf(q) > -1) return true;
-    if (tagsOf(r).some(function (t) { return t.toLowerCase().indexOf(q) > -1; })) return true;
-    return (r.ingredients || []).some(function (i) {
-      return i.toLowerCase().indexOf(q) > -1;
-    });
+    return !q || matchField(r, fold(q)) !== "";
   }
 
   function countBy(list, key, value) {
@@ -809,7 +868,10 @@
              "<p>No recipes match. Try a different word.</p></div>";
       } else {
         h += '<div class="cardgrid">' +
-             hits.slice(0, 12).map(cardHtml).join("") + "</div>";
+             hits.slice(0, 12).map(function (r) {
+               var f = matchField(r, fold(q));
+               return cardHtml(r, f === "title" ? "" : f);
+             }).join("") + "</div>";
       }
       h += "</div>";
       return h;
@@ -877,12 +939,17 @@
      7. Menu screen
      ====================================================================== */
 
-  function cardHtml(r) {
+  function cardHtml(r, matchNote) {
     /* Long time strings are omitted rather than truncated. */
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
     /* meta is pre-escaped here — it is interpolated bare below. */
     var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
+    /* 088: a hit on something not visible on the card says so, so a tag or
+       ingredient match doesn't read as a wrong result. */
+    if (matchNote) {
+      meta += ' · <span class="matchnote">matches ' + esc(matchNote) + "</span>";
+    }
     var src = imageFor(r);
     /* A photo replaces the category icon; without one, the icon is what tells
        you at a glance whether this is a breakfast or a dessert. Either way
@@ -910,6 +977,12 @@
     );
   }
 
+  /* 089, ruled 2026-08-01: the Menu is NOT virtualised. The collection is 48
+     against the task's own ~150 threshold, the full list renders in one
+     innerHTML pass with CLS 0.0000 and FCP at a fifth of budget, and
+     virtualising would complicate scroll restoration, find-in-page, and the
+     screen-reader experience for zero measured gain. Revisit at ~150, per the
+     gameplan. */
   function menuMatches() {
     var q = S.menuQ.trim().toLowerCase();
     var list = S.recipes.filter(function (r) {
@@ -1048,7 +1121,11 @@
                "</span></span></button>";
       }).join("") + "</div>";
     } else {
-      h += '<div class="cardgrid">' + list.map(cardHtml).join("") + "</div>";
+      var mq = S.menuQ.trim() ? fold(S.menuQ.trim()) : "";
+      h += '<div class="cardgrid">' + list.map(function (r) {
+        var f = mq ? matchField(r, mq) : "";
+        return cardHtml(r, f && f !== "title" ? f : "");
+      }).join("") + "</div>";
     }
     h += "</div>";
 

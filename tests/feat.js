@@ -221,6 +221,20 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('merged recipes carry the target exactly once', await p.evaluate(()=>{const l=JSON.parse(localStorage.getItem('kt.recipes'));return l[0].tags.join()==='Italian'&&l[1].tags.join()==='Italian,quick'&&l[2].tags.join()==='Italian,Sunday';}));
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== 087+088: search folds, tolerates a typo, and names its field ==');
+  await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].ingredients=['2 tbsp crème fraîche'].concat(l[0].ingredients||[]);l[1].tags=['Jamaïcan'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="toggle-search"]');
+  await p.fill('#menu-search','creme'); await p.waitForSelector('.matchnote');
+  chk('creme finds crème and says "matches ingredient"', (await p.locator('.matchnote').first().textContent()).includes('ingredient'));
+  await p.fill('#menu-search','jamaican'); await p.waitForSelector('.matchnote');
+  chk('jamaican finds the Jamaïcan tag and says so', (await p.locator('.matchnote').first().textContent()).includes('tag'));
+  await p.fill('#menu-search','chiken'); await p.waitForFunction(()=>document.querySelectorAll('.rcard').length>0);
+  chk('one-letter typo still finds chicken', await p.locator('.rcard').count()>0);
+  await p.fill('#menu-search','zzzzqqq'); await new Promise(r=>setTimeout(r,250));
+  chk('garbage still finds nothing', await p.locator('.rcard').count()===0);
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

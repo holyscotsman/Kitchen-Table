@@ -2315,3 +2315,9 @@ input[type="file"].input {
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* 088 — why this card matched, when the reason isn't visible on it. */
+.matchnote {
+  font-style: italic;
+  color: var(--dim);
+}

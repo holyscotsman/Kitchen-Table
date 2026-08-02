@@ -38,6 +38,9 @@ bundler, no server.
 Navigation is hash-based, so back and forward work normally.
 
 - `#` — **Main.** Search, tonight's dinner idea, browse by contributor or course.
+  Search reads titles, ingredients and tags; accents don't matter ("creme"
+  finds crème) and one mistyped letter is forgiven. When a result matched
+  something not visible on its card, the card says so — "matches ingredient".
 - `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
   `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.

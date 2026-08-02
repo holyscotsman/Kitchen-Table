@@ -449,12 +449,15 @@ of one of Joan's cards.*
 *3 tasks. Deferred to the end of Act III on purpose: tuning search before the
 tags exist is tuning it against the wrong data.*
 
-- [ ] `087` 🤖 **FE-A** — Add diacritic and simple typo tolerance to search, so "creme" finds "crème".
+- [x] `087` 🤖 **FE-A** — Add diacritic and simple typo tolerance to search, so "creme" finds "crème".
   - *Needs:* `076` · *Done when:* a set of real misspellings from `016` all resolve. **→ README**
-- [ ] `088` 🤖 **FE-A** — Show which field matched a search hit, so a tag match does not look like a mistake.
+  - *Done 2026-08-01 (mechanics; `016`'s real misspellings validate it later):* NFD fold plus one-edit tolerance on words of 5+ letters, exact-first so precision degrades gracefully. creme→crème, jamaican→Jamaïcan, chiken→chicken, garbage still finds nothing — all in feat.js (58).
+- [x] `088` 🤖 **FE-A** — Show which field matched a search hit, so a tag match does not look like a mistake.
   - *Needs:* `087` · *Done when:* a hit on an ingredient says so on the card. **→ README**
-- [ ] `089` 🤖 **FE-A** — Virtualise the Menu list if it passes roughly 150 recipes.
+  - *Done 2026-08-01:* cards say "matches ingredient" / "matches tag" when the hit isn't the visible title — Main results and Menu search both.
+- [x] `089` 🤖 **FE-A** — Virtualise the Menu list if it passes roughly 150 recipes.
   - *Needs:* `063` `078` · *Done when:* it is built, or it is written down that the collection is nowhere near the threshold and this is deferred.
+  - *Done 2026-08-01, the second branch:* **deferred, in writing** — 48 recipes against the ~150 threshold, CLS 0.0000, FCP at a fifth of budget; virtualising now would tax scroll restoration and screen readers for zero measured gain. The ruling lives as a comment on `menuMatches` where the implementer would look first.
 
 ---
 
