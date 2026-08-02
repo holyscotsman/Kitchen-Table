@@ -190,6 +190,24 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
 
+  console.log('\n== 068: bulk tagging from the Menu ==');
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+  await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
+  await p.click('[data-act="toggle-tagging"]'); await p.waitForSelector('[data-act="tag-pick"]');
+  for (let i=0;i<10;i++) await p.locator('[data-act="tag-pick"]').nth(i).click();
+  chk('pill counts the selection', (await p.locator('[data-act="open-bulk"]').textContent()).includes('Tag 10 recipes'));
+  await p.click('[data-act="open-bulk"]'); await p.waitForSelector('#bulk-tags');
+  await p.type('#bulk-tags','Family favourite');
+  await p.click('[data-act="bulk-apply"]'); await p.waitForSelector('.rcard');
+  chk('ten recipes tagged in one pass', await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes')).filter(r=>(r.tags||[]).includes('Family favourite')).length===10));
+  await p.click('[data-act="toggle-tagging"]');
+  await p.locator('[data-act="tag-pick"]').first().click();
+  await p.click('[data-act="open-bulk"]'); await p.waitForSelector('#bulk-tags');
+  await p.type('#bulk-tags','family favourite');
+  await p.click('[data-act="bulk-apply"]'); await p.waitForSelector('.rcard');
+  chk('re-tagging in another casing does not duplicate', await p.evaluate(()=>{const t=JSON.parse(localStorage.getItem('kt.recipes'))[0].tags;return t.filter(x=>x.toLowerCase()==='family favourite').length===1&&t.includes('Family favourite');}));
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

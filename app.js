@@ -320,6 +320,13 @@
     sort: "recent",
     removing: false,
 
+    /* 068 — bulk tagging. Its own mode, same shape as removal: enter, tap
+       recipes to select, then one sheet applies a tag list to all of them. */
+    tagging: false,
+    tagSel: {},
+    tagSheetOpen: false,
+    bulkTags: "",
+
     editing: false,
     serves: null,
     checkedIng: {},
@@ -960,17 +967,27 @@
     if (S.notice) h += '<p class="hint" role="status">' + esc(S.notice) + "</p>";
     h += "</div></header>";
 
+    var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
+
     h += '<div class="menubody" id="main-content">';
     h += '<div class="countrow"><span>' + list.length +
          (list.length === 1 ? " recipe" : " recipes") +
-         (S.removing ? " — tap a recipe to remove it" : "") + "</span>" +
+         (S.removing ? " — tap a recipe to remove it" : "") +
+         (S.tagging ? " — tap the ones to tag" : "") + "</span>" +
          '<span class="countrow__actions">' +
          (filterCount || S.menuQ
            ? '<button type="button" class="textbtn" data-act="clear-filters">Clear</button>'
            : "") +
-         '<button type="button" class="textbtn' +
-         (S.removing ? " textbtn--removing" : "") + '" data-act="toggle-remove">' +
-         (S.removing ? "Done" : "Remove") + "</button>" +
+         (S.removing
+           ? ""
+           : '<button type="button" class="textbtn' +
+             (S.tagging ? " textbtn--removing" : "") + '" data-act="toggle-tagging">' +
+             (S.tagging ? "Done" : "Tag") + "</button>") +
+         (S.tagging
+           ? ""
+           : '<button type="button" class="textbtn' +
+             (S.removing ? " textbtn--removing" : "") + '" data-act="toggle-remove">' +
+             (S.removing ? "Done" : "Remove") + "</button>") +
          "</span></div>";
 
     if (!list.length) {
@@ -1003,17 +1020,61 @@
                '<span class="rcard__meta">' + esc(r.contributor) + "</span></span>" +
                '<span class="rrow__minus">' + I.minus(20) + "</span></button>";
       }).join("") + "</div>";
+    } else if (S.tagging) {
+      h += '<div class="cardgrid">' + list.map(function (r) {
+        var on = !!S.tagSel[r.id];
+        return '<button type="button" class="rrow press" data-act="tag-pick" ' +
+               'aria-pressed="' + on + '" data-id="' + esc(r.id) + '">' +
+               '<span class="checkbox">' + (on ? I.check(18) : "") + "</span>" +
+               '<span class="rcard__body"><span class="rcard__title">' +
+               esc(r.title) + "</span>" +
+               '<span class="rcard__meta">' +
+               (tagsOf(r).length ? tagsOf(r).join(", ") : "No tags yet") +
+               "</span></span></button>";
+      }).join("") + "</div>";
     } else {
       h += '<div class="cardgrid">' + list.map(cardHtml).join("") + "</div>";
     }
     h += "</div>";
 
-    h += '<div class="addbar"><a class="addpill press" href="#add">' +
-         I.plus(20) + "Add recipe</a></div>";
+    if (S.tagging) {
+      h += '<div class="addbar"><button type="button" class="addpill press" ' +
+           'data-act="open-bulk"' + (selCount ? "" : " disabled") + ">" +
+           I.plus(20) + "Tag " + selCount +
+           (selCount === 1 ? " recipe" : " recipes") + "</button></div>";
+    } else {
+      h += '<div class="addbar"><a class="addpill press" href="#add">' +
+           I.plus(20) + "Add recipe</a></div>";
+    }
 
     if (S.filterOpen) h += filterSheetHtml();
     if (S.textOpen) h += textSheetHtml();
+    if (S.tagSheetOpen) h += bulkTagSheetHtml(selCount);
     return h;
+  }
+
+  /* 068 — the one sheet that finishes a bulk tag. Same dialog contract as
+     every other sheet; the field reuses the 067 suggestion machinery. */
+  function bulkTagSheetHtml(selCount) {
+    return (
+      '<button type="button" class="scrim" data-act="close-bulk" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bulk-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="bulk-title">Tag ' +
+      selCount + (selCount === 1 ? " recipe" : " recipes") + "</h2>" +
+      '<button type="button" class="donebtn press" data-act="close-bulk">Cancel</button></div>' +
+      '<div class="field">' +
+      '<label class="field__label" for="bulk-tags">Tags to add</label>' +
+      '<input class="input" id="bulk-tags" data-act="bulk-tags" data-k="tags" ' +
+      'value="' + esc(S.bulkTags) + '" autocomplete="off" ' +
+      'placeholder="Italian, vegetarian, quick" />' +
+      '<div class="sugrow" id="bulk-tags-sug" data-for="bulk-tags"></div>' +
+      '<span class="fieldhint">Added to every selected recipe. Tags they ' +
+      "already have aren’t doubled.</span></div>" +
+      '<div class="sheet__foot">' +
+      '<button type="button" class="savebtn press" data-act="bulk-apply">Add tags</button>' +
+      "</div></div></div>"
+    );
   }
 
   function sortMenuHtml() {
@@ -1054,6 +1115,7 @@
     S.dlOpen = false;
     S.lbOpen = false;
     S.sortOpen = false;
+    S.tagSheetOpen = false;
     S[flag] = true;
     openSheetId = null;
     S.pulseSheet = true;
@@ -1580,7 +1642,8 @@
     parts.push(" " + el.getAttribute("data-key"));
     var next = parts.join(",").replace(/^\s+/, "") + ", ";
     input.value = next;
-    if (S.route.name === "recipe" && S.draft) { S.draft.tags = next; S.saved = false; }
+    if (input.id === "bulk-tags") S.bulkTags = next;
+    else if (S.route.name === "recipe" && S.draft) { S.draft.tags = next; S.saved = false; }
     else if (S.addDraft) { S.addDraft.tags = next; scheduleAddPersist(); }
     syncTagSuggestions(input);
     input.focus();
@@ -2827,7 +2890,54 @@
       if (!dropFilterParams()) render();
       return;
     }
-    if (act === "toggle-remove") { S.removing = !S.removing; render(); return; }
+    if (act === "toggle-remove") {
+      S.removing = !S.removing;
+      S.tagging = false; S.tagSel = {};
+      render(); return;
+    }
+    if (act === "toggle-tagging") {
+      S.tagging = !S.tagging;
+      S.removing = false;
+      if (!S.tagging) { S.tagSel = {}; S.bulkTags = ""; }
+      render(); return;
+    }
+    if (act === "tag-pick") {
+      var pid = el.getAttribute("data-id");
+      S.tagSel[pid] = !S.tagSel[pid];
+      render(); return;
+    }
+    if (act === "open-bulk") { openSheet("tagSheetOpen", el); return; }
+    if (act === "close-bulk") { closeSheet("tagSheetOpen"); return; }
+    if (act === "bulk-apply") {
+      var toAdd = parseTags(S.bulkTags);
+      if (!toAdd.length) { closeSheet("tagSheetOpen"); return; }
+      /* A typed tag that matches an existing one in any casing becomes the
+         existing form — bulk tagging must not mint near-duplicates (067's
+         rule, enforced here too). */
+      var canon = {};
+      allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
+      toAdd = toAdd.map(function (t) { return canon[t.toLowerCase()] || t; });
+      var touched = 0;
+      S.recipes = S.recipes.map(function (r) {
+        if (!S.tagSel[r.id]) return r;
+        var out = {};
+        Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+        var have = tagsOf(r).slice();
+        var lower = have.map(function (t) { return t.toLowerCase(); });
+        toAdd.forEach(function (t) {
+          if (lower.indexOf(t.toLowerCase()) === -1) { have.push(t); lower.push(t.toLowerCase()); }
+        });
+        out.tags = have;
+        touched++;
+        return out;
+      });
+      persistRecipes();
+      S.tagSheetOpen = false;
+      S.tagging = false; S.tagSel = {}; S.bulkTags = "";
+      setNotice("Tagged " + touched + (touched === 1 ? " recipe." : " recipes."));
+      render();
+      return;
+    }
     if (act === "reset-local") { resetLocal(); return; }
     if (act === "rm-photo") { removeImage(key); render(); return; }
     if (act === "dl-photos") { downloadPhotos(); return; }
@@ -2992,6 +3102,11 @@
       scheduleAddPersist();
       return;
     }
+    if (act === "bulk-tags") {
+      S.bulkTags = el.value;
+      syncTagSuggestions(el);
+      return;
+    }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
       scheduleAddPersist();
@@ -3018,6 +3133,7 @@
     else if (S.textOpen) closeSheet("textOpen");
     else if (S.dlOpen) closeSheet("dlOpen");
     else if (S.lbOpen) closeSheet("lbOpen");
+    else if (S.tagSheetOpen) closeSheet("tagSheetOpen");
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 
