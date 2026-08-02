@@ -19,7 +19,7 @@ the Share button → *Add to Home Screen* once, and it behaves like an app.)
 ## 2. Tap "Add recipe"
 
 It's the green pill at the bottom of the **All recipes** screen (tap "View
-all recipes" from the front page if you're not there). You'll get three ways
+all recipes" from the front page if you're not there). You'll get four ways
 in — pick whichever matches what you're holding:
 
 - **Type it in** — a blank form. Best when you know the recipe by heart.
@@ -31,10 +31,34 @@ in — pick whichever matches what you're holding:
 - **From a photo** — take a picture of a recipe card or cookbook page. The
   reading happens on your phone; the photo is never uploaded anywhere. It
   *will* misread some lines — that's why the next step exists.
+- **From a video** — paste a YouTube or Instagram link. The family's
+  kitchen server watches it for you: it fetches the video, listens to the
+  narration, reads any text on screen, and writes up a draft. This takes a
+  few minutes and **you don't have to wait** — close the page, and the
+  finished draft will be sitting at the top of the Add screen under "Ready
+  to check over" when anyone comes back. Videos leave a lot unsaid, so
+  expect a longer "Worth double-checking" list than usual — that's the
+  feature being honest, not broken. (If the server's been idle it takes a
+  minute to wake up; the app says so while it happens.)
+
+### Sharing a video straight into the app
+
+- **Android**: install the site (browser menu → *Add to home screen*), then
+  the share button under any YouTube video or Instagram Reel → **Kitchen
+  Table**. The link lands in the importer and sends itself.
+- **iPhone**: Apple doesn't let websites join the share sheet, so paste the
+  link into **From a video** — or set up a one-time Shortcut, about two
+  minutes: open the **Shortcuts** app → **+** → name it "Send to Kitchen
+  Table" → add the action **Get Contents of URL** → set the URL to
+  `https://kitchen-table-5tp6.onrender.com/api/import/video`, Method to
+  **POST**, Request Body to **JSON** with one field: `url` = **Shortcut
+  Input**. Then in the Shortcut's settings (ⓘ) turn on **Show in Share
+  Sheet**. From then on: share button on any video → *Send to Kitchen
+  Table* → the draft appears on the Add screen when it's done.
 
 ## 3. Check the form, then Save
 
-All three paths land on the same review form. Look it over — anything the
+All four paths land on the same review form. Look it over — anything the
 reader had to guess is listed under "Worth double-checking" and stays
 attached to the recipe so others see it too.
 

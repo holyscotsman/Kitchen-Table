@@ -203,3 +203,43 @@ both themes (the audit runs 48 screen × theme × Easy-Read combinations with
 zero failures), and the zoom suite proves the layout survives 200% zoom at
 the top font step with no horizontal scroll. No redraw needed. If Joan's
 sessions (`017`, `020`) show otherwise, this reopens.
+
+## V — The video importer lives on Render, and nowhere else touches a server
+
+**Jason's ruling, in his words: "I only want the video conversion to live on
+the Render, not the whole app. This way the app still works instantly while
+the video conversion can run in the background without the user seeing it."**
+
+So the boundary is drawn exactly there. The site stays static files on
+GitHub Pages — no request to the import server is ever on the path to
+reading a recipe, and the app behaves identically with the server asleep,
+awake, or gone. The server does three things only: turn a YouTube/Instagram
+link into a draft (background job), report job state, and write an accepted
+draft into the database. Its cold starts are absorbed by design: submitting
+shows "waking up the kitchen…", and for the job itself a cold start is just
+processing time. Cost stands at $0 (Render free + Groq free + pennies of
+Anthropic usage per import).
+
+Two consequences worth naming:
+
+- **`096` is superseded.** The question "enable Neon's Data API or ask for a
+  small worker?" answered itself — the import server *is* the small worker,
+  holding `KT_DB` server-side where a browser key never has to exist.
+- **The trust model is unchanged, and that is deliberate.** The API is
+  unauthenticated like the site itself (contributor names are labels, not
+  authentication — CLAUDE.md). What bounds it: three narrow operations,
+  validation identical to the migration's, a short queue, and id collisions
+  suffixing rather than overwriting. Real access control remains the
+  backend-gate conversation, not a patch.
+
+## 031/032 — refreshed for the live-write era (the one-paragraph update they were owed)
+
+The merge story gains one new writer: accepting a video import inserts the
+reviewed recipe into the database directly, and the nightly `db-sync`
+carries it into `recipes.json` — so a recipe can now appear in the published
+file that no phone ever downloaded-and-committed. Conflict handling follows
+the file era's rule (nothing is ever silently replaced): an id already taken
+in the database gets a suffix, and the duplicate is left visible for the
+family to resolve. Pull cadence is unchanged — devices still refresh from
+the published file, so an accepted import reaches other phones after the
+nightly sync commits, or sooner if someone runs the workflow by hand.

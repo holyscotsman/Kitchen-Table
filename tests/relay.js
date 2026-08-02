@@ -14,6 +14,9 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
   console.log('\n== First relay dead, second works ==');
   {
     const ctx=await br.newContext({...devices['iPhone 13']});
+    /* Hermetic: the kitchen server is never poked from CI — the app's
+       ready-list fetch on #add fails silently, exactly like offline. */
+    await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
     const p=await ctx.newPage();
     let tried=[];
     await ctx.route('**/*', route => {
@@ -41,6 +44,9 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
   console.log('\n== Text relay fallback ==');
   {
     const ctx=await br.newContext({...devices['iPhone 13']});
+    /* Hermetic: the kitchen server is never poked from CI — the app's
+       ready-list fetch on #add fails silently, exactly like offline. */
+    await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
     const p=await ctx.newPage();
     await ctx.route('**/*', route => {
       const u=route.request().url();
@@ -64,6 +70,9 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
   console.log('\n== Everything down: honest failure + paste still works ==');
   {
     const ctx=await br.newContext({...devices['iPhone 13']});
+    /* Hermetic: the kitchen server is never poked from CI — the app's
+       ready-list fetch on #add fails silently, exactly like offline. */
+    await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
     const p=await ctx.newPage();
     await ctx.route('**/*', route => route.request().url().startsWith(B) ? route.continue() : route.abort());
     await p.goto(B+'/index.html#add'); await p.waitForSelector('.pathbtn');

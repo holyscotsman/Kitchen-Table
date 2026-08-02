@@ -326,14 +326,42 @@ VoiceOver pass, the sessions with Joan, the content truth pass, twenty real
 photos of her cards — and the family confirmations that turn the provisional
 rulings into settled ones. `GAMEPLAN.md` §11 is the authoritative list.
 
+### The video importer (Phase 16, Jason's spec — 2026-08-02)
+
+The fourth way in, and the one deliberate exception to "nothing here runs on
+a server": **`backend/` is an import server on Render's free tier, and only
+the video conversion lives there** (Jason's ruling, quoted in
+`DECISIONS.md V`). The site stays static and instant; no request to the
+server is ever on the path to reading a recipe. A YouTube/Instagram link
+becomes a background job in `kitchen.import_jobs` (schema v2): metadata via
+yt-dlp, then the cheapest sufficient path — a recipe written in the
+description costs nothing, captions cost one small fetch, and only a video
+with neither is downloaded (audio → Groq Whisper; ~40 deduped frames + the
+words → one `claude-opus-5` call, structured output, **flag-don't-guess**).
+Drafts land on the standard review screen; Save writes locally as always
+*and* tells the server, which inserts the reviewed recipe into the database
+(id collisions suffix, never overwrite) for the nightly sync to publish.
+The phone can close mid-job; finished drafts wait on the Add screen.
+Cold starts read as "waking up the kitchen…", never as errors. The server
+holds `KT_DB` server-side — which is what retired the Data-API question
+(`096`). Deploy is Jason's existing Render service unchanged (`yarn` /
+`yarn start` against the repo root shim) plus three env vars;
+`backend/README.md` is the checklist. The API trusts the way the app
+trusts: no logins, narrow operations, migration-grade validation —
+contributor names stay labels, never keys.
+
 ### Verified
 
-The suite after the completion push: **299 functional checks** across eight
-suites (kt 83, feat 58, add 63, relay 16, quick 21, polish 26, sec 23,
-zoom 9), plus the perf budget (FCP ~900 ms median on throttled 3G — now
-*including* the self-hosted fonts — against a 4000 ms gate; CLS 0.0000 with
-48 photos against 0.02). WCAG AA contrast: zero failures across all 48
-screen × theme × Easy-Read combinations. Nothing interactive measures under
-44px. All of it runs on every pull request via `tests/run.sh`. Off-CI, the
-live-OCR gate (`tests/ocr-live.js`) proves the pipeline device-local and,
-in its `KT_OCR_NOISE=1` variant, that garbage flags rather than invents.
+The suite after the video arc: **450 functional checks** across eleven
+suites (kt 85, feat 59, add 69, relay 16, quick 23, polish 27, sec 23,
+plan 27, video 36, backend 75, zoom 10), plus the perf budget (FCP ~900 ms
+median on throttled 3G — *including* the self-hosted fonts — against a
+4000 ms gate; CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
+zero failures across every screen × theme × Easy-Read combination, the
+video form included. Nothing interactive measures under 44px. All of it
+runs on every pull request via `tests/run.sh`, hermetically — the suites
+stub the kitchen server and abort the Render origin, so CI never wakes the
+real one. Off-CI, the live-OCR gate (`tests/ocr-live.js`) proves that
+pipeline device-local and, in its `KT_OCR_NOISE=1` variant, that garbage
+flags rather than invents; the video pipeline's own live checklist (real
+videos, cold start, restart mid-job) runs once the server has its keys.

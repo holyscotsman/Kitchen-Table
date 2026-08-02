@@ -1,0 +1,14 @@
+{
+  "name": "kitchen-table-backend",
+  "private": true,
+  "description": "The import server — the only part of Kitchen Table that runs on Render. The site itself is static and never needs this to be awake.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node ../tests/backend.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.115.0",
+    "@neondatabase/serverless": "1.1.0"
+  }
+}

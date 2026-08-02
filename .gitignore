@@ -15,6 +15,10 @@ node_modules/
 .cache/
 *.log
 
+# Media tools the import server's build fetches (backend/get-tools.sh) —
+# binaries, never committed
+backend/bin/
+
 # Source material, not site assets: the original recipe screenshots each
 # recipe was transcribed from. Hundreds of files, none of them needed at
 # runtime — recipes.json is the published source of truth.

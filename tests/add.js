@@ -5,6 +5,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
   const ctx=await br.newContext({...devices['iPhone 13']});
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
   /* Hermetic: every relay in the chain is stubbed to fail fast, so the suite
      never waits out a real network timeout. Individual cases re-route
      allorigins with the response they need — later routes win. */
@@ -20,7 +23,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('.addpill');
   await p.waitForSelector('.addscreen');
   chk('route is #add', p.url().endsWith('#add'));
-  chk('three entry paths', await p.locator('.pathbtn').count()===3);
+  chk('four entry paths', await p.locator('.pathbtn').count()===4);
   chk('one h1', await p.locator('h1').count()===1);
 
   console.log('\n== Type it in ==');
@@ -136,7 +139,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('says the photo stays on device', (await p.locator('.addscreen__note').textContent()).includes('never uploaded'));
   await p.click('[data-act="add-back"]');
   await p.waitForTimeout(250);
-  chk('back works', await p.locator('.pathbtn').count()===3);
+  chk('back works', await p.locator('.pathbtn').count()===4);
 
   console.log('\n== Likely duplicates warn, never block (task 070) ==');
   await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
@@ -156,6 +159,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   /* A stub recogniser stands in for Tesseract (the real one runs in
      tests/ocr-live.js); what's under test is the multi-photo flow. */
   const ctx2 = await br.newContext({...devices['iPhone 13']});
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
   const p2 = await ctx2.newPage();
   await p2.addInitScript(() => {
     window.Tesseract = {

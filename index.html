@@ -64,6 +64,11 @@
 
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <!-- The manifest exists for one capability: Android's share sheet can
+         send a video link straight into the app (share_target). Its two
+         colour values mirror tokens.css --bg dark, same as the theme-color
+         meta below — a manifest cannot read CSS variables. -->
+    <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="style.css" />
     <meta name="theme-color" content="#0E1712" />

@@ -201,7 +201,7 @@ them until the database wiring lands.
 someone who has never used GitHub, including how an addition becomes visible
 to everyone. The short version for this README:
 
-The **Add recipe** pill on the Menu opens three ways in:
+The **Add recipe** pill on the Menu opens four ways in:
 
 - **Type it in** — a blank form.
 - **From a link** — paste a recipe page address. Several free public relays
@@ -216,8 +216,23 @@ The **Add recipe** pill on the Menu opens three ways in:
   integrity hash, and a tampered copy refuses to load). A recipe that spans
   two cards can be read as one: add each photo and they're read in
   sequence into a single draft, with every card kept.
+- **From a video** — paste a YouTube or Instagram link. This is the one
+  import that leaves the page: the link goes to the family's import server
+  (`backend/`, on Render — the only part of the app that runs on a server),
+  which fetches the video, transcribes any narration (Groq Whisper), reads
+  on-screen text from sampled frames, and has Claude write up a draft with
+  everything unstated **flagged rather than guessed**. It runs as a
+  background job with a progress card (three human stages, a rough ETA that
+  says "taking a bit longer than usual…" rather than freezing) — and the
+  page can be closed: finished drafts wait at the top of the Add screen
+  under **Ready to check over** for whoever returns. Android can share a
+  video straight in (`manifest.json` `share_target`); iPhone pastes the
+  link or uses the two-minute Shortcut in `ADDING.md`. Failures are plain
+  sentences — an Instagram fetch that's blocked says to screen-record and
+  use the photo path; videos over 30 minutes are refused; a non-recipe
+  video says so instead of producing fiction.
 
-All three land on the same review screen before anything is saved, and
+All four land on the same review screen before anything is saved, and
 anything a parser had to guess is written into `flagged` so the recipe page
 shows it. A half-finished import survives an accidental refresh — the draft
 comes back until you save it or start over. And if what you're saving looks
@@ -225,7 +240,10 @@ a lot like a recipe already in the book, it says so once and lets you save
 anyway — two versions is allowed, it just shouldn't be an accident.
 
 Like every other edit, a new recipe lives in `localStorage` until you press
-**Download updated recipes.json** and commit the file.
+**Download updated recipes.json** and commit the file. A saved video import
+additionally tells the server its draft was accepted, which writes the
+reviewed recipe into the shared database — the nightly sync then carries it
+into `recipes.json` for everyone.
 
 ## Adding a recipe by editing the file
 

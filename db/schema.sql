@@ -70,3 +70,26 @@ create index if not exists idx_recipes_category    on kitchen.recipes(category);
 create index if not exists idx_recipes_contributor on kitchen.recipes(contributor_id);
 create index if not exists idx_menu_plan_date      on kitchen.menu_plan(plan_date);
 create index if not exists idx_recipe_tags_tag     on kitchen.recipe_tags(tag_id);
+
+-- v2 (video import): extraction runs server-side as a background job, so a
+-- phone can submit a link and close. The row is the job's whole life: the
+-- backend walks status forward, the frontend polls it, and result_json holds
+-- the finished draft until the review screen accepts it. `contributor` is a
+-- plain name, not a foreign key — the app sends names, and the byline rule
+-- (CLAUDE.md: labels, not authentication) means nothing may hang off it.
+create table if not exists kitchen.import_jobs (
+  id               serial primary key,
+  url              text not null,
+  platform         text not null check (platform in ('youtube','instagram')),
+  status           text not null default 'queued'
+    check (status in ('queued','downloading','transcribing',
+                      'extracting','ready_for_review','imported','failed')),
+  stage_started_at timestamptz,
+  video_duration_s integer,                     -- known after metadata, drives ETA
+  result_json      jsonb,                       -- the draft, recipes.json-shaped
+  error_message    text,                        -- plain-language failure reason
+  contributor      text,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+create index if not exists idx_import_jobs_status on kitchen.import_jobs(status);

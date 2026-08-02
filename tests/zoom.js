@@ -14,6 +14,9 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
   const ctx = await br.newContext({ viewport: { width: 320, height: 900 } });
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
   const p = await ctx.newPage();
   await p.addInitScript(() => {
     localStorage.setItem('kt.easyRead', 'true');

@@ -18,6 +18,9 @@ const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
   const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
 
   /* Sandboxed environments route egress through a proxy the browser can't
      use. The CDN fetches are bridged: the request is observed exactly as the

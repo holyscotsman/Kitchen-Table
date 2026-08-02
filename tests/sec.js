@@ -28,6 +28,9 @@ const hostile = JSON.stringify({
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
   const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  /* Hermetic: the kitchen server is never poked from CI — the app's
+     ready-list fetch on #add fails silently, exactly like offline. */
+  await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
   for (const host of ['**/corsproxy.io/**','**/r.jina.ai/**','https://example.com/**'])
     await ctx.route(host, route => route.abort('failed'));
   /* Real pages escape closing tags inside JSON-LD as <\/ so the script
