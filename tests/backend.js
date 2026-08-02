@@ -156,6 +156,32 @@ const { runJob, computeFps } = lib('pipeline');
     fs.rmSync(dir, { recursive: true, force: true });
   }
 
+  console.log('\n== YouTube salvage (the Data-API rescue) ==');
+  {
+    const salvage = lib('salvage');
+    chk('watch?v= id', salvage.youtubeId('https://www.youtube.com/watch?v=F5C6UcmyPxc') === 'F5C6UcmyPxc');
+    chk('youtu.be id', salvage.youtubeId('https://youtu.be/F5C6UcmyPxc?t=10') === 'F5C6UcmyPxc');
+    chk('shorts id', salvage.youtubeId('https://youtube.com/shorts/abcABC12345') === 'abcABC12345');
+    chk('no id → null', salvage.youtubeId('https://youtube.com/@somechannel') === null);
+    chk('PT13M5S → 785', salvage.isoDurationS('PT13M5S') === 785);
+    chk('PT1H2M3S → 3723', salvage.isoDurationS('PT1H2M3S') === 3723);
+    chk('garbage → 0', salvage.isoDurationS('whenever') === 0);
+    const api = {
+      items: [{
+        snippet: { title: 'Mushroom Pasta', channelTitle: 'Babish', description: 'INGREDIENTS\n2 cups x\n1 tbsp y\n3 z\nMix.' },
+        contentDetails: { duration: 'PT9M30S' }
+      }]
+    };
+    const meta = salvage.parseApiSnippet(api);
+    chk('snippet → the pipeline meta shape',
+      meta.title === 'Mushroom Pasta' && meta.uploader === 'Babish' && meta.duration_s === 570);
+    chk('empty answer → null', salvage.parseApiSnippet({ items: [] }) === null);
+    const okFetch = async () => ({ ok: true, json: async () => api });
+    chk('salvage happy path', (await salvage.salvageYouTube(okFetch, 'key', 'F5C6UcmyPxc')).title === 'Mushroom Pasta');
+    chk('no key → null without a request', (await salvage.salvageYouTube(async () => { throw new Error('must not be called'); }, '', 'x')) === null);
+    chk('a failing fetch → null, never a throw', (await salvage.salvageYouTube(async () => { throw new Error('net down'); }, 'key', 'x')) === null);
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {
@@ -293,6 +319,49 @@ const { runJob, computeFps } = lib('pipeline');
   delete process.env.YTDLP_PATH;
   delete process.env.FFMPEG_PATH;
   fs.rmSync(toolDir, { recursive: true, force: true });
+
+  console.log('\n== runJob: robot-blocked YouTube is rescued by the description ==');
+  {
+    const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-salv-'));
+    fs.writeFileSync(path.join(dir2, 'yt-dlp'),
+      '#!/usr/bin/env bash\necho "ERROR: Sign in to confirm you’re not a bot" >&2\nexit 1\n');
+    fs.writeFileSync(path.join(dir2, 'ffmpeg'), '#!/usr/bin/env bash\nexit 0\n');
+    fs.chmodSync(path.join(dir2, 'yt-dlp'), 0o755);
+    fs.chmodSync(path.join(dir2, 'ffmpeg'), 0o755);
+    process.env.YTDLP_PATH = path.join(dir2, 'yt-dlp');
+    process.env.FFMPEG_PATH = path.join(dir2, 'ffmpeg');
+    const apiAnswer = {
+      items: [{
+        snippet: { title: 'Rescue Ragu', channelTitle: 'Chef', description: 'Ingredients\n1 cup a\n2 tbsp b\n3 c\nSimmer.' },
+        contentDetails: { duration: 'PT5M' }
+      }]
+    };
+    const sql = sqlStub({ id: 9, status: 'queued', url: 'https://youtu.be/AAAAAAAAAAA', platform: 'youtube', contributor: null });
+    await runJob({
+      sql, anthropic: claudeStub, groqKey: '', ytKey: 'test-key',
+      fetch: async () => ({ ok: true, json: async () => apiAnswer }),
+      uptimeS: () => 999
+    }, 9);
+    const st = sql.state;
+    chk('rescued job reaches ready_for_review',
+      st.statuses.join(',') === 'downloading,extracting,ready_for_review', st.statuses.join(','));
+    chk('duration carried from the API', st.durationSet === 300);
+    chk('the salvage is disclosed on the draft',
+      st.result && st.result.flagged.some(f => /official description only/.test(f)));
+
+    const sql2 = sqlStub({ id: 10, status: 'queued', url: 'https://youtu.be/BBBBBBBBBBB', platform: 'youtube', contributor: null });
+    await runJob({
+      sql: sql2, anthropic: claudeStub, groqKey: '', ytKey: 'test-key',
+      fetch: async () => ({ ok: true, json: async () => ({ items: [{ snippet: { title: 'T', channelTitle: 'C', description: 'subscribe to my channel!!' }, contentDetails: { duration: 'PT2M' } }] }) }),
+      uptimeS: () => 999
+    }, 10);
+    chk('a promo-only description still fails honestly, with the paste advice',
+      sql2.state.statuses.includes('failed') && /copy that text|paste box/.test(sql2.state.error), sql2.state.error);
+    delete process.env.YTDLP_PATH;
+    delete process.env.FFMPEG_PATH;
+    fs.rmSync(dir2, { recursive: true, force: true });
+  }
+
 
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

@@ -165,8 +165,9 @@ function friendlyDownloadError(stderr, platform) {
   if (isBotCheck(s)) {
     return "YouTube blocked the kitchen server’s connection for this video — " +
       "it sometimes treats cloud servers as robots. It’s nothing about the " +
-      "video itself. Try it again in a few minutes; if it keeps happening, " +
-      "screen-record the recipe and use From a photo.";
+      "video itself. If the recipe is written under the video, copy that " +
+      "text and use the paste box under From a link; or screen-record the " +
+      "recipe and use From a photo.";
   }
   if (/private/i.test(s)) return "That video is private, so it can’t be fetched.";
   if (/age.?restrict|confirm your age/i.test(s)) return "That video is age-restricted, so it can’t be fetched without a login.";
