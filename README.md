@@ -181,6 +181,18 @@ while working; `KT_BASE=https://…` points them at a deployed copy instead of
 a local server. `tests/measure-quota.js` is a measuring tool rather than a
 suite — it reports how many photos this browser's storage can actually hold.
 
+## Planning the week
+
+**Plan the week** (on the front page) opens the planner: seven days, dinner
+front and centre, breakfast and lunch one quiet tap away. Tap an empty slot
+to pick a recipe — same search as everywhere else — and tap a planned meal to
+scale it to that night's headcount, open the recipe, or take it off the plan.
+The same dish can appear twice in a week; a recipe that later leaves the book
+stays on the plan under the name it was planned by. **Print this week** makes
+the fridge-door copy, and the **shopping list (preview)** sums what it can
+honestly sum and lists the rest as written. Plans live on the phone that made
+them until the database wiring lands.
+
 ## Adding a recipe
 
 **The family-facing walkthrough is [`ADDING.md`](ADDING.md)** — written for

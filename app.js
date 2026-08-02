@@ -81,8 +81,13 @@
     /* sessionStorage, not localStorage: an accidental refresh mid-import
        keeps the work, closing the tab lets it go. Nothing here is "saved" —
        the draft only becomes a recipe when Save is pressed. */
-    addDraft: "kt.addDraft"
+    addDraft: "kt.addDraft",
+    plan: "kt.plan"
   };
+
+  /* The week planner's slots. All three exist on every day; the UI shows
+     Dinner always and the others on demand (DECISIONS.md 120). */
+  var SLOTS = ["breakfast", "lunch", "dinner"];
 
   /* Photos are held apart from the recipe records, keyed by id. Inlining data
      URLs into kt.recipes would put multi-hundred-kilobyte blobs into the file
@@ -350,6 +355,17 @@
     tagManageOpen: false,
     tagEditing: "",
     tagEditVal: "",
+
+    /* Phase 15 — the week planner. plan entries are shaped exactly like
+       kitchen.menu_plan rows so the database wiring syncs, never migrates. */
+    plan: [],
+    planWeekOffset: 0,   // 0 = the week containing today; ±1 steps whole weeks
+    pickFor: null,       // {date, slot} while the picker sheet is open
+    pickQ: "",
+    mealFor: null,       // plan-entry id while the meal sheet is open
+    pickOpen: false,
+    mealOpen: false,
+    listOpen: false,     // the shopping-list preview fold
 
     editing: false,
     serves: null,
@@ -945,6 +961,12 @@
     h += '<a class="bigbtn press" href="#menu">View all ' + S.recipes.length +
          " recipes " + I.chevR(16, 16) + "</a>";
 
+    var planned = S.plan.filter(function (e) {
+      return weekDays(0).map(isoDate).indexOf(e.date) > -1;
+    }).length;
+    h += '<a class="bigbtn bigbtn--quiet press" href="#plan">Plan the week' +
+         (planned ? " · " + planned + " planned" : "") + " " + I.chevR(16, 16) + "</a>";
+
     h += '<section class="band band--spaced"><h2 class="band__h">What kind of thing?</h2>' +
          '<div class="cat-grid">' +
          CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
@@ -1235,6 +1257,8 @@
     S.sortOpen = false;
     S.tagSheetOpen = false;
     S.tagManageOpen = false;
+    S.pickOpen = false;
+    S.mealOpen = false;
     S[flag] = true;
     openSheetId = null;
     S.pulseSheet = true;
@@ -1954,6 +1978,279 @@
       prepTime: "", cookTime: "", ingredients: [""], steps: [""],
       notes: "", flagged: [], source: "", tags: ""
     };
+  }
+
+  /* ======================================================================
+     10a. The week planner — Phase 15, ruled into 1.0
+     ====================================================================== */
+
+  function loadPlan() {
+    var p = load(K.plan, []);
+    S.plan = Array.isArray(p) ? p.filter(function (e) {
+      return e && e.date && SLOTS.indexOf(e.slot) > -1;
+    }) : [];
+  }
+
+  function persistPlan() { save(K.plan, S.plan); }
+
+  function isoDate(d) {
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  /* Monday of the viewed week (DECISIONS.md 120: weeks start Monday). */
+  function weekStart(offset) {
+    var now = new Date();
+    var day = (now.getDay() + 6) % 7; // Mon=0
+    var mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + offset * 7);
+    return mon;
+  }
+
+  function weekDays(offset) {
+    var mon = weekStart(offset);
+    var out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }
+
+  var DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"];
+
+  function planEntry(date, slot) {
+    for (var i = 0; i < S.plan.length; i++) {
+      if (S.plan[i].date === date && S.plan[i].slot === slot) return S.plan[i];
+    }
+    return null;
+  }
+
+  function planLabel(offset) {
+    var days = weekDays(offset);
+    var a = days[0], b = days[6];
+    var range = a.getMonth() === b.getMonth()
+      ? a.getDate() + " – " + b.getDate() + " " + MONTHS[b.getMonth()]
+      : a.getDate() + " " + MONTHS[a.getMonth()] + " – " + b.getDate() + " " + MONTHS[b.getMonth()];
+    if (offset === 0) return "This week · " + range;
+    if (offset === 1) return "Next week · " + range;
+    if (offset === -1) return "Last week · " + range;
+    return range;
+  }
+
+  function mealCardHtml(entry) {
+    var r = byId(entry.recipeId);
+    /* 127: a plan outlives its recipe. The slot degrades to the name it was
+       planned under, says so, and never crashes or vanishes. */
+    if (!r) {
+      return '<div class="mealcard mealcard--gone">' +
+        '<span class="rcard__body">' +
+        '<span class="rcard__title">' + esc(entry.titleThen) + "</span>" +
+        '<span class="rcard__meta">No longer in the book</span></span>' +
+        '<button type="button" class="delbtn press" data-act="plan-remove" ' +
+        'data-key="' + esc(entry.id) + '" aria-label="Remove ' + esc(entry.titleThen) +
+        ' from the plan">' + I.x() + "</button></div>";
+    }
+    var src = imageFor(r);
+    var lead = src
+      ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" ' +
+        'width="64" height="64" decoding="async" />'
+      : '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>";
+    return '<button type="button" class="mealcard press" data-act="plan-meal" ' +
+      'data-key="' + esc(entry.id) + '">' + lead +
+      '<span class="rcard__body">' +
+      '<span class="rcard__title">' + esc(r.title) + "</span>" +
+      '<span class="rcard__meta">' + esc(cap(entry.slot)) + " · serves " +
+      entry.servings + "</span></span>" +
+      '<span class="rcard__chev">' + I.chevR() + "</span></button>";
+  }
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function viewPlan() {
+    var h = "";
+    h += '<header class="rhead"><div class="rhead__inner">' +
+         '<a class="backlink press" href="#">' + I.chevL() + "Home</a>" +
+         '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
+
+    h += '<div class="plan" id="main-content">';
+    h += '<p class="eyebrow">Kitchen Table</p>';
+    h += '<h1 class="mhead__h1">' + esc(planLabel(S.planWeekOffset)) + "</h1>";
+
+    h += '<div class="weeknav">' +
+         '<button type="button" class="iconbtn press" data-act="week-prev" ' +
+         'aria-label="Previous week">' + I.chevL() + "</button>" +
+         '<button type="button" class="weeknav__today press" data-act="week-today"' +
+         (S.planWeekOffset === 0 ? " disabled" : "") + ">Today</button>" +
+         '<button type="button" class="iconbtn press" data-act="week-next" ' +
+         'aria-label="Next week">' + I.chevR(22, 22) + "</button></div>";
+
+    var todayIso = isoDate(new Date());
+    weekDays(S.planWeekOffset).forEach(function (d) {
+      var iso = isoDate(d);
+      var isToday = iso === todayIso;
+      h += '<section class="dayblock' + (isToday ? " dayblock--today" : "") + '">' +
+           '<h2 class="dayhead">' + DAY_NAMES[(d.getDay() + 6) % 7] + " " + d.getDate() +
+           (isToday ? '<span class="daytag">Today</span>' : "") + "</h2>";
+
+      var dinner = planEntry(iso, "dinner");
+      h += dinner
+        ? mealCardHtml(dinner)
+        : '<button type="button" class="slotadd press" data-act="plan-pick" ' +
+          'data-key="' + iso + '|dinner">' + I.plus(20) + "Add dinner</button>";
+
+      /* Breakfast and lunch: visible when planned, one quiet tap when not. */
+      var quiet = "";
+      ["breakfast", "lunch"].forEach(function (slot) {
+        var e = planEntry(iso, slot);
+        if (e) h += mealCardHtml(e);
+        else quiet += '<button type="button" class="textbtn" data-act="plan-pick" ' +
+                      'data-key="' + iso + "|" + slot + '">+ ' + cap(slot) + "</button>";
+      });
+      if (quiet) h += '<div class="quietadds">' + quiet + "</div>";
+      h += "</section>";
+    });
+
+    h += shoppingHtml();
+
+    h += '<button type="button" class="outlinebtn press planprint" data-act="plan-print">' +
+         "Print this week</button>";
+
+    if (S.notice) h += '<p class="notice" role="status">' + esc(S.notice) + "</p>";
+    h += "</div>";
+
+    if (S.pickOpen) h += pickSheetHtml();
+    if (S.mealOpen) h += mealSheetHtml();
+    return h;
+  }
+
+  /* 130 — the summing spike, shipped honestly as a preview. Lines whose
+     quantity, unit and remaining text all agree get summed at each meal's own
+     servings; everything else is listed as written. Failure modes are in
+     DECISIONS.md 130 — nothing here guesses. */
+  function shoppingHtml() {
+    var days = weekDays(S.planWeekOffset).map(isoDate);
+    var entries = S.plan.filter(function (e) { return days.indexOf(e.date) > -1; });
+    if (!entries.length) return "";
+
+    var sums = {};   // key -> {qty, unit, rest}
+    var asIs = [];
+    entries.forEach(function (e) {
+      var r = byId(e.recipeId);
+      if (!r) return;
+      var mult = r.servings ? e.servings / r.servings : 1;
+      (r.ingredients || []).forEach(function (line) {
+        var m = String(line).match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*([a-zA-Z]*)\s+(.*)$/);
+        if (!m || !m[3]) { asIs.push(scaleLine(line, mult)); return; }
+        var n;
+        if (m[1].indexOf("/") > -1) {
+          var parts = m[1].trim().split(/\s+/);
+          var fr = parts[parts.length - 1].split("/");
+          n = (parts.length > 1 ? parseFloat(parts[0]) : 0) + parseFloat(fr[0]) / parseFloat(fr[1]);
+        } else n = parseFloat(m[1]);
+        var key = fold(m[2]) + "|" + fold(m[3]);
+        if (!sums[key]) sums[key] = { qty: 0, unit: m[2], rest: m[3] };
+        sums[key].qty += n * mult;
+      });
+    });
+
+    var keys = Object.keys(sums).sort(function (a, b) {
+      return sums[a].rest.localeCompare(sums[b].rest);
+    });
+    if (!keys.length && !asIs.length) return "";
+
+    var h = '<section class="shoplist">' +
+      '<button type="button" class="shoplist__head press" data-act="toggle-list" ' +
+      'aria-expanded="' + S.listOpen + '">' +
+      '<span>Shopping list <span class="shoplist__tag">preview</span></span>' +
+      (S.listOpen ? I.chevD() : I.chevR()) + "</button>";
+    if (S.listOpen) {
+      h += '<ul class="shoplist__items">';
+      keys.forEach(function (k) {
+        var s = sums[k];
+        h += "<li>" + esc(fmtQty(s.qty)) + (s.unit ? " " + esc(s.unit) : "") +
+             " " + esc(s.rest) + "</li>";
+      });
+      h += "</ul>";
+      if (asIs.length) {
+        h += '<p class="hint">As written, not summed:</p><ul class="shoplist__items shoplist__items--dim">' +
+             asIs.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ul>";
+      }
+      h += '<p class="hint">Same wording and unit sum together; everything else is listed as written.</p>';
+    }
+    h += "</section>";
+    return h;
+  }
+
+  function pickSheetHtml() {
+    var q = S.pickQ.trim().toLowerCase();
+    var hits = q
+      ? S.recipes.filter(function (r) { return matchesQuery(r, q); }).slice(0, 8)
+      : S.recipes.slice().sort(function (a, b) { return a.title.localeCompare(b.title); }).slice(0, 8);
+    var slot = S.pickFor ? cap(S.pickFor.slot) : "";
+    return (
+      '<button type="button" class="scrim" data-act="close-pick" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="pick-title">' + esc(slot) +
+      (S.pickFor ? " · " + esc(prettyDate(S.pickFor.date)) : "") + "</h2>" +
+      '<button type="button" class="donebtn press" data-act="close-pick">Cancel</button></div>' +
+      '<label class="vh" for="pick-q">Search recipes</label>' +
+      '<input class="input" id="pick-q" type="search" data-act="pick-q" ' +
+      'placeholder="Search recipes" value="' + esc(S.pickQ) + '" autocomplete="off" />' +
+      '<div class="picklist">' +
+      hits.map(function (r) {
+        return '<button type="button" class="mealcard press" data-act="plan-assign" ' +
+          'data-key="' + esc(r.id) + '">' +
+          '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>" +
+          '<span class="rcard__body"><span class="rcard__title">' + esc(r.title) + "</span>" +
+          '<span class="rcard__meta">' + esc(r.category) + " · serves " + r.servings +
+          "</span></span></button>";
+      }).join("") +
+      (hits.length ? "" : '<p class="emptystate">No recipes match.</p>') +
+      "</div></div></div>"
+    );
+  }
+
+  function prettyDate(iso) {
+    var p = iso.split("-");
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return DAY_NAMES[(d.getDay() + 6) % 7] + " " + d.getDate();
+  }
+
+  function mealSheetHtml() {
+    var entry = null;
+    S.plan.forEach(function (e) { if (e.id === S.mealFor) entry = e; });
+    if (!entry) return "";
+    var r = byId(entry.recipeId);
+    var title = r ? r.title : entry.titleThen;
+    return (
+      '<button type="button" class="scrim" data-act="close-meal" aria-label="Close"></button>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="meal-title">' +
+      '<div class="sheet__inner sheet__inner--narrow">' +
+      '<div class="sheet__head"><h2 class="sheet__title" id="meal-title">' + esc(title) + "</h2>" +
+      '<button type="button" class="donebtn press" data-act="close-meal">Done</button></div>' +
+      '<p class="hint" style="margin-top:0">' + esc(cap(entry.slot)) + " · " +
+      esc(prettyDate(entry.date)) + "</p>" +
+      /* 125: the meal's own servings, not the recipe's default. */
+      '<div class="servcard"><div class="servcard__text">' +
+      '<p class="minilabel">Serving</p>' +
+      '<p class="servcard__value">' + entry.servings + " " +
+      (entry.servings === 1 ? "person" : "people") + "</p></div>" +
+      '<button type="button" class="servbtn press" data-act="meal-serv-" ' +
+      'aria-label="Fewer people"' + (entry.servings <= 1 ? " disabled" : "") + ">" +
+      I.minus(24) + "</button>" +
+      '<button type="button" class="servbtn press" data-act="meal-serv+" ' +
+      'aria-label="More people"' + (entry.servings >= 40 ? " disabled" : "") + ">" +
+      I.plus(24) + "</button></div>" +
+      '<div class="sheet__foot">' +
+      (r ? '<a class="bigbtn press" style="margin-bottom:10px" href="#' + esc(r.id) + '">Open the recipe</a>' : "") +
+      '<button type="button" class="outlinebtn outlinebtn--danger press" data-act="plan-remove" ' +
+      'data-key="' + esc(entry.id) + '">Remove from the plan</button>' +
+      "</div></div></div>"
+    );
   }
 
   function viewAdd() {
@@ -2907,6 +3204,7 @@
     var raw = (location.hash || "#").slice(1);
     if (!raw || raw === "main") return { name: "main", id: "" };
     if (raw === "add") return { name: "add", id: "" };
+    if (raw === "plan") return { name: "plan", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
       var who = [], cats = [], tags = [];
@@ -2947,6 +3245,7 @@
   function screenTitle() {
     if (S.route.name === "menu") return "Menu — Kitchen Table";
     if (S.route.name === "add") return "Add a recipe — Kitchen Table";
+    if (S.route.name === "plan") return "This week — Kitchen Table";
     if (S.route.name === "recipe") {
       var r = byId(S.route.id);
       return (r ? r.title + " — " : "") + "Kitchen Table";
@@ -3127,6 +3426,8 @@
       html = viewMenu();
     } else if (S.route.name === "add") {
       html = viewAdd();
+    } else if (S.route.name === "plan") {
+      html = viewPlan();
     } else if (S.route.name === "recipe") {
       var r = byId(S.route.id);
       html = r
@@ -3281,6 +3582,74 @@
     }
     if (act === "open-bulk") { openSheet("tagSheetOpen", el); return; }
     if (act === "close-bulk") { closeSheet("tagSheetOpen"); return; }
+    /* ---- Week planner ---- */
+    if (act === "plan-pick") {
+      var pk = key.split("|");
+      S.pickFor = { date: pk[0], slot: pk[1] };
+      S.pickQ = "";
+      openSheet("pickOpen", el);
+      var pf = document.getElementById("pick-q");
+      if (pf) pf.focus();
+      return;
+    }
+    if (act === "close-pick") { S.pickFor = null; closeSheet("pickOpen"); return; }
+    if (act === "plan-assign") {
+      var pr = byId(key);
+      if (!pr || !S.pickFor) return;
+      /* 126: the same recipe twice in a week is a plan, not an error — each
+         entry stands alone with its own servings. */
+      S.plan.push({
+        id: "p" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
+        date: S.pickFor.date,
+        slot: S.pickFor.slot,
+        recipeId: pr.id,
+        titleThen: pr.title,
+        servings: pr.servings
+      });
+      persistPlan();
+      setNotice(pr.title + " planned for " + prettyDate(S.pickFor.date) + ".");
+      S.pickFor = null;
+      closeSheet("pickOpen");
+      return;
+    }
+    if (act === "plan-meal") { S.mealFor = key; openSheet("mealOpen", el); return; }
+    if (act === "close-meal") { S.mealFor = null; closeSheet("mealOpen"); return; }
+    if (act === "meal-serv-" || act === "meal-serv+") {
+      S.plan.forEach(function (e) {
+        if (e.id !== S.mealFor) return;
+        e.servings = act === "meal-serv-"
+          ? Math.max(1, e.servings - 1)
+          : Math.min(40, e.servings + 1);
+      });
+      persistPlan();
+      render();
+      return;
+    }
+    if (act === "plan-remove") {
+      S.plan = S.plan.filter(function (e) { return e.id !== key; });
+      persistPlan();
+      if (S.mealOpen) { S.mealFor = null; closeSheet("mealOpen"); } else render();
+      return;
+    }
+    if (act === "week-prev" || act === "week-next" || act === "week-today") {
+      var nextOffset = act === "week-today" ? 0
+        : S.planWeekOffset + (act === "week-prev" ? -1 : 1);
+      if (nextOffset === S.planWeekOffset) return;
+      S.planWeekOffset = nextOffset;
+      /* 128: the week slides with the View Transitions API where it exists,
+         repaints plainly where it doesn't, and never animates under reduced
+         motion. */
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (document.startViewTransition && !reduce) {
+        document.startViewTransition(function () { render(); });
+      } else {
+        render();
+      }
+      return;
+    }
+    if (act === "toggle-list") { S.listOpen = !S.listOpen; render(); return; }
+    if (act === "plan-print") { window.print(); return; }
+
     if (act === "tag-manage") { openSheet("tagManageOpen", el); return; }
     if (act === "close-tag-manage") {
       S.tagEditing = ""; S.tagEditVal = "";
@@ -3523,6 +3892,7 @@
       return;
     }
     if (act === "tag-rename-input") { S.tagEditVal = el.value; return; }
+    if (act === "pick-q") { S.pickQ = el.value; render(); return; }
     if (act === "adl") {
       S.addDraft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
       scheduleAddPersist();
@@ -3551,6 +3921,8 @@
     else if (S.lbOpen) closeSheet("lbOpen");
     else if (S.tagSheetOpen) closeSheet("tagSheetOpen");
     else if (S.tagManageOpen) { S.tagEditing = ""; S.tagEditVal = ""; closeSheet("tagManageOpen"); }
+    else if (S.pickOpen) { S.pickFor = null; closeSheet("pickOpen"); }
+    else if (S.mealOpen) { S.mealFor = null; closeSheet("mealOpen"); }
     else if (S.sortOpen) { S.sortOpen = false; render(); }
   });
 
@@ -3605,6 +3977,7 @@
     .then(function (both) {
       S.base = both[0];
       applyOverlay();
+      loadPlan();
       S.loaded = true;
       onRoute();
     })

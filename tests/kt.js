@@ -34,7 +34,8 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('6 contributor sections', await p.locator('.who-tile').count()===6);
   chk('all 48 are Joan\'s, others invite (058)', (await p.locator('.who-tile__count').allTextContents()).join(',')==='48' && await p.locator('.who-tile--empty').count()===5 && (await p.locator('.who-tile--empty').first().textContent()).includes('None yet'));
   chk('category rows present', await p.locator('.cat-row').count()===6);
-  chk('View all button', (await p.locator('.bigbtn').textContent()).includes('View all 48 recipes'));
+  chk('View all button', (await p.locator('a.bigbtn[href="#menu"]').textContent()).includes('View all 48 recipes'));
+  chk('Plan the week sits beside it', await p.locator('a.bigbtn[href="#plan"]').count()===1);
   await p.screenshot({path:require('path').join(__dirname,'shots','kt-1-main-dark.png')});
 
   console.log('\n== Main search replaces browse stack ==');
@@ -66,7 +67,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="theme"]'); await p.waitForTimeout(200);
 
   console.log('\n== Menu screen ==');
-  await p.click('.bigbtn');
+  await p.click('a.bigbtn[href="#menu"]');
   await p.waitForSelector('.mhead__h1');
   chk('route is #menu', p.url().endsWith('#menu'), p.url());
   chk('h1 is "Menu"', (await p.locator('.mhead__h1').textContent()).trim()==='Menu');

@@ -36,6 +36,7 @@ const CONTRAST = `(() => {
       ['Recipe edit','#chicken-cordon-bleu','[data-act="toggle-edit"]'],
       ['Recipe download sheet','#bacon-ranch-chicken-casserole','[data-act="open-dl"]'],
       ['Menu text sheet','#menu','[data-act="open-text"]'],
+      ['Week planner','#plan',null],
       ['Add screen','#add',null],
       ['Add review form','#add','[data-key="review"]'],
       ['Add from a link','#add','[data-key="link"]'],

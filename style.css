@@ -2148,8 +2148,44 @@ input[type="file"].input {
   .skip-link,
   .hint,
   .vstamp,
-  .art {
+  .art,
+  .weeknav,
+  .quietadds,
+  .slotadd,
+  .planprint,
+  .mealcard .rcard__chev,
+  .daytag {
     display: none !important;
+  }
+
+  /* The week prints as the fridge-door list (129): headed days, meals with
+     their servings, empty slots omitted, black on white. */
+  .plan {
+    max-width: none;
+    padding: 0;
+  }
+
+  .dayhead {
+    color: var(--print-ink) !important;
+  }
+
+  .mealcard,
+  .mealcard--gone {
+    background: none !important;
+    color: var(--print-ink) !important;
+    border: 1px solid var(--print-line) !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .mealcard .rcard__meta,
+  .shoplist__items--dim li {
+    color: var(--print-ink) !important;
+  }
+
+  .shoplist {
+    background: none !important;
+    border: 1px solid var(--print-line) !important;
   }
 
   html,
@@ -2370,4 +2406,203 @@ a.minitag--link:hover {
 
 a.outlinebtn:hover {
   color: var(--ink);
+}
+
+/* ======================================================= The week planner
+
+   Phase 15. One column at every width (design/calendar.md — the 033
+   precedent applied before the mistake, not after). Everything composes
+   from the existing vocabulary: meal cards are the Menu card grammar,
+   empty slots are the empty-tile grammar, sheets are sheets. */
+
+.bigbtn--quiet {
+  margin-top: 12px;
+  background: var(--surf);
+  color: var(--ink);
+  border: var(--bw) solid var(--line);
+}
+
+a.bigbtn--quiet:hover {
+  color: var(--ink);
+}
+
+.plan {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px var(--pad) 60px;
+}
+
+.weeknav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.weeknav__today {
+  flex: 1;
+  min-height: 48px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-input);
+  background: var(--surf);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.weeknav__today:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+
+.dayblock {
+  padding: 18px 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dayblock--today .dayhead {
+  color: var(--ink);
+}
+
+.dayhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+
+.daytag {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: var(--r-pill);
+  background: var(--acc);
+  color: var(--acc-ink);
+  letter-spacing: 0.02em;
+}
+
+/* An assigned meal — the Menu card grammar on a planner row. */
+.mealcard {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--card-ink);
+  text-align: left;
+  box-shadow: var(--hi-card);
+}
+
+.mealcard .rcard__meta {
+  color: var(--card-dim);
+}
+
+.mealcard--gone {
+  grid-template-columns: 1fr auto;
+  background: var(--surf);
+  color: var(--ink);
+  border: var(--bw) dashed var(--line);
+  box-shadow: none;
+}
+
+.mealcard--gone .rcard__meta {
+  color: var(--dim);
+}
+
+/* An empty dinner slot — the empty-tile grammar: dashed, plus, words. */
+.slotadd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  margin-bottom: 10px;
+  border: var(--bw) dashed var(--line);
+  border-radius: var(--r-card);
+  background: none;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.slotadd svg {
+  color: var(--acc);
+}
+
+.quietadds {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.picklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+/* The shopping list preview (130). */
+.shoplist {
+  margin-top: 22px;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surf);
+  overflow: hidden;
+}
+
+.shoplist__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 16px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+}
+
+.shoplist__tag {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-left: 8px;
+}
+
+.shoplist__items {
+  padding: 0 16px 12px;
+}
+
+.shoplist__items li {
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.shoplist__items--dim li {
+  color: var(--dim);
+}
+
+.shoplist .hint {
+  padding: 0 16px;
+}
+
+.planprint {
+  margin-top: 18px;
+  width: 100%;
 }
