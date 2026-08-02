@@ -13,9 +13,11 @@ bundler, no server.
 
 **Live:** https://holyscotsman.github.io/Kitchen-Table/
 
-**Status:** `v0.9` — the [1.0 gameplan](GAMEPLAN.md) has consumed every task a
-machine can do. What stands between this and `v1.0` is human work: sessions
-with Joan, a physical iPhone, and the content truth pass (`GAMEPLAN.md` §11).
+**Status:** `v0.9` — Jason has ruled the database (Neon Postgres, see
+[`db/`](db/README.md)) and the menu-planning calendar **into 1.0**. The
+calendar build and the app↔database wiring are the active work; the human
+checks (Joan, a physical iPhone, the content pass) run alongside
+(`GAMEPLAN.md` §11).
 
 ## Files
 
@@ -27,6 +29,7 @@ with Joan, a physical iPhone, and the content truth pass (`GAMEPLAN.md` §11).
 | `style.css` | Layout and components; every colour is a `var(--*)` |
 | `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
 | `fonts/` | Atkinson Hyperlegible, self-hosted (OFL licence included) — no third-party request on any page load |
+| `db/` | The Postgres schema, migration and export — the shared database's tooling ([docs](db/README.md)) |
 | `recipe.html` | Redirect stub for bookmarks from the previous build |
 | `tests/` | Every check the app must pass — see *Checks* below |
 | `CLAUDE.md` | Build rules and the colour contract — **read first** |

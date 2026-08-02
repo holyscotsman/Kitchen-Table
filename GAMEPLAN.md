@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · **60 of 130 done · 41 struck** (no server; calendar post-1.0 — `DECISIONS.md`) · **29 open, every one needing a person**: an iPhone, VoiceOver, Joan, real recipe cards, or a family answer (§11)
+**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 67 of 130 done · 19 struck-as-superseded · 44 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -472,12 +472,46 @@ or straight to the release checklist if `030` also says no.*
 > is 30 tasks, a monthly bill, and a database that becomes the only copy of 48
 > irreplaceable recipes.
 
-> ⛔ **THE GATE CLOSED THIS ACT — 2026-08-01.** `026` ruled **no server** and
-> `030` ruled **calendar is a stretch goal** (both provisional defaults,
-> `DECISIONS.md`). All 41 tasks below are **struck from the 1.0 checklist**:
-> tasks `090`–`119` because there is no server to build, run, or back up, and
-> `120`–`130` because the calendar ships after 1.0 if at all. They are struck,
-> not deleted — the phases read intact for the day either ruling is reversed.
+> ⛔ ~~THE GATE CLOSED THIS ACT — 2026-08-01~~ · **⟲ AND JASON REOPENED IT —
+> 2026-08-02.** He supplied a Neon Postgres instance and ruled the calendar
+> into 1.0 (`DECISIONS.md` §026/§030). The act runs again, **reshaped**: Neon
+> replaces the Express+SQLite+paid-host plan, which supersedes some tasks
+> outright and completes others by different means. Per-task notes below say
+> which. Executed same-day: schema (`db/schema.sql`), migration of all 48
+> recipes (`db/migrate.js`), round-trip export proven clean (`db/export.js`).
+> Open: the app↔database wiring (Data API vs worker — Jason's console call)
+> and the calendar build (Phase 15, now the active queue).
+>
+> Task-status key for this act: **[x] done** (possibly by Neon rather than
+> the original wording) · **[ ] + *superseded*** — no longer meaningful under
+> Neon, struck with that reason · **[ ] open** — still real work.
+>
+> - `090`–`092` *(host comparison, disk persistence, platform choice)* —
+>   **superseded**: Jason chose the platform by handing over the instance;
+>   Neon's storage is managed, there is no disk to distrust.
+> - `093` `094` `095` — **done 2026-08-02**: `kitchen` schema with tags as a
+>   join table, the three indexes, and a `schema_version` ledger.
+> - `096` *(OpenAPI before endpoints)* — **open, reshaped**: the contract
+>   question is now "Neon Data API with row-level security, or a worker" —
+>   blocked on Jason's console decision.
+> - `097` *(images in DB or on disk)* — **open**: currently images stay
+>   files in the repo; revisit when the app wiring lands.
+> - `098`–`101` — **done 2026-08-02**: loud-failing import, the
+>   empty-ingredients audit (reports exactly the four), flags preserved,
+>   round-trip export proven content-identical.
+> - `102` `103` *(backups + tested restore)* — **open, reshaped**: Neon has
+>   point-in-time restore, but an untested backup is still not a backup —
+>   verify PITR on this plan, and schedule `db/export.js` as the off-host
+>   copy (it doubles as one by design).
+> - `104`–`112` *(the Express API)* — **superseded as written**; their
+>   real content (validation, health, server-side import, rate limits,
+>   image sizes, sync/conflicts, static fallback) returns as concrete tasks
+>   once the Data-API-vs-worker call is made. `112`'s guarantee already
+>   holds: the static build runs from `recipes.json` with the database off.
+> - `113`–`119` *(pipeline, staging, uptime, logs, rollback)* — **superseded
+>   as written**: Pages deployment is unchanged; what returns after the
+>   wiring is a nightly `export.js` sync job and an uptime check, tracked
+>   with the wiring task.
 
 ## Phase 11 — Prove the ground *(gated on `026`)*
 
@@ -491,12 +525,15 @@ discovered later.*
   - *Needs:* `090` · *Done when:* proven on the actual plan that would be paid for, not the docs' claim about it.
 - [ ] `092` 👤 **PM** — Choose the hosting platform and record why.
   - *Needs:* `090` `091` · *Done when:* chosen, paid for, and the reason is written down. **→ README** — the README's "no server" premise is now wrong.
-- [ ] `093` 🤖 **DB** — Write the schema with tags as a real join table, not a comma-separated column.
+- [x] `093` 🤖 **DB** — Write the schema with tags as a real join table, not a comma-separated column.
   - *Needs:* `092` `028` · *Done when:* people, recipes, tags and menu_plan exist and the tag join is real.
-- [ ] `094` 🤖 **DB** — Index `recipes.category`, `recipes.contributor_id` and `menu_plan.date` from the start.
+  - *Done 2026-08-02: `kitchen` schema on Jason's Neon — tags are a real join table.*
+- [x] `094` 🤖 **DB** — Index `recipes.category`, `recipes.contributor_id` and `menu_plan.date` from the start.
   - *Needs:* `093` · *Done when:* in the first migration, not a later one.
-- [ ] `095` 🤖 **DB** — Add a migration runner that records applied versions.
+  - *Done 2026-08-02: category, contributor and plan-date indexes in the first migration.*
+- [x] `095` 🤖 **DB** — Add a migration runner that records applied versions.
   - *Needs:* `093` · *Done when:* it exists before the second schema change, not after it.
+  - *Done 2026-08-02: `kitchen.schema_version` ledger, written before any second migration exists.*
 - [ ] `096` 🤖 **BE** — Write the OpenAPI description before any endpoint, so the frontend can be built against a contract.
   - *Needs:* `093` · *Done when:* every endpoint in Phase 13 is described and nothing is implemented yet.
 - [ ] `097` 🤝 **DB** — Decide whether images live in the database or on disk, and write down why.
@@ -508,14 +545,18 @@ discovered later.*
 get. This data is genuinely irreplaceable, so the backup is tested before the
 API is written, not after.*
 
-- [ ] `098` 🤖 **DB** — Build the `recipes.json` import and have it fail loudly on anything malformed.
+- [x] `098` 🤖 **DB** — Build the `recipes.json` import and have it fail loudly on anything malformed.
   - *Needs:* `095` `080` · *Done when:* a deliberately broken file stops the import with a useful message.
-- [ ] `099` 🤖 **DB** — Report, during migration, every recipe with an empty ingredient list.
+  - *Done 2026-08-02: `db/migrate.js` — validates every field, dies loudly, idempotent upserts.*
+- [x] `099` 🤖 **DB** — Report, during migration, every recipe with an empty ingredient list.
   - *Needs:* `098` · *Done when:* the report runs. **If Phase 8 did its job this now returns zero — that is the check on `072`.**
-- [ ] `100` 🤖 **DB** — Preserve the `flagged` array; it is the record of what the transcription was unsure about.
+  - *Done 2026-08-02: the migration reports exactly the four known empty lists — the 072 worklist, confirmed from a second direction.*
+- [x] `100` 🤖 **DB** — Preserve the `flagged` array; it is the record of what the transcription was unsure about.
   - *Needs:* `098` `082` · *Done when:* a round trip loses no flag, including the per-field ones from `082`.
-- [ ] `101` 🤖 **DB** — Add a round-trip export back to `recipes.json` so the project is never locked into the database.
+  - *Done 2026-08-02: `flagged` rides through as jsonb; round trip loses nothing.*
+- [x] `101` 🤖 **DB** — Add a round-trip export back to `recipes.json` so the project is never locked into the database.
   - *Needs:* `098` `100` · *Done when:* export → import → export is byte-identical.
+  - *Done 2026-08-02: `db/export.js` regenerates recipes.json; `--check` proved database and file content-identical.*
 - [ ] `102` 🤝 **DB** — Script a nightly backup that copies the database somewhere off the host.
   - *Needs:* `097` `101` · *Done when:* it has run unattended overnight at least once.
 - [ ] `103` 🤝 **DB** — Test a restore end to end — an untested backup is not a backup.
@@ -567,11 +608,12 @@ bar is that shipping a change stays a normal push.*
 - [ ] `119` 🤖 **OPS** — Keep the static-only build deployable as a fallback if the server has to be abandoned.
   - *Needs:* `112` `101` · *Done when:* Pages can be re-pointed at the static build in one commit, with current data.
 
-## Phase 15 — The calendar *(gated on `030`)*
+## Phase 15 — The calendar *(⟲ RULED INTO 1.0 by Jason, 2026-08-02 — the active build queue)*
 
-*11 tasks. Nothing exists yet. This phase can run without a server if `030` says
-1.0 — but a meal plan only one phone can see is close to useless, which is why
-`030` is a real question and not a formality.*
+*11 tasks. The database's `menu_plan` table already exists with per-meal
+servings (`125`) and deletion-survival (`127`) designed in; the build starts
+at `120` (slot decision) and `121` (drawings before code), per the phase's
+own design-first rule.*
 
 - [ ] `120` 🤝 **FE-C** — Decide and document the meal slots — breakfast, lunch, dinner, or dinner only.
   - *Needs:* `030` · *Done when:* decided from how the family actually plans, not from what a calendar usually has.
@@ -686,6 +728,9 @@ finds out what the last one learned.*
 | `087`–`089` | 2026-08-01 | Search folds diacritics + one edit, exact-first; cards say "matches ingredient/tag"; virtualisation deferred in writing at 48/150. |
 | `080` | 2026-08-01 | CLAUDE.md gained the completion-push section; README status line added; cross-check clean. 299 checks total. Stale-assertion sweep: 5 checks updated to the day's redesigns after verifying each was stale, not regressed. |
 | *Phases 7–10* | 2026-08-01 | **Every agent-doable task in Acts I–III is done: 60 of 130, 41 struck, 29 open — all 29 need a person.** Suite: 299 green + perf + zero AA failures. |
+| — | 2026-08-02 | **Jason answered everything.** Gate reversed: Neon Postgres in, calendar in 1.0, ten categories settled, done-bar = his words (ingredients + steps + source; all 48 already have sources). Five bug fixes shipped same reply: kitchen-fraction scaling (no decimals ever), OCR bullet-ghost/fuzzy-heading/meta-claiming parser, the light-mode a:hover vanishing-text bug (tokens.css's own rule), the mark became a working logo on the left, Jessica joined. |
+| `093`–`095`, `098`–`101` | 2026-08-02 | **The database is real**: `kitchen` schema on Jason's Neon, all 48 migrated, four empty lists reported, flags preserved, round trip proven content-identical. Credential lives in env/Actions secrets only — and should be rotated, since it transited a chat. |
+| — | 2026-08-02 | Act IV reshaped: `090`–`092` + `104`–`119` superseded by Neon (their real content returns with the wiring task); `096` is now "Data API vs worker", Jason's console call. Phase 15 is the active queue. |
 | `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
 | *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |
 | `054` | 2026-08-01 | Print palette became tokens — tokens.css's first sanctioned amendment; style.css now zero hex anywhere. |
@@ -719,8 +764,9 @@ agent task — the agent queue is empty.*
 | `035`–`040`, `042` | **VoiceOver on iOS, Reduce Motion + Increase Contrast.** Findings amend `design/a11y-criteria.md` and may reopen `055`/`056`. | the deferred section of `034` |
 | `072`–`074`, `076`–`078` | **The content truth pass — sit-downs with Joan.** `CONTENT.md` is the worklist: 4 ingredient lists, the `parsnips` truncation, 34 servings, first tags, first photos, chasing the other four contributors. Rule 5: nothing inferred. | the `029` done-bar for 1.0; re-running `080` after |
 | `081` | **Twenty real photos of Joan's recipe cards** through the proven pipeline; write down the honest error rate. | final wording of the `082` flags |
-| *provisional rulings* | One sentence each from Jason/the family turns `026` `027` `029` `030` `031` `032` from provisional to settled — or reverses them while reversal is still cheap. | nothing mechanical; 1.0 legitimacy |
-| *struck* | `090`–`130`: Act IV struck — no server (`026`), calendar post-1.0 (`030`). Reasons in `DECISIONS.md`. Reversal reopens them intact. | — |
+| `096` | **Jason's Neon console call: enable the Data API (browser-safe keys + row-level security) or ask for a small worker instead.** This is the one decision between the live site and the database. | the app↔DB wiring, live shared edits, logins, the calendar syncing across phones |
+| *rotate the credential* | The Postgres password transited a chat; rotate it in the Neon console once the wiring lands (env vars and Actions secrets update in one place each). | hygiene, not function |
+| `031` `032` | Merge story and pull cadence were written for the file era; once live DB writes exist they need a one-paragraph refresh. | post-wiring |
 
 ---
 
