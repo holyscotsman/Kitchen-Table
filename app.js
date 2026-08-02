@@ -82,7 +82,10 @@
        keeps the work, closing the tab lets it go. Nothing here is "saved" —
        the draft only becomes a recipe when Save is pressed. */
     addDraft: "kt.addDraft",
-    plan: "kt.plan"
+    plan: "kt.plan",
+    /* Where the kitchen server lives. Unset means the baked-in address;
+       tests point it at a stub. */
+    importApi: "kt.importApi"
   };
 
   /* The week planner's slots. All three exist on every day; the UI shows
@@ -331,6 +334,12 @@
     addPhotos: [],
     addDupe: null,     // id of the likely duplicate, when one was found
     addDupeOk: false,  // "Save anyway" pressed
+
+    /* From a video — the one import that happens on the kitchen server. */
+    videoUrl: "",
+    videoJob: null,     // { id, status, stage, eta, overrun } while watching
+    videoWaking: false, // slow first answer = free-tier server waking, not broken
+    videoReady: [],     // finished imports awaiting review (the Add screen list)
 
     mainQ: "",
 
@@ -2270,7 +2279,22 @@
     }
 
     if (S.addStep === "choose") {
-      h += '<p class="addscreen__lead">Three ways to get a recipe in. However it ' +
+      /* Finished video imports wait here for whoever comes back (the spec's
+         badge, grown into the list it stood for). */
+      if (S.videoReady.length) {
+        h += '<div class="panel vready"><h2>Ready to check over</h2>' +
+             '<p class="vready__s">Video imports the kitchen server has finished. ' +
+             "Open one to look it over and save it.</p>" +
+             S.videoReady.map(function (j) {
+               return '<button type="button" class="pathbtn press" data-act="video-open" ' +
+                      'data-id="' + j.id + '"><span class="pathbtn__t">' +
+                      esc(j.title || "Untitled recipe") + "</span>" +
+                      '<span class="pathbtn__s">From ' +
+                      (j.platform === "instagram" ? "Instagram" : "YouTube") +
+                      "</span></button>";
+             }).join("") + "</div>";
+      }
+      h += '<p class="addscreen__lead">Four ways to get a recipe in. However it ' +
            "starts, you get to check it over before it’s saved.</p>";
       h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
            'data-key="review"><span class="pathbtn__t">Type it in</span>' +
@@ -2281,6 +2305,9 @@
       h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
            'data-key="photo"><span class="pathbtn__t">From a photo</span>' +
            '<span class="pathbtn__s">Read the text out of a picture of a recipe</span></button>';
+      h += '<button type="button" class="pathbtn press" data-act="add-path" ' +
+           'data-key="video"><span class="pathbtn__t">From a video</span>' +
+           '<span class="pathbtn__s">A YouTube or Instagram link, written up for you</span></button>';
       h += "</div>";
       return h;
     }
@@ -2346,6 +2373,56 @@
       h += '<button type="button" class="savebtn press" data-act="add-ocr"' +
            (S.addBusy || !S.addPhotos.length ? " disabled" : "") + ">Read the photo" +
            (S.addPhotos.length > 1 ? "s" : "") + "</button>";
+      h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
+      h += "</div>";
+      return h;
+    }
+
+    if (S.addStep === "video") {
+      if (S.videoWaking) {
+        h += '<p class="notice" role="status">Waking up the kitchen server — it ' +
+             "falls asleep when nobody’s used it for a while. This can take up " +
+             "to a minute.</p>";
+      }
+      if (S.videoJob) {
+        /* The progress card: three human stages, a rough ETA, and the
+           promise that matters — closing the page loses nothing. */
+        var st = S.videoJob.status;
+        var idx = st === "transcribing" ? 1 : st === "extracting" ? 2 : 0;
+        var names = ["Fetching the video", "Listening to it", "Writing up the recipe"];
+        h += '<div class="panel vprog" role="status"><h2>' +
+             (st === "queued" ? "Waiting its turn…" : "Working on it…") + "</h2>" +
+             '<ol class="vprog__list">' +
+             names.map(function (nm, i) {
+               var cls = i < idx ? "vprog__s vprog__s--done"
+                 : i === idx ? "vprog__s vprog__s--now" : "vprog__s";
+               return '<li class="' + cls + '">' +
+                      (i < idx ? I.check(15) : "") + esc(nm) + "</li>";
+             }).join("") + "</ol>";
+        h += '<p class="vprog__eta">' + esc(fmtEta(S.videoJob)) + "</p>";
+        h += '<p class="addscreen__note">This runs on the kitchen server — you ' +
+             "can close this page. The finished recipe will be waiting on the " +
+             "Add screen when you come back.</p></div>";
+        h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
+             "Leave it cooking</button>";
+        h += "</div>";
+        return h;
+      }
+      h += '<div class="field"><label class="field__label" for="a-vurl">' +
+           "Video address</label>" +
+           '<input class="input" id="a-vurl" type="url" ' +
+           'placeholder="https://youtube.com/… or https://instagram.com/…" ' +
+           'data-act="video-url" value="' + esc(S.videoUrl || "") + '" /></div>';
+      /* Same disclosure discipline as the link importer (050): name every
+         service the link touches before anything is sent. */
+      h += '<p class="addscreen__note">The address goes to the family’s kitchen ' +
+           "server (on Render), which fetches the video, has Groq transcribe " +
+           "the narration, and has Claude write it up into a draft. The video " +
+           "itself is deleted the moment that’s done, and nothing is saved to " +
+           "the book until you’ve checked the draft over. Anything the video " +
+           "never said gets flagged, not guessed.</p>";
+      h += '<button type="button" class="savebtn press" data-act="video-submit"' +
+           (S.addBusy ? " disabled" : "") + ">Send it to the kitchen</button>";
       h += '<button type="button" class="outlinebtn press" data-act="add-back">Back</button>';
       h += "</div>";
       return h;
@@ -2545,6 +2622,10 @@
 
     S.recipes = S.recipes.concat([recipe]);
     persistRecipes();
+    /* A video import tells the kitchen server its draft was accepted, so
+       the database gets the reviewed version and the job leaves the
+       waiting list. The local save above never waits on it. */
+    if (d.videoJobId) acceptVideoJob(d.videoJobId, recipe);
     S.addDraft = null;
     S.addStep = "choose";
     S.addError = "";
@@ -2647,6 +2728,214 @@
         S.addBusy = "";
         S.addError = err.message;
         render();
+      });
+  }
+
+  /* ---- from a video: the kitchen server does the reading ----
+     The only feature that leaves this page's own machinery: a YouTube or
+     Instagram link goes to the import server (backend/), which fetches,
+     transcribes, and writes up a draft as a background job. The phone can
+     close; the job's whole life lives in a database row, and the finished
+     draft lands on the same review screen as every other import. */
+
+  var IMPORT_API = (function () {
+    var o = load(K.importApi, "");
+    return (typeof o === "string" && /^https?:\/\//.test(o)
+      ? o : "https://kitchen-table-5tp6.onrender.com").replace(/\/+$/, "");
+  })();
+
+  /* Fetch against the kitchen server with the free tier's one quirk handled:
+     a cold server takes ~30–60s to wake, so a slow first answer flips the
+     "waking up" notice (never an error) and one network failure retries
+     once before giving up. */
+  function kitchenFetch(path, opts, quiet) {
+    opts = opts || {};
+    function attempt(retriesLeft) {
+      var ctl = typeof AbortController === "undefined" ? null : new AbortController();
+      var timer = ctl && setTimeout(function () { ctl.abort(); }, opts.timeout || 90000);
+      var wakeTimer = null;
+      if (!quiet) {
+        wakeTimer = setTimeout(function () {
+          if (!S.videoWaking) { S.videoWaking = true; render(); }
+        }, 4000);
+      }
+      return fetch(IMPORT_API + path, {
+        method: opts.method || "GET",
+        headers: opts.body ? { "content-type": "application/json" } : undefined,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        signal: ctl ? ctl.signal : undefined
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok) {
+            var e = new Error(data.error || "The kitchen server answered oddly (HTTP " + res.status + ").");
+            e.answered = true; /* the server spoke — never retry these */
+            throw e;
+          }
+          return data;
+        });
+      }).catch(function (err) {
+        var aborted = /abort/i.test(String((err && err.name) || err));
+        if (retriesLeft > 0 && !err.answered && !aborted) {
+          /* A dropped connection is what waking looks like from outside. */
+          return new Promise(function (r) { setTimeout(r, 3000); })
+            .then(function () { return attempt(retriesLeft - 1); });
+        }
+        throw new Error(err.answered
+          ? err.message
+          : "The kitchen server couldn’t be reached — it may still be waking " +
+            "up, which takes about a minute. Try again shortly.");
+      }).finally(function () {
+        if (timer) clearTimeout(timer);
+        if (wakeTimer) clearTimeout(wakeTimer);
+        S.videoWaking = false;
+      });
+    }
+    return attempt(1);
+  }
+
+  function submitVideo() {
+    var url = (S.videoUrl || "").trim();
+    S.addError = "";
+    if (!/^https?:\/\//i.test(url) ||
+        !/youtube\.com|youtu\.be|instagram\.com|instagr\.am/i.test(url)) {
+      S.addError = "That doesn’t look like a YouTube or Instagram link.";
+      render();
+      return;
+    }
+    S.addBusy = "Sending the link to the kitchen…";
+    render();
+    kitchenFetch("/api/import/video", { method: "POST", body: { url: url } })
+      .then(function (r) {
+        S.addBusy = "";
+        S.videoUrl = "";
+        S.videoJob = { id: r.job_id, status: "queued", stage: "Waiting its turn", eta: null };
+        scheduleAddPersist();
+        startVideoPoll();
+        render();
+      })
+      .catch(function (err) {
+        S.addBusy = "";
+        S.addError = err.message;
+        render();
+      });
+  }
+
+  /* Polling, 3.5s while the page is open — the job doesn't need us watching. */
+  var videoPollTick = null;
+  function startVideoPoll() {
+    stopVideoPoll();
+    videoPollTick = setInterval(pollVideoJob, 3500);
+  }
+  function stopVideoPoll() {
+    if (videoPollTick) { clearInterval(videoPollTick); videoPollTick = null; }
+  }
+  function pollVideoJob() {
+    if (!S.videoJob || S.route.name !== "add") { stopVideoPoll(); return; }
+    kitchenFetch("/api/import/jobs/" + S.videoJob.id, { timeout: 15000 }, true)
+      .then(function (job) {
+        if (!S.videoJob || S.videoJob.id !== job.id) return;
+        if (job.status === "ready_for_review") {
+          stopVideoPoll();
+          openVideoDraft(job);
+          return;
+        }
+        if (job.status === "failed") {
+          stopVideoPoll();
+          S.videoJob = null;
+          S.addError = job.error_message || "The import didn’t work — try the link again.";
+          scheduleAddPersist();
+          render();
+          return;
+        }
+        var before = S.videoJob.status + "|" + fmtEta(S.videoJob);
+        S.videoJob = { id: job.id, status: job.status, eta: job.eta_seconds, overrun: job.overrun };
+        if (before !== job.status + "|" + fmtEta(S.videoJob)) render();
+      })
+      .catch(function () { /* transient — the next tick tries again */ });
+  }
+
+  function fmtEta(job) {
+    if (!job) return "";
+    if (job.overrun) return "Taking a bit longer than usual…";
+    var s = job.eta;
+    if (typeof s !== "number") return "Working out how long this will take…";
+    if (s < 50) return "Under a minute left.";
+    var m = Math.round(s / 60) || 1;
+    return "About " + m + (m === 1 ? " minute" : " minutes") + " left.";
+  }
+
+  /* A finished job → the standard review screen. The job id rides along so
+     Save can tell the server its draft was accepted. */
+  function openVideoDraft(job) {
+    var rj = job.result_json || {};
+    var d = blankDraft();
+    d.title = rj.title || "";
+    d.category = CATS.indexOf(rj.category) > -1 ? rj.category : "Dinner";
+    d.contributor = rj.contributor || WHO[0];
+    d.servings = rj.servings || 4;
+    d.prepTime = rj.prepTime || "";
+    d.cookTime = rj.cookTime || "";
+    d.ingredients = rj.ingredients && rj.ingredients.length ? rj.ingredients.slice() : [""];
+    d.steps = rj.steps && rj.steps.length ? rj.steps.slice() : [""];
+    d.notes = rj.notes || "";
+    d.flagged = (rj.flagged || []).slice();
+    d.source = rj.source || "";
+    d.tags = (rj.tags || []).join(", ");
+    d.videoJobId = job.id;
+    S.videoJob = null;
+    S.videoReady = S.videoReady.filter(function (j) { return j.id !== job.id; });
+    S.addDraft = d;
+    S.addStep = "review";
+    S.addError = "";
+    scheduleAddPersist();
+    render();
+  }
+
+  /* The Add screen's waiting list — refreshed on arrival, quietly. */
+  function fetchVideoReady() {
+    kitchenFetch("/api/import/jobs?status=ready_for_review", { timeout: 12000 }, true)
+      .then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var before = JSON.stringify(S.videoReady);
+        S.videoReady = jobs;
+        if (S.route.name === "add" && JSON.stringify(jobs) !== before) render();
+      })
+      .catch(function () { /* asleep or offline — the list just stays empty */ });
+  }
+
+  function openReadyJob(id) {
+    S.addBusy = "Fetching the draft…";
+    render();
+    kitchenFetch("/api/import/jobs/" + id, { timeout: 20000 })
+      .then(function (job) {
+        S.addBusy = "";
+        if (job.status === "ready_for_review") openVideoDraft(job);
+        else {
+          S.addError = "That import isn’t ready after all.";
+          fetchVideoReady();
+          render();
+        }
+      })
+      .catch(function (err) {
+        S.addBusy = "";
+        S.addError = err.message;
+        render();
+      });
+  }
+
+  /* Save pressed on a video draft: the phone's copy saved instantly (like
+     every import); the server is told so the database gets the reviewed
+     version and the job leaves the waiting list. Failure is said, not
+     hidden — the job stays listed until an accept lands. */
+  function acceptVideoJob(jobId, recipe) {
+    kitchenFetch("/api/import/jobs/" + jobId + "/accept",
+      { method: "POST", body: { recipe: recipe }, timeout: 90000 }, true)
+      .then(function () {
+        S.videoReady = S.videoReady.filter(function (j) { return j.id !== jobId; });
+      })
+      .catch(function () {
+        setNotice("Saved on this phone. The kitchen server couldn’t be told " +
+          "yet, so this import stays in the waiting list for now.");
       });
   }
 
@@ -3303,8 +3592,15 @@
       S.addPhotos = [];
       S.addDupe = null;
       S.addDupeOk = false;
+      S.videoUrl = "";
+      S.videoJob = null;
+      S.videoWaking = false;
       restoreAddDraft();
+      /* The waiting list greets whoever arrives — someone else's finished
+         import is family news, not private state. */
+      fetchVideoReady();
     }
+    if (next.name !== "add" && S.route.name === "add") stopVideoPoll();
 
     if (changedRecipe) {
       /* Check state is per-visit and must not survive leaving the recipe. */
@@ -3360,7 +3656,7 @@
   function persistAddDraft() {
     try {
       if (S.route.name !== "add") return;
-      if (S.addStep === "choose" && !S.addDraft && !S.addUrl && !S.addPaste) {
+      if (S.addStep === "choose" && !S.addDraft && !S.addUrl && !S.addPaste && !S.videoJob) {
         sessionStorage.removeItem(K.addDraft);
         return;
       }
@@ -3368,7 +3664,9 @@
         step: S.addStep === "photo" ? "choose" : S.addStep,
         draft: S.addDraft,
         url: S.addUrl,
-        paste: S.addPaste
+        paste: S.addPaste,
+        videoUrl: S.videoUrl,
+        videoJob: S.videoJob ? { id: S.videoJob.id, status: S.videoJob.status } : null
       }));
     } catch (e) { /* private browsing — the draft just won't survive */ }
   }
@@ -3378,11 +3676,18 @@
       var raw = sessionStorage.getItem(K.addDraft);
       if (!raw) return;
       var d = JSON.parse(raw);
-      if (d && (d.draft || d.url || d.paste)) {
+      if (d && (d.draft || d.url || d.paste || d.videoJob)) {
         S.addStep = d.step || "choose";
         S.addDraft = d.draft || null;
         S.addUrl = d.url || "";
         S.addPaste = d.paste || "";
+        S.videoUrl = d.videoUrl || "";
+        /* A watch in progress resumes — the job kept cooking through the
+           refresh; polling picks it back up where the row says it is. */
+        if (d.videoJob && d.videoJob.id) {
+          S.videoJob = { id: d.videoJob.id, status: d.videoJob.status || "queued", eta: null };
+          startVideoPoll();
+        }
       }
     } catch (e) {}
   }
@@ -3723,12 +4028,20 @@
       return;
     }
     if (act === "add-back") {
+      /* Backing out of the wait screen abandons the watching, not the job —
+         it finishes server-side and appears in the waiting list. */
+      stopVideoPoll();
+      S.videoJob = null;
       S.addStep = "choose";
       S.addError = "";
       S.addBusy = "";
+      scheduleAddPersist();
+      fetchVideoReady();
       render();
       return;
     }
+    if (act === "video-submit") { submitVideo(); return; }
+    if (act === "video-open") { openReadyJob(parseInt(el.getAttribute("data-id"), 10)); return; }
     if (act === "add-fetch") { importFromLink(); return; }
     if (act === "add-paste") {
       var text = (S.addPaste || "").trim();
@@ -3845,6 +4158,7 @@
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
     if (act === "a-url") { S.addUrl = el.value; scheduleAddPersist(); return; }
+    if (act === "video-url") { S.videoUrl = el.value; scheduleAddPersist(); return; }
     if (act === "a-paste") {
       var had = !!(S.addPaste || "").trim();
       S.addPaste = el.value;

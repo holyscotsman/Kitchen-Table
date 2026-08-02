@@ -1546,6 +1546,84 @@ input[type="file"].input {
   line-height: 1.4;
 }
 
+/* ---- From a video: the progress card and the waiting list ---- */
+
+.vready {
+  margin-bottom: 26px;
+}
+
+.vready h2 {
+  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--acc);
+  margin-bottom: 6px;
+}
+
+.vready__s {
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+
+.vready .pathbtn {
+  min-height: 72px;
+  margin-bottom: 10px;
+}
+
+.vready .pathbtn:last-child {
+  margin-bottom: 0;
+}
+
+.vprog {
+  margin-bottom: 18px;
+  font-size: 1em;
+}
+
+.vprog h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.vprog__list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.vprog__s {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding-left: 14px;
+  border-left: 4px solid var(--line);
+  color: var(--dim);
+  font-size: 17px;
+}
+
+.vprog__s--done {
+  border-left-color: var(--acc);
+}
+
+.vprog__s--done svg {
+  color: var(--acc);
+  flex: none;
+}
+
+.vprog__s--now {
+  border-left-color: var(--acc);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.vprog__eta {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--acc);
+  margin-bottom: 12px;
+  min-height: 1.4em;
+}
+
 /* ------------------------------------------------------------- edit mode */
 
 .field {
