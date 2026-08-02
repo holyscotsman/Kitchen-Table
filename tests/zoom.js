@@ -23,6 +23,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const screens = [
     ['Main', '#', '.main__title', null],
     ['Menu', '#menu', '.rcard', null],
+    ['Week planner', '#plan', '.dayblock', null],
     ['Menu + filter sheet', '#menu', '.rcard', '[data-act="open-filter"]'],
     ['Menu + text sheet', '#menu', '.rcard', '[data-act="open-text"]'],
     ['Recipe', '#chicken-cordon-bleu', '.r-title', null],

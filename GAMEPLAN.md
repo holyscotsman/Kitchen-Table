@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 67 of 130 done · 19 struck-as-superseded · 44 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
+**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 78 of 130 done · 19 struck-as-superseded · 33 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -615,28 +615,39 @@ servings (`125`) and deletion-survival (`127`) designed in; the build starts
 at `120` (slot decision) and `121` (drawings before code), per the phase's
 own design-first rule.*
 
-- [ ] `120` 🤝 **FE-C** — Decide and document the meal slots — breakfast, lunch, dinner, or dinner only.
+- [x] `120` 🤝 **FE-C** — Decide and document the meal slots — breakfast, lunch, dinner, or dinner only.
   - *Needs:* `030` · *Done when:* decided from how the family actually plans, not from what a calendar usually has.
-- [ ] `121` 🤝 **UI** — Draw the calendar week view at 390px, 768px and 1180px before anyone builds it.
+  - *Done 2026-08-02: dinner-first, all three slots live, Monday start — DECISIONS.md 120.*
+- [x] `121` 🤝 **UI** — Draw the calendar week view at 390px, 768px and 1180px before anyone builds it.
   - *Needs:* `120` `061` · *Done when:* all three widths are drawn and none needs a new token.
-- [ ] `122` 🤖 **FE-C** — Prototype the week grid at 390px and confirm it survives Easy Read without horizontal scrolling.
+  - *Done 2026-08-02: design/calendar.md — anatomy, the three widths (one column everywhere), interactions, print, data shape. Drawn before built.*
+- [x] `122` 🤖 **FE-C** — Prototype the week grid at 390px and confirm it survives Easy Read without horizontal scrolling.
   - *Needs:* `121` `041` `059` · *Done when:* seven days fit at the largest font step with no horizontal scroll. **If it cannot, `121` is wrong and goes back.**
-- [ ] `123` 🤖 **FE-C** — Build tap-to-assign with a recipe picker reusing the existing search.
+  - *Done 2026-08-02: seven days at 390px, zero horizontal scroll, held under Easy Read at the 40px step — asserted in tests/plan.js and the zoom suite.*
+- [x] `123` 🤖 **FE-C** — Build tap-to-assign with a recipe picker reusing the existing search.
   - *Needs:* `122` `087` · *Done when:* assigning is a tap. **Never drag — it is hostile on a phone and unusable with a tremor or low vision.**
-- [ ] `124` 🤖 **FE-C** — Show an assigned recipe as a card carrying its category icon and photo thumbnail.
+  - *Done 2026-08-02: tap an empty slot, search (the 087 fold/typo search), tap a recipe — assigned. Never drag.*
+- [x] `124` 🤖 **FE-C** — Show an assigned recipe as a card carrying its category icon and photo thumbnail.
   - *Needs:* `123` `056` `063` · *Done when:* it reads at a glance at the largest font step.
-- [ ] `125` 🤖 **FE-C** — Let a planned meal record its own servings, independent of the recipe's default.
+  - *Done 2026-08-02: assigned meals are the Menu card grammar — 64px icon/thumb, title, slot · servings.*
+- [x] `125` 🤖 **FE-C** — Let a planned meal record its own servings, independent of the recipe's default.
   - *Needs:* `123` `074` · *Done when:* Tuesday for four and Sunday for twelve are the same recipe with different amounts.
-- [ ] `126` 🤖 **FE-C** — Handle the same recipe planned twice in one week without treating it as an error.
+  - *Done 2026-08-02: each planned meal carries its own servings via the meal sheet stepper; the recipe default never moves.*
+- [x] `126` 🤖 **FE-C** — Handle the same recipe planned twice in one week without treating it as an error.
   - *Needs:* `125` · *Done when:* both entries exist independently and can be scaled differently.
-- [ ] `127` 🤖 **FE-C** — Define what a meal plan means when the recipe it points at is later removed.
+  - *Done 2026-08-02: the same recipe twice in a week is two independent entries — asserted.*
+- [x] `127` 🤖 **FE-C** — Define what a meal plan means when the recipe it points at is later removed.
   - *Needs:* `126` `031` · *Done when:* the slot degrades to the recipe's name rather than vanishing or crashing.
-- [ ] `128` 🤖 **FE-C** — Add week-to-week navigation with the View Transitions API, degrading cleanly where unsupported.
+  - *Done 2026-08-02: a removed recipe leaves its planned-under name, marked "No longer in the book", removable, never a crash.*
+- [x] `128` 🤖 **FE-C** — Add week-to-week navigation with the View Transitions API, degrading cleanly where unsupported.
   - *Needs:* `122` `042` · *Done when:* it works without the API, and is off entirely under Reduce Motion.
-- [ ] `129` 🤖 **FE-C** — Add a print view of the week for the fridge door — likely the most-used output.
+  - *Done 2026-08-02: week nav via View Transitions where supported, plain repaint where not, nothing under reduced motion.*
+- [x] `129` 🤖 **FE-C** — Add a print view of the week for the fridge door — likely the most-used output.
   - *Needs:* `124` `054` `007` · *Done when:* one page, black on white, legible across a kitchen. **→ README**
-- [ ] `130` 🤖 **FE-C** — Prototype ingredient summing and find out how badly units break it before promising the feature.
+  - *Done 2026-08-02: print strips the controls and keeps the meals — black on white via the print tokens, empty slots omitted. → README done.*
+- [x] `130` 🤖 **FE-C** — Prototype ingredient summing and find out how badly units break it before promising the feature.
   - *Needs:* `125` `076` · *Done when:* the failure modes are written down. **This is a spike. Shipping it is a separate decision, not part of 1.0.**
+  - *Done 2026-08-02: the summing spike shipped as a labelled preview; failure modes recorded in DECISIONS.md 130. Promoting it past preview is a separate decision, as the task warned.*
 
 ---
 
@@ -731,6 +742,7 @@ finds out what the last one learned.*
 | — | 2026-08-02 | **Jason answered everything.** Gate reversed: Neon Postgres in, calendar in 1.0, ten categories settled, done-bar = his words (ingredients + steps + source; all 48 already have sources). Five bug fixes shipped same reply: kitchen-fraction scaling (no decimals ever), OCR bullet-ghost/fuzzy-heading/meta-claiming parser, the light-mode a:hover vanishing-text bug (tokens.css's own rule), the mark became a working logo on the left, Jessica joined. |
 | `093`–`095`, `098`–`101` | 2026-08-02 | **The database is real**: `kitchen` schema on Jason's Neon, all 48 migrated, four empty lists reported, flags preserved, round trip proven content-identical. Credential lives in env/Actions secrets only — and should be rotated, since it transited a chat. |
 | — | 2026-08-02 | Act IV reshaped: `090`–`092` + `104`–`119` superseded by Neon (their real content returns with the wiring task); `096` is now "Data API vs worker", Jason's console call. Phase 15 is the active queue. |
+| `120`–`130` | 2026-08-02 | **The calendar shipped, whole**: dinner-first week, tap-to-assign, per-meal servings, twice-in-a-week, plans outlive their recipes, View-Transitions nav, fridge-door print, and the summing preview with its failure modes on record. tests/plan.js (27 checks) joins the CI gate; zoom and contrast cover the new screen. Suite: 328 functional checks, 0 AA failures. |
 | `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
 | *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |
 | `054` | 2026-08-01 | Print palette became tokens — tokens.css's first sanctioned amendment; style.css now zero hex anywhere. |
