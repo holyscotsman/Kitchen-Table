@@ -2295,3 +2295,23 @@ input[type="file"].input {
 .managerow--edit .input {
   flex: 1 1 160px;
 }
+
+/* 082 — a flag that names its field shows up beside that field. The chip is
+   informational wayfinding, not an edit affordance: tapping it scrolls to the
+   full explanation in the panel below. */
+.fieldflag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+  margin-left: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--flag-bg);
+  color: var(--flag);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}

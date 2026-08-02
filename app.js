@@ -211,6 +211,9 @@
         '<path d="M20 5.5h-6a2 2 0 00-2 2V19a2 2 0 012-2h6z"/>',
         s || 26, s || 26
       );
+    },
+    flag: function (s) {
+      return svg('<path d="M6 21V4"/><path d="M6 4h11l-2.5 4L17 12H6"/>', s || 16, s || 16);
     }
   };
 
@@ -1391,9 +1394,36 @@
      8. Recipe screen — viewer
      ====================================================================== */
 
+  /* 082 — a flag that names its field ("Servings — …") surfaces beside that
+     field, not only in the panel at the bottom. Free-text flags (including
+     everything committed before this convention) classify by keyword, so old
+     data gains the chips too. */
+  function fieldOfFlag(f) {
+    var s = String(f).toLowerCase();
+    var m = s.match(/^(title|servings|ingredients|steps)\s*—/);
+    if (m) return m[1];
+    if (/serving/.test(s)) return "servings";
+    if (/ingredient/.test(s)) return "ingredients";
+    if (/\bsteps?\b/.test(s)) return "steps";
+    if (/title/.test(s)) return "title";
+    return "";
+  }
+
+  function fieldFlagChip(field, flags) {
+    if (!flags[field] || !flags[field].length) return "";
+    return '<button type="button" class="fieldflag press" data-act="to-flags">' +
+           I.flag(14) + "Double-check</button>";
+  }
+
   function viewRecipe(r) {
     var mult = S.serves && r.servings ? S.serves / r.servings : 1;
     var h = "";
+
+    var fieldFlags = { title: [], servings: [], ingredients: [], steps: [] };
+    (r.flagged || []).forEach(function (f) {
+      var k = fieldOfFlag(f);
+      if (k) fieldFlags[k].push(f);
+    });
 
     h += '<header class="rhead"><div class="rhead__inner">' +
          '<a class="backlink press" href="#menu">' + I.chevL() + "Menu</a>" +
@@ -1441,7 +1471,8 @@
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
-    h += '<h1 class="r-title">' + esc(r.title) + "</h1>";
+    h += '<h1 class="r-title">' + esc(r.title) +
+         fieldFlagChip("title", fieldFlags) + "</h1>";
 
     if (tagsOf(r).length) {
       h += '<p class="r-tags">' + tagsOf(r).map(function (t) {
@@ -1452,7 +1483,7 @@
 
     h += '<div class="topgrid">';
     h += '<div class="servcard"><div class="servcard__text">' +
-         '<p class="minilabel">Servings</p>' +
+         '<p class="minilabel">Servings' + fieldFlagChip("servings", fieldFlags) + "</p>" +
          '<p class="servcard__value">' + S.serves + " " +
          (S.serves === 1 ? "person" : "people") + "</p></div>" +
          '<button type="button" class="servbtn press" data-act="serv-" ' +
@@ -1487,7 +1518,8 @@
 
     h += '<div class="bodygrid">';
 
-    h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients</h2>' +
+    h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients' +
+         fieldFlagChip("ingredients", fieldFlags) + "</h2>" +
          '<p class="hint">Tap to check off as you go</p>';
     /* A rescale changes the numbers in place, which is easy to miss at any font
        size and very easy to miss at 40px. The list flashes once so the change
@@ -1516,7 +1548,8 @@
     }
     h += "</section>";
 
-    h += "<section><h2 class=\"r-h2\">Instructions</h2>";
+    h += '<section><h2 class="r-h2">Instructions' +
+         fieldFlagChip("steps", fieldFlags) + "</h2>";
     h += '<ol class="checklist checklist--steps' + scaled + '">' +
          (r.steps || []).map(function (line, i) {
       var done = !!S.checkedStep[i];
@@ -1548,7 +1581,7 @@
 
     /* Shown in viewer mode too — it is information, not an edit affordance. */
     if (r.flagged && r.flagged.length) {
-      h += '<section class="r-section"><div class="panel panel--flag">' +
+      h += '<section class="r-section"><div class="panel panel--flag" id="flag-panel">' +
            "<h2>Worth double-checking</h2><ul>" +
            r.flagged.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") +
            "</ul></div></section>";
@@ -2268,24 +2301,24 @@
     var d = blankDraft();
     d.flagged = [];
     d.title = text(node.name);
-    if (!d.title) d.flagged.push("No title was found on the page — add one.");
+    if (!d.title) d.flagged.push("Title — none was found on the page; add one.");
 
     d.ingredients = list(node.recipeIngredient || node.ingredients);
     if (!d.ingredients.length) {
       d.ingredients = [""];
-      d.flagged.push("No ingredients were found — check the original page.");
+      d.flagged.push("Ingredients — none were found; check the original page.");
     }
 
     d.steps = list(node.recipeInstructions);
     if (!d.steps.length) {
       d.steps = [""];
-      d.flagged.push("No steps were found — check the original page.");
+      d.flagged.push("Steps — none were found; check the original page.");
     }
 
     var y = text(node.recipeYield);
     var yn = parseInt((y.match(/\d+/) || [])[0], 10);
     if (yn) d.servings = Math.min(40, Math.max(1, yn));
-    else d.flagged.push("No serving count was found — 4 was assumed.");
+    else d.flagged.push("Servings — no count was found; 4 was assumed.");
 
     d.prepTime = dur(node.prepTime);
     d.cookTime = dur(node.cookTime || node.totalTime);
@@ -2497,7 +2530,7 @@
 
     if (!d.title) {
       d.title = "";
-      d.flagged.push("No title was obvious — add one.");
+      d.flagged.push("Title — none was obvious; add one.");
     }
     if (!sawHeadings) {
       d.flagged.push(
@@ -2505,8 +2538,8 @@
         "between the two lists was guessed. Check both."
       );
     }
-    if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("No ingredients were picked up."); }
-    if (!d.steps.length) { d.steps = [""]; d.flagged.push("No steps were picked up."); }
+    if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("Ingredients — none were picked up."); }
+    if (!d.steps.length) { d.steps = [""]; d.flagged.push("Steps — none were picked up."); }
     d.notes = notes.join(" ");
     d.source = "Read from a photo";
     return capDraft(d);
@@ -2923,6 +2956,17 @@
 
     if (act === "theme") { toggleTheme(); return; }
     if (act === "tag-sug") { applyTagSuggestion(el); return; }
+    if (act === "to-flags") {
+      var fp = document.getElementById("flag-panel");
+      if (fp) {
+        fp.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto" : "smooth",
+          block: "center"
+        });
+      }
+      return;
+    }
     if (act === "open-text") { openSheet("textOpen", el); return; }
     if (act === "close-text") { closeSheet("textOpen"); return; }
     if (act === "toggle-easy") { toggleEasy(); return; }
