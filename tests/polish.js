@@ -108,6 +108,27 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('wake row hidden when API unavailable', true);
   }
 
+  console.log('\n== a:hover never turns a filled control invisible (Jason bug) ==');
+  await p.evaluate(()=>localStorage.setItem('kt.theme',JSON.stringify('light')));
+  await p.goto(B+'/index.html'); await p.waitForSelector('.bigbtn');
+  let hoverBad=[];
+  for (const sel of ['.bigbtn','.who-tile','.hero','.cat-row']) {
+    const el=p.locator(sel).first();
+    if (!(await el.count())) continue;
+    await el.hover().catch(()=>{}); await p.waitForTimeout(100);
+    const s=await el.evaluate(e=>{const c=getComputedStyle(e);return [c.color,c.backgroundColor];});
+    if (s[0]===s[1]) hoverBad.push(sel);
+  }
+  await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
+  for (const sel of ['.rcard','.addpill']) {
+    const el=p.locator(sel).first();
+    await el.hover().catch(()=>{}); await p.waitForTimeout(100);
+    const s=await el.evaluate(e=>{const c=getComputedStyle(e);return [c.color,c.backgroundColor];});
+    if (s[0]===s[1]) hoverBad.push(sel);
+  }
+  chk('hovered text never matches its background (light mode)', hoverBad.length===0, hoverBad.join(', '));
+  await p.evaluate(()=>localStorage.removeItem('kt.theme'));
+
   console.log('\n== Colour is never the only signal (task 043) ==');
   await p.goto(B+'/index.html#chops'); await p.waitForSelector('.r-title');
   chk('flagged panel carries a heading, not just a colour', /Worth double-checking|No ingredients were captured/.test(await p.locator('.panel--flag').first().textContent()));

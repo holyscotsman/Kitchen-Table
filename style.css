@@ -2321,3 +2321,41 @@ input[type="file"].input {
   font-style: italic;
   color: var(--dim);
 }
+
+/* ============================================== The a:hover ink guard
+
+   tokens.css carries the handoff's `a:hover { color: var(--acc) }` — right
+   for text links, catastrophic for anchors styled as filled controls: in
+   light mode the accent IS the fill, so hovering (or tapping, which passes
+   through hover) turned the label accent-on-accent — invisible. Every anchor
+   that owns a filled surface keeps that surface's ink on hover instead.
+   tokens.css itself stays verbatim; this is an override, not an edit. */
+
+a.bigbtn:hover,
+a.addpill:hover,
+a.skip-link:hover {
+  color: var(--acc-ink);
+}
+
+a.rcard:hover,
+a.hero:hover,
+a.who-tile:hover {
+  color: var(--card-ink);
+}
+
+a.who-tile--empty:hover {
+  color: var(--ink);
+}
+
+a.cat-row:hover,
+a.backlink:hover {
+  color: var(--ink);
+}
+
+a.minitag--link:hover {
+  color: var(--tag-ink);
+}
+
+a.outlinebtn:hover {
+  color: var(--ink);
+}
