@@ -38,6 +38,17 @@ async function runJob(ctx, jobId) {
        set status = 'failed', error_message = ${String(msg).slice(0, 500)},
            updated_at = now()
      where id = ${jobId}`;
+  /* Download failures keep the tool's own last words (result_json.debug —
+   * unused on failed jobs otherwise): the friendly sentence is for people,
+   * the raw tail is how the NEXT YouTube-defense shift gets diagnosed from
+   * the job row instead of from guesswork. */
+  const failDownload = (run) => sql`
+    update kitchen.import_jobs
+       set status = 'failed',
+           error_message = ${media.friendlyDownloadError(run.stderr, job.platform)},
+           result_json = ${JSON.stringify({ debug: String(run.stderr || "").slice(-1500) })},
+           updated_at = now()
+     where id = ${jobId}`;
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kt-job-"));
   const ytdlp = media.resolveTool("yt-dlp");
@@ -50,7 +61,7 @@ async function runJob(ctx, jobId) {
       ["-J", "--no-download", "--no-playlist", "--no-warnings", job.url],
       { timeoutMs: 120000 });
     if (!metaRun.ok || !metaRun.stdout) {
-      await fail(media.friendlyDownloadError(metaRun.stderr, job.platform));
+      await failDownload(metaRun);
       return;
     }
     let info;
@@ -98,7 +109,7 @@ async function runJob(ctx, jobId) {
           { cwd: tmp, timeoutMs: 300000 });
         const mediaFile = fs.readdirSync(tmp).find(f => f.startsWith("media."));
         if (!dl.ok || !mediaFile) {
-          await fail(media.friendlyDownloadError(dl.stderr, job.platform));
+          await failDownload(dl);
           return;
         }
 

@@ -120,7 +120,12 @@ function jobPublic(row, uptimeS) {
     video_duration_s: row.video_duration_s,
     created_at: row.created_at
   };
-  if (row.status === "failed") out.error_message = row.error_message;
+  if (row.status === "failed") {
+    out.error_message = row.error_message;
+    /* The tool's own last words, for diagnosing YouTube-defense shifts
+     * from the job row. The app ignores this field. */
+    if (row.result_json && row.result_json.debug) out.debug = row.result_json.debug;
+  }
   if (row.status === "ready_for_review") out.result_json = row.result_json;
   return out;
 }

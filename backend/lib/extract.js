@@ -24,7 +24,10 @@ const RESULT_SCHEMA = {
     not_recipe_reason: { type: "string" },
     title: { type: "string" },
     category: { type: "string", enum: CATS },
-    servings: { type: "integer", minimum: 1, maximum: 40 },
+    /* No minimum/maximum here — the structured-outputs schema subset
+     * rejects numeric bounds on integers (learned from a live 400);
+     * draftFromResult clamps to 1–40 anyway. */
+    servings: { type: "integer" },
     prepTime: { type: "string" },
     cookTime: { type: "string" },
     ingredients: { type: "array", items: { type: "string" } },
