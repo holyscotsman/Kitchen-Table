@@ -102,8 +102,10 @@ than carrying the picture inline.
 
 **Tags** are free-form and comma-separated — include where a dish is from. They
 filter (picking two means both), they're searched, and tapping one on a recipe
-opens the Menu filtered to it. Nothing ships pre-tagged; the tag filter appears
-once something has been tagged.
+opens the Menu filtered to it. The collection ships tagged where the answer is
+established — Scottish for the tablet and tattie scones, Cajun for the
+étouffée, *air fryer* for everything cooked in the Ninja — and stays untagged
+where only Joan would know.
 
 **Category or tag?** The rule: **the category answers "when would you serve
 this?" — one per recipe, from the fixed list of ten. Everything else true about

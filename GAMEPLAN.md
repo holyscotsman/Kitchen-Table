@@ -1,6 +1,6 @@
 # Kitchen Table — the 1.0 gameplan
 
-**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 78 of 130 done · 19 struck-as-superseded · 33 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
+**Status:** `v0.9` · **Jason reversed the gate 2026-08-02**: a database (Neon Postgres) and the calendar are both **in** for 1.0 · 79 of 130 done · 19 struck-as-superseded · 32 open — the calendar build, the app↔database wiring (needs Jason's Neon console step), and the human checks (§11)
 **When this file is fully ticked, the app is version 1.0.**
 
 ---
@@ -409,8 +409,9 @@ here may be inferred.** Rule 5 in §3 exists for this phase.*
 - [x] `075` 🤝 **TW** — Maintain a duplicates list and decide which version wins when two people have the same recipe.
   - *Needs:* `070` · *Done when:* the list exists and each entry has a winner named.
   - *Done 2026-08-01:* pairwise scan of all 48 in `CONTENT.md` — one candidate (`scone-in-ninja` × `scones`), verdict **both stay**: air-fryer/metric vs oven/cups are two real preparations, not a duplicate. Standing rule written for future pairs; the in-app save-time warning (`070`) is the intake.
-- [ ] `076` 👤 **TW** — Seed the first nationality tags by asking where each dish came from, rather than inferring it.
+- [x] `076` 👤 **TW** — Seed the first nationality tags by asking where each dish came from, rather than inferring it.
   - *Needs:* `067` `068` `028` · *Done when:* every tag traces to something someone said.
+  - *Done 2026-08-02, basis amended by Jason ("research where they come from to tag it properly"): 38 tags across 37 recipes, each traceable to an established culinary fact or a method the title states; the eleven genuinely-ambiguous recipes stay untagged for Joan. Research record + the two Needs-Jason items in CONTENT.md.*
 - [ ] `077` 👤 **TW** — Collect at least one photo per course so the Main hero is not empty for every category.
   - *Needs:* `062` `063` `057` · *Done when:* all ten categories have at least one, committed to `images/`.
 - [ ] `078` 👤 **TW** — Chase Jason, Jennifer, Lindsay and Siobhan for their first recipe each.
@@ -742,6 +743,8 @@ finds out what the last one learned.*
 | — | 2026-08-02 | **Jason answered everything.** Gate reversed: Neon Postgres in, calendar in 1.0, ten categories settled, done-bar = his words (ingredients + steps + source; all 48 already have sources). Five bug fixes shipped same reply: kitchen-fraction scaling (no decimals ever), OCR bullet-ghost/fuzzy-heading/meta-claiming parser, the light-mode a:hover vanishing-text bug (tokens.css's own rule), the mark became a working logo on the left, Jessica joined. |
 | `093`–`095`, `098`–`101` | 2026-08-02 | **The database is real**: `kitchen` schema on Jason's Neon, all 48 migrated, four empty lists reported, flags preserved, round trip proven content-identical. Credential lives in env/Actions secrets only — and should be rotated, since it transited a chat. |
 | — | 2026-08-02 | Act IV reshaped: `090`–`092` + `104`–`119` superseded by Neon (their real content returns with the wiring task); `096` is now "Data API vs worker", Jason's console call. Phase 15 is the active queue. |
+| `076` | 2026-08-02 | Research tagging (Jason-authorized): 38 traceable tags, 11 recipes left for Joan on purpose. Content scan found zero defensible errors — the 125–145°F "anomalies" are correct doneness temps. One junk source fixed, two questions filed for Jason (empanada spelling; satay origin). |
+| `096`~ | 2026-08-02 | Data API enabled by Jason and probed live: the gateway requires a Neon-Auth JWT even for the anonymous role (grants are in place server-side). Bridge shipped meanwhile: nightly db-sync Action regenerates recipes.json from the database (needs the KT_DB repo secret). Remaining for live reads/writes: the Neon Auth publishable key, or Neon adding tokenless anon. |
 | `120`–`130` | 2026-08-02 | **The calendar shipped, whole**: dinner-first week, tap-to-assign, per-meal servings, twice-in-a-week, plans outlive their recipes, View-Transitions nav, fridge-door print, and the summing preview with its failure modes on record. tests/plan.js (27 checks) joins the CI gate; zoom and contrast cover the new screen. Suite: 328 functional checks, 0 AA failures. |
 | `052` | 2026-08-01 | CSP shipped; OCR broke on wasm exactly as predicted, fixed with `wasm-unsafe-eval`, re-proven live. **Found a real bug:** the pre-paint theme script never matched `save()`'s JSON quoting — light-mode users have had a dark flash since the beginning. Fixed, proven with app.js blocked. sec.js now 23 checks. |
 | *Phase 5* | 2026-08-01 | **Closed for real: 6 of 6.** The third-party surface at page load is now zero; jsdelivr remains only when OCR is invoked, pinned + SRI'd, and the relays only when a link is imported, disclosed. |

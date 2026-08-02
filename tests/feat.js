@@ -39,29 +39,32 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('Course sort puts Breakfast first', true, 'first = '+firstTitle);
 
   console.log('\n== Tags: add, render, filter, search ==');
-  await p.goto(B+'/index.html#chicken-cordon-bleu'); await p.waitForSelector('.r-title');
+  /* The collection ships tagged since the research pass; chops is one of the
+     deliberately-untagged eleven, and the test tag is unique on purpose. */
+  await p.goto(B+'/index.html#chops'); await p.waitForSelector('.r-title');
   chk('no tag row when untagged', await p.locator('.r-tags').count()===0);
   await p.click('[data-act="toggle-edit"]'); await p.waitForTimeout(300);
   chk('tags field present in edit mode', await p.locator('#e-tags').count()===1);
-  await p.fill('#e-tags','French, Chicken, quick');
+  await p.fill('#e-tags','Testonia, Pork, quick');
   await p.click('[data-act="save"]'); await p.waitForTimeout(400);
   await p.click('[data-act="toggle-edit"]'); await p.waitForTimeout(400);
   chk('tags render on the recipe', await p.locator('.r-tags .minitag').count()===3, String(await p.locator('.r-tags .minitag').count()));
   const href=await p.locator('.r-tags a').first().getAttribute('href');
-  chk('tag links to a filtered menu', href==='#menu?tag=French', String(href));
+  chk('tag links to a filtered menu', href==='#menu?tag=Testonia', String(href));
   await p.click('.r-tags a >> nth=0'); await p.waitForTimeout(500);
   chk('tag link filters the menu', await p.locator('.rcard').count()===1, String(await p.locator('.rcard').count()));
   chk('filter badge counts the tag', (await p.locator('.badge').textContent())==='1');
 
   await p.click('[data-act="open-filter"]'); await p.waitForSelector('#filter-sheet');
-  chk('Tags group appears once tags exist', (await p.locator('.grouph').allTextContents()).some(t=>/tags/i.test(t)));
-  chk('3 tag chips', await p.locator('[data-act="ft"]').count()===3);
+  chk('Tags group appears', (await p.locator('.grouph').allTextContents()).some(t=>/tags/i.test(t)));
+  chk('shipped research tags are chips too', await p.locator('[data-act="ft"]').count()>3);
+  chk('the new tag joined them', await p.locator('[data-act="ft"][data-key="Testonia"]').count()===1);
   await p.click('.donebtn'); await p.waitForTimeout(300);
   await p.click('[data-act="clear-filters"]'); await p.waitForTimeout(300);
   chk('clear resets tag filter', await p.locator('.rcard').count()===48, String(await p.locator('.rcard').count()));
 
   await p.goto(B+'/index.html'); await p.waitForSelector('#main-search');
-  await p.fill('#main-search','french'); await p.waitForTimeout(300);
+  await p.fill('#main-search','testonia'); await p.waitForTimeout(300);
   chk('search matches a tag', await p.locator('.rcard').count()===1, String(await p.locator('.rcard').count()));
 
   console.log('\n== Photos ==');
@@ -111,7 +114,8 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   const rec=parsed.find(r=>r.id==='chicken-cordon-bleu');
   chk('image written as a repo path', rec.image==='images/chicken-cordon-bleu.jpg', String(rec.image));
   chk('no base64 blob in the JSON', !js.includes('data:image'), 'size '+js.length);
-  chk('tags written to the JSON', JSON.stringify(rec.tags)==='["French","Chicken","quick"]', JSON.stringify(rec.tags));
+  const chops=parsed.find(r=>r.id==='chops');
+  chk('tags written to the JSON', JSON.stringify(chops.tags)==='["Testonia","Pork","quick"]', JSON.stringify(chops.tags));
   chk('categories migrated in output', parsed.some(r=>r.category==='Sides') && !parsed.some(r=>r.category==='Side'));
 
   console.log('\n== Download photos produces a file ==');

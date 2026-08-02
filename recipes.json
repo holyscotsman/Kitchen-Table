@@ -30,7 +30,10 @@
       "Enjoy! Took it with salad."
     ],
     "notes": "Recipe source: favorite.happycoking.com (Bacon Ranch Chicken).",
-    "source": "Chicken"
+    "source": "Chicken",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "bbq-steak-times",
@@ -73,7 +76,10 @@
     "flagged": [
       "No explicit ingredients list appeared in the screenshots — only the numbered instructions were captured, so 'eggs' and '1.5 cups water' are inferred from those steps rather than transcribed from a dedicated ingredients section."
     ],
-    "source": "Boiled eggs in ninja"
+    "source": "Boiled eggs in ninja",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "chicken-cordon-bleu",
@@ -98,7 +104,10 @@
       "Bake for 30 to 35 minutes, or until chicken is no longer pink. Remove from oven, and place 1/2 cheese slice on top of each breast. Return to oven for 3 to 5 minutes or until cheese has melted. Remove toothpicks, and serve immediately."
     ],
     "notes": "Ready in about 45 minutes total. Aluminum foil can be used to keep food moist, cook it evenly, and make clean-up easier.",
-    "source": "Chicken cordon bleu"
+    "source": "Chicken cordon bleu",
+    "tags": [
+      "French"
+    ]
   },
   {
     "id": "chicken-fritters",
@@ -156,7 +165,10 @@
       "Layer the lasagna: Grease a 9x13 pan and preheat the oven to 400 degrees. Cover the bottom of the pan with (about 5) broken lasagna noodles, half of the chicken, half of the peas, 1/4 cup Parmesan, 1/3 cup water, and 1 1/2 cups sauce. Repeat this layer once more. Top with a layer of broken noodles, 1/3 cup water, 1 1/2 cups sauce, and 1/2 cup Swiss cheese. Cover with foil and bake for 40 minutes.",
       "Making it pretty: Remove the foil, sprinkle evenly with breadcrumbs, and bake for an additional 5-10 minutes until the top is golden brown and bubbly. Sprinkle with fresh herbs like parsley and thyme. Let stand 10 minutes or more before cutting and serving."
     ],
-    "source": "Chicken lasagne"
+    "source": "Chicken lasagne",
+    "tags": [
+      "Italian"
+    ]
   },
   {
     "id": "chops",
@@ -239,7 +251,10 @@
     "flagged": [
       "The end of step 8 is covered by an ad banner in the screenshot: '...sprinkle a little oatmeal on the top for ___.' The final word(s) could not be recovered."
     ],
-    "source": "Crannachan"
+    "source": "Crannachan",
+    "tags": [
+      "Scottish"
+    ]
   },
   {
     "id": "creamy-chicken-casserole",
@@ -285,7 +300,10 @@
     "flagged": [
       "The blog presented two ingredient-quantity options ('a little bit of sauce' vs 'a lot of sauce'). The ingredient list above is the formal checklist card (the 'lot of sauce' amounts), but the numbered instructions actually use smaller amounts throughout (matching the 'little bit' option). The ingredient list and instructions may not be perfectly reconciled — worth double-checking before cooking."
     ],
-    "source": "Creamy chicken casserole"
+    "source": "Creamy chicken casserole",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "chicken-stroganoff",
@@ -317,7 +335,10 @@
       "Adjust the seasoning with more salt and pepper if needed. Garnish with freshly chopped parsley before serving."
     ],
     "notes": "350 kcal per serving. Source note was a screenshot of a Gordon Ramsay page Facebook/Instagram post.",
-    "source": "Chicken stroganoff"
+    "source": "Chicken stroganoff",
+    "tags": [
+      "Russian"
+    ]
   },
   {
     "id": "crepes",
@@ -339,7 +360,10 @@
       "Cook until the top of the crepe is no longer wet and the bottom has turned light brown, 1 to 2 minutes. Run a spatula around the edge of the skillet to loosen the crepe; flip and cook until the other side has turned light brown, about 1 minute more. Serve hot."
     ],
     "notes": "Reviewer tip (Morley, 5 stars): \"Great recipe, with ONE exception: I initially followed the directions to whisk the flour/eggs then add the wet ingredients, but this left me with VERY lumpy unusable batter. Doing the reverse - mixing the eggs & wet stuff then sifting in the flour - worked way better.\"",
-    "source": "Crepes"
+    "source": "Crepes",
+    "tags": [
+      "French"
+    ]
   },
   {
     "id": "crescent-roll-breakfast-casserole",
@@ -367,7 +391,10 @@
       "Bake, uncovered, 35-40 minutes or until a knife inserted in the center comes out clean. Let stand 5-10 minutes before serving."
     ],
     "notes": "Seal the crescent roll seams well to prevent the egg mixture leaking underneath. Drain the sausage thoroughly. Use freshly shredded cheese for smoother melting. Don't overbake. Let it rest before slicing.",
-    "source": "Breakfast recipe (note only contained a link — fetched from allthingsmamma.com)"
+    "source": "Breakfast recipe (note only contained a link — fetched from allthingsmamma.com)",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "empinada",
@@ -402,7 +429,10 @@
       "Allow to cool slightly before serving with guacamole. Enjoy!"
     ],
     "notes": "Make ahead: freeze before baking (add ~5 min to bake time from frozen) or bake then freeze. Reheat in microwave. Spicy variation: add 1 finely diced jalapeno with the onions/chiles/peppers. Personal tweak noted: 375F for 8-10 mins in air fryer as an alternative cooking method.",
-    "source": "Empinada"
+    "source": "Empinada",
+    "tags": [
+      "Latin American"
+    ]
   },
   {
     "id": "fish-pie",
@@ -441,7 +471,10 @@
     "flagged": [
       "There were TWO separate 'Fish Pie' notes in the original Notes folder (creation dates ~2020 and ~2021). Only one exported successfully — same-titled files overwrite each other during export, so the second recipe's content could not be recovered. If you want that one, it needs to be pulled from Notes directly (e.g. rename one before re-exporting)."
     ],
-    "source": "Fish pie"
+    "source": "Fish pie",
+    "tags": [
+      "British"
+    ]
   },
   {
     "id": "vanilla-frosting",
@@ -483,7 +516,10 @@
       "Pour into cup and garnish with lemon slice."
     ],
     "notes": "Recipe source: cincyshopper.com.",
-    "source": "Frozen lemonade"
+    "source": "Frozen lemonade",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "frozen-steak-and-mashed-potatoes",
@@ -533,7 +569,10 @@
     "flagged": [
       "Note is titled 'Fries in ninja' but also mentions adding fish partway through - unclear if this is a fries-only setting or a combined fish-and-fries timing note."
     ],
-    "source": "Fries in ninja"
+    "source": "Fries in ninja",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "grilled-potatoes-and-peppers",
@@ -558,7 +597,7 @@
       "Grill, covered, over medium heat 40-45 minutes or until potatoes are tender. Open foil carefully to allow steam to escape."
     ],
     "notes": "This was saved under a note titled \"Ingredients\" (generic name) rather than the recipe's actual name — retitled here since it's a complete recipe, not a shopping list.",
-    "source": "Ingredients"
+    "source": "Grilled potatoes and peppers"
   },
   {
     "id": "grilled-zucchini",
@@ -626,7 +665,10 @@
     "flagged": [
       "The servings count at the top of the first screenshot is partly cut off by the browser header; couldn't be confirmed."
     ],
-    "source": "Hibachi"
+    "source": "Hibachi",
+    "tags": [
+      "Japanese-American"
+    ]
   },
   {
     "id": "honey-glazed-parsnips",
@@ -647,7 +689,11 @@
       "Place your honey glazed air fryer parsnips in your air fryer.",
       "Cook at 200C for approximately 18 minutes. Start checking from 15 minutes onwards."
     ],
-    "source": "Parsnips in ninja"
+    "source": "Parsnips in ninja",
+    "tags": [
+      "British",
+      "air fryer"
+    ]
   },
   {
     "id": "keto-soup",
@@ -674,7 +720,10 @@
       "Simmer gently, stirring occasionally, 20 minutes.",
       "Stir in juice and herbs. Top with optional avocado."
     ],
-    "source": "Keto soup"
+    "source": "Keto soup",
+    "tags": [
+      "keto"
+    ]
   },
   {
     "id": "mexican-chicken",
@@ -699,7 +748,10 @@
       "Bake at 350 degrees for 30 minutes."
     ],
     "notes": "Recipe credited to Diann Mitchell, Doyline (from a community cookbook, Poultry section).",
-    "source": "Mexican chicken"
+    "source": "Mexican chicken",
+    "tags": [
+      "Mexican"
+    ]
   },
   {
     "id": "mushroom-risotto",
@@ -726,7 +778,10 @@
       "Add wine and cook until evaporated while stirring. Add warmed broth 1/2 cup at a time, stirring until evaporated after each addition. This will take about 20 minutes.",
       "Stir in mushrooms with any juices, parmesan cheese (reserve a couple of tablespoons for garnish) and parsley. Taste and add salt & pepper as needed. Garnish with fresh herbs as desired."
     ],
-    "source": "Mushroom risotto"
+    "source": "Mushroom risotto",
+    "tags": [
+      "Italian"
+    ]
   },
   {
     "id": "ninja-cookies",
@@ -755,7 +810,10 @@
       "Transfer the baking sheet to the oven, and bake for 10 minutes, or until cookies are golden.",
       "When cooking is complete, allow cookies to cool on baking sheet for 5 minutes, then transfer to a cooling rack. Repeat with remaining batter."
     ],
-    "source": "Ninja cookies"
+    "source": "Ninja cookies",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "ninja-frozen-meatballs",
@@ -772,7 +830,10 @@
       "Cook for 9 minutes, shaking often."
     ],
     "notes": "No defrosting necessary. Shaking the basket often makes sure the meatballs cook evenly and get a crispy outside and tender inside. No oil needed.",
-    "source": "Ninja frozen meatballs"
+    "source": "Ninja frozen meatballs",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "parsnips",
@@ -795,7 +856,10 @@
       "No ingredients list was visible in the single available screenshot. Likely ingredients: parsnips, cooking oil spray, salt, and optional honey.",
       "The last step is cut off mid-sentence ('The parsnips are ready when they are...') by an ad banner, and only one image exists for this recipe."
     ],
-    "source": "Parsnips"
+    "source": "Parsnips",
+    "tags": [
+      "British"
+    ]
   },
   {
     "id": "picante-chicken-enchiladas",
@@ -821,7 +885,10 @@
       "Bake for 20 minutes or until the enchiladas are hot and bubbling. Top with the onion."
     ],
     "notes": "Substitute 3 cans (4.5 oz each) Swanson Premium White Chunk Chicken Breast, drained, for the cooked chicken.",
-    "source": "Chicken enchilada (note only contained a link — fetched from campbells.com/pace; this was one of two identically-named notes in the Recipes folder)"
+    "source": "Chicken enchilada (note only contained a link — fetched from campbells.com/pace; this was one of two identically-named notes in the Recipes folder)",
+    "tags": [
+      "Mexican"
+    ]
   },
   {
     "id": "pork-chops-white-wine",
@@ -885,7 +952,10 @@
       "In a large skillet, cook pork in oil for 2 minutes on each side or until browned. Remove and keep warm. Stir 1/3 cup broth into skillet, scraping browned bits. In a bowl, combine flour and remaining broth until smooth. Stir into skillet. Bring to a boil; cook and stir for 1-2 minutes or until thickened. Reduce heat; stir in the sour cream, dill, salt and pepper; heat through. Serve with cutlets."
     ],
     "notes": "Nutrition facts (per serving, cut off in source): 341 calories, 19g fat (6g saturated fat), 157mg cholesterol.",
-    "source": "Pork schnitzel"
+    "source": "Pork schnitzel",
+    "tags": [
+      "German"
+    ]
   },
   {
     "id": "potato-bacon-soup",
@@ -923,7 +993,10 @@
       "Top with additional sour cream, bacon, cheddar cheese, or chives. Enjoy!"
     ],
     "notes": "Start with less salt and adjust to taste since it varies with the broth used. If you haven't used ancho chili powder before, start with 1/4 teaspoon. For a completely creamy soup, puree all of it in batches; for chunks of potato, puree only half.",
-    "source": "Potato bacon soup"
+    "source": "Potato bacon soup",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "potato-scone",
@@ -952,7 +1025,10 @@
       "Step 1 of the instructions (before 'Preheat the oven') wasn't captured in any screenshot.",
       "The bake step is cut off — text about transferring dough to a baking sheet beforehand may be missing."
     ],
-    "source": "Potato scone"
+    "source": "Potato scone",
+    "tags": [
+      "Scottish"
+    ]
   },
   {
     "id": "rice-in-ninja",
@@ -975,7 +1051,10 @@
     "flagged": [
       "Step 5's instructions for brown rice are cut off mid-sentence ('If making brown rice allow it...') by an ad banner, and only one screenshot exists for this note, so the rest could not be recovered."
     ],
-    "source": "Rice in ninja"
+    "source": "Rice in ninja",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "salmon-in-ninja",
@@ -1001,7 +1080,10 @@
     "flagged": [
       "The end of the Notes section is cut off mid-sentence ('...Things cook so fast sometimes a minute more is...') in all three screenshots."
     ],
-    "source": "Salmon in ninja"
+    "source": "Salmon in ninja",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "satay-sauce",
@@ -1020,7 +1102,10 @@
     "steps": [
       "Mix the lime juice, honey, soy sauce, curry powder and peanut butter in a small bowl. Add a splash of water if it's too stiff. Transfer to a small pan with the coconut milk, and heat gently for 5 mins, stirring continually, until combined."
     ],
-    "source": "Satay sauce"
+    "source": "Satay sauce",
+    "tags": [
+      "Southeast Asian"
+    ]
   },
   {
     "id": "scone-in-ninja",
@@ -1048,7 +1133,10 @@
       "Remove the scones from the air fryer basket and cool them on a wire rack for 10 minutes before serving."
     ],
     "notes": "Always use cold cubed butter straight from the fridge for a flakey texture. No rolling pin needed — just shape by hand. Make sure your self-raising flour and baking powder are in date to ensure the scones rise.",
-    "source": "Scone in Ninja"
+    "source": "Scone in Ninja",
+    "tags": [
+      "air fryer"
+    ]
   },
   {
     "id": "scones",
@@ -1073,7 +1161,10 @@
       "Turn dough out onto a lightly floured surface, and knead briefly. Roll dough out into a 1/2 inch thick round. Cut into 8 wedges, and place on the prepared baking sheet.",
       "Bake 15 minutes in the preheated oven, or until golden brown."
     ],
-    "source": "Scones"
+    "source": "Scones",
+    "tags": [
+      "British"
+    ]
   },
   {
     "id": "scottish-tablet",
@@ -1104,7 +1195,10 @@
       "The instructions never explicitly state when the vinegar (listed as an ingredient) gets added — presumably with the condensed milk/sugar/milk in step 1, but not stated directly.",
       "The ingredient list literally reads 'A few drops of white chocolate,' transcribed exactly as shown even though it reads oddly."
     ],
-    "source": "Scottish tablet"
+    "source": "Scottish tablet",
+    "tags": [
+      "Scottish"
+    ]
   },
   {
     "id": "shepherds-pie",
@@ -1152,7 +1246,10 @@
       "If the baking dish looks very full, place it on a rimmed baking sheet so that the filling doesn't bubble over into your oven. Bake uncovered for 25-30 minutes. Cool for 15 minutes before serving."
     ],
     "notes": "Recipe lists 'frozen mixed corn & carrots' in the ingredient list but the instructions reference 'frozen peas and carrots, and frozen corn' - transcribed as written in the note.",
-    "source": "Shepherds pie"
+    "source": "Shepherds pie",
+    "tags": [
+      "British"
+    ]
   },
   {
     "id": "shrimp-etouffee",
@@ -1183,7 +1280,10 @@
       "Serve over white rice."
     ],
     "notes": "Cook time 25 min, ready in 45 min total. Cooked in the microwave.",
-    "source": "Shrimp etouffee"
+    "source": "Shrimp etouffee",
+    "tags": [
+      "Cajun"
+    ]
   },
   {
     "id": "sponge-cake",
@@ -1229,7 +1329,10 @@
       "Remove it and cut them to the thickness you prefer then put them into freezer bags and put them back in the freezer.",
       "When required, defrost and fry in a little fat or oil until brown and cooked through."
     ],
-    "source": "Square sausage"
+    "source": "Square sausage",
+    "tags": [
+      "Scottish"
+    ]
   },
   {
     "id": "steak-time-to-cook",
@@ -1266,7 +1369,10 @@
       "Place the sweet potatoes in a Dutch oven, and cover with cold water. Bring to a boil. Reduce heat, and simmer for 15 minutes or until very tender. Drain; cool slightly.",
       "Place potatoes in a large bowl. Add sugar, butter, salt, and vanilla. Mash sweet potato mixture with a potato masher. Fold in 1/4 cup pecans. Scrape potato mixture into an even layer in an 11 x 7-inch baking dish coated with cooking spray. Sprinkle with remaining 1/4 cup pecans; top with marshmallows. Bake at 375 degrees for 25 minutes or until golden."
     ],
-    "source": "Sweet potato casserole"
+    "source": "Sweet potato casserole",
+    "tags": [
+      "American"
+    ]
   },
   {
     "id": "taco-pasta",
@@ -1302,7 +1408,10 @@
       "Serve warm with optional toppings."
     ],
     "notes": "Storage: cool completely and refrigerate up to 5 days or freeze for up to 90 days; add a splash of broth or water when reheating. Tip: 2 tablespoons (1 packet) taco seasoning keeps it mild; use up to 4 tablespoons for a stronger flavor. Pressure cooker instructions also available (0 min for shells, 1 min for macaroni/rotini, 10 min natural release).",
-    "source": "Taco Pasta (note only contained a link — fetched from thekitchengirl.com)"
+    "source": "Taco Pasta (note only contained a link — fetched from thekitchengirl.com)",
+    "tags": [
+      "Tex-Mex"
+    ]
   },
   {
     "id": "warm-chocolate-pudding-cake",
@@ -1330,6 +1439,9 @@
       "Bake for 30 minutes or until center is barely set. Remove from the oven and let stand for 15 minutes. Scoop into dessert dishes, spooning sauce from bottom of pan over top. Garnish with the ice cream."
     ],
     "notes": "Can be mixed entirely in the baking pan - no extra dishes needed. Recipe adapted from Hershey's Kitchens (biggirlssmallkitchen.com).",
-    "source": "Warm chocolate dessert"
+    "source": "Warm chocolate dessert",
+    "tags": [
+      "American"
+    ]
   }
 ]
