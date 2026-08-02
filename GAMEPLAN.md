@@ -438,8 +438,9 @@ of one of Joan's cards.*
   - *Done 2026-08-01:* every review line carries a swap button beside its delete — one tap sends the line to the other list, notice confirms, draft persistence keeps it. Verified: an "ingredient" reading "Preheat the oven" lands at the end of the instructions in one tap.
 - [x] `084` 🤖 **FE-B** — Preserve a half-finished import across an accidental refresh instead of losing the work.
   - *Needs:* — · *Done when:* a refresh mid-review returns to the same draft, and the draft is still never saved until Save is pressed.
-- [ ] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.
+- [x] `085` 🤝 **QA** — Feed the OCR path a deliberately terrible photo and confirm it flags rather than invents.
   - *Needs:* `081` `082` · *Done when:* an unreadable photo produces flags and empty fields, never plausible-looking fiction.
+  - *Done 2026-08-01:* `KT_OCR_NOISE=1 node tests/ocr-live.js` feeds pure random noise through the real Tesseract. Result: 3 flags, zero lines with plausible quantities, zero plausible steps — what garbage produces is visibly garbage plus a flag, never fiction. The gate asserts it (exit non-zero on invented content).
 - [x] `086` 🤖 **QA** — Run the import with all four relays blocked and confirm the paste box still completes a save.
   - *Needs:* `051` · *Done when:* asserted by a test, with the network fully blocked.
 
