@@ -42,17 +42,28 @@ function parseApiSnippet(json) {
   };
 }
 
+/* Returns { meta, why } — never throws. `why` is the diagnostic that gets
+ * written beside the job's raw stderr: a salvage that doesn't help must
+ * say WHICH way it didn't (no key, key refused, video gone, description
+ * carries no recipe), or the next failure is guesswork again. */
 async function salvageYouTube(fetchFn, apiKey, videoId) {
-  if (!apiKey || !videoId) return null;
+  if (!apiKey) return { meta: null, why: "no YT_API_KEY set" };
+  if (!videoId) return { meta: null, why: "no video id in the link" };
   try {
     const res = await fetchFn(
       "https://www.googleapis.com/youtube/v3/videos?part=snippet%2CcontentDetails&id=" +
       encodeURIComponent(videoId) + "&key=" + encodeURIComponent(apiKey),
       { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return null;
-    return parseApiSnippet(await res.json());
+    if (!res.ok) {
+      let detail = "";
+      try { detail = (await res.text()).slice(0, 300); } catch (e) {}
+      return { meta: null, why: "Data API HTTP " + res.status + " " + detail };
+    }
+    const meta = parseApiSnippet(await res.json());
+    if (!meta) return { meta: null, why: "Data API returned no video for that id" };
+    return { meta: meta, why: "ok (description " + meta.description.length + " chars)" };
   } catch (e) {
-    return null;
+    return { meta: null, why: "Data API unreachable: " + String(e && e.message || e).slice(0, 200) };
   }
 }
 
