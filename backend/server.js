@@ -46,6 +46,7 @@ const ctx = {
   sql,
   anthropic,
   groqKey: process.env.GROQ_API_KEY || "",
+  ytKey: process.env.YT_API_KEY || "",
   uptimeS: () => process.uptime()
 };
 
@@ -246,7 +247,8 @@ const server = http.createServer((req, res) => {
         queue_pending: queue.size(),
         pot_provider: potUp,
         missing: [!sql && "KT_DB", !anthropic && "ANTHROPIC_API_KEY",
-          !ctx.groqKey && "GROQ_API_KEY (optional)"].filter(Boolean)
+          !ctx.groqKey && "GROQ_API_KEY (optional)",
+          !ctx.ytKey && "YT_API_KEY (optional — rescues robot-blocked YouTube imports)"].filter(Boolean)
       });
     }
     if (!sql && p.indexOf("/api/import") === 0) {

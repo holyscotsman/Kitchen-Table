@@ -16,6 +16,7 @@ const path = require("path");
 const media = require("./media");
 const groq = require("./groq");
 const extract = require("./extract");
+const { youtubeId, salvageYouTube } = require("./salvage");
 
 /* One frame per 2–3s on short videos, stretched so long ones still fit the
  * ~40-frame cap with even coverage. */
@@ -60,13 +61,30 @@ async function runJob(ctx, jobId) {
     const metaRun = await media.runYtdlp(ytdlp,
       ["-J", "--no-download", "--no-playlist", "--no-warnings", job.url],
       { timeoutMs: 120000 });
-    if (!metaRun.ok || !metaRun.stdout) {
-      await failDownload(metaRun);
-      return;
-    }
     let info;
-    try { info = JSON.parse(metaRun.stdout); }
-    catch (e) { await fail(media.friendlyDownloadError("", job.platform)); return; }
+    if (!metaRun.ok || !metaRun.stdout) {
+      /* YouTube's robot wall refused every disguise. The official Data
+       * API (a free key, YT_API_KEY) can still hand over title +
+       * description — and when the recipe is written under the video,
+       * that is a whole import. Anything else about this failure stays
+       * honest: no captions, no audio, no frames. */
+      let saved = null;
+      if (job.platform === "youtube" && media.isBotCheck(metaRun.stderr)) {
+        saved = await salvageYouTube(ctx.fetch || fetch, ctx.ytKey, youtubeId(job.url));
+      }
+      if (!saved || !media.looksLikeRecipeText(saved.description)) {
+        await failDownload(metaRun);
+        return;
+      }
+      info = {
+        title: saved.title, uploader: saved.uploader,
+        description: saved.description, duration: saved.duration_s,
+        __salvaged: true
+      };
+    } else {
+      try { info = JSON.parse(metaRun.stdout); }
+      catch (e) { await fail(media.friendlyDownloadError("", job.platform)); return; }
+    }
 
     const duration = Math.round(info.duration || 0);
     if (duration > 1800) {
@@ -83,7 +101,11 @@ async function runJob(ctx, jobId) {
     let transcript = "";
     let frames = [];
 
-    if (media.looksLikeRecipeText(desc)) {
+    if (info.__salvaged) {
+      extraFlags.push("Video — YouTube blocked the server’s direct fetch, so this was " +
+        "written up from the video’s official description only: no narration or " +
+        "on-screen text was read. Check it against the video.");
+    } else if (media.looksLikeRecipeText(desc)) {
       /* The recipe is written out under the video — no media needed. */
     } else {
       const track = media.pickCaptionTrack(info);

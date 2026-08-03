@@ -26,6 +26,13 @@ because this folder didn't exist yet. With this code on the deployed branch:
    - `ANTHROPIC_API_KEY` — from console.anthropic.com.
    - `GROQ_API_KEY` — from console.groq.com (free). Optional but wanted:
      without it, videos with no captions get read from on-screen text only.
+   - `YT_API_KEY` — optional but strongly wanted: **this is what rescues
+     YouTube imports the robot wall blocks** (see below). Free, ~2 minutes:
+     console.cloud.google.com → create a project (any name) → APIs &
+     Services → Library → enable **YouTube Data API v3** → Credentials →
+     **Create credentials → API key** → copy it here. No billing account
+     needed; the free quota (10,000 lookups/day) is thousands of times
+     family scale.
 2. **Settings → Build & Deploy** → confirm **Build Command** is `yarn` and
    **Start Command** is `yarn start`. Leave **Root Directory** empty.
 3. **Manual Deploy → Deploy latest commit.** The build fetches yt-dlp and
@@ -50,14 +57,27 @@ service's `KT_DB` env var, and the GitHub Actions secret `KT_DB`
   time.
 - **YouTube treats datacenter addresses as suspects.** It answers ordinary
   videos with "Sign in to confirm you're not a bot" — about the server,
-  never the video. The build therefore installs the community
-  [PO-token provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
-  (plugin + token server, pinned to one release tag): the server runs as a
-  supervised sibling process on port 4416 (`KT_POT_PORT` to move it,
-  `KT_NO_POT=1` to disable), mints YouTube's proof-of-origin tokens
-  locally — no login, no cookies — and every yt-dlp call presents them.
-  If it ever crashes for good, imports continue with the TV-client
-  fallback alone. `/api/health` reports it as `pot_provider`.
+  never the video. Three layers respond, in order:
+  1. The build installs the community
+     [PO-token provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
+     (plugin + token server, pinned to one release tag): the server runs
+     as a supervised sibling process on port 4416 (`KT_POT_PORT` to move
+     it, `KT_NO_POT=1` to disable), mints YouTube's proof-of-origin
+     tokens locally — no login, no cookies — and every yt-dlp call
+     presents them. `/api/health` reports it as `pot_provider`.
+  2. Calls that still hit the robot check retry as YouTube's TV client
+     (which passes many genuine age gates too).
+  3. When every disguise is refused, the **official Data API** takes over
+     (`YT_API_KEY`, above — the one route YouTube designed for servers):
+     title, full description, and duration for any video. Most cooking
+     channels write the whole recipe in the description, so this turns a
+     blocked import into a finished draft — flagged honestly, since no
+     narration or on-screen text was read. Videos with neither captions
+     reachable nor a written-out description still fail, with advice
+     that names the paste box and the screen-record path.
+  What the wall costs, measured live: an ancient video sailed through
+  layer 1; a current cooking upload needed layer 3. This is YouTube
+  churning its defenses, not a bug in any one part.
 - **Deploys and spin-downs restart the process.** A job caught mid-import is
   marked failed with "The server restarted mid-import — please resubmit the
   link." Queued-but-unstarted jobs simply resume. Nothing gets stuck.
