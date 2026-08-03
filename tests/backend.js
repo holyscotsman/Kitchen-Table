@@ -177,9 +177,15 @@ const { runJob, computeFps } = lib('pipeline');
       meta.title === 'Mushroom Pasta' && meta.uploader === 'Babish' && meta.duration_s === 570);
     chk('empty answer → null', salvage.parseApiSnippet({ items: [] }) === null);
     const okFetch = async () => ({ ok: true, json: async () => api });
-    chk('salvage happy path', (await salvage.salvageYouTube(okFetch, 'key', 'F5C6UcmyPxc')).title === 'Mushroom Pasta');
-    chk('no key → null without a request', (await salvage.salvageYouTube(async () => { throw new Error('must not be called'); }, '', 'x')) === null);
-    chk('a failing fetch → null, never a throw', (await salvage.salvageYouTube(async () => { throw new Error('net down'); }, 'key', 'x')) === null);
+    const happy = await salvage.salvageYouTube(okFetch, 'key', 'F5C6UcmyPxc');
+    chk('salvage happy path', happy.meta.title === 'Mushroom Pasta');
+    chk('the happy path still reports what it got', /^ok \(description \d+ chars\)$/.test(happy.why), happy.why);
+    const noKey = await salvage.salvageYouTube(async () => { throw new Error('must not be called'); }, '', 'x');
+    chk('no key → no request, and says so', noKey.meta === null && /no YT_API_KEY/.test(noKey.why));
+    const netDown = await salvage.salvageYouTube(async () => { throw new Error('net down'); }, 'key', 'x');
+    chk('a failing fetch → null, never a throw, with the reason', netDown.meta === null && /unreachable: net down/.test(netDown.why));
+    const refused = await salvage.salvageYouTube(async () => ({ ok: false, status: 403, text: async () => 'API not enabled' }), 'key', 'x');
+    chk('a refused key names the status and body', refused.meta === null && /HTTP 403 API not enabled/.test(refused.why), refused.why);
   }
 
   console.log('\n== PO-token plumbing ==');
@@ -257,7 +263,11 @@ const { runJob, computeFps } = lib('pipeline');
       if (/select \* from kitchen\.import_jobs/.test(text)) return Promise.resolve([jobRow]);
       if (/set status = ¤,/.test(text)) state.statuses.push(vals[0]);
       if (/'ready_for_review'/.test(text)) { state.statuses.push('ready_for_review'); state.result = JSON.parse(vals[0]); }
-      if (/'failed'/.test(text)) { state.statuses.push('failed'); state.error = vals[0]; }
+      if (/'failed'/.test(text)) {
+        state.statuses.push('failed');
+        state.error = vals[0];
+        if (vals.length > 1) { try { state.debug = JSON.parse(vals[1]).debug; } catch (e) {} }
+      }
       if (/video_duration_s/.test(text)) state.durationSet = vals[0];
       return Promise.resolve([]);
     };
@@ -357,6 +367,9 @@ const { runJob, computeFps } = lib('pipeline');
     }, 10);
     chk('a promo-only description still fails honestly, with the paste advice',
       sql2.state.statuses.includes('failed') && /copy that text|paste box/.test(sql2.state.error), sql2.state.error);
+    chk('and the job records WHY the salvage did not help',
+      /SALVAGE: ok \(description \d+ chars\) — but no recipe is written in it/.test(sql2.state.debug || ''),
+      sql2.state.debug);
     delete process.env.YTDLP_PATH;
     delete process.env.FFMPEG_PATH;
     fs.rmSync(dir2, { recursive: true, force: true });

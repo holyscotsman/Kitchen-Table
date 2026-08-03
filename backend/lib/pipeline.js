@@ -43,11 +43,13 @@ async function runJob(ctx, jobId) {
    * unused on failed jobs otherwise): the friendly sentence is for people,
    * the raw tail is how the NEXT YouTube-defense shift gets diagnosed from
    * the job row instead of from guesswork. */
-  const failDownload = (run) => sql`
+  const failDownload = (run, note) => sql`
     update kitchen.import_jobs
        set status = 'failed',
            error_message = ${media.friendlyDownloadError(run.stderr, job.platform)},
-           result_json = ${JSON.stringify({ debug: String(run.stderr || "").slice(-1500) })},
+           result_json = ${JSON.stringify({
+             debug: String(run.stderr || "").slice(-1200) + (note ? "\n\n" + note : "")
+           })},
            updated_at = now()
      where id = ${jobId}`;
 
@@ -68,12 +70,18 @@ async function runJob(ctx, jobId) {
        * description — and when the recipe is written under the video,
        * that is a whole import. Anything else about this failure stays
        * honest: no captions, no audio, no frames. */
-      let saved = null;
+      let saved = null, why = "not attempted (not a bot-check)";
       if (job.platform === "youtube" && media.isBotCheck(metaRun.stderr)) {
-        saved = await salvageYouTube(ctx.fetch || fetch, ctx.ytKey, youtubeId(job.url));
+        const r = await salvageYouTube(ctx.fetch || fetch, ctx.ytKey, youtubeId(job.url));
+        saved = r.meta;
+        why = r.why;
+        if (saved && !media.looksLikeRecipeText(saved.description)) {
+          why += " — but no recipe is written in it";
+          saved = null;
+        }
       }
-      if (!saved || !media.looksLikeRecipeText(saved.description)) {
-        await failDownload(metaRun);
+      if (!saved) {
+        await failDownload(metaRun, "SALVAGE: " + why);
         return;
       }
       info = {
