@@ -321,6 +321,14 @@ too. What that unlocked, all verified in the suites:
   bound into `design/components.md` (`061`) and `design/a11y-criteria.md`
   (`034`). `ADDING.md` (`079`) is the family-facing walkthrough.
 
+**The video importer is live and proven** (2026-08-03): all four keys are
+in Render, Instagram imports run the full heavy path, and YouTube — which
+now walls every anonymous server-side route — comes through the official
+Data API when its robot check refuses, writing up the video's own
+description with honest flags about what wasn't heard or seen. A blocked
+video with no description at all fails plainly and points at the paste
+box. Both outcomes verified with live jobs, not fixtures.
+
 What remains is exactly the work only people can do: the iPhone checks, the
 VoiceOver pass, the sessions with Joan, the content truth pass, twenty real
 photos of her cards — and the family confirmations that turn the provisional
