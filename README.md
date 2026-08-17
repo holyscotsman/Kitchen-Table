@@ -220,7 +220,7 @@ The **Add recipe** pill on the Menu opens four ways in:
   import that leaves the page: the link goes to the family's import server
   (`backend/`, on Render — the only part of the app that runs on a server),
   which fetches the video, transcribes any narration (Groq Whisper), reads
-  on-screen text from sampled frames, and has Claude write up a draft with
+  on-screen text from sampled frames, and has Anthropic’s AI write up a draft with
   everything unstated **flagged rather than guessed**. It runs as a
   background job with a progress card (three human stages, a rough ETA that
   says "taking a bit longer than usual…" rather than freezing) — and the

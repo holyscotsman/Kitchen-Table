@@ -2427,7 +2427,7 @@
          service the link touches before anything is sent. */
       h += '<p class="addscreen__note">The address goes to the family’s kitchen ' +
            "server (on Render), which fetches the video, has Groq transcribe " +
-           "the narration, and has Claude write it up into a draft. The video " +
+           "the narration, and has Anthropic’s AI write it up into a draft. The video " +
            "itself is deleted the moment that’s done, and nothing is saved to " +
            "the book until you’ve checked the draft over. Anything the video " +
            "never said gets flagged, not guessed.</p>";

@@ -1,7 +1,7 @@
 /* The import server's logic, no network and no browser: URL validation, ETA
  * math, VTT cleanup, frame dedupe, extraction shaping — and the whole
  * pipeline walked once with yt-dlp/ffmpeg faked by shell scripts and the
- * database and Claude stubbed in-process. Run directly: node tests/backend.js
+ * database and the extraction API stubbed in-process. Run directly: node tests/backend.js
  */
 const fs = require('fs');
 const os = require('os');

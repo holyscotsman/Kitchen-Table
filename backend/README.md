@@ -7,7 +7,7 @@ Render, not the whole app.*
 
 What it does: someone pastes a YouTube or Instagram link on the Add screen,
 this server fetches the video, listens to it (Groq Whisper), reads its
-on-screen text (frames → Claude), and writes up a draft recipe with anything
+on-screen text (frames → the Anthropic API), and writes up a draft recipe with anything
 uncertain flagged. The draft lands on the same review screen every other
 import uses — nothing is ever saved without a person checking it. The phone
 can be closed the whole time; the finished draft waits under **Imports**.
@@ -112,7 +112,7 @@ Job pipeline: `queued → downloading → transcribing → extracting →
 ready_for_review → imported`, any failure → `failed` with a plain-language
 message. Cheap paths first: a recipe written in the description costs
 nothing; captions cost one small fetch; only a video with neither is
-downloaded (audio → Groq Whisper; ~40 deduped frames → Claude). Videos over
+downloaded (audio → Groq Whisper; ~40 deduped frames → the Anthropic API). Videos over
 30 minutes are refused. All media is deleted the moment extraction ends,
 success or failure.
 

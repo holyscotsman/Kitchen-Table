@@ -75,10 +75,10 @@ async function freshPage(br, opts) {
     chk('tap target ≥44px', box.height >= 44, JSON.stringify(box));
     await p.click('.pathbtn[data-key="video"]');
     await p.waitForSelector('#a-vurl');
-    chk('disclosure names Render, Groq and Claude before anything is sent',
+    chk('disclosure names Render, Groq and Anthropic before anything is sent',
       /Render/.test(await p.textContent('.addscreen')) &&
       /Groq/.test(await p.textContent('.addscreen')) &&
-      /Claude/.test(await p.textContent('.addscreen')));
+      /Anthropic/.test(await p.textContent('.addscreen')));
     chk('no horizontal scroll at 390px', await p.evaluate(() =>
       document.documentElement.scrollWidth <= window.innerWidth));
     await ctx.close();
