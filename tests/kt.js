@@ -194,6 +194,15 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('ingredient textareas', await p.locator('[data-k="ingredients"][data-act="dl"]').count()>0);
   chk('add-ingredient button', await p.locator('[data-act="add"][data-k="ingredients"]').count()===1);
   chk('download json button', await p.locator('[data-act="dl-json"]').count()===1);
+  chk('serves stepper parity with the review form (R4)',
+    await p.locator('[data-act="e-serv"]').count()===2);
+  {
+    const b4 = parseInt(await p.inputValue('#e-serves'),10);
+    await p.click('[data-act="e-serv"][data-d="1"]'); await p.waitForTimeout(150);
+    chk('one tap, one more serving in edit mode',
+      parseInt(await p.inputValue('#e-serves'),10)===b4+1);
+    await p.click('[data-act="e-serv"][data-d="-1"]'); await p.waitForTimeout(150);
+  }
   await p.fill('#e-title','Chicken Cordon Bleu (Tweaked)');
   await p.click('[data-act="save"]');
   await p.waitForTimeout(300);

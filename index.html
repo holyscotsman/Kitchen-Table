@@ -62,6 +62,14 @@
     />
     <link rel="stylesheet" href="fonts/fonts.css" />
 
+    <!-- Warm the path to the kitchen server (video imports) so the first
+         interaction skips DNS + TLS setup. Nothing is requested here. -->
+    <link
+      rel="preconnect"
+      href="https://kitchen-table-5tp6.onrender.com"
+      crossorigin
+    />
+
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <!-- The manifest exists for one capability: Android's share sheet can

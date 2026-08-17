@@ -1771,8 +1771,18 @@
 
     h += '<div class="fieldrow">' +
          '<div class="field"><label class="field__label" for="e-serves">Serves</label>' +
-         '<input class="input" id="e-serves" type="number" min="1" max="40" ' +
-         'data-act="d" data-k="servings" value="' + esc(d.servings) + '" /></div>' +
+         /* Same one-tap stepper as the review form (R3) — parity, so the
+            grammar is one thing everywhere servings get corrected. */
+         '<div class="servrow">' +
+         '<button type="button" class="servbtn servbtn--form press" data-act="e-serv" ' +
+         'data-d="-1" aria-label="Fewer servings"' +
+         (parseInt(d.servings, 10) <= 1 ? " disabled" : "") + ">" + I.minus(24) + "</button>" +
+         '<input class="input servrow__n" id="e-serves" type="number" min="1" max="40" ' +
+         'inputmode="numeric" data-act="d" data-k="servings" value="' + esc(d.servings) + '" />' +
+         '<button type="button" class="servbtn servbtn--form press" data-act="e-serv" ' +
+         'data-d="1" aria-label="More servings"' +
+         (parseInt(d.servings, 10) >= 40 ? " disabled" : "") + ">" + I.plus(24) + "</button>" +
+         "</div></div>" +
          '<div class="field"><label class="field__label" for="e-from">From</label>' +
          '<input class="input" id="e-from" data-act="d" data-k="contributor" value="' +
          esc(d.contributor) + '" /></div></div>';
@@ -2840,10 +2850,15 @@
   function stopVideoPoll() {
     if (videoPollTick) { clearInterval(videoPollTick); videoPollTick = null; }
   }
+  var videoPollBusy = false;
   function pollVideoJob() {
     if (!S.videoJob || S.route.name !== "add") { stopVideoPoll(); return; }
+    /* A slow answer must not stack polls behind it — one in flight, ever. */
+    if (videoPollBusy) return;
+    videoPollBusy = true;
     kitchenFetch("/api/import/jobs/" + S.videoJob.id, { timeout: 15000 }, true)
       .then(function (job) {
+        videoPollBusy = false;
         if (!S.videoJob || S.videoJob.id !== job.id) return;
         if (job.status === "ready_for_review") {
           stopVideoPoll();
@@ -2862,7 +2877,7 @@
         S.videoJob = { id: job.id, status: job.status, eta: job.eta_seconds, overrun: job.overrun };
         if (before !== job.status + "|" + fmtEta(S.videoJob)) render();
       })
-      .catch(function () { /* transient — the next tick tries again */ });
+      .catch(function () { videoPollBusy = false; /* transient — the next tick tries again */ });
   }
 
   function fmtEta(job) {
@@ -4072,6 +4087,14 @@
       var cur = parseInt(S.addDraft.servings, 10) || 4;
       S.addDraft.servings = Math.min(40, Math.max(1, cur + dsv));
       scheduleAddPersist();
+      render();
+      return;
+    }
+    if (act === "e-serv") {
+      var dse = parseInt(el.getAttribute("data-d"), 10);
+      var cure = parseInt(S.draft.servings, 10) || 4;
+      S.draft.servings = Math.min(40, Math.max(1, cure + dse));
+      S.saved = false;
       render();
       return;
     }
