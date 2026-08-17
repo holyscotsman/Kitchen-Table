@@ -21,6 +21,7 @@ const { spawn } = require("child_process");
 const { parseVideoUrl, validateRecipe } = require("./lib/validate");
 const { LABEL, estimate } = require("./lib/eta");
 const { serialQueue } = require("./lib/queue");
+const { makeLimiter } = require("./lib/ratelimit");
 const db = require("./lib/db");
 const { runJob } = require("./lib/pipeline");
 
@@ -85,9 +86,25 @@ function send(res, status, body) {
      * from; there are no cookies and no credentials to protect. What the
      * API can DO is bounded instead: submit a public video link, read job
      * state, accept a finished draft. */
-    "access-control-allow-origin": "*"
+    "access-control-allow-origin": "*",
+    /* Hardening that costs nothing: answers are JSON and say so firmly,
+     * carry no referrer anywhere, and never linger in a shared cache —
+     * a finished draft is the family's, not an intermediary's. */
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+    "cache-control": "no-store"
   });
   res.end(text);
+}
+
+/* One request budget per caller address: generous against the app's own
+ * polling, a wall against loops. Render terminates TLS in front of us, so
+ * the caller is the first hop of x-forwarded-for. */
+const limiter = makeLimiter(120, 60000);
+function callerIp(req) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (fwd) return String(fwd).split(",")[0].trim();
+  return (req.socket && req.socket.remoteAddress) || "?";
 }
 
 function readJson(req) {
@@ -239,6 +256,9 @@ const server = http.createServer((req, res) => {
   }
 
   const route = (async () => {
+    if (!limiter.hit(callerIp(req), Date.now())) {
+      return send(res, 429, { error: "Too many requests from this connection — give it a minute." });
+    }
     if (req.method === "GET" && (p === "/" || p === "/api/health")) {
       return send(res, 200, {
         ok: !!(sql && anthropic),

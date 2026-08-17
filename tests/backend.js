@@ -188,6 +188,26 @@ const { runJob, computeFps } = lib('pipeline');
     chk('a refused key names the status and body', refused.meta === null && /HTTP 403 API not enabled/.test(refused.why), refused.why);
   }
 
+  console.log('\n== R2 hardening: the key never leaks, loops hit a wall ==');
+  {
+    const salvage = lib('salvage');
+    const leaky = async () => { throw new Error('fetch to ...key=SECRET123... failed'); };
+    const r = await salvage.salvageYouTube(leaky, 'SECRET123', 'AAAAAAAAAAA');
+    chk('the API key is scrubbed from public diagnostics',
+      !r.why.includes('SECRET123') && r.why.includes('[key]'), r.why);
+    const refusing = async () => ({ ok: false, status: 400, text: async () => 'bad request for key=SECRET123 given' });
+    const r2 = await salvage.salvageYouTube(refusing, 'SECRET123', 'AAAAAAAAAAA');
+    chk('…including when Google echoes it in an error body', !r2.why.includes('SECRET123'), r2.why);
+
+    const { makeLimiter } = lib('ratelimit');
+    const lim = makeLimiter(3, 60000);
+    const t0 = 1000000;
+    chk('under the limit flows', lim.hit('a', t0) && lim.hit('a', t0 + 1) && lim.hit('a', t0 + 2));
+    chk('over the limit refuses', lim.hit('a', t0 + 3) === false);
+    chk('addresses are independent', lim.hit('b', t0 + 4) === true);
+    chk('the window forgives', lim.hit('a', t0 + 60001) === true);
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {

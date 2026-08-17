@@ -18,12 +18,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      # The Chromium download is the slowest part of every run — cache it
+      # keyed on the Playwright version, so only a version bump re-fetches.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/package-lock.json') }}
 
       - name: Install Playwright
         working-directory: tests
         run: |
-          npm install
-          npx playwright install --with-deps chromium
+          npm ci
+          npx playwright install-deps chromium
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install chromium
+          fi
 
       - name: Run all suites
         working-directory: tests

@@ -2458,8 +2458,19 @@
 
     h += '<div class="fieldrow">' +
          '<div class="field"><label class="field__label" for="a-serves">Serves</label>' +
-         '<input class="input" id="a-serves" type="number" min="1" max="40" ' +
-         'data-act="ad" data-k="servings" value="' + esc(d.servings) + '" /></div>' +
+         /* Same one-tap stepper grammar as the recipe screen — imports land
+            here with flagged servings, and fixing a number should be taps,
+            not a number-pad wrestle. Typing still works. */
+         '<div class="servrow">' +
+         '<button type="button" class="servbtn servbtn--form press" data-act="ad-serv" ' +
+         'data-d="-1" aria-label="Fewer servings"' +
+         (parseInt(d.servings, 10) <= 1 ? " disabled" : "") + ">" + I.minus(24) + "</button>" +
+         '<input class="input servrow__n" id="a-serves" type="number" min="1" max="40" ' +
+         'inputmode="numeric" data-act="ad" data-k="servings" value="' + esc(d.servings) + '" />' +
+         '<button type="button" class="servbtn servbtn--form press" data-act="ad-serv" ' +
+         'data-d="1" aria-label="More servings"' +
+         (parseInt(d.servings, 10) >= 40 ? " disabled" : "") + ">" + I.plus(24) + "</button>" +
+         "</div></div>" +
          '<div class="field"><label class="field__label" for="a-prep">Prep time</label>' +
          '<input class="input" id="a-prep" data-act="ad" data-k="prepTime" value="' +
          esc(d.prepTime) + '" /></div>' +
@@ -4056,6 +4067,14 @@
       return;
     }
     if (act === "add-ocr") { importFromPhoto(); return; }
+    if (act === "ad-serv") {
+      var dsv = parseInt(el.getAttribute("data-d"), 10);
+      var cur = parseInt(S.addDraft.servings, 10) || 4;
+      S.addDraft.servings = Math.min(40, Math.max(1, cur + dsv));
+      scheduleAddPersist();
+      render();
+      return;
+    }
     if (act === "aadd") { S.addDraft[key].push(""); render(); return; }
     if (act === "adel") { S.addDraft[key].splice(idx, 1); render(); return; }
     if (act === "amove") {
@@ -4277,6 +4296,15 @@
   window.addEventListener("hashchange", onRoute);
 
   applyTheme();
+
+  /* The service worker makes the book instant and offline-proof: the shell
+   * and recipes.json come cache-first with a background refresh (sw.js).
+   * Registration failing — old Safari, file://, private modes — costs
+   * nothing: the app simply stays network-served, exactly as before. */
+  if ("serviceWorker" in navigator) {
+    try { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+    catch (e) { /* not available here — fine */ }
+  }
 
   /* Photos load alongside the recipes so the first paint already knows every
      thumbnail — initImages never rejects, so the only failure mode here is

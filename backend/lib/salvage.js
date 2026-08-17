@@ -47,6 +47,9 @@ function parseApiSnippet(json) {
  * say WHICH way it didn't (no key, key refused, video gone, description
  * carries no recipe), or the next failure is guesswork again. */
 async function salvageYouTube(fetchFn, apiKey, videoId) {
+  /* `why` ends up in the job row's public debug field — the key must never
+   * ride along, however an error message chooses to phrase itself. */
+  const scrub = (s) => apiKey ? String(s).split(apiKey).join("[key]") : String(s);
   if (!apiKey) return { meta: null, why: "no YT_API_KEY set" };
   if (!videoId) return { meta: null, why: "no video id in the link" };
   try {
@@ -57,13 +60,13 @@ async function salvageYouTube(fetchFn, apiKey, videoId) {
     if (!res.ok) {
       let detail = "";
       try { detail = (await res.text()).slice(0, 300); } catch (e) {}
-      return { meta: null, why: "Data API HTTP " + res.status + " " + detail };
+      return { meta: null, why: scrub("Data API HTTP " + res.status + " " + detail) };
     }
     const meta = parseApiSnippet(await res.json());
     if (!meta) return { meta: null, why: "Data API returned no video for that id" };
     return { meta: meta, why: "ok (description " + meta.description.length + " chars)" };
   } catch (e) {
-    return { meta: null, why: "Data API unreachable: " + String(e && e.message || e).slice(0, 200) };
+    return { meta: null, why: scrub("Data API unreachable: " + String(e && e.message || e).slice(0, 200)) };
   }
 }
 
