@@ -4278,6 +4278,15 @@
 
   applyTheme();
 
+  /* The service worker makes the book instant and offline-proof: the shell
+   * and recipes.json come cache-first with a background refresh (sw.js).
+   * Registration failing — old Safari, file://, private modes — costs
+   * nothing: the app simply stays network-served, exactly as before. */
+  if ("serviceWorker" in navigator) {
+    try { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+    catch (e) { /* not available here — fine */ }
+  }
+
   /* Photos load alongside the recipes so the first paint already knows every
      thumbnail — initImages never rejects, so the only failure mode here is
      the recipes themselves. */

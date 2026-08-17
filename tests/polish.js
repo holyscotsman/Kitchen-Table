@@ -148,6 +148,34 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== The shell survives offline (R1 — service worker) ==');
+  {
+    const ctxSW = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxSW.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const psw = await ctxSW.newPage();
+    await psw.goto(B + '/index.html#menu');
+    await psw.waitForSelector('.rcard');
+    chk('service worker registers', await psw.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      const reg = await navigator.serviceWorker.ready;
+      return !!reg.active;
+    }));
+    /* Give the install-time precache a beat to finish writing. */
+    await psw.waitForTimeout(800);
+    await ctxSW.setOffline(true);
+    await psw.reload();
+    await psw.waitForSelector('.rcard', { timeout: 10000 });
+    chk('offline reload still serves the whole book',
+      await psw.locator('.rcard').count() >= 40);
+    await psw.locator('.rcard').first().click();
+    await psw.waitForSelector('.r-title', { timeout: 8000 });
+    chk('and a recipe opens, offline, with its ingredients',
+      await psw.locator('.ing-row, .ingrow, [data-act="ing"]').count() > 0 ||
+      (await psw.locator('#main-content').textContent()).length > 100);
+    await ctxSW.setOffline(false);
+    await ctxSW.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
