@@ -12,10 +12,13 @@ green," do not invent hex values, do not use `emerald-600` or `green-800` or any
 scale. If a color you need is not in `tokens.css`, that is a question to ask — not a value to invent.
 
 Ground truth, in priority order:
-1. `tokens.css` — the actual values. Copy it.
-2. `styleguide.html` — open it in a browser. The build must match it.
-3. `screenshots/` — what the three screens look like. Compare against these.
-4. `README.md` — the full spec for layout, behavior, and accessibility.
+1. `tokens.css` — the actual values. Use it.
+2. `design/components.md` and `design/a11y-criteria.md` — the component
+   vocabulary and the accessibility bar the build is held to.
+3. `README.md` — the full spec for layout, behavior, and accessibility.
+(The original handoff's `styleguide.html`, `screenshots/`, and `*.dc.html`
+design references were never committed to this repo; the `design/` documents
+above are the operative record of the same intent.)
 
 The four load-bearing colors, so there is no ambiguity:
 
@@ -49,16 +52,12 @@ bundler, no server. Hash routing (`#` → Main, `#menu` → Menu, `#<recipe-id>`
 Recipe data is read from `recipes.json`. Ship `recipes.json` from this folder as-is — it already
 has the `contributor` field added and `servings` normalized to integers.
 
-## About the .dc.html files
+## About the original handoff references
 
-`Main.dc.html`, `Home.dc.html` (the **Menu** screen), and `Recipe.dc.html` are **design
-references** in a proprietary format — a template with `{{ }}` holes plus a logic class. Do not
-run them, port them, or copy their markup structure.
-
-**Do read them** to extract exact values: sizes, spacing, the order of elements, the state logic,
-the quantity-scaling algorithm. They are the most precise record of intended behavior. Their
-`THEMES` object at the top of each logic class is the same palette as `tokens.css` — if the two ever
-disagree, `tokens.css` wins.
+The handoff folder carried proprietary design references (`*.dc.html`
+templates, `styleguide.html`, `screenshots/`). They were read during the
+build for exact sizes, spacing, and state logic, but were never committed
+here. Where anything ever disagreed, `tokens.css` won — and still does.
 
 ## Definition of done
 
@@ -73,7 +72,7 @@ disagree, `tokens.css` wins.
 - [ ] Servings stepper rescales ingredient quantities, opening at each recipe's own count
 - [ ] Ingredients and steps tap to check off; state resets on leaving the recipe
 - [ ] WCAG AA contrast verified in **both** themes
-- [ ] Build compared side by side against `styleguide.html` and `screenshots/`
+- [ ] Build compared against `design/components.md` and the screens it describes
 
 ---
 
@@ -98,8 +97,6 @@ this section only records decisions and gaps.
   chrome, currently-scaled quantities — rather than rendering the dark UI.
 - **Menu pre-filter links use `#menu?who=Name` / `#menu?cat=Course`**, the
   query-ish form the README allows. Picked once, used consistently.
-- **`recipe.html` is a redirect stub**, kept only so bookmarks from the previous
-  `recipe.html?id=…` build land on the right hash route instead of a 404.
 
 ### The hardcoded-colour exception, retired
 

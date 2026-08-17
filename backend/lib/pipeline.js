@@ -200,7 +200,7 @@ async function runJob(ctx, jobId) {
     };
     let draft;
     try {
-      const parsed = await extract.callClaude(ctx.anthropic, meta, transcript, frames);
+      const parsed = await extract.callExtractor(ctx.anthropic, meta, transcript, frames);
       draft = extract.draftFromResult(parsed, job.url, job.platform);
     } catch (e) {
       if (e && e.notRecipe) { await fail(e.message); return; }

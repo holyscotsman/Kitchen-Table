@@ -4,7 +4,7 @@
  * whole feature leans on is FLAG, DON'T GUESS — a video that never states a
  * quantity must produce a flagged line, not a confident number.
  *
- * buildContent / draftFromResult are pure and tested; callClaude is the thin
+ * buildContent / draftFromResult are pure and tested; callExtractor is the thin
  * network wrapper around them. */
 "use strict";
 
@@ -145,7 +145,7 @@ function draftFromResult(parsed, url, platform) {
  * json_schema output format because a shapeless answer helps nobody. If the
  * API rejects the thinking+format pairing, retry once without thinking
  * rather than failing the whole job over a parameter. */
-async function callClaude(client, meta, transcript, framesB64) {
+async function callExtractor(client, meta, transcript, framesB64) {
   const req = {
     model: MODEL,
     max_tokens: 6000,
@@ -175,4 +175,4 @@ async function callClaude(client, meta, transcript, framesB64) {
   return JSON.parse(block.text);
 }
 
-module.exports = { MODEL, RESULT_SCHEMA, SYSTEM, buildContent, draftFromResult, callClaude };
+module.exports = { MODEL, RESULT_SCHEMA, SYSTEM, buildContent, draftFromResult, callExtractor };
