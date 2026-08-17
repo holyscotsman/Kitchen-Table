@@ -33,6 +33,22 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('title labelled', await p.locator('label[for="a-title"]').count()===1);
   chk('course select', await p.locator('#a-cat').count()===1);
   chk('serves numeric', await p.getAttribute('#a-serves','type')==='number');
+  {
+    /* R3 — servings are taps, not a number-pad wrestle: the recipe screen's
+       stepper grammar beside the field, typing still allowed. */
+    chk('serves has a one-tap stepper', await p.locator('[data-act="ad-serv"]').count()===2);
+    const bb = await p.locator('[data-act="ad-serv"][data-d="1"]').boundingBox();
+    chk('stepper meets the 44px floor', bb.width>=44 && bb.height>=44, JSON.stringify(bb));
+    const before = parseInt(await p.inputValue('#a-serves'),10);
+    await p.click('[data-act="ad-serv"][data-d="1"]');
+    chk('one tap, one more serving', parseInt(await p.inputValue('#a-serves'),10)===before+1);
+    await p.click('[data-act="ad-serv"][data-d="-1"]');
+    chk('and back down', parseInt(await p.inputValue('#a-serves'),10)===before);
+    await p.fill('#a-serves','1'); await p.dispatchEvent('#a-serves','input');
+    await p.click('[data-act="ad-serv"][data-d="-1"]');
+    chk('never steps below one person', parseInt(await p.inputValue('#a-serves'),10)===1);
+  }
+  await p.fill('#a-serves','4'); await p.dispatchEvent('#a-serves','input');
   await p.click('[data-act="add-save"]');
   await p.waitForTimeout(300);
   chk('empty title is refused', (await p.locator('.notice--bad').textContent()).includes('title'));

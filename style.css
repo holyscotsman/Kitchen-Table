@@ -1132,7 +1132,7 @@ a.applogo:hover {
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  text-wrap: pretty;
+  text-wrap: balance;
   margin-bottom: 18px;
 }
 
@@ -1214,6 +1214,26 @@ a.applogo:hover {
 .servbtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* The same stepper, sat on the page surface instead of a recipe card —
+   used beside the Serves input on the review form. */
+.servrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.servrow__n {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.servbtn--form {
+  background: var(--surf);
+  color: var(--ink);
+  border: var(--bw) solid var(--line);
 }
 
 .statcard {
@@ -1402,6 +1422,9 @@ a.applogo:hover {
 .panel--flag {
   background: none;
   border-color: var(--danger);
+  /* The Double-check chips scroll here (082) — land with breathing room,
+     not glued to the viewport edge. */
+  scroll-margin-top: 16px;
 }
 
 .panel--flag h2 {
@@ -1760,6 +1783,9 @@ input[type="file"].input {
   z-index: 21;
   max-height: 82%;
   overflow-y: auto;
+  /* A scroll that ends inside the sheet stays inside the sheet — no
+     rubber-banding through to the page behind it. */
+  overscroll-behavior: contain;
   background: var(--bg);
   border-radius: var(--r-hero) var(--r-hero) 0 0;
   box-shadow: var(--sh-sheet);
