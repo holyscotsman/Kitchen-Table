@@ -1,0 +1,16 @@
+# Dependency updates arrive as small monthly PRs instead of rotting
+# silently. The suites gate every one of them like any other change.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: monthly
+  - package-ecosystem: npm
+    directory: /tests
+    schedule:
+      interval: monthly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

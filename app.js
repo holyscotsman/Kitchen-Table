@@ -2301,6 +2301,7 @@
                       esc(j.title || "Untitled recipe") + "</span>" +
                       '<span class="pathbtn__s">From ' +
                       (j.platform === "instagram" ? "Instagram" : "YouTube") +
+                      (j.created_at ? " · " + agoText(j.created_at) : "") +
                       "</span></button>";
              }).join("") + "</div>";
       }
@@ -2878,6 +2879,15 @@
         if (before !== job.status + "|" + fmtEta(S.videoJob)) render();
       })
       .catch(function () { videoPollBusy = false; /* transient — the next tick tries again */ });
+  }
+
+  /* How long a finished draft has been waiting — rough on purpose. */
+  function agoText(iso) {
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return "just now";
+    if (s < 5400) return Math.round(s / 60) + " minutes ago";
+    if (s < 129600) return Math.round(s / 3600) + " hours ago";
+    return Math.round(s / 86400) + " days ago";
   }
 
   function fmtEta(job) {

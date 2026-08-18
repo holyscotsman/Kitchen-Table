@@ -1,0 +1,27 @@
+# Continuous code scanning — the audit lane of the improvement loops,
+# made permanent. CodeQL reads every PR and a weekly pass of main;
+# findings land in the repo's Security tab.
+name: codeql
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 7 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - uses: github/codeql-action/analyze@v3

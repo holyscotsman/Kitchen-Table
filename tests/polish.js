@@ -173,6 +173,16 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await psw.locator('.ing-row, .ingrow, [data-act="ing"]').count() > 0 ||
       (await psw.locator('#main-content').textContent()).length > 100);
     await ctxSW.setOffline(false);
+    /* R6 — repeat visits must actually ride the worker, not merely survive
+       without the network: on an online reload, the shell's resources show
+       a service-worker hop in their timing (workerStart > 0). */
+    await psw.goto(B + '/index.html#menu');
+    await psw.waitForSelector('.rcard');
+    chk('repeat visits are served through the worker', await psw.evaluate(() => {
+      const e = performance.getEntriesByType('resource')
+        .find(r => r.name.endsWith('/app.js'));
+      return !!e && e.workerStart > 0;
+    }));
     await ctxSW.close();
   }
 
