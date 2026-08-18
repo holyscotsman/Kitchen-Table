@@ -106,6 +106,7 @@ Docker (tools baked in; build from the **repo root** — the server applies
 | `POST /api/import/video` `{url, contributor?}` | validates YouTube/Instagram, inserts a `queued` job, returns `{job_id}` immediately |
 | `GET /api/import/jobs/:id` | status, human stage label, `eta_seconds`, `overrun`, and `result_json` once ready |
 | `GET /api/import/jobs?status=ready_for_review` | finished imports awaiting review (the Add screen's badge) |
+| `GET /api/import/jobs?status=failed` | recent failures (3 days, capped at 20) so an import that died unwatched is still owed a sentence |
 | `POST /api/import/jobs/:id/accept` `{recipe}` | writes the reviewed recipe into the database, marks the job `imported` |
 
 Job pipeline: `queued → downloading → transcribing → extracting →

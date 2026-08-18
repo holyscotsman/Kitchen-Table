@@ -1571,6 +1571,40 @@ input[type="file"].input {
 
 /* ---- From a video: the progress card and the waiting list ---- */
 
+.vfailed {
+  margin-bottom: 22px;
+}
+
+.vfailed__row + .vfailed__row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: var(--bw) solid var(--line);
+}
+
+.vfailed__why {
+  margin: 0 0 6px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.vfailed__url {
+  margin: 0 0 12px;
+  font-size: 0.85em;
+  color: var(--dim);
+  word-break: break-all;
+}
+
+.vfailed__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vfailed__acts .outlinebtn {
+  flex: 1 1 150px;
+  margin: 0;
+}
+
 .vready {
   margin-bottom: 26px;
 }

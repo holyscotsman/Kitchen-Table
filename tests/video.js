@@ -20,7 +20,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], accepted: [], posts: [], failPost: null, postDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, postDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -37,7 +37,7 @@ function stubKitchen(ctx, opts) {
       return json(202, { job_id: 7 });
     }
     if (req.method() === 'GET' && u.pathname === '/api/import/jobs') {
-      return json(200, { jobs: o.ready });
+      return json(200, { jobs: u.searchParams.get('status') === 'failed' ? o.failed : o.ready });
     }
     if (req.method() === 'GET' && /^\/api\/import\/jobs\/\d+$/.test(u.pathname)) {
       pollN = Math.min(pollN + 1, o.polls.length - 1);
@@ -265,6 +265,51 @@ async function freshPage(br, opts) {
     chk('both manifest icons exist', i192.ok() && i512.ok());
     chk('index links the manifest', /rel="manifest"/.test(await (await p2.request.get(B + '/index.html')).text()));
     await p2.close();
+  }
+
+  console.log('\n== A failure that happened while nobody watched (R8) ==');
+  {
+    const FAILED = [{
+      id: 12, url: 'https://youtu.be/gone', platform: 'youtube',
+      created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+      error_message: 'That video is private, so it can’t be fetched.'
+    }];
+    const { ctx, p } = await freshPage(br, { failed: FAILED });
+    await p.goto(B + '/index.html#add');
+    await p.waitForSelector('.vfailed', { timeout: 12000 });
+    const txt = await p.textContent('.vfailed');
+    chk('the failure is surfaced, not swallowed', /didn’t work/.test(txt));
+    chk('with the server’s own reason', /private/.test(txt));
+    chk('and when it happened', /3 hours ago/.test(txt));
+    chk('both actions meet the tap floor', await (async () => {
+      for (const sel of ['[data-act="video-retry"]', '[data-act="video-dismiss"]']) {
+        const b = await p.locator(sel).boundingBox();
+        if (!b || b.height < 44) return false;
+      }
+      return true;
+    })());
+    await p.click('[data-act="video-retry"]');
+    await p.waitForSelector('#a-vurl');
+    chk('Try again pre-fills the link rather than resubmitting behind you',
+      await p.inputValue('#a-vurl') === 'https://youtu.be/gone');
+    await ctx.close();
+  }
+  {
+    const FAILED = [{
+      id: 13, url: 'https://youtu.be/nope', platform: 'youtube',
+      created_at: new Date().toISOString(), error_message: 'It didn’t work.'
+    }];
+    const { ctx, p } = await freshPage(br, { failed: FAILED });
+    await p.goto(B + '/index.html#add');
+    await p.waitForSelector('.vfailed', { timeout: 12000 });
+    await p.click('[data-act="video-dismiss"]');
+    await p.waitForTimeout(200);
+    chk('Dismiss clears it', await p.locator('.vfailed').count() === 0);
+    await p.reload();
+    await p.waitForSelector('.pathbtn');
+    await p.waitForTimeout(1200);
+    chk('and it stays dismissed across a reload', await p.locator('.vfailed').count() === 0);
+    await ctx.close();
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
