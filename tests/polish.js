@@ -159,6 +159,24 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     const fsx = require('fs');
     const pathx = require('path');
     const ROOT = pathx.join(__dirname, '..');
+
+    /* R10 — the precache list is hand-maintained, and cache.addAll() is
+       all-or-nothing: one missing file and the worker's install rejects,
+       leaving NO offline support at all, silently. (R5 deleted a file from
+       this repo; had it been listed here, that is exactly what would have
+       happened.) So every path the worker promises to cache must exist. */
+    {
+      const swSrc = fsx.readFileSync(pathx.join(ROOT, 'sw.js'), 'utf8');
+      const list = swSrc.slice(swSrc.indexOf('const SHELL = ['), swSrc.indexOf('];'))
+        .match(/"([^"]+)"/g).map(s => s.replace(/"/g, ''));
+      const missing = list.filter(rel => {
+        const f = pathx.join(ROOT, rel === './' ? 'index.html' : rel);
+        return !fsx.existsSync(f);
+      });
+      chk('every file the worker precaches exists', missing.length === 0, missing.join(', '));
+      chk('the precache list covers the app itself', list.includes('app.js') &&
+        list.includes('style.css') && list.includes('index.html'));
+    }
     const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
       '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
       '.woff2': 'font/woff2', '.txt': 'text/plain' };
