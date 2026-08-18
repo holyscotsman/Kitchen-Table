@@ -13,11 +13,12 @@ bundler, no server.
 
 **Live:** https://holyscotsman.github.io/Kitchen-Table/
 
-**Status:** `v0.9` — Jason has ruled the database (Neon Postgres, see
-[`db/`](db/README.md)) and the menu-planning calendar **into 1.0**. The
-calendar build and the app↔database wiring are the active work; the human
-checks (Joan, a physical iPhone, the content pass) run alongside
-(`GAMEPLAN.md` §11).
+**Status:** `v0.9` — the software is feature-complete: the week planner, the
+shared database ([`db/`](db/README.md)), four import paths including video
+(the kitchen server, [`backend/`](backend/README.md)), offline support, and
+continuous scanning are all live. What remains for 1.0 is the human work —
+Joan's sessions, a physical iPhone, the content truth pass (`GAMEPLAN.md`
+§11).
 
 ## Files
 
@@ -30,13 +31,11 @@ checks (Joan, a physical iPhone, the content pass) run alongside
 | `recipes.json` | The 48 recipes. Source of truth for Viewer mode |
 | `fonts/` | Atkinson Hyperlegible, self-hosted (OFL licence included) — no third-party request on any page load |
 | `db/` | The Postgres schema, migration and export — the shared database's tooling ([docs](db/README.md)) |
-| `recipe.html` | Redirect stub for bookmarks from the previous build |
 | `tests/` | Every check the app must pass — see *Checks* below |
 | `CLAUDE.md` | Build rules and the colour contract — **read first** |
 | `DESIGN.md` | Full screen-by-screen spec from the design handoff |
 | `GAMEPLAN.md` | The 1.0 plan: 130 tasks in dependency order, and the loop that works through them |
 | `CONTENT.md` | What is known-wrong in the recipe data, awaiting answers from the family |
-| `design/` | Styleguide, screenshots, and the `.dc.html` design references |
 | [`design/components.md`](design/components.md) | The component reference — build new screens from this vocabulary |
 | [`design/a11y-criteria.md`](design/a11y-criteria.md) | The accessibility bar every merged feature must clear |
 

@@ -193,12 +193,15 @@ async function freshPage(br, opts) {
   console.log('\n== Finished imports wait for whoever returns ==');
   {
     const { ctx, p, stub } = await freshPage(br, {
-      ready: [{ id: 9, title: 'Waiting Pie', platform: 'youtube', url: 'https://youtu.be/w' }],
+      ready: [{ id: 9, title: 'Waiting Pie', platform: 'youtube', url: 'https://youtu.be/w',
+        created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString() }],
       polls: [{ id: 9, status: 'ready_for_review', result_json: Object.assign({}, READY_RESULT, { title: 'Waiting Pie' }) }]
     });
     await p.goto(B + '/index.html#add');
     await p.waitForSelector('.vready');
     chk('the waiting list greets arrival', /Waiting Pie/.test(await p.textContent('.vready')));
+    chk('a waiting draft says how long it has waited (R6)',
+      /2 hours ago/.test(await p.textContent('.vready')));
     await p.click('.vready .pathbtn');
     await p.waitForSelector('#a-title', { timeout: 12000 });
     chk('opening one lands on the standard review screen', await p.inputValue('#a-title') === 'Waiting Pie');
