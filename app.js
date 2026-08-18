@@ -85,7 +85,9 @@
     plan: "kt.plan",
     /* Where the kitchen server lives. Unset means the baked-in address;
        tests point it at a stub. */
-    importApi: "kt.importApi"
+    importApi: "kt.importApi",
+    /* Failed imports this device has been told about and waved away. */
+    dismissed: "kt.dismissedImports"
   };
 
   /* The week planner's slots. All three exist on every day; the UI shows
@@ -340,6 +342,7 @@
     videoJob: null,     // { id, status, stage, eta, overrun } while watching
     videoWaking: false, // slow first answer = free-tier server waking, not broken
     videoReady: [],     // finished imports awaiting review (the Add screen list)
+    videoFailed: [],    // recent imports that died while nobody was watching
 
     mainQ: "",
 
@@ -2291,6 +2294,25 @@
     if (S.addStep === "choose") {
       /* Finished video imports wait here for whoever comes back (the spec's
          badge, grown into the list it stood for). */
+      /* A submission that died unwatched is owed a sentence, not silence. */
+      if (S.videoFailed.length) {
+        h += '<div class="panel panel--flag vfailed" role="status">' +
+             "<h2>" + (S.videoFailed.length === 1 ? "An import didn’t work"
+               : S.videoFailed.length + " imports didn’t work") + "</h2>" +
+             S.videoFailed.map(function (j) {
+               return '<div class="vfailed__row">' +
+                      '<p class="vfailed__why">' + esc(j.error_message ||
+                        "It didn’t work, and the server didn’t say why.") + "</p>" +
+                      '<p class="vfailed__url">' + esc(j.url || "") +
+                      (j.created_at ? " · " + esc(agoText(j.created_at)) : "") + "</p>" +
+                      '<div class="vfailed__acts">' +
+                      '<button type="button" class="outlinebtn press" data-act="video-retry" ' +
+                      'data-id="' + j.id + '" data-url="' + esc(j.url || "") + '">Try again</button>' +
+                      '<button type="button" class="outlinebtn press" data-act="video-dismiss" ' +
+                      'data-id="' + j.id + '">Dismiss</button>' +
+                      "</div></div>";
+             }).join("") + "</div>";
+      }
       if (S.videoReady.length) {
         h += '<div class="panel vready"><h2>Ready to check over</h2>' +
              '<p class="vready__s">Video imports the kitchen server has finished. ' +
@@ -2937,6 +2959,29 @@
         if (S.route.name === "add" && JSON.stringify(jobs) !== before) render();
       })
       .catch(function () { /* asleep or offline — the list just stays empty */ });
+
+    /* An import that died while the phone was away must not vanish
+       silently: the submission was real, so the failure is owed a
+       sentence. Dismissed ones stay dismissed on this device. */
+    kitchenFetch("/api/import/jobs?status=failed", { timeout: 12000 }, true)
+      .then(function (data) {
+        var seen = load(K.dismissed, []);
+        var jobs = ((data && data.jobs) || []).filter(function (j) {
+          return seen.indexOf(j.id) === -1;
+        });
+        var before = JSON.stringify(S.videoFailed);
+        S.videoFailed = jobs;
+        if (S.route.name === "add" && JSON.stringify(jobs) !== before) render();
+      })
+      .catch(function () { /* the same silence is fine here */ });
+  }
+
+  function dismissFailedJob(id) {
+    var seen = load(K.dismissed, []);
+    if (seen.indexOf(id) === -1) seen.push(id);
+    save(K.dismissed, seen.slice(-100));
+    S.videoFailed = S.videoFailed.filter(function (j) { return j.id !== id; });
+    render();
   }
 
   function openReadyJob(id) {
@@ -4078,6 +4123,21 @@
     }
     if (act === "video-submit") { submitVideo(); return; }
     if (act === "video-open") { openReadyJob(parseInt(el.getAttribute("data-id"), 10)); return; }
+    if (act === "video-retry") {
+      /* The link comes back pre-filled rather than resubmitted: whatever
+         refused it once may need a moment, and the person gets to choose. */
+      dismissFailedJob(parseInt(el.getAttribute("data-id"), 10));
+      S.addStep = "video";
+      S.videoUrl = el.getAttribute("data-url") || "";
+      S.addError = "";
+      scheduleAddPersist();
+      render();
+      return;
+    }
+    if (act === "video-dismiss") {
+      dismissFailedJob(parseInt(el.getAttribute("data-id"), 10));
+      return;
+    }
     if (act === "add-fetch") { importFromLink(); return; }
     if (act === "add-paste") {
       var text = (S.addPaste || "").trim();

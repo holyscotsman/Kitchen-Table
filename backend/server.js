@@ -178,9 +178,23 @@ async function getJob(req, res, id) {
 }
 
 async function listJobs(req, res, query) {
-  /* Only the one filter the app uses — this is not a general query API. */
-  if (query.get("status") !== "ready_for_review") {
-    return send(res, 400, { error: "only status=ready_for_review can be listed" });
+  /* Two filters, both the app's own — this is not a general query API.
+   * `failed` exists because an import that dies while the phone is away
+   * would otherwise be invisible: the Add screen surfaces it with its
+   * plain-language reason instead of silently losing the submission. */
+  const status = query.get("status");
+  if (status !== "ready_for_review" && status !== "failed") {
+    return send(res, 400, { error: "only status=ready_for_review or status=failed can be listed" });
+  }
+  if (status === "failed") {
+    const rows = await sql`
+      select id, url, platform, created_at, error_message
+        from kitchen.import_jobs
+       where status = 'failed'
+         and updated_at > now() - interval '3 days'
+       order by created_at desc
+       limit 20`;
+    return send(res, 200, { jobs: rows });
   }
   const rows = await sql`
     select id, url, platform, created_at, result_json->>'title' as title

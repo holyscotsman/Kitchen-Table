@@ -208,6 +208,23 @@ const { runJob, computeFps } = lib('pipeline');
     chk('the window forgives', lim.hit('a', t0 + 60001) === true);
   }
 
+  console.log('\n== R8: the failed-jobs listing is bounded, not a query API ==');
+  {
+    /* The endpoint's contract, asserted where it is cheapest: exactly two
+       statuses are listable, and nothing else — a failed import must be
+       visible to the family without opening the API to arbitrary reads. */
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const fn = src.slice(src.indexOf('async function listJobs'), src.indexOf('async function acceptJob'));
+    chk('ready_for_review and failed are the only listable statuses',
+      /status !== "ready_for_review" && status !== "failed"/.test(fn) &&
+      !/status\s*\)\s*;?\s*$/.test(fn.split('\n')[3] || ''));
+    chk('failed rows carry their reason', /error_message/.test(fn));
+    chk('failed listing is time-bounded and capped',
+      /interval '3 days'/.test(fn) && /limit 20/.test(fn));
+    chk('a raw status string never reaches SQL',
+      !/status = \$\{status\}/.test(fn) && !/\$\{status\}/.test(fn));
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {
