@@ -2301,7 +2301,7 @@
                : S.videoFailed.length + " imports didn’t work") + "</h2>" +
              S.videoFailed.map(function (j) {
                return '<div class="vfailed__row">' +
-                      '<p class="vfailed__why">' + esc(j.error_message ||
+                      '<p class="vfailed__why">' + esc(asText(j.error_message) ||
                         "It didn’t work, and the server didn’t say why.") + "</p>" +
                       '<p class="vfailed__url">' + esc(j.url || "") +
                       (j.created_at ? " · " + esc(agoText(j.created_at)) : "") + "</p>" +
@@ -2320,7 +2320,7 @@
              S.videoReady.map(function (j) {
                return '<button type="button" class="pathbtn press" data-act="video-open" ' +
                       'data-id="' + j.id + '"><span class="pathbtn__t">' +
-                      esc(j.title || "Untitled recipe") + "</span>" +
+                      esc(asText(j.title) || "Untitled recipe") + "</span>" +
                       '<span class="pathbtn__s">From ' +
                       (j.platform === "instagram" ? "Instagram" : "YouTube") +
                       (j.created_at ? " · " + agoText(j.created_at) : "") +
@@ -2905,7 +2905,9 @@
 
   /* How long a finished draft has been waiting — rough on purpose. */
   function agoText(iso) {
-    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    var when = new Date(iso).getTime();
+    if (!isFinite(when)) return "";          // a bad timestamp says nothing
+    var s = Math.max(0, (Date.now() - when) / 1000);
     if (s < 90) return "just now";
     if (s < 5400) return Math.round(s / 60) + " minutes ago";
     if (s < 129600) return Math.round(s / 3600) + " hours ago";
@@ -2924,21 +2926,44 @@
 
   /* A finished job → the standard review screen. The job id rides along so
      Save can tell the server its draft was accepted. */
+  /* The kitchen server is ours, but it is still a network boundary: a
+     truncated body, a proxy's error page, a row written by an older
+     schema. A draft that arrives the wrong shape must not take the
+     screen down with it — losing the import AND the way to fix it. So
+     every field is coerced into what the review form expects. */
+  function asText(v) {
+    if (typeof v === "string") return v.trim().slice(0, 2000);
+    if (typeof v === "number" && isFinite(v)) return String(v);
+    return "";
+  }
+
+  function asLines(v) {
+    if (Array.isArray(v)) {
+      return v.map(asText).filter(function (s) { return s; }).slice(0, 200);
+    }
+    var one = asText(v);
+    return one ? [one] : [];
+  }
+
   function openVideoDraft(job) {
-    var rj = job.result_json || {};
+    var rj = (job && job.result_json && typeof job.result_json === "object")
+      ? job.result_json : {};
     var d = blankDraft();
-    d.title = rj.title || "";
+    d.title = asText(rj.title);
     d.category = CATS.indexOf(rj.category) > -1 ? rj.category : "Dinner";
-    d.contributor = rj.contributor || WHO[0];
-    d.servings = rj.servings || 4;
-    d.prepTime = rj.prepTime || "";
-    d.cookTime = rj.cookTime || "";
-    d.ingredients = rj.ingredients && rj.ingredients.length ? rj.ingredients.slice() : [""];
-    d.steps = rj.steps && rj.steps.length ? rj.steps.slice() : [""];
-    d.notes = rj.notes || "";
-    d.flagged = (rj.flagged || []).slice();
-    d.source = rj.source || "";
-    d.tags = (rj.tags || []).join(", ");
+    d.contributor = asText(rj.contributor) || WHO[0];
+    var serves = parseInt(rj.servings, 10);
+    d.servings = (serves >= 1 && serves <= 40) ? serves : 4;
+    d.prepTime = asText(rj.prepTime);
+    d.cookTime = asText(rj.cookTime);
+    var ing = asLines(rj.ingredients);
+    d.ingredients = ing.length ? ing : [""];
+    var steps = asLines(rj.steps);
+    d.steps = steps.length ? steps : [""];
+    d.notes = asText(rj.notes);
+    d.flagged = asLines(rj.flagged);
+    d.source = asText(rj.source);
+    d.tags = asLines(rj.tags).join(", ");
     d.videoJobId = job.id;
     S.videoJob = null;
     S.videoReady = S.videoReady.filter(function (j) { return j.id !== job.id; });
