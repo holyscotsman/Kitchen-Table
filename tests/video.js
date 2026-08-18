@@ -10,6 +10,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
   : (fail++, console.log('  FAIL ' + n + (e ? ' :: ' + e : '')));
 
 const API = 'https://kt-kitchen.test';
+const CATS_OK = ['Breakfast','Brunch','Lunch','Dinner','Sides','Snacks','Baking','Desserts','Cocktails','Drinks'];
 
 const READY_RESULT = {
   title: 'Video Test Soup', category: 'Dinner', servings: 4,
@@ -265,6 +266,41 @@ async function freshPage(br, opts) {
     chk('both manifest icons exist', i192.ok() && i512.ok());
     chk('index links the manifest', /rel="manifest"/.test(await (await p2.request.get(B + '/index.html')).text()));
     await p2.close();
+  }
+
+  console.log('\n== A draft that arrives malformed (R11) ==');
+  {
+    /* The kitchen server is ours, but it is still a network boundary: a
+       truncated body, a proxy's error page, a row written by an older
+       schema. The review screen must survive whatever comes back — a
+       crash here would lose the import AND the screen. */
+    const JUNK = {
+      title: { not: 'a string' }, category: 'Nonsense', servings: 'four',
+      ingredients: '2 cups flour', steps: null, flagged: 'check this',
+      tags: 'soup', notes: 42, source: ['https://youtu.be/x']
+    };
+    const { ctx, p } = await freshPage(br, {
+      ready: [{ id: 21, title: 'Junk Draft', platform: 'youtube',
+        created_at: new Date().toISOString() }],
+      polls: [{ id: 21, status: 'ready_for_review', result_json: JUNK }]
+    });
+    await p.goto(B + '/index.html#add');
+    await p.waitForSelector('.vready', { timeout: 12000 });
+    await p.click('.vready .pathbtn');
+    await p.waitForSelector('#a-title', { timeout: 12000 });
+    chk('a malformed draft still reaches the review screen', true);
+    chk('no page errors from the junk', p.errs.length === 0, p.errs.join(' | '));
+    chk('a string ingredient list becomes one editable line',
+      await p.locator('[data-act="adl"][data-k="ingredients"]').count() >= 1);
+    chk('a string tag list is readable, not [object Object]',
+      !/\[object/.test(await p.inputValue('#a-tags')));
+    chk('an unknown course falls back to a real one',
+      CATS_OK.includes(await p.inputValue('#a-cat')), await p.inputValue('#a-cat'));
+    chk('a non-numeric servings becomes a number',
+      /^\d+$/.test(await p.inputValue('#a-serves')), await p.inputValue('#a-serves'));
+    chk('the screen is still usable — Save is there',
+      await p.locator('[data-act="add-save"]').count() === 1);
+    await ctx.close();
   }
 
   console.log('\n== A failure that happened while nobody watched (R8) ==');
