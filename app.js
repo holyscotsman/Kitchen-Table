@@ -2952,25 +2952,39 @@
     return one ? [one] : [];
   }
 
+  /* One shape-guard for every draft the review form is handed, wherever
+     it came from: a finished job on the kitchen server, or this tab's own
+     snapshot written by an older build. Both are outside today's code's
+     control, and a draft missing a field it expects takes the screen
+     down — with the snapshot, on every arrival until the tab closes. */
+  function normalizeDraft(src) {
+    var s = (src && typeof src === "object" && !Array.isArray(src)) ? src : {};
+    var d = blankDraft();
+    d.title = asText(s.title);
+    d.category = CATS.indexOf(s.category) > -1 ? s.category : "Dinner";
+    d.contributor = asText(s.contributor) || WHO[0];
+    var serves = parseInt(s.servings, 10);
+    d.servings = (serves >= 1 && serves <= 40) ? serves : 4;
+    d.prepTime = asText(s.prepTime);
+    d.cookTime = asText(s.cookTime);
+    var ing = asLines(s.ingredients);
+    d.ingredients = ing.length ? ing : [""];
+    var steps = asLines(s.steps);
+    d.steps = steps.length ? steps : [""];
+    d.notes = asText(s.notes);
+    d.flagged = asLines(s.flagged);
+    d.source = asText(s.source);
+    /* The form holds tags as one comma string; a snapshot already has
+       that shape, a job's result_json has a list. */
+    d.tags = typeof s.tags === "string" ? s.tags : asLines(s.tags).join(", ");
+    if (s.videoJobId) d.videoJobId = s.videoJobId;
+    return d;
+  }
+
   function openVideoDraft(job) {
     var rj = (job && job.result_json && typeof job.result_json === "object")
       ? job.result_json : {};
-    var d = blankDraft();
-    d.title = asText(rj.title);
-    d.category = CATS.indexOf(rj.category) > -1 ? rj.category : "Dinner";
-    d.contributor = asText(rj.contributor) || WHO[0];
-    var serves = parseInt(rj.servings, 10);
-    d.servings = (serves >= 1 && serves <= 40) ? serves : 4;
-    d.prepTime = asText(rj.prepTime);
-    d.cookTime = asText(rj.cookTime);
-    var ing = asLines(rj.ingredients);
-    d.ingredients = ing.length ? ing : [""];
-    var steps = asLines(rj.steps);
-    d.steps = steps.length ? steps : [""];
-    d.notes = asText(rj.notes);
-    d.flagged = asLines(rj.flagged);
-    d.source = asText(rj.source);
-    d.tags = asLines(rj.tags).join(", ");
+    var d = normalizeDraft(rj);
     d.videoJobId = job.id;
     S.videoJob = null;
     S.videoReady = S.videoReady.filter(function (j) { return j.id !== job.id; });
@@ -3791,7 +3805,7 @@
       var d = JSON.parse(raw);
       if (d && (d.draft || d.url || d.paste || d.videoJob)) {
         S.addStep = d.step || "choose";
-        S.addDraft = d.draft || null;
+        S.addDraft = d.draft ? normalizeDraft(d.draft) : null;
         S.addUrl = d.url || "";
         S.addPaste = d.paste || "";
         S.videoUrl = d.videoUrl || "";

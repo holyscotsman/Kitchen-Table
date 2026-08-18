@@ -194,6 +194,61 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxBad2.close();
   }
 
+  console.log('\n== A half-finished import, restored (R13) ==');
+  {
+    /* The Add screen snapshots itself so a refresh doesn't lose work
+       (084). That snapshot is restored straight into the review form —
+       and a snapshot written by an older build has fewer fields than
+       today's form expects. It also survives in sessionStorage, so a
+       crash here repeats on every arrival until the tab is closed. */
+    const ctxSnap = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxSnap.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const ps = await ctxSnap.newPage();
+    const snapErrs = [];
+    ps.on('pageerror', e => snapErrs.push(String(e.message)));
+    await ps.addInitScript(() => {
+      sessionStorage.setItem('kt.addDraft', JSON.stringify({
+        step: 'review', draft: { title: 'Half a Recipe' }   // an older shape
+      }));
+    });
+    await ps.goto(B + '/index.html#add');
+    await ps.waitForSelector('#a-title, .pathbtn', { timeout: 12000 });
+    chk('an old-shaped snapshot still opens the review form',
+      await ps.locator('#a-title').count() === 1);
+    chk('what it did carry is kept', await ps.inputValue('#a-title') === 'Half a Recipe');
+    chk('the missing lists come back as empty fields, not a crash',
+      await ps.locator('[data-act="adl"][data-k="ingredients"]').count() >= 1 &&
+      await ps.locator('[data-act="adl"][data-k="steps"]').count() >= 1);
+    chk('no page error from the restore', snapErrs.length === 0, snapErrs.join(' | '));
+    await ctxSnap.close();
+  }
+
+  console.log('\n== A photo store holding nonsense (R13) ==');
+  {
+    const ctxImg = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxImg.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pi = await ctxImg.newPage();
+    const imgErrs = [];
+    pi.on('pageerror', e => imgErrs.push(String(e.message)));
+    /* The legacy localStorage path (no IndexedDB) with junk in it. */
+    await pi.addInitScript(() => {
+      localStorage.setItem('kt.images', JSON.stringify({
+        'chicken-cordon-bleu': { not: 'a data url' },
+        'chops': 12345
+      }));
+    });
+    await pi.goto(B + '/index.html#menu');
+    await pi.waitForSelector('.rcard', { timeout: 12000 });
+    chk('junk in the photo store does not stop the book rendering',
+      await pi.locator('.rcard').count() >= 40);
+    await pi.goto(B + '/index.html#chicken-cordon-bleu');
+    await pi.waitForSelector('.r-title', { timeout: 12000 });
+    chk('and a recipe whose photo is nonsense still opens',
+      (await pi.locator('.r-title').textContent()).length > 0);
+    chk('no page error from the photo store', imgErrs.length === 0, imgErrs.join(' | '));
+    await ctxImg.close();
+  }
+
   console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
     /* Playwright's offline emulation does NOT reach fetches made by a
