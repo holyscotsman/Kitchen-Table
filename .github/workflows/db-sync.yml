@@ -31,11 +31,19 @@ jobs:
           KT_DB: ${{ secrets.KT_DB }}
         run: |
           if [ -z "$KT_DB" ]; then
-            echo "KT_DB secret is not set — add it in Settings → Secrets. Skipping."
+            # Loud, not polite. An unconfigured sync used to report success and
+            # do nothing — which is exactly how it went unnoticed for a
+            # fortnight while video imports piled up in the database and never
+            # reached recipes.json. A warning annotation and a summary line
+            # make "not wired up" look different from "nothing to do".
+            echo "::warning title=db-sync is not wired up::KT_DB is not set, so the database was never read. Recipes accepted from video imports will not reach recipes.json until this secret exists (Settings → Secrets and variables → Actions)."
+            echo "⚠️ **Skipped: \`KT_DB\` secret is not set.** The database was never read, so nothing could sync. Add it under Settings → Secrets and variables → Actions." >> "$GITHUB_STEP_SUMMARY"
             echo "drift=skip" >> "$GITHUB_OUTPUT"
           elif node db/export.js --check; then
+            echo "✅ Database and \`recipes.json\` already agree — nothing to sync." >> "$GITHUB_STEP_SUMMARY"
             echo "drift=no" >> "$GITHUB_OUTPUT"
           else
+            echo "📥 Database has drifted from \`recipes.json\` — committing the regenerated file." >> "$GITHUB_STEP_SUMMARY"
             echo "drift=yes" >> "$GITHUB_OUTPUT"
           fi
       - name: Export and commit
