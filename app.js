@@ -626,12 +626,19 @@
      The trade-off: once a device has local changes, recipes added to the
      published recipes.json won't appear there until those changes are
      downloaded and committed, or undone with "Undo all my changes". */
+  /* The overlay is this device's own writing, but a half-finished write,
+     a hand-edited value, or a file from an older version can still leave
+     something that is not a recipe in the list. Dropping it silently is
+     right: the alternative is a boot crash, and the escape hatch ("Undo
+     all my changes on this phone") lives inside the app that just died. */
   function applyOverlay() {
     var overlay = load(K.recipes, null);
-    S.recipes = (Array.isArray(overlay) ? overlay : S.base).map(normalizeRecipe);
+    var list = Array.isArray(overlay) ? overlay : (Array.isArray(S.base) ? S.base : []);
+    S.recipes = list.map(normalizeRecipe).filter(Boolean);
   }
 
   function normalizeRecipe(r) {
+    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
     var out = {};
     Object.keys(r).forEach(function (k) { out[k] = r[k]; });
     if (WHO_ALIASES[out.contributor]) out.contributor = WHO_ALIASES[out.contributor];
@@ -4449,6 +4456,12 @@
     fetch("recipes.json", { cache: "no-cache" }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
+    }).then(function (list) {
+      /* A file that parses but is not a list of recipes must reach the
+         same honest error as a file that never arrived — never a page
+         stuck on "Loading recipes…" forever. */
+      if (!Array.isArray(list)) throw new Error("recipes.json is not a list of recipes");
+      return list;
     }),
     initImages()
   ])

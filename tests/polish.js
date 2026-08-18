@@ -148,6 +148,52 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== The book survives bad data (R12) ==');
+  {
+    /* Both of these brick the app if unguarded — and the escape hatch
+       ("Undo all my changes on this phone") lives INSIDE the app, so a
+       boot crash takes the recovery with it. */
+    const ctxBad = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxBad.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pb = await ctxBad.newPage();
+    const bootErrs = [];
+    pb.on('pageerror', e => bootErrs.push(String(e.message)));
+
+    /* 1. A local overlay with a rotten entry in it. */
+    await pb.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([
+        { id: 'good-one', title: 'Still Here', category: 'Dinner',
+          contributor: 'Joan', servings: 4, ingredients: ['a'], steps: ['b'] },
+        null,
+        'not a recipe at all'
+      ]));
+    });
+    await pb.goto(B + '/index.html#menu');
+    await pb.waitForSelector('.rcard, .notice--bad', { timeout: 12000 });
+    chk('a rotten entry in the overlay does not brick the book',
+      await pb.locator('.rcard__title', { hasText: 'Still Here' }).count() === 1);
+    chk('the junk entries are dropped, not rendered',
+      await pb.locator('.rcard').count() === 1, String(await pb.locator('.rcard').count()));
+    chk('no boot crash from the overlay', bootErrs.length === 0, bootErrs.join(' | '));
+    await ctxBad.close();
+
+    /* 2. A published recipes.json that parses but is not a list. */
+    const ctxBad2 = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxBad2.route('**/*.onrender.com/**', r => r.abort('failed'));
+    await ctxBad2.route('**/recipes.json', r => r.fulfill({
+      status: 200, contentType: 'application/json', body: '{"oops":"not a list"}' }));
+    const pb2 = await ctxBad2.newPage();
+    const errs2 = [];
+    pb2.on('pageerror', e => errs2.push(String(e.message)));
+    await pb2.goto(B + '/index.html');
+    await pb2.waitForSelector('.emptystate, .main__title', { timeout: 12000 });
+    const shown = await pb2.locator('#app').textContent();
+    chk('a malformed recipes.json says so instead of hanging on "Loading recipes…"',
+      /could not be loaded/i.test(shown), shown.slice(0, 80));
+    chk('and it fails without throwing', errs2.length === 0, errs2.join(' | '));
+    await ctxBad2.close();
+  }
+
   console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
     /* Playwright's offline emulation does NOT reach fetches made by a
