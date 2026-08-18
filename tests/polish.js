@@ -148,41 +148,79 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
-  console.log('\n== The shell survives offline (R1 — service worker) ==');
+  console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
+    /* Playwright's offline emulation does NOT reach fetches made by a
+       service worker — an "offline" assertion written that way passes
+       because the worker quietly reached the live server. So this block
+       serves the app from its own throwaway server and then KILLS it:
+       the outage is real, and so is what it proves. */
+    const http = require('http');
+    const fsx = require('fs');
+    const pathx = require('path');
+    const ROOT = pathx.join(__dirname, '..');
+    const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+      '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+      '.woff2': 'font/woff2', '.txt': 'text/plain' };
+    const srv = http.createServer((rq, rs) => {
+      const rel = decodeURIComponent(new URL(rq.url, 'http://x').pathname);
+      const file = pathx.join(ROOT, rel === '/' ? '/index.html' : rel);
+      if (!file.startsWith(ROOT) || !fsx.existsSync(file) || fsx.statSync(file).isDirectory()) {
+        rs.writeHead(404); return rs.end('no');
+      }
+      rs.writeHead(200, { 'content-type': TYPES[pathx.extname(file)] || 'application/octet-stream' });
+      fsx.createReadStream(file).pipe(rs);
+    });
+    await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    const OWN = 'http://127.0.0.1:' + srv.address().port;
+
     const ctxSW = await br.newContext({ ...devices['iPhone 13'] });
     await ctxSW.route('**/*.onrender.com/**', r => r.abort('failed'));
     const psw = await ctxSW.newPage();
-    await psw.goto(B + '/index.html#menu');
+    await psw.goto(OWN + '/index.html#menu');
     await psw.waitForSelector('.rcard');
     chk('service worker registers', await psw.evaluate(async () => {
       if (!('serviceWorker' in navigator)) return false;
       const reg = await navigator.serviceWorker.ready;
       return !!reg.active;
     }));
-    /* Give the install-time precache a beat to finish writing. */
-    await psw.waitForTimeout(800);
-    await ctxSW.setOffline(true);
-    await psw.reload();
-    await psw.waitForSelector('.rcard', { timeout: 10000 });
-    chk('offline reload still serves the whole book',
-      await psw.locator('.rcard').count() >= 40);
-    await psw.locator('.rcard').first().click();
-    await psw.waitForSelector('.r-title', { timeout: 8000 });
-    chk('and a recipe opens, offline, with its ingredients',
-      await psw.locator('.ing-row, .ingrow, [data-act="ing"]').count() > 0 ||
-      (await psw.locator('#main-content').textContent()).length > 100);
-    await ctxSW.setOffline(false);
-    /* R6 — repeat visits must actually ride the worker, not merely survive
-       without the network: on an online reload, the shell's resources show
-       a service-worker hop in their timing (workerStart > 0). */
-    await psw.goto(B + '/index.html#menu');
+    await psw.waitForTimeout(900);          // let the precache finish
+    await psw.reload();                     // second load: the worker takes control
     await psw.waitForSelector('.rcard');
     chk('repeat visits are served through the worker', await psw.evaluate(() => {
-      const e = performance.getEntriesByType('resource')
-        .find(r => r.name.endsWith('/app.js'));
+      const e = performance.getEntriesByType('resource').find(r => r.name.endsWith('/app.js'));
       return !!e && e.workerStart > 0;
     }));
+
+    /* R9 — the recipes are DATA, not shell: a book published an hour ago
+       must appear on the next open, not the one after. Doctoring the
+       worker's own cache proves which copy wins, without a network. */
+    const doctor = async () => psw.evaluate(async () => {
+      const c = await caches.open('kt-shell-v2');
+      await c.put('/recipes.json', new Response(JSON.stringify([{ id: 'stale-sentinel',
+        title: 'Stale Sentinel Loaf', category: 'Baking', contributor: 'Joan', servings: 4,
+        ingredients: ['1 cup flour'], steps: ['Bake.'] }]),
+        { headers: { 'content-type': 'application/json' } }));
+    });
+    await doctor();
+    await psw.reload();
+    await psw.waitForSelector('.rcard');
+    chk('online, a freshly published book beats the cached one',
+      await psw.locator('.rcard__title', { hasText: 'Stale Sentinel Loaf' }).count() === 0);
+
+    /* Now the outage: the server is gone, not merely emulated away. */
+    await doctor();
+    await new Promise(r => srv.close(r));
+    await psw.reload();
+    await psw.waitForSelector('.rcard', { timeout: 15000 });
+    chk('with the server gone, the whole app still loads from the worker',
+      await psw.locator('.rcard').count() >= 1);
+    chk('and the cached book is what it serves',
+      await psw.locator('.rcard__title', { hasText: 'Stale Sentinel Loaf' }).count() === 1);
+    await psw.locator('.rcard').first().click();
+    await psw.waitForSelector('.r-title', { timeout: 8000 });
+    chk('a recipe still opens with the server down',
+      (await psw.locator('#main-content').textContent()).length > 60);
     await ctxSW.close();
   }
 

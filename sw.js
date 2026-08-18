@@ -15,7 +15,7 @@
  */
 "use strict";
 
-const CACHE = "kt-shell-v1";
+const CACHE = "kt-shell-v2";
 const SHELL = [
   "./",
   "index.html",
@@ -67,6 +67,30 @@ self.addEventListener("fetch", (ev) => {
           return res;
         })
         .catch(() => caches.match("index.html", { cacheName: CACHE }))
+    );
+    return;
+  }
+
+  /* The recipes themselves are DATA, not shell: a recipe published an hour
+   * ago must appear on the next open, not the one after. Network-first
+   * with the cache as fallback keeps the book both current and offline —
+   * the shell below stays cache-first, so the page still paints instantly
+   * while this one request settles. */
+  if (url.pathname.endsWith("/recipes.json")) {
+    /* Matched and stored by URL string, not by Request: the app asks for
+     * the book with `cache: "no-cache"`, and a Request carrying that mode
+     * does not reliably match a stored entry — the offline fallback has
+     * to be exact about what it looks up. */
+    ev.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(url.pathname, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.open(CACHE).then((c) => c.match(url.pathname)))
     );
     return;
   }
