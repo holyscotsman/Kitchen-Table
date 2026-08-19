@@ -908,7 +908,8 @@
 
     h += '<p class="main__intro">Every recipe the family cooks, in one place — ' +
          "search it, scale it to however many you're feeding, and tick off the " +
-         "ingredients as you go.</p>";
+         "ingredients as you go. " +
+         '<a class="main__help" href="#help">How to use it</a></p>';
 
     h += '<div class="searchwrap">' +
          '<span class="searchwrap__icon">' + I.search() + "</span>" +
@@ -2097,6 +2098,112 @@
   }
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* ======================================================================
+     10c. How to use it
+
+     Written for the person holding the phone, not for whoever built this:
+     plain sentences, one idea each, in the order someone actually meets
+     them. It lives inside the app on purpose — a help page on a website
+     somewhere is no use to a person standing at the hob. It inherits
+     everything else: the typeface, the text-size stepper, Easy Read.
+     ====================================================================== */
+
+  function viewHelp() {
+    var h = "";
+    h += '<header class="rhead"><div class="rhead__inner">' +
+         '<a class="backlink press" href="#">' + I.chevL() + "Home</a>" +
+         '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
+
+    h += '<div class="help" id="main-content">';
+    h += '<h1 class="help__h1">How to use it</h1>';
+    h += '<p class="help__lead">Everything here is a tap. Nothing you press ' +
+         "can break the book — and anything you change on your own phone can " +
+         "be put back.</p>";
+
+    var sections = [
+      ["Finding a recipe",
+       ["Type in the search box on the front page. It looks inside the " +
+        "recipes too, so “bacon” finds anything with bacon in it, not just " +
+        "recipes with bacon in the name.",
+        "Spelling doesn’t have to be perfect, and accents don’t matter — " +
+        "“creme” finds crème.",
+        "Or browse: tap a person to see their recipes, or a course like " +
+        "Dinner or Baking. <strong>View all recipes</strong> shows the lot."]],
+
+      ["Making the writing bigger",
+       ["On the All recipes screen, tap <strong>Aa</strong> at the top. " +
+        "<strong>A−</strong> and <strong>A+</strong> step the size up and " +
+        "down, and it stays that way until you change it again.",
+        "In the same place there’s <strong>Easy Read</strong>. It makes " +
+        "everything larger and plainer, with no faint grey writing anywhere.",
+        "The sun/moon button switches between the dark and light look."]],
+
+      ["Cooking from a recipe",
+       ["<strong>Servings</strong> at the top: press − or + and every amount " +
+        "changes with it. Cooking for two instead of six? Press it twice and " +
+        "the recipe does the sums.",
+        "<strong>Tap any ingredient or step to tick it off</strong> while " +
+        "you cook. The ticks clear themselves when you leave the recipe — " +
+        "they’re for this once, not forever.",
+        "<strong>Keep screen on while cooking</strong> stops the phone going " +
+        "dark with your hands covered in flour.",
+        "<strong>Share</strong> sends it to Notes or a message. " +
+        "<strong>Download</strong> gives you a clean printable page — at " +
+        "whatever servings you’ve set."]],
+
+      ["Planning the week",
+       ["<strong>Plan the week</strong> on the front page gives you seven " +
+        "days. Tap a day, search, tap a recipe — that’s it planned.",
+        "Each meal can have its own servings, so Tuesday for four and " +
+        "Sunday for twelve is no trouble.",
+        "There’s a shopping list underneath, and the week prints as a plain " +
+        "list for the fridge door."]],
+
+      ["Adding a recipe",
+       ["<strong>Add recipe</strong> at the bottom of the All recipes " +
+        "screen. Four ways in:",
+        "<strong>Type it in</strong> — a blank form, for one you know by heart.",
+        "<strong>From a link</strong> — paste a recipe page’s address and it " +
+        "reads the page for you.",
+        "<strong>From a photo</strong> — photograph a recipe card. The " +
+        "reading happens on your phone; the picture never leaves it. It will " +
+        "misread some words.",
+        "<strong>From a video</strong> — paste a YouTube or Instagram link " +
+        "and the family’s server writes it up. It takes a few minutes and " +
+        "<em>you don’t have to wait</em> — close the app, and the draft will " +
+        "be waiting on the Add screen when you come back.",
+        "All four end at the same page, where you check it over before " +
+        "saving. Anything the app wasn’t sure about is listed under " +
+        "<strong>Worth double-checking</strong> — that list is the app being " +
+        "honest, not being broken."]],
+
+      ["Changing a recipe",
+       ["Open it and turn on the <strong>Edit</strong> switch at the top. " +
+        "Change what you like and press Save.",
+        "<strong>Your changes live on your phone only.</strong> Nobody else " +
+        "sees them until they’re published.",
+        "To make them real for everyone: press <strong>Download updated " +
+        "recipes.json</strong> and send that file to Jason. If you added " +
+        "photos, press <strong>Download photos</strong> too.",
+        "Changed your mind about everything? <strong>Undo all my changes on " +
+        "this phone</strong> puts it all back the way it was published."]]
+    ];
+
+    h += sections.map(function (sec) {
+      return '<section class="help__sec"><h2 class="help__h2">' + esc(sec[0]) +
+             "</h2><ul class=\"help__list\">" +
+             sec[1].map(function (line) { return "<li>" + line + "</li>"; }).join("") +
+             "</ul></section>";
+    }).join("");
+
+    h += '<p class="help__foot">Still stuck? Ask Jason — and if something ' +
+         "here is confusing, that’s worth saying out loud. The app can be " +
+         "changed; you shouldn’t have to work around it.</p>";
+    h += '<a class="bigbtn press" href="#">Back to the recipes</a>';
+    h += "</div>";
+    return h;
+  }
 
   function viewPlan() {
     var h = "";
@@ -3621,6 +3728,7 @@
     if (!raw || raw === "main") return { name: "main", id: "" };
     if (raw === "add") return { name: "add", id: "" };
     if (raw === "plan") return { name: "plan", id: "" };
+    if (raw === "help") return { name: "help", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
       var who = [], cats = [], tags = [];
@@ -3662,6 +3770,7 @@
     if (S.route.name === "menu") return "Menu — Kitchen Table";
     if (S.route.name === "add") return "Add a recipe — Kitchen Table";
     if (S.route.name === "plan") return "This week — Kitchen Table";
+    if (S.route.name === "help") return "How to use it — Kitchen Table";
     if (S.route.name === "recipe") {
       var r = byId(S.route.id);
       return (r ? r.title + " — " : "") + "Kitchen Table";
@@ -3860,6 +3969,8 @@
       html = viewAdd();
     } else if (S.route.name === "plan") {
       html = viewPlan();
+    } else if (S.route.name === "help") {
+      html = viewHelp();
     } else if (S.route.name === "recipe") {
       var r = byId(S.route.id);
       html = r

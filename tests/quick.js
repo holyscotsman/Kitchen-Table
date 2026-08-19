@@ -70,6 +70,35 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   console.log('\n== Tap targets ==');
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
+  console.log('\n== How to use it (the help screen) ==');
+  await p.goto(B+'/index.html');
+  await p.waitForSelector('.main__title');
+  chk('the front page offers help', await p.locator('.main__help').count()===1);
+  await p.click('.main__help');
+  await p.waitForSelector('.help');
+  chk('route is #help', p.url().endsWith('#help'), p.url());
+  chk('one h1', await p.locator('.help h1').count()===1);
+  chk('document title names the screen', (await p.title())==='How to use it — Kitchen Table', await p.title());
+  chk('it covers the six things people actually do',
+    await p.locator('.help__sec').count()===6, String(await p.locator('.help__sec').count()));
+  chk('no horizontal scroll at 390px', await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+  const helpSmall = await p.evaluate(()=>{
+    const bad=[];
+    document.querySelectorAll('.help a[href], .help button, header a[href], header button').forEach(el=>{
+      const r=el.getBoundingClientRect();
+      if (r.height>0 && r.height<44) bad.push((el.className||el.id)+' h='+r.height.toFixed(1));
+    });
+    return bad;
+  });
+  chk('nothing interactive under 44px', helpSmall.length===0, helpSmall.join(', '));
+  chk('a way back to the recipes', await p.locator('.help a[href="#"]').count()>=1);
+  /* It must grow with the reader like every other screen. */
+  await p.evaluate(()=>{localStorage.setItem('kt.easyRead','true');localStorage.setItem('kt.fsIndex','4');});
+  await p.reload(); await p.waitForSelector('.help');
+  chk('survives Easy Read at the largest text', await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+  await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
+  await p.reload(); await p.waitForSelector('.help');
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
 
   await p.goto(B+'/index.html'); await p.waitForSelector('.main__title'); await p.waitForTimeout(300);
