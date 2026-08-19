@@ -42,6 +42,7 @@ const CONTRAST = `(() => {
       ['Add from a link','#add','[data-key="link"]'],
       ['Add from a photo','#add','[data-key="photo"]'],
       ['Add from a video','#add','[data-key="video"]'],
+      ['How to use it','#help',''],
     ]){
       const ctx=await br.newContext({...devices['iPhone 13']});
       /* Hermetic: the kitchen server is never poked from CI — the app's

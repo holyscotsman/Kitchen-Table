@@ -50,6 +50,10 @@ Navigation is hash-based, so back and forward work normally.
 - `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
   `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.
+- `#help` — **How to use it.** The family-facing walkthrough, in the app
+  rather than in a file: finding, reading, cooking, planning, adding and
+  changing a recipe. Reached from the link in the front page's one-line
+  explanation.
 
 ## Reading a recipe
 
