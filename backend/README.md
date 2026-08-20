@@ -26,6 +26,9 @@ because this folder didn't exist yet. With this code on the deployed branch:
    - `ANTHROPIC_API_KEY` — from console.anthropic.com.
    - `GROQ_API_KEY` — from console.groq.com (free). Optional but wanted:
      without it, videos with no captions get read from on-screen text only.
+   - `KT_DAY_CAP` — optional. Video imports allowed in any 24 hours,
+     default 40. It exists to bound what the keys above can be made to
+     spend; family use never reaches it.
    - `YT_API_KEY` — optional but strongly wanted: **this is what rescues
      YouTube imports the robot wall blocks** (see below). Free, ~2 minutes:
      console.cloud.google.com → create a project (any name) → APIs &
@@ -103,7 +106,7 @@ Docker (tools baked in; build from the **repo root** — the server applies
 | Route | What it does |
 |---|---|
 | `GET /api/health` | `{ok, uptime_s, queue_pending}` — also the wake-up ping |
-| `POST /api/import/video` `{url, contributor?}` | validates YouTube/Instagram, inserts a `queued` job, returns `{job_id}` immediately |
+| `POST /api/import/video` `{url, contributor?}` | validates YouTube/Instagram, inserts a `queued` job, returns `{job_id}` immediately — refuses with 429 past 40 imports in 24 hours (`KT_DAY_CAP`) |
 | `GET /api/import/jobs/:id` | status, human stage label, `eta_seconds`, `overrun`, and `result_json` once ready |
 | `GET /api/import/jobs?status=ready_for_review` | finished imports awaiting review (the Add screen's badge) |
 | `GET /api/import/jobs?status=failed` | recent failures (3 days, capped at 20) so an import that died unwatched is still owed a sentence |
@@ -129,3 +132,17 @@ go through the same validation as `db/migrate.js`, and an id collision
 suffixes rather than overwrites, so nothing can be silently replaced. If
 real access control is ever wanted, that's the gameplan's backend-gate
 conversation, not a patch here.
+
+**What bounds the bill** is separate, and worth saying plainly, because
+every other limit here bounds a *burst* rather than a total: 120 requests
+a minute per address, eight jobs queued at once. None of those stops a
+patient stranger submitting one link every thirty seconds forever, and
+each import spends real money on the keys in Render's dashboard. So a
+day's importing is capped — **40 in any 24 hours**, counted in the
+database (an in-memory tally would reset on every spin-down and forgive
+anyone willing to wait). `KT_DAY_CAP` moves it. Past the cap the answer
+is a plain sentence pointing at the two ways in that never touch the
+server at all — typing a recipe in, and importing from a photo — and the
+importer opens again as the day rolls forward. A count the server cannot
+read lets the import through: this wall is for a stranger's spending, not
+for the server's own confusion.

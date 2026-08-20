@@ -22,6 +22,7 @@ const { parseVideoUrl, validateRecipe } = require("./lib/validate");
 const { LABEL, estimate } = require("./lib/eta");
 const { serialQueue } = require("./lib/queue");
 const { makeLimiter } = require("./lib/ratelimit");
+const budget = require("./lib/budget");
 const db = require("./lib/db");
 const { runJob } = require("./lib/pipeline");
 
@@ -160,6 +161,14 @@ async function postVideo(req, res) {
   if (queue.size() >= MAX_QUEUE) {
     return send(res, 429, { error: "The kitchen is busy right now — try again in a few minutes." });
   }
+  /* The queue bounds how much runs at once; this bounds what a day can
+   * cost. Counted in the database because the free tier spins down, and an
+   * in-memory tally would forgive anyone patient enough to wait it out. */
+  const usedToday = await sql`
+    select count(*)::int as n from kitchen.import_jobs
+     where created_at > now() - interval '24 hours'`;
+  const capped = budget.dayCapMessage(usedToday[0] && usedToday[0].n);
+  if (capped) return send(res, 429, { error: capped });
   const contributor = typeof body.contributor === "string"
     ? body.contributor.trim().slice(0, 60) : null;
   const rows = await sql`
