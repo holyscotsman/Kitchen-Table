@@ -341,6 +341,33 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()>=1);
   chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
 
+  console.log('\n== Back from a recipe returns the list you left (R22) ==');
+  await p.goto(B+'/index.html#menu?cat=Desserts');
+  await p.waitForSelector('.rcard');
+  const dessertCount = await p.locator('.rcard').count();
+  await p.locator('.rcard').first().click();
+  await p.waitForSelector('.r-title');
+  chk('the way back carries the filtered list, not a bare menu',
+    (await p.getAttribute('.backlink', 'href')) === '#menu?cat=Desserts',
+    await p.getAttribute('.backlink', 'href'));
+  await p.click('.backlink');
+  await p.waitForSelector('.rcard');
+  chk('and it lands on that list', await p.locator('.rcard').count() === dessertCount,
+    String(await p.locator('.rcard').count()));
+  chk('with the address still agreeing', /cat=Desserts/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  chk('so a reload from there keeps it', await p.locator('.rcard').count() === dessertCount);
+  /* Arriving from Main, where there is no list to return to, is unchanged. */
+  await p.goto(B+'/index.html#menu');
+  await p.waitForSelector('.rcard');
+  await p.goto(B+'/index.html#chicken-cordon-bleu');
+  await p.waitForSelector('.r-title');
+  chk('an unfiltered visit still just says Menu',
+    (await p.getAttribute('.backlink', 'href')) === '#menu',
+    await p.getAttribute('.backlink', 'href'));
+
   console.log('\n== The status-bar pad is the device\'s, not a guess (R20) ==');
   {
     /* The design reference pads the top of every screen on narrow widths to
