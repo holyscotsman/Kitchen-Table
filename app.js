@@ -3,7 +3,9 @@
 
    Plain ES2018, no build step, no framework. A hash router over three screens:
      #            → Main
-     #menu        → Menu   (#menu?who=Joan / #menu?cat=Dinner pre-filter it)
+     #menu        → Menu   (?who= / ?cat= / ?tag= / ?sort= describe the list;
+                            repeated keys multi-select, and the screen writes
+                            its own state back with replaceState)
      #<recipe-id> → Recipe
 
    Rendering is a full re-render of the active screen into #app on every state
@@ -3741,16 +3743,50 @@
     if (raw === "help") return { name: "help", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
-      var who = [], cats = [], tags = [];
+      var who = [], cats = [], tags = [], sort = "";
       qs.split("&").forEach(function (pair) {
         var kv = pair.split("=");
-        if (kv[0] === "who" && kv[1]) who = [decodeURIComponent(kv[1])];
-        if (kv[0] === "cat" && kv[1]) cats = [decodeURIComponent(kv[1])];
-        if (kv[0] === "tag" && kv[1]) tags = [decodeURIComponent(kv[1])];
+        var v = kv[1] ? decodeURIComponent(kv[1]) : "";
+        if (!v) return;
+        /* Repeated, not replaced: the filters are multi-select, so an
+           address that could only carry one of each described a list the
+           Menu was never actually showing. */
+        if (kv[0] === "who" && who.indexOf(v) < 0) who.push(v);
+        if (kv[0] === "cat" && cats.indexOf(v) < 0) cats.push(v);
+        if (kv[0] === "tag" && tags.indexOf(v) < 0) tags.push(v);
+        if (kv[0] === "sort" && SORTS.some(function (x) { return x.key === v; })) sort = v;
       });
-      return { name: "menu", id: "", who: who, cats: cats, tags: tags };
+      return { name: "menu", id: "", who: who, cats: cats, tags: tags, sort: sort };
     }
     return { name: "recipe", id: decodeURIComponent(raw) };
+  }
+
+  /* The address the Menu is currently showing. Filtering and sorting are not
+     navigation — they are a lens on one screen — so this is written with
+     replaceState: the address always describes what is on the page (so it can
+     be shared, bookmarked, and survive a reload) while Back keeps its plain
+     meaning of "the screen I came from" instead of unwinding twenty chip taps
+     one at a time. Clearing is the way out of a filter, and it is right there
+     in the sheet. The default sort is left out — an address should carry what
+     you chose, not what you were given. */
+  function menuHash() {
+    var q = [];
+    S.who.forEach(function (w) { q.push("who=" + encodeURIComponent(w)); });
+    S.cats.forEach(function (c) { q.push("cat=" + encodeURIComponent(c)); });
+    S.tags.forEach(function (t) { q.push("tag=" + encodeURIComponent(t)); });
+    if (S.sort !== "recent") q.push("sort=" + encodeURIComponent(S.sort));
+    return "#menu" + (q.length ? "?" + q.join("&") : "");
+  }
+
+  function syncMenuHash() {
+    if (S.route.name === "menu") {
+      var h = menuHash();
+      if (h !== location.hash) {
+        try { history.replaceState(null, "", h); }
+        catch (e) { /* a browser that won't rewrite the address still filters */ }
+      }
+    }
+    render();
   }
 
   /* Scroll position per route. Coming back to the Menu from a recipe should
@@ -3808,6 +3844,11 @@
     var changedRoute = routeKey(next) !== routeKey(S.route);
 
     if (next.name === "menu") {
+      /* Sort travels with the filters, and resets with them: a bare #menu
+         means the whole menu, most recent first. Returning from a recipe
+         keeps what you had, same as the filters do. */
+      if (next.sort) S.sort = next.sort;
+      else if (S.route.name !== "recipe") S.sort = "recent";
       if (next.who.length || next.cats.length || next.tags.length) {
         S.who = next.who;
         S.cats = next.cats;
@@ -4075,46 +4116,40 @@
     if (act === "open-filter") { openSheet("filterOpen", el); return; }
     if (act === "close-filter") { closeSheet("filterOpen"); return; }
     if (act === "toggle-sort") { S.sortOpen = !S.sortOpen; render(); return; }
-    if (act === "sort") { S.sort = key; S.sortOpen = false; render(); return; }
+    if (act === "sort") { S.sort = key; S.sortOpen = false; syncMenuHash(); return; }
     if (act === "fw") {
       var iw = S.who.indexOf(key);
       if (iw > -1) S.who.splice(iw, 1); else S.who.push(key);
-      render(); return;
+      syncMenuHash(); return;
     }
     if (act === "fc") {
       var ic = S.cats.indexOf(key);
       if (ic > -1) S.cats.splice(ic, 1); else S.cats.push(key);
-      render(); return;
+      syncMenuHash(); return;
     }
     if (act === "ft") {
       var it = S.tags.indexOf(key);
       if (it > -1) S.tags.splice(it, 1); else S.tags.push(key);
-      render(); return;
+      syncMenuHash(); return;
     }
-    /* Clearing filters has to drop them from the address too. Otherwise the
-       list shows everything while the URL still says ?who=…, and a reload or a
-       shared link quietly re-applies it. */
-    function dropFilterParams() {
-      if (/^#menu\?/.test(location.hash)) {
-        location.hash = "#menu";
-        return true;
-      }
-      return false;
-    }
+    /* Clearing drops the filters from the address as well as from the list —
+       otherwise the list shows everything while the URL still says ?who=…,
+       and a reload or a shared link quietly re-applies it. Same replaceState
+       as applying them, so clearing doesn't leave a Back step behind either. */
     if (act === "reset-filters") {
       S.who = []; S.cats = []; S.tags = [];
-      if (!dropFilterParams()) render();
+      syncMenuHash();
       return;
     }
     if (act === "clear-filters") {
       S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
-      if (!dropFilterParams()) render();
+      syncMenuHash();
       return;
     }
     if (act === "show-all") {
       S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
       S.searchOpen = false;
-      if (!dropFilterParams()) render();
+      syncMenuHash();
       return;
     }
     if (act === "toggle-remove") {

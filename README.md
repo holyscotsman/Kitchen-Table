@@ -48,7 +48,12 @@ Navigation is hash-based, so back and forward work normally.
   finds crème) and one mistyped letter is forgiven. When a result matched
   something not visible on its card, the card says so — "matches ingredient".
 - `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
-  `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered.
+  `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered, and
+  filtering or sorting from inside the screen writes the same address back —
+  repeated for multi-select (`?cat=Sides&cat=Desserts`), plus `?sort=az` when
+  the sort isn't the default. So a filtered list can be shared, bookmarked and
+  reloaded. It's written with `replaceState`: the address describes what's on
+  screen without turning twenty chip taps into twenty presses of Back.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.
 - `#help` — **How to use it.** The family-facing walkthrough, in the app
   rather than in a file: finding, reading, cooking, planning, adding and

@@ -118,6 +118,65 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('A-Z sort applied', first.startsWith('Air Fryer') || first < 'B', first);
   chk('sort label updated', (await p.locator('.toolbtn--sort').textContent()).includes('Name A – Z'));
 
+  console.log('\n== The address says what you are looking at (R18) ==');
+  await p.goto(B+'/index.html#menu');
+  await p.waitForSelector('.rcard');
+  await p.click('[data-act="open-filter"]');
+  await p.waitForSelector('#filter-sheet');
+  await p.click('[data-act="fc"][data-key="Desserts"]');
+  await p.waitForTimeout(200);
+  chk('choosing a filter writes it into the address',
+    /[?&]cat=Desserts/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.click('[data-act="fc"][data-key="Sides"]');
+  await p.waitForTimeout(200);
+  chk('two of the same kind both survive the trip',
+    /cat=Desserts/.test(await p.evaluate(()=>location.hash)) &&
+    /cat=Sides/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.click('.donebtn');
+  await p.waitForTimeout(200);
+  const twoCats = await p.locator('.rcard').count();
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  chk('and a reload lands on the same list, not on everything',
+    await p.locator('.rcard').count()===twoCats && twoCats < 48, String(twoCats));
+  chk('the filter count survives with it',
+    (await p.locator('.badge').textContent())==='2');
+  await p.click('[data-act="toggle-sort"]');
+  await p.waitForSelector('.sortmenu');
+  await p.click('[data-act="sort"][data-key="az"]');
+  await p.waitForTimeout(200);
+  chk('sort is in the address too',
+    /[?&]sort=az/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  chk('and survives a reload', (await p.locator('.toolbtn--sort').textContent()).includes('Name A – Z'));
+  chk('the default sort is not written into the address',
+    !/sort=recent/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  // Filtering is not navigation: twenty chip taps must not become twenty
+  // presses of Back before you can leave the Menu.
+  const backSteps = await p.evaluate(()=>history.length);
+  await p.click('[data-act="open-filter"]');
+  await p.waitForSelector('#filter-sheet');
+  await p.click('[data-act="fc"][data-key="Breakfast"]');
+  await p.waitForTimeout(200);
+  await p.click('[data-act="fc"][data-key="Breakfast"]');
+  await p.waitForTimeout(200);
+  chk('filtering never piles up history entries',
+    await p.evaluate(()=>history.length) === backSteps,
+    backSteps + ' → ' + await p.evaluate(()=>history.length));
+  await p.click('.donebtn');
+  await p.waitForTimeout(150);
+  await p.click('[data-act="clear-filters"]');
+  await p.waitForTimeout(250);
+  chk('clearing empties the address as well as the list',
+    await p.locator('.rcard').count()===48 &&
+    !/cat=/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+
   console.log('\n== Deep link pre-filter from Main ==');
   await p.goto(B+'/index.html#menu?cat=Desserts');
   await p.waitForSelector('.rcard');
