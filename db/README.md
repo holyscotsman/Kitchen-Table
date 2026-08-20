@@ -19,6 +19,9 @@ npm install @neondatabase/serverless      # once
 # Push recipes.json into the database (idempotent — re-run to sync edits in)
 KT_DB='postgres://…' node db/migrate.js
 
+# …and remove from the database anything the file no longer has
+KT_DB='postgres://…' node db/migrate.js --prune
+
 # Compare the two without changing anything
 KT_DB='postgres://…' node db/export.js --check
 
@@ -44,6 +47,26 @@ shrinkage (someone removed a recipe on purpose); losing more than a third in
 one sync is not, and `--force` exists for the day it genuinely is. With no
 readable `recipes.json` to compare against, the guard has nothing to say and
 stands aside.
+
+## Removing a recipe (read this before wondering why one came back)
+
+`migrate.js` only ever **upserts**. That is the safe direction — a truncated
+`recipes.json` can never empty the database — and it has one consequence
+worth knowing before it surprises somebody:
+
+**A recipe removed from `recipes.json` stays in the database, and the nightly
+sync writes it straight back into the file.** It is the same shape as the bug
+the app fixed once at the overlay layer (a removed recipe reappearing on the
+next load), one layer up.
+
+So every run of `migrate.js` now names what the database holds that the file
+does not, and says which of the two things it probably is:
+
+- **recipes someone removed** — re-run with `--prune` to remove them here too
+- **a video import the server just accepted** — normal, and the sync is about
+  to publish them; pruning would throw away exactly what the server took in
+
+Pruning is never the default for precisely that second case.
 
 ## What the database is, and isn't, today
 

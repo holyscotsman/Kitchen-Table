@@ -219,6 +219,15 @@ The consequence, worth stating: once a device has local changes, recipes added
 to the published `recipes.json` will not appear there until those changes are
 downloaded and committed, or discarded with "Undo all my changes on this phone".
 
+**The same bug had a second home, found in `R28`.** `db/migrate.js` only ever
+upserts, so a recipe removed from `recipes.json` stays in the database — and
+the nightly `db-sync` writes it back into the file. Removal now has to be said
+in both places: commit the shorter file, then `node db/migrate.js --prune`.
+Migrate names the orphans on every run either way, because silence there is
+exactly how a removed recipe reappears. Pruning is never automatic: a row in
+the database that isn't in the file yet is the *normal* state between
+accepting a video import and the next sync.
+
 ### Undo
 
 Edit mode writes only to `kt.recipes`, and there is no other undo — a removed
@@ -357,9 +366,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **630 functional checks** across eleven
+The suite after the video arc: **637 functional checks** across eleven
 suites (kt 118, feat 59, add 74, relay 16, quick 32, polish 67, sec 36,
-plan 27, video 51, backend 140, zoom 10), plus the perf budget (FCP ~900 ms
+plan 27, video 51, backend 147, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

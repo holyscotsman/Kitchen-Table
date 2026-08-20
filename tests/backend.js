@@ -322,6 +322,33 @@ const { runJob, computeFps } = lib('pipeline');
       appOrder.join(',') + ' vs ' + xp.FIELD_ORDER.join(','));
   }
 
+  console.log('\n== R28: a removed recipe must not walk back in ==');
+  {
+    /* The bug CLAUDE.md records fixing once at the overlay layer, waiting one
+       layer up for the database era: migrate.js only ever upserts, so a
+       recipe removed from recipes.json stays in the database — and the
+       nightly sync writes it straight back into the file. */
+    const mg = require(path.join(__dirname, '..', 'db', 'migrate.js'));
+    chk('a recipe dropped from the file is reported as an orphan',
+      mg.orphanIds(['a', 'b'], ['a', 'b', 'gone']).join(',') === 'gone');
+    chk('a database with nothing extra reports nothing',
+      mg.orphanIds(['a', 'b'], ['a', 'b']).length === 0);
+    chk('and a file with something new is not an orphan in either direction',
+      mg.orphanIds(['a', 'b', 'fresh'], ['a', 'b']).length === 0);
+    chk('several at once, in the database\'s own order',
+      mg.orphanIds(['b'], ['a', 'b', 'c']).join(',') === 'a,c');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrate.js'), 'utf8');
+    chk('pruning is never the default — it is a flag someone types',
+      /--prune/.test(src) && /argv\.includes\('--prune'\)/.test(src));
+    chk('and the orphans are named out loud whether or not they are pruned',
+      /orphan/i.test(src) && /console\.log/.test(src));
+    chk('a delete only ever happens inside the prune branch',
+      (src.match(/delete from kitchen\.recipes\b/g) || []).length === 1 &&
+      src.indexOf('delete from kitchen.recipes\n') === -1 ||
+      /prune/.test(src.slice(Math.max(0, src.indexOf('delete from kitchen.recipes') - 600),
+        src.indexOf('delete from kitchen.recipes'))));
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {

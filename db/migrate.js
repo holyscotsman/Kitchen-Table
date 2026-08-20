@@ -19,6 +19,26 @@ const CATS = ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Sides',
 
 function die(msg) { console.error('MIGRATION STOPPED: ' + msg); process.exit(1); }
 
+/* Ids the database holds that the file no longer does.
+ *
+ * migrate.js only ever upserts, which is the safe direction — a truncated
+ * recipes.json can never empty the database. The cost of that safety is this:
+ * a recipe REMOVED from the file stays in the database, and db-sync writes it
+ * straight back into the file overnight. It is the same bug the app already
+ * fixed once at the overlay layer (CLAUDE.md: "an earlier version merged it
+ * id by id, which meant a removed recipe came back on the next load"), one
+ * layer up.
+ *
+ * Not pruned by default, deliberately: a row in the database that is not yet
+ * in the file is the NORMAL state between accepting a video import and the
+ * next sync, and deleting those would throw away exactly the recipes the
+ * server just took in. So the orphans are always named, and removing them is
+ * something a person types. */
+function orphanIds(fileIds, dbIds) {
+  const have = new Set(fileIds);
+  return dbIds.filter(id => !have.has(id));
+}
+
 function validate(list) {
   if (!Array.isArray(list)) die('recipes.json is not an array');
   const seen = new Set();
@@ -42,7 +62,7 @@ function validate(list) {
   return { emptyIng };
 }
 
-(async () => {
+async function main() {
   if (!process.env.KT_DB) die('set KT_DB to the Postgres connection string');
   const file = path.join(__dirname, '..', 'recipes.json');
   const list = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -107,13 +127,41 @@ function validate(list) {
     }
   }
 
+  /* What the database is holding that the file is not. Named every run,
+     because silence here is how a removed recipe reappears. */
+  const dbIds = (await sql`select id from kitchen.recipes order by position`)
+    .map(r => r.id);
+  const orphans = orphanIds(list.map(r => r.id), dbIds);
+  if (orphans.length && process.argv.includes('--prune')) {
+    for (const id of orphans) {
+      await sql`delete from kitchen.recipe_tags where recipe_id = ${id}`;
+      await sql`delete from kitchen.recipes where id = ${id}`;
+    }
+  }
+
   const [{ count }] = await sql`select count(*)::int as count from kitchen.recipes`;
   console.log(`Imported/updated ${upserts} recipes; database now holds ${count}.`);
   console.log(`Tag links written: ${tagLinks}.`);
+  if (!orphans.length) {
+    console.log('In the database but not in the file: none.');
+  } else if (process.argv.includes('--prune')) {
+    console.log(`Pruned ${orphans.length} recipe(s) the file no longer has: ${orphans.join(', ')}.`);
+  } else {
+    console.log(`In the database but NOT in recipes.json (${orphans.length}): ${orphans.join(', ')}.`);
+    console.log('  These will be written back into recipes.json by the next db-sync.');
+    console.log('  If they are recipes someone removed, re-run with --prune to remove them here too.');
+    console.log('  If they arrived from a video import, this is normal — the sync is about to publish them.');
+  }
 
   /* 099 — the audit the migration doubles as. When the content pass (072)
      lands, this line reads "none" and that is its proof. */
   console.log(emptyIng.length
     ? `Empty ingredient lists (${emptyIng.length}): ${emptyIng.join(', ')} — the 072 worklist.`
     : 'Empty ingredient lists: none.');
-})().catch(e => die(String(e)));
+}
+
+module.exports = { orphanIds, validate, CATS };
+
+if (require.main === module) {
+  main().catch(e => die(String(e)));
+}
