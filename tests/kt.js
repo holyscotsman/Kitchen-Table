@@ -122,6 +122,34 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('A-Z sort applied', first.startsWith('Air Fryer') || first < 'B', first);
   chk('sort label updated', (await p.locator('.toolbtn--sort').textContent()).includes('Name A – Z'));
 
+  console.log('\n== The How-To teaches what the app actually does (R33) ==');
+  {
+    await p.goto(B+'/index.html#help');
+    await p.reload();
+    await p.waitForSelector('.help__h1');
+    const help = (await p.locator('#main-content').textContent()).toLowerCase();
+    /* R15 made the servings number typeable precisely because 4 → 40 was
+       thirty-six taps. The person most likely to open the How-To is the
+       person that punished most, and it was still teaching only the ± pair. */
+    /* Scoped to the paragraph that is actually about servings — "type" alone
+       matches "Type it in" three sections further down. */
+    const servPara = (await p.locator('#main-content li, #main-content p')
+      .filter({ hasText: 'Servings' }).first().textContent()).toLowerCase();
+    chk('it says the servings number can be typed',
+      /type/.test(servPara) && /tap/.test(servPara), servPara.slice(0, 80));
+    chk('and it still explains the − and + for small changes',
+      help.indexOf('−') > -1 || help.indexOf('minus') > -1);
+    /* R15's other half: the keyboard's blue key opens the top match. */
+    chk('it mentions the keyboard key that opens the top match',
+      /go key|return key|blue key|search key/.test(help), '');
+    /* And what it teaches must exist — a How-To that describes a control the
+       app does not have is worse than one that says nothing. */
+    await p.goto(B+'/index.html#chicken-cordon-bleu');
+    await p.waitForSelector('.r-title');
+    chk('and the control it describes is really there',
+      await p.locator('button.servcard__value').count() === 1);
+  }
+
   console.log('\n== Finding what still needs a person (R32) ==');
   await p.goto(B+'/index.html#menu');
   await p.reload();
