@@ -239,6 +239,36 @@ const { runJob, computeFps } = lib('pipeline');
     chk('empty in, empty out', media.scrubInternal('') === '');
   }
 
+  console.log('\n== R17: a day of importing has a ceiling ==');
+  {
+    const budget = lib('budget');
+    chk('an ordinary day is never touched', budget.dayCapMessage(3, 40) === null);
+    chk('one below the cap still flows', budget.dayCapMessage(39, 40) === null);
+    chk('the cap itself refuses', typeof budget.dayCapMessage(40, 40) === 'string');
+    chk('and everything past it', typeof budget.dayCapMessage(400, 40) === 'string');
+    const msg = budget.dayCapMessage(40, 40);
+    chk('the refusal names the ways in that cost nothing',
+      /photo/i.test(msg) && /(typ|by hand)/i.test(msg), msg);
+    chk('the refusal never blames the person', !/abuse|banned|blocked/i.test(msg), msg);
+    /* Fail open, on purpose: if the count query ever answers with nonsense,
+       the family keeps their importer. The wall is against a patient
+       stranger, not against the server's own confusion. */
+    chk('a count it cannot read lets the import through',
+      budget.dayCapMessage(NaN, 40) === null && budget.dayCapMessage(undefined, 40) === null);
+    chk('the default ceiling is generous but real',
+      budget.DAY_CAP >= 20 && budget.DAY_CAP <= 100, String(budget.DAY_CAP));
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const fn = src.slice(src.indexOf('async function postVideo'), src.indexOf('async function getJob'));
+    chk('the route counts the day before it spends the day',
+      fn.indexOf('dayCapMessage') > -1 &&
+      fn.indexOf('dayCapMessage') < fn.indexOf('insert into kitchen.import_jobs'));
+    chk('the count is bounded to one day, not the whole table',
+      /interval '24 hours'/.test(fn) && /count\(\*\)/.test(fn));
+    chk('a refused import is a 429, the same language as the other walls',
+      /send\(res, 429/.test(fn));
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {
