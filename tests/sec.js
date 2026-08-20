@@ -108,6 +108,95 @@ const hostile = JSON.stringify({
   chk('ingredient line capped', firstIng.length <= 500, String(firstIng.length));
   chk('truncation is disclosed in flagged', (await p.locator('.panel--flag').textContent()).toLowerCase().includes('trimmed'));
 
+  console.log('\n== Hostile data on the surfaces the sweep never reached (R21) ==');
+  {
+    /* The block above proves the import path is inert on the title, the
+       ingredients and the steps. It never touched the fields an importer can
+       also fill — tags, contributor, notes, the times, the flags, the id
+       itself — and it never opened the Week planner at all. This puts a
+       payload in every one of them and walks every screen. */
+    const pX = await ctx.newPage();
+    let xDialogs = 0; pX.on('dialog', d => { xDialogs++; d.accept(); });
+    const xErrs = []; pX.on('pageerror', e => xErrs.push(e.message));
+    await pX.goto(B + '/index.html');
+    await pX.evaluate(() => {
+      const boom = (n) => '<img src=x onerror="window.__x' + n + '=1">';
+      const id = 'evil" onmouseover="window.__xid=1';
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: id,
+        title: 'Evil Cake ' + boom('title'),
+        category: boom('cat'),
+        contributor: boom('who'),
+        servings: 4,
+        prepTime: boom('prep'), cookTime: boom('cook'),
+        ingredients: ['1 cup ' + boom('ing')],
+        steps: ['Stir ' + boom('step')],
+        notes: boom('notes'),
+        tags: [boom('tag'), '"><script>window.__xtag2=1<\/script>'],
+        flagged: ['Servings — ' + boom('flag')],
+        source: 'javascript:window.__xsrc=1',
+        image: 'javascript:window.__ximg=1'
+      }]));
+      /* And the planner, whose entries carry their own copies. */
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('kt.plan', JSON.stringify([
+        { id: 'p1', date: today, slot: 'dinner', recipeId: id,
+          titleThen: 'Evil Cake', servings: '4' + boom('serv') },
+        { id: 'p2' + boom('pid'), date: today, slot: 'lunch',
+          recipeId: 'gone-' + boom('gone'), titleThen: 'Gone ' + boom('then'),
+          servings: 2 }
+      ]));
+    });
+    /* The seeding only counts if the app BOOTS with it: a goto that changes
+       nothing but the hash is a same-document navigation, and the overlay is
+       read once, at boot. Without this reload every check below passes
+       against the shipped book and proves nothing. */
+    await pX.reload();
+    await pX.waitForSelector('.main__title');
+    const fired = () => pX.evaluate(() =>
+      Object.keys(window).filter(k => k.indexOf('__x') === 0));
+    /* Executed is not the only failure. The CSP refuses inline handlers, so a
+       payload can be built into the DOM as a real element and still never
+       run — defence in depth working, and a hole all the same. Count the
+       elements, not just the handlers that fired. */
+    const injected = () => pX.evaluate(() =>
+      document.querySelectorAll('#app img[src="x"], #app script').length);
+    for (const [name, hash, sel] of [['Main', '#', '.main__title'],
+      ['Menu', '#menu', '.rcard'], ['Recipe', '#' + 'evil" onmouseover="window.__xid=1', '.r-title'],
+      ['Week planner', '#plan', '.dayblock']]) {
+      await pX.goto(B + '/index.html' + hash);
+      await pX.waitForSelector(sel, { timeout: 10000 });
+      await pX.waitForTimeout(250);
+      chk(name + ': nothing hostile ran', (await fired()).length === 0,
+        (await fired()).join(', '));
+      chk(name + ': and nothing hostile was even built',
+        (await injected()) === 0, String(await injected()));
+    }
+    /* The payloads must be VISIBLE as text — inert is not the same as
+       swallowed, and a family reading an imported recipe needs to see what
+       actually came in. */
+    await pX.goto(B + '/index.html#' + encodeURIComponent('evil" onmouseover="window.__xid=1'));
+    await pX.waitForSelector('.r-title');
+    chk('the tag is shown as text, not as markup',
+      (await pX.locator('.r-tags').textContent()).includes('<img'));
+    chk('the notes are shown as text',
+      (await pX.locator('#main-content').textContent()).includes('onerror'));
+    /* The meal sheet carries its own copy of the servings number, and is only
+       reachable by opening a planned meal. */
+    await pX.goto(B + '/index.html#plan');
+    await pX.waitForSelector('.dayblock');
+    await pX.click('.mealcard');
+    await pX.waitForSelector('#meal-sheet, .sheet', { timeout: 8000 });
+    chk('the meal sheet builds nothing hostile either',
+      (await injected()) === 0 && (await fired()).length === 0,
+      String(await injected()));
+    chk('no dialogs anywhere in the sweep', xDialogs === 0);
+    chk('and no screen threw', xErrs.length === 0, xErrs.join(' | '));
+    await pX.evaluate(() => { localStorage.removeItem('kt.recipes');
+      localStorage.removeItem('kt.plan'); });
+    await pX.close();
+  }
+
   /* 052 — the CSP must exist and keep its load-bearing lines. The exact
      policy lives in index.html; this guards against it being weakened or
      dropped in a refactor, not against every possible retune. */

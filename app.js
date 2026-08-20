@@ -2030,6 +2030,14 @@
     var p = load(K.plan, []);
     S.plan = Array.isArray(p) ? p.filter(function (e) {
       return e && e.date && SLOTS.indexOf(e.slot) > -1;
+    }).map(function (e) {
+      /* Servings is a number by construction, so anything else is rotten
+         data — and it is rendered, compared against 1 and 40, and printed.
+         Coerced at the boundary rather than defended against at each of
+         those, the same way the recipe overlay is (R12). */
+      var n = Math.round(Number(e.servings));
+      e.servings = n >= 1 && n <= 40 ? n : 1;
+      return e;
     }) : [];
   }
 
@@ -2105,7 +2113,7 @@
       '<span class="rcard__body">' +
       '<span class="rcard__title">' + esc(r.title) + "</span>" +
       '<span class="rcard__meta">' + esc(cap(entry.slot)) + " · serves " +
-      entry.servings + "</span></span>" +
+      esc(entry.servings) + "</span></span>" +
       '<span class="rcard__chev">' + I.chevR() + "</span></button>";
   }
 
@@ -2385,7 +2393,7 @@
       /* 125: the meal's own servings, not the recipe's default. */
       '<div class="servcard"><div class="servcard__text">' +
       '<p class="minilabel">Serving</p>' +
-      '<p class="servcard__value">' + entry.servings + " " +
+      '<p class="servcard__value">' + esc(entry.servings) + " " +
       (entry.servings === 1 ? "person" : "people") + "</p></div>" +
       '<button type="button" class="servbtn press" data-act="meal-serv-" ' +
       'aria-label="Fewer people"' + (entry.servings <= 1 ? " disabled" : "") + ">" +
