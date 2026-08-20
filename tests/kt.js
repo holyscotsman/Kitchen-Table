@@ -416,17 +416,88 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   }
   chk('nothing interactive under 44px, on any screen',
     tooSmall.length===0, tooSmall.join(', '));
+  /* R23 — four of design/a11y-criteria.md's "checked by the reviewer, by
+     hand" items are cheap to check by machine, and a reviewer's attention is
+     not a durable guarantee. These run on every screen, every time. */
+  const named = [], unlabelled = [], positive = [], loudSvg = [];
+  let inspected = 0;
+  /* Every screen AND the states you have to open to reach — the sheets, edit
+     mode and the review form are exactly where an unlabelled field hides.
+     Same list the contrast audit walks. */
+  const a11yScreens = routes.map(r => [r[0], r[1], null]).concat([
+    ['Menu + filter sheet', '#menu', '[data-act="open-filter"]'],
+    ['Menu + search open', '#menu', '[data-act="toggle-search"]'],
+    ['Menu text sheet', '#menu', '[data-act="open-text"]'],
+    ['Recipe edit', '#chicken-cordon-bleu', '[data-act="toggle-edit"]'],
+    ['Recipe download sheet', '#bacon-ranch-chicken-casserole', '[data-act="open-dl"]'],
+    ['Recipe flagged', '#chops', null],
+    ['Add review form', '#add', '[data-key="review"]'],
+    ['Add from a link', '#add', '[data-key="link"]'],
+    ['Add from a photo', '#add', '[data-key="photo"]'],
+    ['Add from a video', '#add', '[data-key="video"]']
+  ]);
+  for (const [name, hash, open] of a11yScreens) {
+    /* A full reload per screen: a sheet left open by the previous one would
+       otherwise sit over this one and swallow the click that opens it. */
+    await p.goto(B+'/index.html'+hash);
+    /* …and no half-finished import snapshot either (084): restored, it lands
+       on the review form instead of the three ways in. */
+    await p.evaluate(()=>sessionStorage.removeItem('kt.addDraft'));
+    await p.reload();
+    await p.waitForSelector('h1');
+    if (open) { await p.click(open, { timeout: 8000 }); await p.waitForTimeout(350); }
+    const bad = await p.evaluate(()=>{
+      const out = { named: [], unlabelled: [], positive: [], loudSvg: [], seen: 0 };
+      const seen = (el) => el.offsetParent !== null || el === document.activeElement;
+      document.querySelectorAll('button, a[href]').forEach(b=>{
+        if (!seen(b)) return;
+        out.seen++;
+        const name = (b.textContent||'').trim() || b.getAttribute('aria-label') ||
+          b.getAttribute('title') || '';
+        if (!name) out.named.push(b.className || b.tagName);
+      });
+      document.querySelectorAll('input, textarea, select').forEach(f=>{
+        if (!seen(f) || f.type === 'hidden') return;
+        const has = (f.id && document.querySelector('label[for="'+CSS.escape(f.id)+'"]')) ||
+          f.getAttribute('aria-label') || f.getAttribute('aria-labelledby') ||
+          f.closest('label');
+        if (!has) out.unlabelled.push(f.className || f.id || f.type);
+      });
+      document.querySelectorAll('[tabindex]').forEach(e=>{
+        if (parseInt(e.getAttribute('tabindex'), 10) > 0) out.positive.push(e.className || e.tagName);
+      });
+      /* Decorative artwork must not be read out. An <svg> with no title, no
+         aria-label and no role="img" is decoration by definition. */
+      document.querySelectorAll('svg').forEach(g=>{
+        if (!seen(g.parentElement || g)) return;
+        const speaks = g.getAttribute('aria-label') || g.querySelector('title') ||
+          g.getAttribute('role') === 'img';
+        const hidden = g.getAttribute('aria-hidden') === 'true' ||
+          (g.closest('[aria-hidden="true"]') !== null) ||
+          (g.closest('button,a[href]') && (g.closest('button,a[href]').getAttribute('aria-label') ||
+            (g.closest('button,a[href]').textContent||'').trim()));
+        if (!speaks && !hidden) out.loudSvg.push((g.parentElement && g.parentElement.className) || 'svg');
+      });
+      return out;
+    });
+    for (const x of bad.named) named.push(name + ': ' + x);
+    for (const x of bad.unlabelled) unlabelled.push(name + ': ' + x);
+    for (const x of bad.positive) positive.push(name + ': ' + x);
+    for (const x of bad.loudSvg) loudSvg.push(name + ': ' + x);
+    inspected += bad.seen;
+  }
+  chk('every control has a name a screen reader can say, on every screen',
+    named.length===0, named.join(', '));
+  chk('every field has a label, on every screen', unlabelled.length===0, unlabelled.join(', '));
+  chk('nothing jumps the focus order with a positive tabindex',
+    positive.length===0, positive.join(', '));
+  chk('decorative artwork is not read out', loudSvg.length===0, loudSvg.join(', '));
+  /* The sweep above is only worth its green tick if it actually looked at
+     something: a selector that stopped matching, or a state that failed to
+     open, would otherwise read as a clean pass (R21's lesson). */
+  chk('and the sweep actually reached the controls', inspected > 200, String(inspected));
   await p.goto(B+'/index.html#menu');
   await p.waitForSelector('.rcard');
-  const noLabel = await p.evaluate(()=>{
-    const bad=[];
-    document.querySelectorAll('button').forEach(b=>{
-      if(b.offsetParent===null) return;
-      if(!(b.textContent||'').trim() && !b.getAttribute('aria-label')) bad.push(b.className);
-    });
-    return bad;
-  });
-  chk('all buttons have accessible names', noLabel.length===0, noLabel.join(','));
   chk('one h1 per screen', await p.locator('h1').count()===1);
 
   console.log('\n== JS errors ==');
