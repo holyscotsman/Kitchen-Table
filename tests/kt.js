@@ -186,6 +186,56 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('persisted to kt.fsIndex', await p.evaluate(()=>localStorage.getItem('kt.fsIndex'))==='4');
   for(let i=0;i<3;i++){ await p.click('[data-act="fs-"]'); await p.waitForTimeout(100); }
 
+  console.log('\n== Servings can be typed, not just stepped (R15) ==');
+  await p.goto(B+'/index.html#chicken-cordon-bleu');
+  await p.waitForSelector('.servcard__value');
+  chk('the number itself is a control', await p.locator('button.servcard__value').count()===1);
+  const servBox = await p.locator('button.servcard__value').boundingBox();
+  chk('and it is a real tap target', servBox.height>=44, JSON.stringify(servBox));
+  // Making the number a button must not quietly strip its emphasis: a UA
+  // font reset on `button` is exactly how that happens.
+  const servType = await p.locator('button.servcard__value').evaluate(el => {
+    const c = getComputedStyle(el), parent = getComputedStyle(el.parentElement);
+    return { w: c.fontWeight, size: parseFloat(c.fontSize),
+             base: parseFloat(parent.fontSize) };
+  });
+  chk('the number still reads as the number', servType.w === '700' &&
+    servType.size > servType.base, JSON.stringify(servType));
+  await p.click('button.servcard__value');
+  await p.waitForSelector('#serv-input');
+  chk('tapping it opens a number field', await p.locator('#serv-input').count()===1);
+  await p.fill('#serv-input','24');
+  await p.press('#serv-input','Enter');
+  await p.waitForSelector('button.servcard__value');
+  chk('Enter commits the typed number', (await p.locator('.servcard__value').textContent()).includes('24'));
+  const scaled = await p.locator('.ing-line, .checkrow').first().textContent();
+  chk('and the quantities scaled with it', scaled.length>0);
+  await p.click('button.servcard__value');
+  await p.fill('#serv-input','999');
+  await p.press('#serv-input','Enter');
+  await p.waitForSelector('button.servcard__value');
+  chk('an absurd number is clamped, never accepted',
+    !(await p.locator('.servcard__value').textContent()).includes('999'));
+  await p.click('button.servcard__value');
+  await p.fill('#serv-input','6');
+  await p.click('.r-title');                    // leaving the field commits too
+  await p.waitForSelector('button.servcard__value');
+  chk('leaving the field commits it', (await p.locator('.servcard__value').textContent()).includes('6'));
+
+  console.log('\n== The keyboard Go key finds a recipe (R15) ==');
+  await p.goto(B+'/index.html');
+  await p.waitForSelector('#main-search');
+  await p.fill('#main-search','cordon');
+  // Wait for the search to actually have rendered its top match — a fixed
+  // pause races the debounce on a loaded CI machine.
+  await p.waitForFunction(() => {
+    const a = document.querySelector('#app a.rcard[href]');
+    return !!a && a.getAttribute('href') === '#chicken-cordon-bleu';
+  }, null, { timeout: 5000 });
+  await p.press('#main-search','Enter');
+  await p.waitForSelector('.r-title', { timeout: 5000 });
+  chk('Enter opens the top match', (await p.locator('.r-title').textContent()).includes('Cordon'));
+
   console.log('\n== Edit mode ==');
   await p.click('[data-act="toggle-edit"]');
   await p.waitForTimeout(250);
@@ -233,17 +283,28 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
 
   console.log('\n== Tap targets + a11y ==');
+  // Every screen, not just the Menu: the servings number shipped a hair under
+  // the floor (R16) precisely because this sweep only ever visited one route.
+  const routes = [['Main','#'], ['Menu','#menu'], ['Recipe','#chicken-cordon-bleu'],
+    ['Add','#add'], ['Week planner','#plan'], ['How to use it','#help']];
+  const tooSmall = [];
+  for (const [name, hash] of routes) {
+    await p.goto(B+'/index.html'+hash);
+    await p.waitForSelector('h1');
+    const bad = await p.evaluate(()=>{
+      const out=[];
+      document.querySelectorAll('button, a[href], input, select, textarea').forEach(el=>{
+        const r=el.getBoundingClientRect();
+        if(r.height>0 && r.height<44) out.push((el.className||el.tagName)+' h='+r.height.toFixed(1));
+      });
+      return out;
+    });
+    for (const b of bad) tooSmall.push(name+': '+b);
+  }
+  chk('nothing interactive under 44px, on any screen',
+    tooSmall.length===0, tooSmall.join(', '));
   await p.goto(B+'/index.html#menu');
   await p.waitForSelector('.rcard');
-  const small = await p.evaluate(()=>{
-    const bad=[];
-    document.querySelectorAll('button, a[href], input').forEach(el=>{
-      const r=el.getBoundingClientRect();
-      if(r.height>0 && r.height<44) bad.push((el.className||el.tagName)+' h='+r.height.toFixed(1));
-    });
-    return bad;
-  });
-  chk('nothing interactive under 44px', small.length===0, small.join(', '));
   const noLabel = await p.evaluate(()=>{
     const bad=[];
     document.querySelectorAll('button').forEach(b=>{

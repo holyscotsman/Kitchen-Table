@@ -48,7 +48,8 @@ async function runJob(ctx, jobId) {
        set status = 'failed',
            error_message = ${media.friendlyDownloadError(run.stderr, job.platform)},
            result_json = ${JSON.stringify({
-             debug: String(run.stderr || "").slice(-1200) + (note ? "\n\n" + note : "")
+             debug: media.scrubInternal(String(run.stderr || "").slice(-1200) +
+               (note ? "\n\n" + note : ""))
            })},
            updated_at = now()
      where id = ${jobId}`;

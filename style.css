@@ -2827,13 +2827,49 @@ a.bigbtn--quiet:hover {
   text-wrap: pretty;
 }
 
-/* The way in, sat at the end of the front page's one-line explanation. */
+/* The way in, sat at the end of the front page's one-line explanation. An
+   inline link inside a sentence can't be a 44px-tall box without wrecking the
+   line rhythm around it — but vertical padding on an inline box grows the tap
+   area WITHOUT growing the line box, which is exactly what a thumb needs. The
+   overspill lands on ordinary prose, which nothing else is listening to. */
 .main__help {
   white-space: nowrap;
   font-weight: 700;
   color: var(--acc);
+  padding: 12px 3px;
 }
 
 @media (min-width: 900px) {
   .help__h1 { font-size: 38px; }
+}
+
+/* The servings number, when it is being typed rather than stepped. Matches
+   the value it replaces so the card doesn't jump as it swaps. */
+.servcard__input {
+  width: 100%;
+  min-height: 45px;
+  padding: 0 8px;
+  background: var(--bg);
+  border: var(--bw) solid var(--acc);
+  border-radius: var(--r-input);
+  color: var(--card-ink);
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* The number is a button now, but it must still look and measure like the
+   number: no `font: inherit` here — the global button reset already supplies
+   the family, and re-declaring the shorthand would out-specify
+   `.servcard__value` and quietly strip the size and weight off it. The
+   min-height is the tap-target floor, since a line box alone lands a hair
+   under 44px on some font metrics. */
+button.servcard__value {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 45px; /* 44px floor + a pixel, so sub-pixel rounding can never dip under it */
+  padding: 0;
+  text-align: left;
+  border-radius: var(--r-input);
 }
