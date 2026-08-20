@@ -110,7 +110,7 @@ Docker (tools baked in; build from the **repo root** — the server applies
 | `GET /api/import/jobs/:id` | status, human stage label, `eta_seconds`, `overrun`, and `result_json` once ready |
 | `GET /api/import/jobs?status=ready_for_review` | finished imports awaiting review (the Add screen's badge) |
 | `GET /api/import/jobs?status=failed` | recent failures (3 days, capped at 20) so an import that died unwatched is still owed a sentence |
-| `POST /api/import/jobs/:id/accept` `{recipe}` | writes the reviewed recipe into the database, marks the job `imported` |
+| `POST /api/import/jobs/:id/accept` `{recipe}` | claims the job with one conditional update, then writes the reviewed recipe into the database. Two people accepting the same draft is a tie, not a duplicate: the loser gets `{ok:true, id:null}` |
 
 Job pipeline: `queued → downloading → transcribing → extracting →
 ready_for_review → imported`, any failure → `failed` with a plain-language
@@ -129,7 +129,12 @@ the site itself (CLAUDE.md: contributor names are labels, not
 authentication). What bounds it: the server only does the three things
 above, one import runs at a time with a short queue cap, accepted recipes
 go through the same validation as `db/migrate.js`, and an id collision
-suffixes rather than overwrites, so nothing can be silently replaced. If
+suffixes rather than overwrites, so nothing can be silently replaced.
+Accepting is claim-then-write: the ready-for-review list is shared on
+purpose, so two people can be looking at the same finished draft and both
+press Save, and one conditional update decides it rather than both
+inserting. If the write then fails the claim is handed back, because a job
+marked `imported` with no recipe behind it is work quietly lost. If
 real access control is ever wanted, that's the gameplan's backend-gate
 conversation, not a patch here.
 

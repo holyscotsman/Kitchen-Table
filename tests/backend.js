@@ -349,6 +349,40 @@ const { runJob, computeFps } = lib('pipeline');
         src.indexOf('delete from kitchen.recipes'))));
   }
 
+  console.log('\n== R31: accepting the same import twice ==');
+  {
+    /* The ready-for-review list is shared on purpose — "someone else's
+       finished import is family news" — so two people can be looking at the
+       same finished draft, and both can press Save. The old order read the
+       job, inserted the recipe, then marked the job imported: two accepts
+       that overlap both pass the status check and both insert, and the id
+       collision suffixes rather than overwrites, so the family gets a
+       duplicate they then have to find and delete. */
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const fn = src.slice(src.indexOf('async function acceptJob'),
+      src.indexOf('/* ----------------------------------------------------------------- server */'));
+    chk('the job is claimed with a conditional update, not a blind one',
+      /update kitchen\.import_jobs[\s\S]*?where id = \$\{id\} and status = 'ready_for_review'/.test(fn) &&
+      /returning id/.test(fn));
+    chk('and the claim happens BEFORE the recipe is inserted',
+      fn.indexOf('returning id') < fn.indexOf('insert into kitchen.recipes'));
+    chk('losing the race is not an error — the recipe is already in',
+      /if \(!claimed\.length\)[\s\S]{0,300}?send\(res, 200, \{ ok: true, id: null \}\)/.test(fn),
+      'see acceptJob');
+    chk('and a failed insert hands the draft back rather than eating it',
+      /catch \(e\)[\s\S]*?set status = 'ready_for_review'/.test(
+        fn.slice(fn.indexOf('insert into kitchen.recipes'))));
+    /* A body the server cannot read is the caller's mistake. It used to
+       reach the route's catch-all and come back as "server error: bad
+       JSON", which reads like the kitchen fell over. */
+    chk('a body that is not JSON is the caller\'s fault, not a server error',
+      /function bodyOr400/.test(src) && /send\(res, 400/.test(
+        src.slice(src.indexOf('function bodyOr400'), src.indexOf('async function postVideo'))));
+    chk('and both writing routes read their body that way',
+      (src.match(/await bodyOr400\(req, res\)/g) || []).length === 2 &&
+      !/const body = await readJson\(req\)/.test(src));
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {
