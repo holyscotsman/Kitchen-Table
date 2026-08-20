@@ -39,19 +39,44 @@ jobs:
             echo "::warning title=db-sync is not wired up::KT_DB is not set, so the database was never read. Recipes accepted from video imports will not reach recipes.json until this secret exists (Settings → Secrets and variables → Actions)."
             echo "⚠️ **Skipped: \`KT_DB\` secret is not set.** The database was never read, so nothing could sync. Add it under Settings → Secrets and variables → Actions." >> "$GITHUB_STEP_SUMMARY"
             echo "drift=skip" >> "$GITHUB_OUTPUT"
-          elif node db/export.js --check; then
-            echo "✅ Database and \`recipes.json\` already agree — nothing to sync." >> "$GITHUB_STEP_SUMMARY"
-            echo "drift=no" >> "$GITHUB_OUTPUT"
           else
-            echo "📥 Database has drifted from \`recipes.json\` — committing the regenerated file." >> "$GITHUB_STEP_SUMMARY"
-            echo "drift=yes" >> "$GITHUB_OUTPUT"
+            set +e
+            node db/export.js --check
+            code=$?
+            set -e
+            # 0 = identical, 2 = genuinely drifted. Anything else is the
+            # database being unreachable or the query failing, which must not
+            # be mistaken for "drifted, go ahead and rewrite the file".
+            if [ "$code" -eq 0 ]; then
+              echo "✅ Database and \`recipes.json\` already agree — nothing to sync." >> "$GITHUB_STEP_SUMMARY"
+              echo "drift=no" >> "$GITHUB_OUTPUT"
+            elif [ "$code" -eq 2 ]; then
+              echo "📥 Database has drifted from \`recipes.json\` — committing the regenerated file." >> "$GITHUB_STEP_SUMMARY"
+              echo "drift=yes" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error title=db-sync could not read the database::db/export.js --check exited $code. The file was not touched."
+              echo "❌ **Could not read the database** (exit $code). \`recipes.json\` was left alone." >> "$GITHUB_STEP_SUMMARY"
+              exit "$code"
+            fi
           fi
       - name: Export and commit
         if: steps.check.outputs.drift == 'yes'
         env:
           KT_DB: ${{ secrets.KT_DB }}
         run: |
+          # export.js exits 3 rather than writing a book that lost most of
+          # itself — an empty or half-migrated database must not become a
+          # commit at 06:17 with nobody watching.
+          set +e
           node db/export.js
+          code=$?
+          set -e
+          if [ "$code" -eq 3 ]; then
+            echo "::error title=db-sync refused to write::The database returned far fewer recipes than recipes.json holds. Nothing was committed."
+            echo "🛑 **Refused to write.** The database returned far fewer recipes than \`recipes.json\` holds, so nothing was committed. Check \`KT_DB\`; re-run with \`--force\` locally if the loss is deliberate." >> "$GITHUB_STEP_SUMMARY"
+            exit 3
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
           git config user.name "kitchen-table-sync"
           git config user.email "actions@users.noreply.github.com"
           git add recipes.json

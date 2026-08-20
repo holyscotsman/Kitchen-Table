@@ -30,7 +30,20 @@ KT_DB='postgres://…' node db/export.js
 `migrate.js` fails loudly on malformed data and reports every recipe with an
 empty ingredient list — it doubles as the content audit. `export.js --check`
 exits 0 only when database and file carry identical content, which makes it
-a one-line drift detector.
+a one-line drift detector; it exits **2** on real drift, and anything else
+means the database could not be read (the nightly workflow treats those three
+cases as three different things, because "unreachable" must never be mistaken
+for "drifted, go ahead and rewrite the file").
+
+`export.js` **refuses to write a book that lost most of itself** — exit 3,
+nothing touched. An empty or half-migrated database, or one pointed at the
+wrong branch of a fork, returns few or no rows, and the nightly sync commits
+at 06:17 with nobody watching; replacing 48 recipes with none is the one
+outcome that must be impossible. Growth is always fine and so is ordinary
+shrinkage (someone removed a recipe on purpose); losing more than a third in
+one sync is not, and `--force` exists for the day it genuinely is. With no
+readable `recipes.json` to compare against, the guard has nothing to say and
+stands aside.
 
 ## What the database is, and isn't, today
 

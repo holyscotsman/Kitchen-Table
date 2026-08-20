@@ -269,6 +269,59 @@ const { runJob, computeFps } = lib('pipeline');
       /send\(res, 429/.test(fn));
   }
 
+  console.log('\n== R27: the nightly sync cannot quietly empty the book ==');
+  {
+    /* db-sync runs unattended at 06:17 and commits whatever export.js writes.
+       An empty or half-migrated database returns zero rows, which used to
+       mean: write [], commit it, and the family's 48 recipes are gone from
+       the published file with nobody watching. */
+    const xp = require(path.join(__dirname, '..', 'db', 'export.js'));
+    const book = (n) => Array.from({ length: n }, (_, i) =>
+      ({ id: 'r' + i, title: 'R' + i, category: 'Dinner', contributor: 'Joan',
+         servings: 4, ingredients: ['a'], steps: ['b'] }));
+    const asText = (l) => JSON.stringify(l, null, 2) + '\n';
+
+    chk('an empty database is refused, never written',
+      xp.refuseToWrite(book(0), asText(book(48))) !== null);
+    chk('and the refusal says what it is protecting',
+      /48/.test(xp.refuseToWrite(book(0), asText(book(48)))),
+      xp.refuseToWrite(book(0), asText(book(48))));
+    chk('losing most of the book is refused too',
+      xp.refuseToWrite(book(10), asText(book(48))) !== null);
+    chk('a normal night writes without comment',
+      xp.refuseToWrite(book(48), asText(book(48))) === null);
+    chk('so does the book growing',
+      xp.refuseToWrite(book(53), asText(book(48))) === null);
+    chk('and shrinking a little — a recipe was removed on purpose',
+      xp.refuseToWrite(book(45), asText(book(48))) === null);
+    chk('an unreadable current file never blocks a write',
+      xp.refuseToWrite(book(48), 'not json at all') === null);
+    chk('the first write of all, with no file yet, is allowed',
+      xp.refuseToWrite(book(48), '') === null);
+    /* The app drops empty strings when it writes the file (orderFields), so
+       the exporter must too or --check reports drift that isn't there. */
+    const withBlank = xp.rowToRecipe({ id: 'x', title: 'X', category: 'Dinner',
+      contributor: 'Joan', servings: 4, ingredients: ['a'], steps: ['b'],
+      notes: '', source: '', prep_time: null });
+    chk('empty strings are dropped, exactly as the app drops them',
+      !('notes' in withBlank) && !('source' in withBlank) && !('prepTime' in withBlank),
+      JSON.stringify(withBlank));
+    chk('and the real fields survive in the app\'s own order',
+      Object.keys(withBlank).join(',') ===
+      'id,title,category,contributor,servings,ingredients,steps',
+      Object.keys(withBlank).join(','));
+    /* Two hand-maintained copies of the same list, in two languages, that
+       must agree or the nightly sync rewrites the whole file on field order
+       alone. */
+    const appSrc = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const appOrder = appSrc.slice(appSrc.indexOf('var FIELD_ORDER = ['),
+      appSrc.indexOf(']', appSrc.indexOf('var FIELD_ORDER = [')))
+      .match(/"([^"]+)"/g).map(x => x.replace(/"/g, ''));
+    chk('the exporter and the app agree on the field order',
+      appOrder.join(',') === xp.FIELD_ORDER.join(','),
+      appOrder.join(',') + ' vs ' + xp.FIELD_ORDER.join(','));
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {
