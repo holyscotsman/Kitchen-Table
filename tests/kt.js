@@ -581,6 +581,33 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     for (const x of bad.loudSvg) loudSvg.push(name + ': ' + x);
     inspected += bad.seen;
   }
+  /* R35 — criterion 8, the last of the cheap ones: a focus ring you can
+     actually see. Tabbed for real, because :focus-visible is about keyboard
+     focus and a programmatic .focus() is a different thing. */
+  const ringless = [];
+  for (const [name, hash] of routes) {
+    await p.goto(B+'/index.html'+hash);
+    await p.reload();
+    await p.waitForSelector('h1');
+    for (let i = 0; i < 12; i++) {
+      await p.keyboard.press('Tab');
+      const seen = await p.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const c = getComputedStyle(el);
+        const ring = parseFloat(c.outlineWidth) || 0;
+        const hasRing = c.outlineStyle !== 'none' && ring >= 2;
+        const shadow = c.boxShadow && c.boxShadow !== 'none';
+        return { what: (el.className || el.tagName) + '', ok: hasRing || shadow,
+                 detail: c.outlineStyle + ' ' + c.outlineWidth };
+      });
+      if (!seen) break;
+      if (!seen.ok) ringless.push(name + ': ' + seen.what + ' (' + seen.detail + ')');
+    }
+  }
+  chk('every control tabbed to shows a focus ring', ringless.length === 0,
+    ringless.slice(0, 3).join(' | '));
+
   chk('every control has a name a screen reader can say, on every screen',
     named.length===0, named.join(', '));
   chk('every field has a label, on every screen', unlabelled.length===0, unlabelled.join(', '));
