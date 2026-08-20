@@ -157,6 +157,19 @@ async function runYtdlp(tool, args, opts) {
   return res;
 }
 
+
+/* Anything that reaches a job's public `debug` field has left the server.
+ * yt-dlp is chatty about where it lives — plugin directories, temp paths,
+ * the local token server's port — and none of that is the family's business
+ * or anyone else's. Paths keep their last segment so the message still
+ * makes sense; public URLs are left alone, because they are the point. */
+function scrubInternal(text) {
+  return String(text || "")
+    .replace(/\/(?:opt|home|tmp|usr|app|var|root|private|Users)(?:\/[\w.\-]+)+/g,
+      function (p) { return "…/" + p.split("/").pop(); })
+    .replace(/https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?/g, "[local service]");
+}
+
 /* yt-dlp's stderr → a sentence a person can act on. The Instagram wording is
  * a spec requirement: scraping IG breaks periodically, and the workaround
  * (screen-record it) deserves to be said every time. */
@@ -180,6 +193,6 @@ function friendlyDownloadError(stderr, platform) {
 }
 
 module.exports = {
-  resolveTool, run, runYtdlp, isBotCheck, potArgs, vttToText, looksLikeRecipeText,
+  resolveTool, run, runYtdlp, isBotCheck, potArgs, scrubInternal, vttToText, looksLikeRecipeText,
   pickCaptionTrack, frameKeepIndices, friendlyDownloadError
 };

@@ -325,6 +325,7 @@
     route: { name: "main", id: "" },
 
     textOpen: false,
+    servEdit: false,   // the servings number is being typed rather than stepped
 
     /* Add / Import flow */
     addStep: "choose",   // choose | link | photo | review
@@ -1635,10 +1636,19 @@
     }
 
     h += '<div class="topgrid">';
+    /* The number itself is a control: stepping from 4 to 40 is thirty-six
+       taps, which is not a serving stepper, it is a punishment. Tapping the
+       number types it instead; the ± buttons stay for small adjustments. */
     h += '<div class="servcard"><div class="servcard__text">' +
          '<p class="minilabel">Servings' + fieldFlagChip("servings", fieldFlags) + "</p>" +
-         '<p class="servcard__value">' + S.serves + " " +
-         (S.serves === 1 ? "person" : "people") + "</p></div>" +
+         (S.servEdit
+           ? '<input class="servcard__input" id="serv-input" type="number" ' +
+             'inputmode="numeric" min="1" max="40" step="1" data-act="serv-set" ' +
+             'aria-label="Number of servings — type a number" value="' + esc(S.serves) + '" />'
+           : '<button type="button" class="servcard__value press" data-act="serv-edit" ' +
+             'aria-label="Serves ' + S.serves + '. Tap to type a different number">' +
+             S.serves + " " + (S.serves === 1 ? "person" : "people") + "</button>") +
+         "</div>" +
          '<button type="button" class="servbtn press" data-act="serv-" ' +
          'aria-label="Fewer servings"' + (S.serves <= 1 ? " disabled" : "") + ">" +
          I.minus(24) + "</button>" +
@@ -4341,6 +4351,13 @@
 
     if (!r) return;
 
+    if (act === "serv-edit") {
+      S.servEdit = true;
+      render();
+      var si = document.getElementById("serv-input");
+      if (si) { si.focus(); si.select(); }
+      return;
+    }
     if (act === "serv-" || act === "serv+") {
       var before = S.serves;
       S.serves = act === "serv-"
@@ -4424,6 +4441,13 @@
     var act = el.getAttribute && el.getAttribute("data-act");
     if (!act) return;
 
+    if (act === "serv-set") {
+      /* Typing does not re-render — the quantities settle when the number
+         is committed, on Enter or on leaving the field. */
+      var typed = parseInt(el.value, 10);
+      if (typed >= 1 && typed <= 40) S.serves = typed;
+      return;
+    }
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
     if (act === "menu-q") { S.menuQ = el.value; render(); return; }
     if (act === "a-url") { S.addUrl = el.value; scheduleAddPersist(); return; }
@@ -4493,6 +4517,44 @@
       S.draft[el.getAttribute("data-k")][parseInt(el.getAttribute("data-i"), 10)] = el.value;
       S.saved = false;
       return;
+    }
+  });
+
+  /* Committing the typed servings, and the search key that had nothing
+     behind it: on a phone the keyboard's blue Go key is the obvious way to
+     say "that one" — it used to do nothing at all. */
+  document.addEventListener("keydown", function (ev) {
+    var t = ev.target;
+    if (!t) return;
+    if (ev.key === "Enter" && t.id === "serv-input") {
+      ev.preventDefault();
+      S.servEdit = false;
+      render();
+      return;
+    }
+    if (ev.key === "Enter" && (t.id === "main-search" || t.id === "menu-q")) {
+      var first = document.querySelector("#app a.rcard[href]");
+      if (first) {
+        ev.preventDefault();
+        t.blur();
+        location.hash = first.getAttribute("href");
+      }
+      return;
+    }
+    if (ev.key === "Escape" && t.id === "serv-input") {
+      ev.preventDefault();
+      S.servEdit = false;
+      render();
+      return;
+    }
+  });
+
+  /* Leaving the field commits it too — nobody should have to press Enter to
+     make a number they can already see take effect. */
+  document.addEventListener("focusout", function (ev) {
+    if (ev.target && ev.target.id === "serv-input" && S.servEdit) {
+      S.servEdit = false;
+      render();
     }
   });
 

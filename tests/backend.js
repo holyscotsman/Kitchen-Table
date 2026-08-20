@@ -225,6 +225,20 @@ const { runJob, computeFps } = lib('pipeline');
       !/status = \$\{status\}/.test(fn) && !/\$\{status\}/.test(fn));
   }
 
+  console.log('\n== R15: internals never reach a public job field ==');
+  {
+    const dirty = "ERROR: plugin dir /opt/render/project/src/backend/bin/plugins missing; " +
+      "token server http://127.0.0.1:4416 refused; temp /tmp/kt-job-abc123/media.mp4 gone; " +
+      "see https://github.com/yt-dlp/yt-dlp/wiki/FAQ";
+    const clean = media.scrubInternal(dirty);
+    chk('server paths are reduced to their last part', !/\/opt\/render/.test(clean) && /plugins/.test(clean));
+    chk('temp directories do not leak', !/\/tmp\/kt-job/.test(clean));
+    chk('the local token service is not advertised', !/127\.0\.0\.1:4416/.test(clean));
+    chk('the public help link survives — it is the useful part',
+      /github\.com\/yt-dlp/.test(clean), clean);
+    chk('empty in, empty out', media.scrubInternal('') === '');
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {

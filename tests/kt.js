@@ -186,6 +186,42 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('persisted to kt.fsIndex', await p.evaluate(()=>localStorage.getItem('kt.fsIndex'))==='4');
   for(let i=0;i<3;i++){ await p.click('[data-act="fs-"]'); await p.waitForTimeout(100); }
 
+  console.log('\n== Servings can be typed, not just stepped (R15) ==');
+  await p.goto(B+'/index.html#chicken-cordon-bleu');
+  await p.waitForSelector('.servcard__value');
+  chk('the number itself is a control', await p.locator('button.servcard__value').count()===1);
+  const servBox = await p.locator('button.servcard__value').boundingBox();
+  chk('and it is a real tap target', servBox.height>=44, JSON.stringify(servBox));
+  await p.click('button.servcard__value');
+  await p.waitForSelector('#serv-input');
+  chk('tapping it opens a number field', await p.locator('#serv-input').count()===1);
+  await p.fill('#serv-input','24');
+  await p.press('#serv-input','Enter');
+  await p.waitForSelector('button.servcard__value');
+  chk('Enter commits the typed number', (await p.locator('.servcard__value').textContent()).includes('24'));
+  const scaled = await p.locator('.ing-line, .checkrow').first().textContent();
+  chk('and the quantities scaled with it', scaled.length>0);
+  await p.click('button.servcard__value');
+  await p.fill('#serv-input','999');
+  await p.press('#serv-input','Enter');
+  await p.waitForSelector('button.servcard__value');
+  chk('an absurd number is clamped, never accepted',
+    !(await p.locator('.servcard__value').textContent()).includes('999'));
+  await p.click('button.servcard__value');
+  await p.fill('#serv-input','6');
+  await p.click('.r-title');                    // leaving the field commits too
+  await p.waitForSelector('button.servcard__value');
+  chk('leaving the field commits it', (await p.locator('.servcard__value').textContent()).includes('6'));
+
+  console.log('\n== The keyboard Go key finds a recipe (R15) ==');
+  await p.goto(B+'/index.html');
+  await p.waitForSelector('#main-search');
+  await p.fill('#main-search','cordon');
+  await p.waitForTimeout(300);
+  await p.press('#main-search','Enter');
+  await p.waitForSelector('.r-title', { timeout: 5000 });
+  chk('Enter opens the top match', (await p.locator('.r-title').textContent()).includes('Cordon'));
+
   console.log('\n== Edit mode ==');
   await p.click('[data-act="toggle-edit"]');
   await p.waitForTimeout(250);

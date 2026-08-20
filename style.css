@@ -2837,3 +2837,28 @@ a.bigbtn--quiet:hover {
 @media (min-width: 900px) {
   .help__h1 { font-size: 38px; }
 }
+
+/* The servings number, when it is being typed rather than stepped. Matches
+   the value it replaces so the card doesn't jump as it swaps. */
+.servcard__input {
+  width: 100%;
+  min-height: 45px;
+  padding: 0 8px;
+  background: var(--bg);
+  border: var(--bw) solid var(--acc);
+  border-radius: var(--r-input);
+  color: var(--card-ink);
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+button.servcard__value {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  border-radius: var(--r-input);
+}
