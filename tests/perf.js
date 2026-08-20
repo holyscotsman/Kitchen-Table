@@ -107,7 +107,70 @@ const BUDGET = parseInt(process.env.KT_FCP_BUDGET || '4000', 10);
   const clsOk = cls < 0.02;
   if (!clsOk) console.log('FAIL: the list reflows as photos decode');
 
-  if (fcpOk && clsOk) console.log('PASS');
+  /* R25 — a budget for the taps themselves. FCP says the book opens fast and
+     CLS says it doesn't jump; neither says anything about what happens once
+     someone is using it. Every state change here is a full re-render, which
+     is the right architecture at 48 recipes and a wrong one at 4,800 — this
+     is the tripwire between the two.
+     Measured in-page (a Playwright click adds its own round trip to the
+     number) under a 6x CPU throttle, standing in for a phone several years
+     older than the machine running CI. As shipped: check-off 33 ms,
+     servings 50 ms, filter chip 158 ms.
+
+     What this gate is honestly worth. Of the filter chip's 158 ms, only
+     ~30 ms is this app's JavaScript; the rest is the browser laying out and
+     painting 48 cards, which no amount of tidying here would change. So the
+     budgets catch an ARCHITECTURAL regression — a list that stops fitting in
+     one re-render, a route that starts doing real work per tap — and not
+     small waste: twelve full JSON round-trips of the whole book per render,
+     added deliberately, moved the chip only to 206 ms. Budgets sit ~2.5x over
+     measured, the same philosophy as the FCP gate: a tripwire, not a grade. */
+  const TAPS = [
+    ['ingredient check-off', '#chicken-cordon-bleu', '.checklist li', 120],
+    ['servings +', '#chicken-cordon-bleu', '[data-act="serv+"]', 180],
+    ['filter chip (48 cards re-render)', '#menu', '[data-act="fc"][data-key="Dinner"]', 450]
+  ];
+  let tapsOk = true;
+  const pTap = await ctx.newPage();
+  const tapCdp = await ctx.newCDPSession(pTap);
+  await tapCdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+  for (const [label, hash, sel, budget] of TAPS) {
+    await pTap.goto(B + '/index.html' + hash);
+    await pTap.waitForSelector('h1');
+    if (hash === '#menu') {
+      await pTap.click('[data-act="open-filter"]');
+      await pTap.waitForSelector('#filter-sheet');
+    }
+    const times = await pTap.evaluate(async (s) => {
+      const out = [];
+      for (let i = 0; i < 5; i++) {
+        const el = document.querySelectorAll(s)[i] || document.querySelector(s);
+        if (!el) return null;
+        const t = performance.now();
+        el.click();
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        out.push(Math.round(performance.now() - t));
+      }
+      return out;
+    }, sel);
+    if (!times) {
+      console.log('FAIL: ' + label + ' — the control was not there to tap');
+      tapsOk = false;
+      continue;
+    }
+    times.sort((a, b) => a - b);
+    const med = times[Math.floor(times.length / 2)];
+    console.log(label + ': ' + med + ' ms median of ' + times.join('/') +
+      '   Budget: ' + budget + ' ms');
+    if (med > budget) {
+      console.log('FAIL: ' + label + ' is over its budget');
+      tapsOk = false;
+    }
+  }
+  await pTap.close();
+
+  const ok = fcpOk && clsOk && tapsOk;
+  if (ok) console.log('PASS');
   await br.close();
-  process.exit(fcpOk && clsOk ? 0 : 1);
+  process.exit(ok ? 0 : 1);
 })();
