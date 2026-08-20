@@ -1581,8 +1581,13 @@
       if (k) fieldFlags[k].push(f);
     });
 
+    /* The way back is the list you left, filters and sort included — a bare
+       #menu would show the same recipes (the filters live in state) while the
+       address claimed otherwise, and a reload from there would lose them.
+       Arriving from Main there is nothing to carry, and this is "#menu". */
     h += '<header class="rhead"><div class="rhead__inner">' +
-         '<a class="backlink press" href="#menu">' + I.chevL() + "Menu</a>" +
+         '<a class="backlink press" href="' + menuHash() + '">' +
+         I.chevL() + "Menu</a>" +
          '<div class="rhead__tools">' + themeBtn() +
          '<div class="fsgroup">' +
          '<button type="button" data-act="fs-" aria-label="Smaller text"' +
@@ -2411,8 +2416,10 @@
 
   function viewAdd() {
     var h = "";
+    /* Same as the recipe screen: back is the list you left, not a bare menu. */
     h += '<header class="rhead"><div class="rhead__inner">' +
-         '<a class="backlink press" href="#menu">' + I.chevL() + "Menu</a>" +
+         '<a class="backlink press" href="' + menuHash() + '">' +
+         I.chevL() + "Menu</a>" +
          '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
 
     h += '<div class="addscreen" id="main-content">';
