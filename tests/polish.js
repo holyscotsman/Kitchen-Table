@@ -249,6 +249,74 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== A recipe on paper (R24) ==');
+  {
+    /* "Print is the PDF path" (CLAUDE.md): the download sheet's PDF option is
+       window.print() against the print stylesheet. The week planner's print
+       view has been checked since 129; the recipe's — the one a family
+       actually puts on the counter — never was. */
+    const pPr = await br.newPage();
+    await pPr.goto(B + '/index.html#chicken-cordon-bleu');
+    await pPr.waitForSelector('.r-title');
+    /* Scale it first: the promise is that paper carries the quantities you
+       are actually cooking, not the recipe's stored default. */
+    const before = (await pPr.locator('.checklist li').first().textContent()).trim();
+    await pPr.click('[data-act="serv+"]');
+    await pPr.waitForTimeout(200);
+    await pPr.click('[data-act="serv+"]');
+    await pPr.waitForTimeout(250);
+    const scaled = (await pPr.locator('.checklist li').first().textContent()).trim();
+    chk('scaling changed the quantity on screen', scaled !== before, before + ' → ' + scaled);
+
+    await pPr.emulateMedia({ media: 'print' });
+    await pPr.waitForTimeout(150);
+    const paper = await pPr.evaluate(() => {
+      const vis = (sel) => {
+        const el = document.querySelector(sel);
+        return el ? getComputedStyle(el).display !== 'none' : null;
+      };
+      const rgb = (s) => (s.match(/\d+/g) || []).map(Number);
+      const body = getComputedStyle(document.body);
+      const li = document.querySelector('.checklist li');
+      return {
+        head: vis('.rhead'), checkbox: vis('.checkbox'), servbtn: vis('.servbtn'),
+        title: vis('.r-title'), list: vis('.checklist'), steps: vis('.checklist--steps'),
+        paper: rgb(body.backgroundColor), ink: rgb(body.color),
+        firstLine: li ? li.textContent.trim() : '',
+        cols: getComputedStyle(document.querySelector('.bodygrid')).display
+      };
+    });
+    chk('the site chrome is gone', paper.head === false && paper.checkbox === false &&
+      paper.servbtn === false, JSON.stringify(paper).slice(0, 90));
+    chk('the recipe itself is there', paper.title && paper.list && paper.steps);
+    chk('and it carries the quantities you scaled to',
+      paper.firstLine === scaled, paper.firstLine + ' vs ' + scaled);
+    chk('it prints black on white, whatever the screen was',
+      paper.paper.every(v => v > 200) && paper.ink.every(v => v < 90),
+      'paper ' + paper.paper.join(',') + ' ink ' + paper.ink.join(','));
+    chk('one column on paper, not the two-column screen layout',
+      paper.cols === 'block', paper.cols);
+
+    /* Dark mode is the app's default, and a dark page printed is a wasted
+       cartridge and an unreadable sheet. */
+    await pPr.emulateMedia({ media: 'screen' });
+    await pPr.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await pPr.emulateMedia({ media: 'print' });
+    await pPr.waitForTimeout(150);
+    const dark = await pPr.evaluate(() => {
+      const rgb = (s) => (s.match(/\d+/g) || []).map(Number);
+      const b = getComputedStyle(document.body);
+      return { paper: rgb(b.backgroundColor), ink: rgb(b.color),
+        label: rgb(getComputedStyle(document.querySelector('.minilabel')).color) };
+    });
+    chk('dark mode prints on white too',
+      dark.paper.every(v => v > 200) && dark.ink.every(v => v < 90),
+      'paper ' + dark.paper.join(',') + ' ink ' + dark.ink.join(','));
+    chk('and the faded tier does not vanish into the page',
+      dark.label.every(v => v < 120), dark.label.join(','));
+    await pPr.close();
+  }
+
   console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
     /* Playwright's offline emulation does NOT reach fetches made by a
