@@ -47,7 +47,11 @@ Navigation is hash-based, so back and forward work normally.
   Search reads titles, ingredients and tags; accents don't matter ("creme"
   finds crème) and one mistyped letter is forgiven. When a result matched
   something not visible on its card, the card says so — "matches ingredient".
-- `#menu` — **Menu.** All 48 recipes with Filter and Sort. `#menu?who=Mom`,
+- `#menu` — **Menu.** All 48 recipes with Filter and Sort. The Filter sheet
+  has a fourth group, **Still needs a person**, whenever any recipe carries an
+  importer flag or has no ingredients — the content pass as a list rather than
+  a hunt (`?needs=1`). It removes itself once nothing qualifies, which is how
+  you can tell the pass is finished. `#menu?who=Mom`,
   `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered, and
   filtering or sorting from inside the screen writes the same address back —
   repeated for multi-select (`?cat=Sides&cat=Desserts`), plus `?sort=az` when
