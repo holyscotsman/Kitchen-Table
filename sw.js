@@ -16,6 +16,12 @@
 "use strict";
 
 const CACHE = "kt-shell-v2";
+
+/* How long the book's own request may hold the app up before the cached
+ * copy is served instead. Long enough that a healthy connection always
+ * wins (the file is ~60KB); short enough that a bad one is never the
+ * reader's problem. */
+const NET_FIRST_MS = 2000;
 const SHELL = [
   "./",
   "index.html",
@@ -75,22 +81,37 @@ self.addEventListener("fetch", (ev) => {
    * ago must appear on the next open, not the one after. Network-first
    * with the cache as fallback keeps the book both current and offline —
    * the shell below stays cache-first, so the page still paints instantly
-   * while this one request settles. */
+   * while this one request settles.
+   *
+   * With a clock on it, though. A weak signal is not an outage and must not
+   * behave like one: without this the book waited for the browser's own
+   * timeout — tens of seconds, in a kitchen with one bar — while a complete
+   * copy sat in the cache the whole time. The network gets NET_FIRST_MS to
+   * answer; past that the cached book is served and the late answer is
+   * still stored, which is what makes the NEXT open current. A first visit
+   * has nothing cached and simply waits, as it must. */
   if (url.pathname.endsWith("/recipes.json")) {
     /* Matched and stored by URL string, not by Request: the app asks for
      * the book with `cache: "no-cache"`, and a Request carrying that mode
      * does not reliably match a stored entry — the offline fallback has
      * to be exact about what it looks up. */
     ev.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(url.pathname, copy));
-          }
+      caches.open(CACHE).then((c) => {
+        const net = fetch(req).then((res) => {
+          if (res && res.ok) c.put(url.pathname, res.clone());
           return res;
-        })
-        .catch(() => caches.open(CACHE).then((c) => c.match(url.pathname)))
+        });
+        /* The put above outlives the response we hand back, so the worker
+         * must be kept alive for it. */
+        ev.waitUntil(net.catch(() => {}));
+        return c.match(url.pathname).then((cached) => {
+          if (!cached) return net;
+          return Promise.race([
+            net.catch(() => cached),
+            new Promise((r) => setTimeout(() => r(cached.clone()), NET_FIRST_MS))
+          ]);
+        });
+      })
     );
     return;
   }
