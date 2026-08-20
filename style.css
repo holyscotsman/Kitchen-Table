@@ -274,7 +274,13 @@ img {
 
 @media (max-width: 500px) {
   .main {
-    padding-top: 60px; /* clears the iPhone status bar */
+    /* Clears the phone's status bar — using the device's own measurement of
+       it, not a constant. Added to the Home Screen the page really does run
+       under the status bar and the inset supplies the exact number; in a
+       browser tab the browser's chrome is already there, the inset is 0, and
+       this is 34px of screen the reader gets back. The design reference wrote
+       a flat 60 because it had no way to ask. */
+    padding-top: calc(26px + env(safe-area-inset-top));
   }
 }
 
@@ -599,7 +605,10 @@ a.applogo:hover {
 
 @media (max-width: 500px) {
   .mhead {
-    padding-top: 54px;
+    /* The device's own status-bar measurement — see .main above. This one is
+       the sticky header, so the dead space was charged against every scroll
+       position, not just the top of the page. */
+    padding-top: calc(14px + env(safe-area-inset-top));
   }
 }
 
@@ -1017,7 +1026,8 @@ a.applogo:hover {
 
 @media (max-width: 500px) {
   .rhead {
-    padding-top: 54px;
+    /* The device's own status-bar measurement — see .main above. */
+    padding-top: calc(14px + env(safe-area-inset-top));
   }
 }
 

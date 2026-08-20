@@ -341,6 +341,33 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()>=1);
   chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
 
+  console.log('\n== The status-bar pad is the device\'s, not a guess (R20) ==');
+  {
+    /* The design reference pads the top of every screen on narrow widths to
+       clear the phone's status bar — correct for a Home Screen install, where
+       the page really does run under it. In a browser tab there is nothing to
+       clear: the browser's own chrome is already there, and the pad was 40-54px
+       of dead space at the top of every screen, on the screens with the least
+       room to spare. */
+    const tops = [];
+    for (const [name, hash, sel] of [['Main','#','.main'], ['Menu','#menu','.mhead'],
+      ['Recipe','#chicken-cordon-bleu','.rhead']]) {
+      await p.goto(B+'/index.html'+hash);
+      await p.waitForSelector('h1');
+      const pt = await p.evaluate((s) =>
+        parseFloat(getComputedStyle(document.querySelector(s)).paddingTop), sel);
+      tops.push(name + ' ' + pt + 'px');
+      chk(name + ': no phantom status bar in a browser tab', pt <= 30, pt + 'px');
+    }
+    /* …and the intent survives where it was true: on a Home Screen install the
+       inset is a real number and the pad comes back by itself. */
+    const css = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'style.css'), 'utf8');
+    const heads = css.match(/env\(safe-area-inset-top\)/g) || [];
+    chk('the pad follows the device inset instead of a constant',
+      heads.length >= 3 && !/padding-top:\s*5[0-9]px/.test(css), tops.join(', '));
+  }
+
   console.log('\n== Tap targets + a11y ==');
   // Every screen, not just the Menu: the servings number shipped a hair under
   // the floor (R16) precisely because this sweep only ever visited one route.
