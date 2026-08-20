@@ -27,7 +27,15 @@ a known gap, not a silent one.
 5. **Reduced motion.** Any new animation is listed in the
    `prefers-reduced-motion` block and dies there (`tests/quick.js` asserts
    the block covers every `animation:` rule in the file).
-6. **Names, labels, focus order and decorative artwork** (`R23`). Every
+6. **Focus visible** (`R35`). Every control tabbed to on every screen draws
+   the designed ring — tabbed for real, since `:focus-visible` is about
+   keyboard focus and a programmatic `.focus()` is a different thing. This
+   was a reviewer item until the sweep found the fields: **every text input
+   in the app had `outline: none` on focus**, leaving a border colour change
+   as the only cue, which is exactly what criterion 12 says can never stand
+   alone. The one deliberate exception stays: route headings take programmatic
+   focus and are not interactive, so they draw nothing.
+7. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
    every decorative `<svg>` is hidden from the accessibility tree. Checked on
@@ -39,9 +47,7 @@ a known gap, not a silent one.
 
 ## Checked by the reviewer, by hand
 
-7. **No hover-only affordances.** Everything reachable by tap alone.
-8. **Focus visible** on every new interactive element, using the designed
-   ring (`design/components.md`), not a browser default remnant.
+8. **No hover-only affordances.** Everything reachable by tap alone.
 9. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
    return focus to the opener. Reuse the existing machinery; don't rebuild it.
 11. **State is announced, not just drawn.** Toggles use `aria-pressed` /

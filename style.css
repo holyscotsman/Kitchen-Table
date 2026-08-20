@@ -414,9 +414,13 @@ a.applogo:hover {
   opacity: 1;
 }
 
+/* The accent border is the field waking up; the ring is 055's designed
+   focus state, and fields were the one place it had been switched off — so
+   the only cue a keyboard user got was a colour change, which is exactly
+   what criterion 12 says can never stand alone. The ring's 2px offset lands
+   in page colour, so accent ring and accent border never fuse. */
 .searchfield:focus {
   border-color: var(--acc);
-  outline: none;
 }
 
 .band {
@@ -1723,10 +1727,11 @@ input[type="file"].input {
   resize: vertical;
 }
 
+/* Same as .searchfield above: the border says awake, the ring says focused,
+   and the ring is not optional. */
 .input:focus,
 .textarea:focus {
   border-color: var(--acc);
-  outline: none;
 }
 
 .fieldrow {
