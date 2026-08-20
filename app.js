@@ -335,7 +335,8 @@
     route: { name: "main", id: "" },
 
     textOpen: false,
-    servEdit: false,   // the servings number is being typed rather than stepped
+    servEdit: false,
+    needsLook: false, // "needs a look" filter: flags, or nothing to cook from   // the servings number is being typed rather than stepped
 
     /* Add / Import flow */
     addStep: "choose",   // choose | link | photo | review
@@ -1061,9 +1062,24 @@
      virtualising would complicate scroll restoration, find-in-page, and the
      screen-reader experience for zero measured gain. Revisit at ~150, per the
      gameplan. */
+  /* "Needs a look": the two things only a person can settle. A flag is the
+     importer saying it could not be sure; an empty ingredient list is a
+     recipe you cannot cook from. Both are already visible one recipe at a
+     time — this is the same information as a list, so the content pass can
+     be worked through rather than hunted for. */
+  function needsLook(r) {
+    if (r.flagged && r.flagged.length) return true;
+    return !(r.ingredients || []).some(function (x) { return String(x).trim(); });
+  }
+
+  function needsLookCount() {
+    return S.recipes.filter(needsLook).length;
+  }
+
   function menuMatches() {
     var q = S.menuQ.trim().toLowerCase();
     var list = S.recipes.filter(function (r) {
+      if (S.needsLook && !needsLook(r)) return false;
       if (S.who.length && S.who.indexOf(r.contributor) === -1) return false;
       if (S.cats.length && S.cats.indexOf(r.category) === -1) return false;
       /* Tags are AND-ed: picking Italian and Vegetarian means both. */
@@ -1086,7 +1102,8 @@
 
   function viewMenu() {
     var list = menuMatches();
-    var filterCount = S.who.length + S.cats.length + S.tags.length;
+    var filterCount = S.who.length + S.cats.length + S.tags.length +
+                      (S.needsLook ? 1 : 0);
     var sortLabel = SORTS.filter(function (s) { return s.key === S.sort; })[0].label;
     var h = "";
 
@@ -1391,6 +1408,16 @@
                  '<span class="chip__label">' + esc(cat) + " (" + countCat(cat) + ")</span></button>";
         }).join("") + "</div>" +
       tagGroupHtml() +
+      /* Only when there is something to find: a chip that returns nothing is
+         not a filter (the same rule the empty contributors follow), and when
+         the content pass is finished this disappears by itself. */
+      (needsLookCount()
+        ? '<h3 class="grouph">Still needs a person</h3><div class="chiprow">' +
+          '<button type="button" class="chip press" aria-pressed="' + S.needsLook +
+          '" data-act="fn">' + (S.needsLook ? I.check(15) : "") +
+          '<span class="chip__label">Needs a look (' + needsLookCount() +
+          ")</span></button></div>"
+        : "") +
       '<div class="sheet__foot">' +
       '<button type="button" class="sheetbtn press" data-act="reset-filters">' +
       "Reset to all recipes</button></div>" +
@@ -3766,7 +3793,7 @@
     if (raw === "help") return { name: "help", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
-      var who = [], cats = [], tags = [], sort = "";
+      var who = [], cats = [], tags = [], sort = "", needs = false;
       qs.split("&").forEach(function (pair) {
         var kv = pair.split("=");
         var v = kv[1] ? decodeURIComponent(kv[1]) : "";
@@ -3778,8 +3805,10 @@
         if (kv[0] === "cat" && cats.indexOf(v) < 0) cats.push(v);
         if (kv[0] === "tag" && tags.indexOf(v) < 0) tags.push(v);
         if (kv[0] === "sort" && SORTS.some(function (x) { return x.key === v; })) sort = v;
+        if (kv[0] === "needs" && v === "1") needs = true;
       });
-      return { name: "menu", id: "", who: who, cats: cats, tags: tags, sort: sort };
+      return { name: "menu", id: "", who: who, cats: cats, tags: tags, sort: sort,
+               needs: needs };
     }
     return { name: "recipe", id: decodeURIComponent(raw) };
   }
@@ -3797,6 +3826,7 @@
     S.who.forEach(function (w) { q.push("who=" + encodeURIComponent(w)); });
     S.cats.forEach(function (c) { q.push("cat=" + encodeURIComponent(c)); });
     S.tags.forEach(function (t) { q.push("tag=" + encodeURIComponent(t)); });
+    if (S.needsLook) q.push("needs=1");
     if (S.sort !== "recent") q.push("sort=" + encodeURIComponent(S.sort));
     return "#menu" + (q.length ? "?" + q.join("&") : "");
   }
@@ -3872,6 +3902,8 @@
          keeps what you had, same as the filters do. */
       if (next.sort) S.sort = next.sort;
       else if (S.route.name !== "recipe") S.sort = "recent";
+      if (next.needs) S.needsLook = true;
+      else if (S.route.name !== "recipe") S.needsLook = false;
       if (next.who.length || next.cats.length || next.tags.length) {
         S.who = next.who;
         S.cats = next.cats;
@@ -4151,6 +4183,10 @@
       if (ic > -1) S.cats.splice(ic, 1); else S.cats.push(key);
       syncMenuHash(); return;
     }
+    if (act === "fn") {
+      S.needsLook = !S.needsLook;
+      syncMenuHash(); return;
+    }
     if (act === "ft") {
       var it = S.tags.indexOf(key);
       if (it > -1) S.tags.splice(it, 1); else S.tags.push(key);
@@ -4161,17 +4197,17 @@
        and a reload or a shared link quietly re-applies it. Same replaceState
        as applying them, so clearing doesn't leave a Back step behind either. */
     if (act === "reset-filters") {
-      S.who = []; S.cats = []; S.tags = [];
+      S.who = []; S.cats = []; S.tags = []; S.needsLook = false;
       syncMenuHash();
       return;
     }
     if (act === "clear-filters") {
-      S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
+      S.who = []; S.cats = []; S.tags = []; S.needsLook = false; S.menuQ = "";
       syncMenuHash();
       return;
     }
     if (act === "show-all") {
-      S.who = []; S.cats = []; S.tags = []; S.menuQ = "";
+      S.who = []; S.cats = []; S.tags = []; S.needsLook = false; S.menuQ = "";
       S.searchOpen = false;
       syncMenuHash();
       return;

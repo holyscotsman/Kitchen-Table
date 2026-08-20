@@ -84,7 +84,11 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.waitForSelector('#filter-sheet');
   chk('sheet is a modal dialog', await p.getAttribute('#filter-sheet','aria-modal')==='true');
   chk('scrim is a labelled button', await p.getAttribute('.scrim','aria-label')==='Close filters');
-  chk('three groups now the collection ships tagged', await p.locator('.grouph').count()===3);
+  /* Who, Course, Tags — and a fourth, "Still needs a person", for as long as
+     anything does (R32). It removes itself when the content pass is done. */
+  chk('four groups while the content pass is unfinished',
+    await p.locator('.grouph').count()===4,
+    String(await p.locator('.grouph').count()));
   await p.click('[data-act="fw"][data-key="Joan"]');
   await p.waitForTimeout(200);
   chk('chip becomes pressed', await p.getAttribute('[data-act="fw"][data-key="Joan"]','aria-pressed')==='true');
@@ -117,6 +121,34 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const first = await p.locator('.rcard__title').first().textContent();
   chk('A-Z sort applied', first.startsWith('Air Fryer') || first < 'B', first);
   chk('sort label updated', (await p.locator('.toolbtn--sort').textContent()).includes('Name A – Z'));
+
+  console.log('\n== Finding what still needs a person (R32) ==');
+  await p.goto(B+'/index.html#menu');
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  await p.click('[data-act="open-filter"]');
+  await p.waitForSelector('#filter-sheet');
+  const needsChip = p.locator('[data-act="fn"]');
+  chk('the Filter sheet offers it', await needsChip.count() === 1);
+  chk('and says how many there are',
+    /\(\d+\)/.test(await needsChip.textContent()), await needsChip.textContent());
+  await needsChip.click();
+  await p.waitForTimeout(250);
+  const flaggedCount = await p.locator('.rcard').count();
+  chk('it narrows the list', flaggedCount > 0 && flaggedCount < 48, String(flaggedCount));
+  chk('a recipe with an open question is in it',
+    await p.locator('.rcard[href="#chops"]').count() === 1);
+  chk('a recipe with nothing wrong is not',
+    await p.locator('.rcard[href="#chicken-cordon-bleu"]').count() === 0);
+  chk('and it travels in the address like every other filter',
+    /needs=1/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  chk('so it survives a reload', await p.locator('.rcard').count() === flaggedCount);
+  await p.click('[data-act="clear-filters"]');
+  await p.waitForTimeout(250);
+  chk('and clearing lets everything back', await p.locator('.rcard').count() === 48);
 
   console.log('\n== The address says what you are looking at (R18) ==');
   await p.goto(B+'/index.html#menu');
