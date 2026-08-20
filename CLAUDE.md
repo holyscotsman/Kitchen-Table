@@ -357,13 +357,14 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **552 functional checks** across eleven
-suites (kt 95, feat 59, add 74, relay 16, quick 32, polish 47, sec 23,
+The suite after the video arc: **553 functional checks** across eleven
+suites (kt 96, feat 59, add 74, relay 16, quick 32, polish 47, sec 23,
 plan 27, video 51, backend 118, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
-video form included. Nothing interactive measures under 44px. All of it
+video form included. Nothing interactive measures under 44px — checked on
+every screen, not just one (`R16`). All of it
 runs on every pull request via `tests/run.sh`, hermetically — the suites
 stub the kitchen server and abort the Render origin, so CI never wakes the
 real one. Off-CI, the live-OCR gate (`tests/ocr-live.js`) proves that
