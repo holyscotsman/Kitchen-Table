@@ -55,7 +55,8 @@ Navigation is hash-based, so back and forward work normally.
   `#menu?cat=Desserts` and `#menu?tag=Italian` open it pre-filtered, and
   filtering or sorting from inside the screen writes the same address back —
   repeated for multi-select (`?cat=Sides&cat=Desserts`), plus `?sort=az` when
-  the sort isn't the default. So a filtered list can be shared, bookmarked and
+  the sort isn't the default and `?q=bacon` when there's a search running —
+  arriving with one opens the search box with the words in it. So a filtered list can be shared, bookmarked and
   reloaded. It's written with `replaceState`: the address describes what's on
   screen without turning twenty chip taps into twenty presses of Back.
 - `#<recipe-id>` — **Recipe.** e.g. `#chicken-cordon-bleu`.

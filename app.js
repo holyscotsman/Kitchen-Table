@@ -3798,7 +3798,7 @@
     if (raw === "help") return { name: "help", id: "" };
     if (raw.indexOf("menu") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
-      var who = [], cats = [], tags = [], sort = "", needs = false;
+      var who = [], cats = [], tags = [], sort = "", needs = false, q = "";
       qs.split("&").forEach(function (pair) {
         var kv = pair.split("=");
         var v = kv[1] ? decodeURIComponent(kv[1]) : "";
@@ -3811,9 +3811,10 @@
         if (kv[0] === "tag" && tags.indexOf(v) < 0) tags.push(v);
         if (kv[0] === "sort" && SORTS.some(function (x) { return x.key === v; })) sort = v;
         if (kv[0] === "needs" && v === "1") needs = true;
+        if (kv[0] === "q") q = v;
       });
       return { name: "menu", id: "", who: who, cats: cats, tags: tags, sort: sort,
-               needs: needs };
+               needs: needs, q: q };
     }
     return { name: "recipe", id: decodeURIComponent(raw) };
   }
@@ -3831,6 +3832,7 @@
     S.who.forEach(function (w) { q.push("who=" + encodeURIComponent(w)); });
     S.cats.forEach(function (c) { q.push("cat=" + encodeURIComponent(c)); });
     S.tags.forEach(function (t) { q.push("tag=" + encodeURIComponent(t)); });
+    if (S.menuQ.trim()) q.push("q=" + encodeURIComponent(S.menuQ.trim()));
     if (S.needsLook) q.push("needs=1");
     if (S.sort !== "recent") q.push("sort=" + encodeURIComponent(S.sort));
     return "#menu" + (q.length ? "?" + q.join("&") : "");
@@ -3907,6 +3909,11 @@
          keeps what you had, same as the filters do. */
       if (next.sort) S.sort = next.sort;
       else if (S.route.name !== "recipe") S.sort = "recent";
+      /* A search in the address opens the box with it, because a filtered
+         list whose reason is hidden is the same trap as a filter the address
+         does not mention. */
+      if (next.q) { S.menuQ = next.q; S.searchOpen = true; }
+      else if (S.route.name !== "recipe") S.menuQ = "";
       if (next.needs) S.needsLook = true;
       else if (S.route.name !== "recipe") S.needsLook = false;
       if (next.who.length || next.cats.length || next.tags.length) {
@@ -4549,7 +4556,7 @@
       return;
     }
     if (act === "main-q") { S.mainQ = el.value; render(); return; }
-    if (act === "menu-q") { S.menuQ = el.value; render(); return; }
+    if (act === "menu-q") { S.menuQ = el.value; syncMenuHash(); return; }
     if (act === "a-url") { S.addUrl = el.value; scheduleAddPersist(); return; }
     if (act === "video-url") { S.videoUrl = el.value; scheduleAddPersist(); return; }
     if (act === "a-paste") {

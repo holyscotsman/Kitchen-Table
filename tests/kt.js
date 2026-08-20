@@ -150,6 +150,41 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await p.locator('button.servcard__value').count() === 1);
   }
 
+  console.log('\n== A search you can send to someone (R34) ==');
+  await p.goto(B+'/index.html#menu');
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  await p.click('[data-act="toggle-search"]');
+  await p.waitForSelector('#menu-search');
+  await p.fill('#menu-search', 'bacon');
+  await p.waitForTimeout(300);
+  const baconCount = await p.locator('.rcard').count();
+  chk('searching narrows the list', baconCount > 0 && baconCount < 48, String(baconCount));
+  chk('and the search is in the address', /[?&]q=bacon/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  await p.reload();
+  await p.waitForSelector('.rcard');
+  chk('a reload lands on the same search',
+    await p.locator('.rcard').count() === baconCount, String(await p.locator('.rcard').count()));
+  chk('with the box open and the words still in it',
+    await p.inputValue('#menu-search') === 'bacon');
+  /* Typing is not navigation either — twenty letters must not be twenty
+     presses of Back. */
+  const histBefore = await p.evaluate(()=>history.length);
+  await p.fill('#menu-search', 'bacon r');
+  await p.waitForTimeout(250);
+  await p.fill('#menu-search', 'bacon ra');
+  await p.waitForTimeout(250);
+  chk('typing never piles up history entries',
+    await p.evaluate(()=>history.length) === histBefore,
+    histBefore + ' → ' + await p.evaluate(()=>history.length));
+  await p.fill('#menu-search', '');
+  await p.waitForTimeout(250);
+  chk('emptying it takes it back out of the address',
+    !/[?&]q=/.test(await p.evaluate(()=>location.hash)),
+    await p.evaluate(()=>location.hash));
+  chk('and the whole book is back', await p.locator('.rcard').count() === 48);
+
   console.log('\n== Finding what still needs a person (R32) ==');
   await p.goto(B+'/index.html#menu');
   await p.reload();
