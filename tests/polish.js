@@ -283,6 +283,28 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pDead.waitForTimeout(1500);
     chk('a healthy boot never shows it',
       !/could not start/i.test(await pDead.locator('#app').textContent()));
+
+    /* R30 — the case that nearly shipped. The worker serves a CACHED app.js
+       on the first load after a deploy, so the very phones this message
+       reaches are running the previous app.js: one that never heard of the
+       marker it was watching for. Measured, before the fix: the app rendered
+       normally and was then replaced, eight seconds later, by "could not
+       start". The failure the message exists to prevent, aimed at a working
+       page. */
+    const oldApp = require('fs')
+      .readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8')
+      .replace(/document\.getElementById\("app"\)\.setAttribute\("data-booted", "1"\);/,
+        '/* an app.js from before the marker existed */');
+    chk('the stand-in really is missing the marker',
+      !/data-booted/.test(oldApp));
+    await pDead.route('**/app.js', route => route.fulfill({
+      status: 200, contentType: 'text/javascript', body: oldApp }));
+    await pDead.reload();
+    await pDead.waitForSelector('.main__title');
+    await pDead.waitForTimeout(13000);
+    chk('an app.js from before the message never gets wiped by it',
+      await pDead.locator('.main__title').count() === 1 &&
+      !/could not start/i.test(await pDead.locator('#app').textContent()));
     await ctxDead.close();
   }
 

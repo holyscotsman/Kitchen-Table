@@ -23,7 +23,7 @@
          either one and rehash it, or it silently stops running. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-o1OJtOYup8CcPW/GTXWqN/q4fHOREV9wzGW+rZoycms=' 'sha256-Z16yHOTWV/Wfnoo+EH2LJkzOgCYVpsGar2ueJcLaG7Q='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self' blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-o1OJtOYup8CcPW/GTXWqN/q4fHOREV9wzGW+rZoycms=' 'sha256-rot/xsmDGhnEtFlkYALw1Uzc00LvMBxV6CAuwxzk51Q='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self' blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <meta
       name="description"
@@ -56,9 +56,22 @@
          script and rehash it, or the page boots without its safety net. -->
     <script>
       (function () {
+        /* "Alive" cannot rest on a marker alone. The worker serves a cached
+           app.js on the first load after a deploy, so the very phones this
+           message ships to are running the PREVIOUS app.js — one that never
+           heard of the marker. Judged by the page as well: anything in #app
+           that is not the boot paragraph is an app that rendered. */
+        function alive(app) {
+          if (app.getAttribute("data-booted") === "1") return true;
+          for (var i = 0; i < app.children.length; i++) {
+            var el = app.children[i];
+            if (el.tagName !== "P" || el.className !== "boot") return true;
+          }
+          return false;
+        }
         function down() {
           var app = document.getElementById("app");
-          if (!app || app.getAttribute("data-booted") === "1") return;
+          if (!app || alive(app)) return;
           app.textContent = "";
           var p = document.createElement("p");
           p.className = "boot";
@@ -77,11 +90,15 @@
           app.appendChild(wrap);
         }
         /* A syntax error or a synchronous throw says so at once; anything
-           slower (a script that never arrives) falls to the timer. */
+           slower (a script that never arrives) falls to the timer. Twelve
+           seconds, not eight: a first visit on one bar can still be fetching
+           the book, and one narrow case — an app.js cached from before this
+           message existed, on a connection that slow — has neither the marker
+           nor anything rendered to show for itself. */
         window.addEventListener("error", function (e) {
           if (e && e.filename && e.filename.indexOf("app.js") > -1) down();
         });
-        setTimeout(down, 8000);
+        setTimeout(down, 12000);
       })();
     </script>
 

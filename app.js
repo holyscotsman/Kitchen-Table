@@ -29,6 +29,14 @@
 (function () {
   "use strict";
 
+  /* app.js is running. index.html's last-resort message watches for this and
+     stands down — set here rather than at first render, because a slow first
+     visit spends its time waiting for the book, and "the network is slow" is
+     a different failure with its own sentence. */
+  try {
+    document.getElementById("app").setAttribute("data-booted", "1");
+  } catch (e) {}
+
   /* ======================================================================
      1. Constants + storage
      ====================================================================== */
@@ -4012,9 +4020,7 @@
   function render() {
     var app = document.getElementById("app");
     if (!app) return;
-    /* Tells index.html's last-resort message that the app is alive, so it
-       never paints over a working page. */
-    app.setAttribute("data-booted", "1");
+
 
     /* Preserve focus and caret across the re-render. */
     var active = document.activeElement;
