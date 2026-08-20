@@ -361,7 +361,12 @@ The suite after the video arc: **610 functional checks** across eleven
 suites (kt 118, feat 59, add 74, relay 16, quick 32, polish 58, sec 36,
 plan 27, video 51, backend 129, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
-4000 ms gate; CLS 0.0000 with 48 photos against 0.02). WCAG AA contrast:
+4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
+three interaction budgets measured in-page under a 6× CPU throttle —
+check-off 33 ms, servings 50 ms, a filter chip re-rendering all 48 cards
+158 ms — which are tripwires for an architectural regression, not a grade:
+the comment in `tests/perf.js` says exactly what they will and will not
+catch). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
 video form included. Nothing interactive measures under 44px — checked on
 every screen, not just one (`R16`). All of it
