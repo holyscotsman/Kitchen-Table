@@ -281,14 +281,21 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
       '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
       '.woff2': 'font/woff2', '.txt': 'text/plain' };
+    /* Turned up for the R19 block: a weak signal, served by the same server
+       that serves everything else, so only the book is slow. */
+    let slowJsonMs = 0;
     const srv = http.createServer((rq, rs) => {
       const rel = decodeURIComponent(new URL(rq.url, 'http://x').pathname);
       const file = pathx.join(ROOT, rel === '/' ? '/index.html' : rel);
       if (!file.startsWith(ROOT) || !fsx.existsSync(file) || fsx.statSync(file).isDirectory()) {
         rs.writeHead(404); return rs.end('no');
       }
-      rs.writeHead(200, { 'content-type': TYPES[pathx.extname(file)] || 'application/octet-stream' });
-      fsx.createReadStream(file).pipe(rs);
+      const serve = () => {
+        rs.writeHead(200, { 'content-type': TYPES[pathx.extname(file)] || 'application/octet-stream' });
+        fsx.createReadStream(file).pipe(rs);
+      };
+      if (slowJsonMs && rel.endsWith('/recipes.json')) setTimeout(serve, slowJsonMs);
+      else serve();
     });
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
     const OWN = 'http://127.0.0.1:' + srv.address().port;
@@ -326,6 +333,32 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await psw.waitForSelector('.rcard');
     chk('online, a freshly published book beats the cached one',
       await psw.locator('.rcard__title', { hasText: 'Stale Sentinel Loaf' }).count() === 0);
+
+    /* R19 — a weak signal is not an outage, and it used to behave like one.
+       recipes.json was network-first with no clock on it, so on a bad
+       connection the book waited for the browser to give up — tens of
+       seconds — with a complete copy sitting in the cache the whole time.
+       The network gets a short head start now, and the cached book wins if
+       it doesn't answer in it. */
+    slowJsonMs = 6000;
+    await doctor();
+    const slowStart = Date.now();
+    await psw.reload();
+    await psw.waitForSelector('.rcard', { timeout: 20000 });
+    const waited = Date.now() - slowStart;
+    chk('a slow book does not hold the app hostage', waited < 4500, waited + 'ms');
+    chk('and what it shows meanwhile is the cached book',
+      await psw.locator('.rcard__title', { hasText: 'Stale Sentinel Loaf' }).count() === 1);
+    /* The late answer is not thrown away — it is what makes the NEXT open
+       current, which is the whole reason this route is network-first. */
+    await psw.waitForTimeout(7000);
+    slowJsonMs = 0;
+    await psw.reload();
+    await psw.waitForSelector('.rcard');
+    chk('the late answer still lands, so the next open is current',
+      await psw.locator('.rcard__title', { hasText: 'Stale Sentinel Loaf' }).count() === 0 &&
+      await psw.locator('.rcard').count() > 40,
+      String(await psw.locator('.rcard').count()));
 
     /* Now the outage: the server is gone, not merely emulated away. */
     await doctor();
