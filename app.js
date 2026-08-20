@@ -4012,6 +4012,9 @@
   function render() {
     var app = document.getElementById("app");
     if (!app) return;
+    /* Tells index.html's last-resort message that the app is alive, so it
+       never paints over a working page. */
+    app.setAttribute("data-booted", "1");
 
     /* Preserve focus and caret across the re-render. */
     var active = document.activeElement;

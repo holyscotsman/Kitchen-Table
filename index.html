@@ -18,10 +18,12 @@
            img/media data: blob: - photos live as data URLs, downloads as blobs;
            style 'unsafe-inline' - the renderer sets style="" attributes (font
                                  stepping); element styles stay in the sheets.
-         The inline theme script is admitted by hash - change it, rehash it. -->
+         The two inline scripts (the pre-paint theme, and the last-resort
+         boot message below) are each admitted by their own hash - change
+         either one and rehash it, or it silently stops running. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-o1OJtOYup8CcPW/GTXWqN/q4fHOREV9wzGW+rZoycms='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self' blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-o1OJtOYup8CcPW/GTXWqN/q4fHOREV9wzGW+rZoycms=' 'sha256-Z16yHOTWV/Wfnoo+EH2LJkzOgCYVpsGar2ueJcLaG7Q='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self' blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <meta
       name="description"
@@ -40,6 +42,46 @@
             document.documentElement.setAttribute("data-theme", "light");
           }
         } catch (e) {}
+      })();
+    </script>
+
+    <!-- The last-resort message. Every other failure in this app has a
+         sentence; the one that never did was the worst of them. If app.js is
+         truncated by a bad deploy, or uses syntax an older iPhone cannot
+         parse, nothing runs — no catch, no render — and this page reads
+         "Loading recipes…" for ever, which on the phone this book was built
+         for looks like a broken phone rather than a broken deploy.
+         Inline on purpose: a separate file could fail the same way app.js
+         just did. Admitted by its own hash in the policy above — change this
+         script and rehash it, or the page boots without its safety net. -->
+    <script>
+      (function () {
+        function down() {
+          var app = document.getElementById("app");
+          if (!app || app.getAttribute("data-booted") === "1") return;
+          app.textContent = "";
+          var p = document.createElement("p");
+          p.className = "boot";
+          p.textContent = "Kitchen Table could not start on this phone. " +
+            "It is not something you did — try again, and if it keeps " +
+            "happening the app needs a fix rather than you.";
+          var wrap = document.createElement("p");
+          wrap.className = "boot";
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "bigbtn press";
+          b.textContent = "Try again";
+          b.addEventListener("click", function () { location.reload(); });
+          wrap.appendChild(b);
+          app.appendChild(p);
+          app.appendChild(wrap);
+        }
+        /* A syntax error or a synchronous throw says so at once; anything
+           slower (a script that never arrives) falls to the timer. */
+        window.addEventListener("error", function (e) {
+          if (e && e.filename && e.filename.indexOf("app.js") > -1) down();
+        });
+        setTimeout(down, 8000);
       })();
     </script>
 

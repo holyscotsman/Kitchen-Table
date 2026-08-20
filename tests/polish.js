@@ -249,6 +249,43 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== When the app itself cannot start (R29) ==');
+  {
+    /* Every other failure in this app has a sentence. The one that never did
+       was the worst of them: if app.js is truncated by a bad deploy, or uses
+       syntax an older iPhone cannot parse, nothing runs — no catch, no
+       render — and the page reads "Loading recipes…" for ever. On the phone
+       this book was built for, that looks like a broken phone rather than a
+       broken deploy, and there is nothing to do about it. */
+    const ctxDead = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pDead = await ctxDead.newPage();
+    await pDead.route('**/app.js', route => route.fulfill({
+      status: 200, contentType: 'text/javascript',
+      body: 'this is not javascript ((('
+    }));
+    await pDead.goto(B + '/index.html');
+    await pDead.waitForTimeout(1200);
+    const text = await pDead.locator('#app').textContent();
+    chk('it does not sit on "Loading recipes…" for ever',
+      !/Loading recipes/.test(text), text.slice(0, 70));
+    chk('it says so in words, and says it is not your fault',
+      /could not start/i.test(text) && /not something you did/i.test(text),
+      text.slice(0, 90));
+    const again = pDead.locator('#app button');
+    chk('and offers a way to try again', await again.count() === 1);
+    chk('which is a real tap target',
+      (await again.boundingBox()).height >= 44,
+      String((await again.boundingBox()).height));
+    /* And the message must never appear over a working app. */
+    await pDead.unroute('**/app.js');
+    await pDead.reload();
+    await pDead.waitForSelector('.main__title');
+    await pDead.waitForTimeout(1500);
+    chk('a healthy boot never shows it',
+      !/could not start/i.test(await pDead.locator('#app').textContent()));
+    await ctxDead.close();
+  }
+
   console.log('\n== Download, commit, read back — the whole loop (R26) ==');
   {
     /* This is how an edit becomes permanent in a no-server app: Download
