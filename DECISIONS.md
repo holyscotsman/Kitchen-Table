@@ -243,3 +243,28 @@ in the database gets a suffix, and the duplicate is left visible for the
 family to resolve. Pull cadence is unchanged — devices still refresh from
 the published file, so an accepted import reaches other phones after the
 nightly sync commits, or sooner if someone runs the workflow by hand.
+
+## R20 — The status-bar pad is the device's number, not the reference's constant
+
+**Provisional; Jason can reverse it in one line.** The design references pad
+the top of all three screens on narrow widths — `statusPad`, a flat 60px on
+Main and 54px on the Menu and Recipe headers — to clear the phone's status
+bar. That is right for a Home Screen install, where the page genuinely runs
+under it. It is wrong in a browser tab, which is how the family actually
+opens this today: the browser's own chrome already occupies that space, so
+the pad is dead, charged at the top of every screen and — on the two sticky
+headers — at every scroll position, on the devices with the least room.
+
+The ruling: keep the *intent* and drop the *constant*. All three read
+`calc(base + env(safe-area-inset-top))` now, the same technique the sheets
+and the lightbox already used. In a tab the inset is 0 and the space comes
+back; added to the Home Screen on a notched phone the inset supplies the
+exact number the constant was guessing at. The Menu's sticky header goes
+208px → 168px, a quarter of an iPhone viewport down to a fifth.
+
+**What it costs if reversed:** one media-query value per screen. **Why it
+was taken without asking:** it is the design's own intent expressed
+accurately, on the axis this app exists to serve — a low-vision reader at
+200% zoom gets a third of the viewport back on the Menu rather than losing
+41% of it to chrome. If Jason wants the reference's literal spacing on
+phones in a tab, say so and it goes back.
