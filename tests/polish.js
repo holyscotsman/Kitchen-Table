@@ -249,6 +249,99 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== Download, commit, read back — the whole loop (R26) ==');
+  {
+    /* This is how an edit becomes permanent in a no-server app: Download
+       updated recipes.json → someone commits it → every phone reads it. The
+       download's individual fields have been spot-checked since the first
+       build, but the LOOP never was, and a field quietly dropped on the way
+       out would lose family data silently and for good. */
+    /* serviceWorkers: 'block' is load-bearing, not tidiness. Once the worker
+       is installed on this origin it answers recipes.json itself, and a
+       page.route() stub never sees the request — so the "read it back"
+       half below would quietly test the shipped file instead of the
+       downloaded one and pass while proving nothing. (Same shape as R9's
+       vacuous offline check and R21's vacuous seeding: a stub that loses to
+       the worker is not a stub.) */
+    const ctxRt = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pRt = await ctxRt.newPage();
+    const rtErrs = []; pRt.on('pageerror', e => rtErrs.push(e.message));
+    await pRt.goto(B + '/index.html');
+    await pRt.evaluate(() => { localStorage.removeItem('kt.recipes'); });
+    await pRt.goto(B + '/index.html#chicken-cordon-bleu');
+    await pRt.reload();
+    await pRt.waitForSelector('.r-title');
+    await pRt.click('[data-act="toggle-edit"]');
+    await pRt.waitForTimeout(300);
+    const grab = async () => {
+      const [d] = await Promise.all([pRt.waitForEvent('download'),
+        pRt.click('[data-act="dl-json"]')]);
+      let t = ''; const st = await d.createReadStream(); for await (const c of st) t += c;
+      return t;
+    };
+    const first = await grab();
+    const shipped = await pRt.evaluate(() => fetch('recipes.json').then(r => r.json()));
+    const out = JSON.parse(first);
+
+    chk('every recipe comes back out', out.length === shipped.length,
+      out.length + ' vs ' + shipped.length);
+    chk('in the same order', out.every((r, i) => r.id === shipped[i].id));
+    /* Field by field, with the two documented transformations allowed and
+       nothing else: the category rename, and a local photo becoming a path. */
+    const CATS_OLD = { Side: 'Sides', Dessert: 'Desserts', Snack: 'Snacks', Drink: 'Drinks' };
+    const drift = [];
+    out.forEach((r, i) => {
+      const src = shipped[i];
+      const keys = new Set([...Object.keys(r), ...Object.keys(src)]);
+      keys.forEach(k => {
+        const a = JSON.stringify(r[k]), b = JSON.stringify(src[k]);
+        if (a === b) return;
+        if (k === 'category' && r.category === (CATS_OLD[src.category] || src.category)) return;
+        if (k === 'image' && /^images\//.test(r.image || '')) return;
+        /* orderFields drops empty strings — an absent field and "" mean the
+           same thing to this app, and always have. */
+        if (a === undefined && b === '""') return;
+        drift.push(src.id + '.' + k + ': ' + String(b).slice(0, 30) + ' → ' + String(a).slice(0, 30));
+      });
+    });
+    chk('and nothing is lost or altered on the way out', drift.length === 0,
+      drift.slice(0, 3).join(' | '));
+
+    /* Now the edit, and the round trip proper. */
+    await pRt.fill('#e-title', 'Chicken Cordon Bleu (Round Trip)');
+    await pRt.click('[data-act="save"]');
+    await pRt.waitForTimeout(400);
+    const edited = await grab();
+    const back = JSON.parse(edited);
+    chk('the edit is in the file', back.find(r => r.id === 'chicken-cordon-bleu')
+      .title === 'Chicken Cordon Bleu (Round Trip)');
+    chk('and it is the only thing that moved',
+      back.filter((r, i) => JSON.stringify(r) !== JSON.stringify(out[i])).length === 1,
+      String(back.filter((r, i) => JSON.stringify(r) !== JSON.stringify(out[i])).length));
+
+    /* Serve that exact file as the published book, with no local changes at
+       all — which is what every OTHER phone sees after the commit. */
+    await pRt.route('**/recipes.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: edited }));
+    await pRt.goto(B + '/index.html#menu');
+    await pRt.evaluate(() => { localStorage.removeItem('kt.recipes'); });
+    await pRt.reload();
+    await pRt.waitForSelector('.rcard');
+    chk('committed, it reads back as the same book',
+      await pRt.locator('.rcard').count() === shipped.length,
+      String(await pRt.locator('.rcard').count()));
+    await pRt.goto(B + '/index.html#chicken-cordon-bleu');
+    await pRt.waitForSelector('.r-title');
+    chk('with the edit now published, not local',
+      (await pRt.locator('.r-title').textContent()).includes('Round Trip'),
+      (await pRt.locator('.r-title').textContent()).slice(0, 60));
+    chk('and the recipe still has its ingredients and steps',
+      (await pRt.locator('.checklist').first().textContent()).trim().length > 10 &&
+      (await pRt.locator('.checklist--steps').textContent()).trim().length > 20);
+    chk('no page errors anywhere in the loop', rtErrs.length === 0, rtErrs.join(' | '));
+    await ctxRt.close();
+  }
+
   console.log('\n== A recipe on paper (R24) ==');
   {
     /* "Print is the PDF path" (CLAUDE.md): the download sheet's PDF option is
