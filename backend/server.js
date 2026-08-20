@@ -151,8 +151,20 @@ function jobPublic(row, uptimeS) {
 
 /* ----------------------------------------------------------------- routes */
 
+/* A body the server cannot read is the caller's mistake, not a server
+ * error: 400 with the reason, never a 500 that reads like the kitchen fell
+ * over. Returns null when it has already answered. */
+async function bodyOr400(req, res) {
+  try { return await readJson(req); }
+  catch (e) {
+    send(res, 400, { error: "That request body could not be read (" + e.message + ")." });
+    return null;
+  }
+}
+
 async function postVideo(req, res) {
-  const body = await readJson(req);
+  const body = await bodyOr400(req, res);
+  if (!body) return;
   const parsed = parseVideoUrl(body.url);
   if (parsed.error) return send(res, 400, { error: parsed.error });
   if (!anthropic) {
@@ -222,44 +234,70 @@ async function acceptJob(req, res, id) {
   if (job.status !== "ready_for_review") {
     return send(res, 409, { error: "that import isn’t ready to accept (status: " + job.status + ")" });
   }
-  const body = await readJson(req);
+  const body = await bodyOr400(req, res);
+  if (!body) return;
   const v = validateRecipe(body.recipe);
   if (v.error) return send(res, 400, { error: v.error });
   const r = v.recipe;
 
-  /* The phone chose the id against its own copy of the book; another device
-   * may have taken it since. Suffix rather than overwrite — a duplicate the
-   * family can see and delete beats a recipe silently replaced. */
-  let id2 = r.id;
-  let n = 2;
-  while ((await sql`select 1 from kitchen.recipes where id = ${id2}`).length) {
-    id2 = r.id + "-" + n++;
+  /* Claim the job before writing anything. The ready-for-review list is
+   * shared on purpose — someone else's finished import is family news — so
+   * two people can be looking at the same draft and both press Save. Reading
+   * the status and then inserting lets both through: both see
+   * ready_for_review, both insert, and the id collision below suffixes
+   * rather than overwrites, leaving the family a duplicate to find and
+   * delete. One conditional update decides it instead. */
+  const claimed = await sql`
+    update kitchen.import_jobs
+       set status = 'imported', updated_at = now()
+     where id = ${id} and status = 'ready_for_review'
+     returning id`;
+  if (!claimed.length) {
+    /* Someone else got there first, which is not an error: the recipe they
+     * accepted is the same one, and it is already in. */
+    return send(res, 200, { ok: true, id: null });
   }
 
-  await sql`insert into kitchen.contributors (name) values (${r.contributor})
-            on conflict (name) do nothing`;
-  await sql`
-    insert into kitchen.recipes
-      (id, title, category, contributor_id, servings, prep_time, cook_time,
-       ingredients, steps, notes, flagged, source, image, position)
-    values
-      (${id2}, ${r.title}, ${r.category},
-       (select id from kitchen.contributors where name = ${r.contributor}),
-       ${r.servings}, ${r.prepTime || null}, ${r.cookTime || null},
-       ${JSON.stringify(r.ingredients)}, ${JSON.stringify(r.steps)},
-       ${r.notes || null}, ${JSON.stringify(r.flagged)},
-       ${r.source || null}, ${r.image || null},
-       (select coalesce(max(position), -1) + 1 from kitchen.recipes))`;
-  for (const t of r.tags) {
-    await sql`insert into kitchen.tags (name) values (${t}) on conflict (name) do nothing`;
-    await sql`insert into kitchen.recipe_tags (recipe_id, tag_id)
-              values (${id2}, (select id from kitchen.tags where name = ${t}))
-              on conflict do nothing`;
+  try {
+    /* The phone chose the id against its own copy of the book; another device
+     * may have taken it since. Suffix rather than overwrite — a duplicate the
+     * family can see and delete beats a recipe silently replaced. */
+    let id2 = r.id;
+    let n = 2;
+    while ((await sql`select 1 from kitchen.recipes where id = ${id2}`).length) {
+      id2 = r.id + "-" + n++;
+    }
+
+    await sql`insert into kitchen.contributors (name) values (${r.contributor})
+              on conflict (name) do nothing`;
+    await sql`
+      insert into kitchen.recipes
+        (id, title, category, contributor_id, servings, prep_time, cook_time,
+         ingredients, steps, notes, flagged, source, image, position)
+      values
+        (${id2}, ${r.title}, ${r.category},
+         (select id from kitchen.contributors where name = ${r.contributor}),
+         ${r.servings}, ${r.prepTime || null}, ${r.cookTime || null},
+         ${JSON.stringify(r.ingredients)}, ${JSON.stringify(r.steps)},
+         ${r.notes || null}, ${JSON.stringify(r.flagged)},
+         ${r.source || null}, ${r.image || null},
+         (select coalesce(max(position), -1) + 1 from kitchen.recipes))`;
+    for (const t of r.tags) {
+      await sql`insert into kitchen.tags (name) values (${t}) on conflict (name) do nothing`;
+      await sql`insert into kitchen.recipe_tags (recipe_id, tag_id)
+                values (${id2}, (select id from kitchen.tags where name = ${t}))
+                on conflict do nothing`;
+    }
+    send(res, 200, { ok: true, id: id2 });
+  } catch (e) {
+    /* The claim is only good if the write follows it. Hand the draft back to
+     * the review screen rather than eating it — a job stuck on 'imported'
+     * with no recipe behind it is work quietly lost. */
+    await sql`update kitchen.import_jobs
+                 set status = 'ready_for_review', updated_at = now()
+               where id = ${id}`.catch(() => {});
+    throw e;
   }
-  await sql`update kitchen.import_jobs
-               set status = 'imported', updated_at = now()
-             where id = ${id}`;
-  send(res, 200, { ok: true, id: id2 });
 }
 
 /* ----------------------------------------------------------------- server */
