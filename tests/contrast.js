@@ -65,7 +65,55 @@ const CONTRAST = `(() => {
     }
   }
   }
+
+  /* `R82` — paper is a screen this audit had never looked at.
+     The print stylesheet keeps a hand-written list of "these carry --dim /
+     --card-dim, which are near-white on the dark theme and so vanish
+     entirely on paper" — a list maintained by memory, which is exactly the
+     kind of thing this project stops maintaining by memory. The same audit,
+     under `media: print`, says what is actually on the page.
+     Both themes on purpose: print is supposed to be theme-independent, so a
+     failure that appears in one theme and not the other is the dark palette
+     leaking onto paper — which is precisely the bug. */
+  for(const theme of ['dark','light']){
+    for(const [name,hash,extra] of [
+      ['Recipe','#chicken-cordon-bleu',null],
+      ['Recipe with a tag','#scottish-tablet',null],
+      ['Recipe rescaled','#potato-bacon-soup','[data-act="serv+"]'],
+      ['Week plan + shopping list','#plan','[data-act="toggle-list"]']
+    ]){
+      const ctx=await br.newContext({viewport:{width:820,height:1160}});
+      await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
+      const p=await ctx.newPage();
+      await p.addInitScript(t=>{
+        localStorage.setItem('kt.theme',JSON.stringify(t));
+        const iso=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+        localStorage.setItem('kt.plan',JSON.stringify([
+          {date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
+          {date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
+        ]));
+      },theme);
+      /* Set the state on screen, THEN switch to paper. Print hides the very
+         controls some of these routes need — `.servbtn` is display:none
+         there, so rescaling first and printing second is the only order
+         that reaches a rescaled page at all. */
+      await p.goto(''+B+'/index.html'+hash);
+      await p.waitForTimeout(900);
+      if(extra){ try{ await p.click(extra,{timeout:4000}); }catch(e){ console.log("  (trigger missing: "+extra+")"); } await p.waitForTimeout(400); }
+      await p.emulateMedia({media:'print'});
+      await p.waitForTimeout(300);
+      /* A floor: paper that rendered nothing would read as a clean pass. */
+      const drew=await p.evaluate(()=>document.querySelectorAll('#app *').length);
+      if(drew<20){ console.log('  (print page drew almost nothing: '+drew+' elements)'); total++; }
+      const bad=await p.evaluate(CONTRAST);
+      console.log('[print/'+theme+'] '+name+': '+(bad.length?bad.length+' FAILURES':'AA clean'));
+      bad.forEach(x=>console.log('    '+x.ratio+':1 (need '+x.need+') '+x.size+'px '+x.sel+' "'+x.txt+'"'));
+      total+=bad.length;
+      await ctx.close();
+    }
+  }
+
   await br.close();
-  console.log('\nTotal AA failures across both themes: '+total);
+  console.log('\nTotal AA failures across every screen, and on paper: '+total);
   process.exit(total?1:0);
 })();
