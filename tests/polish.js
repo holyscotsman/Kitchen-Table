@@ -822,6 +822,146 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pPaper.close();
   }
 
+  console.log('\n== The way out of a sheet must stay on screen (R55) ==');
+  {
+    /* Every sheet has a Done button in its head and a full-screen scrim
+       behind it, and both close it. The scrim is the invisible one — a bare
+       button with an aria-label and nothing drawn — so Done is the whole of
+       what a reader can SEE to get out. And Done scrolls: measured on the
+       Filter sheet, 1134px of content in a 544px window, Done sitting 590px
+       above the fold once you reach the tags. A reader who scrolls down to
+       find "Scottish" has, at that moment, no visible way back out of the
+       sheet at all — on a phone with no Escape key, for the reader this app
+       is built around. Landscape is the same fault, worse: the sheet is
+       320px tall there. */
+    const sheets = [
+      ['Filter', async (pg) => {
+        await pg.goto(B + '/index.html#menu'); await pg.waitForSelector('.rcard');
+        await pg.click('[data-act="open-filter"]'); await pg.waitForSelector('#filter-sheet');
+      }],
+      ['Text size', async (pg) => {
+        await pg.goto(B + '/index.html#menu'); await pg.waitForSelector('.rcard');
+        await pg.click('[data-act="open-text"]'); await pg.waitForSelector('.sheet');
+      }],
+      ['Download', async (pg) => {
+        await pg.goto(B + '/index.html#chicken-cordon-bleu'); await pg.waitForSelector('.r-title');
+        await pg.click('[data-act="open-dl"]'); await pg.waitForSelector('.sheet');
+      }],
+      ['Recipe picker', async (pg) => {
+        await pg.goto(B + '/index.html#plan'); await pg.waitForSelector('.slotadd');
+        await pg.locator('.slotadd').first().click(); await pg.waitForSelector('#pick-q');
+      }]
+    ];
+    /* Measured at the bottom of the scroll, which is the only place the
+       fault shows. The question is not "is Done pinned" — two shapes are in
+       use here and both are fine: a Done in the head (Filter, Text size) and
+       a big Cancel at the end of a short sheet (Download). The question is
+       whether ANY control that closes this sheet, and that a person can
+       actually see, is fully on screen from down there. The scrim closes it
+       too and is deliberately excluded: it is drawn as nothing. */
+    const wayOut = (pg) => pg.evaluate(() => {
+      const s = document.querySelector('.sheet');
+      if (!s) return null;
+      s.scrollTop = s.scrollHeight;
+      return new Promise(res => requestAnimationFrame(() => {
+        const vh = window.innerHeight;
+        const outs = [...s.querySelectorAll('[data-act]')]
+          .filter(el => /^close-/.test(el.getAttribute('data-act')) &&
+            !el.classList.contains('scrim'))
+          .map(el => {
+            const b = el.getBoundingClientRect();
+            /* On screen is not the same as reachable. A pinned bar with no
+               background and no stacking order sits exactly where this
+               measurement wants it while the chips scroll over the top of
+               it — so ask the browser what is actually at that point. */
+            const hit = document.elementFromPoint(
+              Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+            return { text: el.textContent.trim().slice(0, 12),
+              top: Math.round(b.top), bottom: Math.round(b.bottom),
+              h: Math.round(b.height),
+              hit: hit ? (hit === el || el.contains(hit) ? 'self'
+                : (hit.className || hit.tagName) + '') : 'nothing',
+              onScreen: b.top >= 0 && b.bottom <= vh && b.height >= 44 };
+          });
+        /* A bar that is pinned over scrolling content has to be opaque, or
+           the chips travel visibly through the words. Sticky alone already
+           wins the hit test — it is a positioned element — so this is the
+           half elementFromPoint cannot see. */
+        const head = s.querySelector('.sheet__head');
+        const hs = head ? getComputedStyle(head) : null;
+        const pinned = !!hs && hs.position === 'sticky';
+        const bg = hs ? hs.backgroundColor : '';
+        const alpha = /rgba?\(([^)]+)\)/.test(bg)
+          ? parseFloat((bg.match(/rgba?\(([^)]+)\)/)[1].split(',')[3] || '1'))
+          : (bg && bg !== 'transparent' ? 1 : 0);
+        res({ vh, outs, scrolled: s.scrollTop,
+          scrollable: s.scrollHeight - s.clientHeight,
+          pinned, bg, seeThrough: pinned && !(alpha > 0.99),
+          onScreen: outs.some(o => o.onScreen) });
+      }));
+    });
+
+    for (const [label, size] of [['upright', devices['iPhone 13'].viewport],
+      ['on its side', { width: 844, height: 390 }]]) {
+      const ctxS = await br.newContext({ ...devices['iPhone 13'], viewport: size });
+      const pS = await ctxS.newPage();
+      const bad = [];
+      const covered = [];
+      let scrolledSomething = 0;
+      for (const [name, open] of sheets) {
+        /* Sheets survive a same-hash goto — that is a same-document
+           navigation, so nothing re-renders. Close the last one first. */
+        if (await pS.locator('.sheet').count()) {
+          await pS.keyboard.press('Escape');
+          await pS.waitForTimeout(250);
+        }
+        await open(pS);
+        await pS.waitForTimeout(650);          // let the slide-up settle
+        const r = await wayOut(pS);
+        if (!r || !r.outs.length) { bad.push(name + ': nothing visible closes it'); continue; }
+        if (r.scrolled > 0) scrolledSomething++;
+        if (!r.onScreen) bad.push(name + ' ' + label + ': ' +
+          r.outs.map(o => '"' + o.text + '" @' + o.top + '-' + o.bottom +
+            ' h' + o.h).join(', ') + ' — screen is ' + r.vh);
+        else if (!r.outs.some(o => o.onScreen && o.hit === 'self')) {
+          covered.push(name + ' ' + label + ': ' +
+            r.outs.filter(o => o.onScreen)
+              .map(o => '"' + o.text + '" is under ' + o.hit).join(', '));
+        }
+        if (r.seeThrough) {
+          covered.push(name + ' ' + label + ': pinned but see-through (' + r.bg + ')');
+        }
+      }
+      chk('every sheet keeps its way out on screen, ' + label,
+        bad.length === 0, bad.join(' | '));
+      /* The floor: if nothing actually scrolled, the check above is asking a
+         question no sheet was in a position to fail. */
+      chk('and nothing scrolls over or through it, ' + label,
+        covered.length === 0, covered.join(' | '));
+      chk('and at least one sheet really was scrolled, ' + label,
+        scrolledSomething > 0, String(scrolledSomething));
+      await ctxS.close();
+    }
+
+    /* Painted in the right place is not the same as working there. */
+    {
+      const ctxT = await br.newContext({ ...devices['iPhone 13'] });
+      const pT = await ctxT.newPage();
+      await sheets[0][1](pT);
+      await pT.waitForTimeout(650);
+      await pT.evaluate(() => {
+        const s = document.querySelector('.sheet');
+        s.scrollTop = s.scrollHeight;
+      });
+      await pT.waitForTimeout(200);
+      await pT.locator('.sheet__head .donebtn').click({ timeout: 3000 });
+      await pT.waitForTimeout(400);
+      chk('and tapping it from down there really does close the sheet',
+        await pT.locator('.sheet').count() === 0);
+      await ctxT.close();
+    }
+  }
+
   console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
     /* Playwright's offline emulation does NOT reach fetches made by a
