@@ -23,10 +23,30 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     localStorage.setItem('kt.fsIndex', '4'); // 40px, the top step
   });
 
+  /* `R79` — a screen has two states and only one of them was ever measured.
+     The week planner was in this list from the start, and it was in it
+     EMPTY: seven "Add dinner" buttons and nothing else. The state that
+     matters is the one with meals in it and the shopping list open, which
+     is where the reader's chosen size lands on the longest strings in the
+     app — ingredient lines at 40px inside a 320px viewport. Same lesson as
+     `R61` and `R16`: a route in the list is not the same as the route's
+     content in the list. */
+  const seedPlan = () => {
+    const iso = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    localStorage.setItem('kt.plan', JSON.stringify([
+      { date: iso(0), slot: 'dinner', recipeId: 'chicken-cordon-bleu', servings: 8 },
+      { date: iso(0), slot: 'lunch', recipeId: 'potato-bacon-soup', servings: 6 },
+      { date: iso(1), slot: 'dinner', recipeId: 'chicken-lasagne', servings: 4 },
+      { date: iso(2), slot: 'breakfast', recipeId: 'scones', servings: 12 }
+    ]));
+  };
+
   const screens = [
     ['Main', '#', '.main__title', null],
     ['Menu', '#menu', '.rcard', null],
     ['Week planner', '#plan', '.dayblock', null],
+    ['Week planner with meals + shopping list', '#plan', '.dayblock',
+      '[data-act="toggle-list"]', seedPlan],
     ['Menu + filter sheet', '#menu', '.rcard', '[data-act="open-filter"]'],
     ['Menu + text sheet', '#menu', '.rcard', '[data-act="open-text"]'],
     ['Recipe', '#chicken-cordon-bleu', '.r-title', null],
@@ -40,13 +60,33 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     ['Add review form', '#add', '.pathbtn', '[data-key="review"]']
   ];
 
-  for (const [name, hash, ready, extra] of screens) {
+  for (const [name, hash, ready, extra, seed] of screens) {
     /* A hash-only goto is not a navigation — blank first, so each screen
        starts clean and no sheet leaks into the next measurement. */
     await p.goto('about:blank');
+    if (seed) {
+      /* Seeding needs the origin, and the screen has to be loaded AFTER the
+         write or it renders the empty state it was meant to replace. */
+      await p.goto(B + '/index.html');
+      await p.evaluate(seed);
+      await p.goto('about:blank');
+    }
     await p.goto(B + '/index.html' + hash);
     await p.waitForSelector(ready);
     if (extra) { await p.click(extra); await p.waitForTimeout(400); }
+    if (seed) {
+      /* A seed that missed leaves the empty screen behind, and an empty
+         screen passes a reflow check on nothing at all. One of the four
+         ids in the first draft of this was wrong; the floor is what said
+         so. */
+      const drew = await p.evaluate(() => ({
+        meals: document.querySelectorAll('.dayblock .mealcard').length,
+        items: document.querySelectorAll('.shoplist__items li').length
+      }));
+      chk(name + ': the seeded week really drew',
+        drew.meals === 4 && drew.items > 5, JSON.stringify(drew));
+      await p.evaluate(() => localStorage.removeItem('kt.plan'));
+    }
 
     const r = await p.evaluate(() => {
       const doc = document.scrollingElement;

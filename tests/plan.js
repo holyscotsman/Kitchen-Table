@@ -113,6 +113,59 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     [...document.querySelectorAll('.shoplist__items li')].some(li => /\d\.\d/.test(li.textContent)))));
   chk('the preview says what it is', (await p.locator('.shoplist__head').textContent()).toLowerCase().includes('preview'));
 
+  console.log('\n== R79 — the list you read in the shop is recipe text ==');
+  {
+    /* `R78` fixed the review form and wrote the rule down: recipe text
+       scales wherever it appears. This is the other place it appears. The
+       shopping list is ingredient lines — the recipe's own words, rescaled
+       to the servings planned — and they sat at a hardcoded 17px at every
+       step. Someone who set 40px because they cannot read 24px got 17px in
+       the shop, at arm's length, holding a phone in one hand.
+       There is no A−/A+ on this screen either, so it could not even be
+       fixed in place. The check is against the recipe screen: the same
+       words, at the same size, on both screens. */
+    const sizeOn = async (hash, ready, sel, step) => {
+      await p.evaluate((v) => localStorage.setItem('kt.fsIndex', v), step);
+      await p.goto('about:blank');
+      await p.goto(B + '/index.html' + hash);
+      await p.waitForSelector(ready);
+      if (hash === '#plan') {
+        const open = await p.locator('[data-act="toggle-list"]').count();
+        if (open) {
+          const expanded = await p.getAttribute('[data-act="toggle-list"]', 'aria-expanded');
+          if (expanded !== 'true') await p.click('[data-act="toggle-list"]');
+          await p.waitForSelector('.shoplist__items');
+        }
+      }
+      try {
+        return await p.evaluate((q) => {
+          const el = document.querySelector(q);
+          return el ? parseFloat(getComputedStyle(el).fontSize) : -1;
+        }, sel);
+      } catch (e) { return -1; }
+    };
+    const seen = {};
+    for (const step of ['0', '4']) {
+      const shop = await sizeOn('#plan', '.dayblock', '.shoplist__items li', step);
+      const ing = await sizeOn('#chicken-cordon-bleu', '.r-title', '.checkrow', step);
+      seen[step] = shop;
+      chk('a shopping-list line is the size of an ingredient line at step ' + step,
+        shop > 0 && Math.abs(shop - ing) < 0.5, 'shop ' + shop + 'px vs recipe ' + ing + 'px');
+    }
+    /* The floor: both could agree by both being frozen. */
+    chk('and the shopping list actually moves when the step does',
+      seen['4'] > seen['0'] * 1.5, seen['0'] + ' -> ' + seen['4']);
+    await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#plan');
+    await p.waitForSelector('.dayblock');
+    if (await p.locator('[data-act="toggle-list"]').count()) {
+      const expanded = await p.getAttribute('[data-act="toggle-list"]', 'aria-expanded');
+      if (expanded !== 'true') await p.click('[data-act="toggle-list"]');
+      await p.waitForSelector('.shoplist__items');
+    }
+  }
+
   console.log('\n== The shopping list had its own parser (R64) ==');
   {
     /* The list sums what it can and lists the rest as written — 130, shipped

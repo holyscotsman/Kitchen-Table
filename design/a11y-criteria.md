@@ -73,7 +73,12 @@ a known gap, not a silent one.
    had chosen. A new screen that shows or edits recipe text inherits this
    or it is broken for the person the app was built for; the two forms are
    measured against each other at more than one step, with a floor so they
-   cannot pass by both being wrong.
+   cannot pass by both being wrong. `R79` found the third place — the week
+   plan's shopping list, ingredient lines at a hardcoded 17px on the screen
+   you read in the shop. **The test for "is this recipe text?" is whose
+   words they are**, not which screen they are on: quantities and
+   ingredient names are the recipe's, so they scale; day headings, sheet
+   titles and hints are the app's, so they do not.
 10. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
