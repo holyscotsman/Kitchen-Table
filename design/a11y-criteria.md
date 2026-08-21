@@ -6,8 +6,8 @@ of gameplan task `034`; the precedent it enforces is `DECISIONS.md` §033:
 
 Two sections. The first is enforced by the suites on every PR — a reviewer
 checks that the new feature is *covered* by them, not that they pass (CI does
-that). The second is manual and cheap. **Five items moved from the second
-list to the first between `R23` and `R37`**, and four of those five found a
+that). The second is manual and cheap. **Six items moved from the second
+list to the first between `R23` and `R39`**, and four of those five found a
 real defect on the way: a control under the tap floor, every text field with
 its focus ring switched off, a notice announced twelve times, and Easy Read
 drawn as on while announcing nothing. A reviewer's attention is not a durable
@@ -53,7 +53,12 @@ a known gap, not a silent one.
    state goes off. Checked by comparing the on state against the off state,
    not by looking for the presence of an attribute: an attribute that never
    changes passes the second test and fails the reader.
-9. **Names, labels, focus order and decorative artwork** (`R23`). Every
+9. **Chrome does not scale with reading text** (`R39`). A−/A+ is for the
+   recipe, not for the app: three presses must move `.recipe` and leave the
+   header, the back link and the stepper exactly where they were. Labels
+   *inside* the recipe do scale, because they are the recipe — that
+   distinction is the point, so it is asserted rather than assumed.
+10. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
    every decorative `<svg>` is hidden from the accessibility tree. Checked on
@@ -65,15 +70,13 @@ a known gap, not a silent one.
 
 ## Checked by the reviewer, by hand
 
-10. **No hover-only affordances.** Everything reachable by tap alone.
+11. **No hover-only affordances.** Everything reachable by tap alone.
    (Partly enforced: `tests/polish.js` proves no `a:hover` rule turns a
    filled control invisible.)
-11. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
+12. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
    return focus to the opener. Reuse the existing machinery; don't rebuild it.
-12. **Colour is never the only signal** — pair it with a word, a glyph, or a
+13. **Colour is never the only signal** — pair it with a word, a glyph, or a
     weight change.
-13. **Chrome does not scale with reading text.** New UI takes the fixed
-    chrome sizes; only recipe content follows the A−/A+ stepper.
 14. **Easy Read survives it.** Open the feature with Easy Read on, top step:
     one column, no faded text, nothing truncated.
 15. **Both themes, by eye.** The automated audit catches ratios, not a
