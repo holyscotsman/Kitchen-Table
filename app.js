@@ -2523,9 +2523,9 @@
                       (j.created_at ? " · " + esc(agoText(j.created_at)) : "") + "</p>" +
                       '<div class="vfailed__acts">' +
                       '<button type="button" class="outlinebtn press" data-act="video-retry" ' +
-                      'data-id="' + j.id + '" data-url="' + esc(j.url || "") + '">Try again</button>' +
+                      'data-id="' + esc(j.id) + '" data-url="' + esc(j.url || "") + '">Try again</button>' +
                       '<button type="button" class="outlinebtn press" data-act="video-dismiss" ' +
-                      'data-id="' + j.id + '">Dismiss</button>' +
+                      'data-id="' + esc(j.id) + '">Dismiss</button>' +
                       "</div></div>";
              }).join("") + "</div>";
       }
@@ -2535,7 +2535,7 @@
              "Open one to look it over and save it.</p>" +
              S.videoReady.map(function (j) {
                return '<button type="button" class="pathbtn press" data-act="video-open" ' +
-                      'data-id="' + j.id + '"><span class="pathbtn__t">' +
+                      'data-id="' + esc(j.id) + '"><span class="pathbtn__t">' +
                       esc(asText(j.title) || "Untitled recipe") + "</span>" +
                       '<span class="pathbtn__s">From ' +
                       (j.platform === "instagram" ? "Instagram" : "YouTube") +
@@ -3014,6 +3014,15 @@
      a cold server takes ~30–60s to wake, so a slow first answer flips the
      "waking up" notice (never an error) and one network failure retries
      once before giving up. */
+  /* A job id comes back from the server and then rides into a URL path.
+     Ordinarily it is a plain number; encoded anyway, because an id carrying
+     a slash, a "?" or a "#" would silently address a DIFFERENT endpoint on
+     that server rather than fail — and quietly doing the wrong thing is the
+     failure this app least wants. */
+  function jobPath(id, tail) {
+    return "/api/import/jobs/" + encodeURIComponent(String(id)) + (tail || "");
+  }
+
   function kitchenFetch(path, opts, quiet) {
     opts = opts || {};
     function attempt(retriesLeft) {
@@ -3101,7 +3110,7 @@
     /* A slow answer must not stack polls behind it — one in flight, ever. */
     if (videoPollBusy) return;
     videoPollBusy = true;
-    kitchenFetch("/api/import/jobs/" + S.videoJob.id, { timeout: 15000 }, true)
+    kitchenFetch(jobPath(S.videoJob.id), { timeout: 15000 }, true)
       .then(function (job) {
         videoPollBusy = false;
         if (!S.videoJob || S.videoJob.id !== job.id) return;
@@ -3259,7 +3268,7 @@
   function openReadyJob(id) {
     S.addBusy = "Fetching the draft…";
     render();
-    kitchenFetch("/api/import/jobs/" + id, { timeout: 20000 })
+    kitchenFetch(jobPath(id), { timeout: 20000 })
       .then(function (job) {
         S.addBusy = "";
         if (job.status === "ready_for_review") openVideoDraft(job);
@@ -3281,7 +3290,7 @@
      version and the job leaves the waiting list. Failure is said, not
      hidden — the job stays listed until an accept lands. */
   function acceptVideoJob(jobId, recipe) {
-    kitchenFetch("/api/import/jobs/" + jobId + "/accept",
+    kitchenFetch(jobPath(jobId, "/accept"),
       { method: "POST", body: { recipe: recipe }, timeout: 90000 }, true)
       .then(function () {
         S.videoReady = S.videoReady.filter(function (j) { return j.id !== jobId; });
