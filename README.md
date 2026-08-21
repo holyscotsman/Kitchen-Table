@@ -91,6 +91,14 @@ temperature — so the leading number in a step now scales where the meaning is
 plain and is left as Joan wrote it everywhere else. Ingredient lines are
 untouched by this: a leading number there *is* an amount.
 
+A hyphen is read for what it means (`R57`). Handwritten cards write one and a
+half as `1-1/2` and a range as `7-8`; both open with a number and a hyphen and
+they mean opposite things, so they are told apart by what follows — a fraction
+makes it one amount, a whole number makes it two ends of a range, and both ends
+scale. Before this, doubling turned `7-8 slices of bacon` into `14-8 slices`,
+and — the one that still looked like an amount — `1-1/2 teaspoons vanilla` into
+`2-1/2 teaspoons`, when one and a half doubled is three.
+
 **Tap any ingredient or step to check it off** while you cook. That state is
 deliberately per-visit and resets when you leave the recipe.
 

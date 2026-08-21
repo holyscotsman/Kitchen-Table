@@ -739,6 +739,67 @@ const browserContextWithReduce = (br) =>
     await pN.close();
   }
 
+  console.log('\n== A hyphen means two different things on a recipe card (R57) ==');
+  {
+    /* Handwritten cards write one-and-a-half as "1-1/2" and a range as
+       "7-8". Both open with a number and a hyphen and they mean opposite
+       things, and the scaler read every one of them as "a number, then some
+       text". Six ingredient lines in the book are affected, and the two
+       failure shapes are not equally visible:
+         "7-8 slices of bacon"        doubled to "14-8 slices"   — obvious
+         "1-1/2 teaspoons vanilla"    doubled to "2-1/2 teaspoons" — which
+       reads as two and a half and is wrong by a third; one and a half
+       doubled is three. A wrong amount that still looks like an amount is
+       the one worth catching. */
+    const pH = await ctx.newPage();
+    const doubled = async (id, servings) => {
+      await pH.goto(B + '/index.html#' + id);
+      await pH.waitForSelector('.checklist');
+      for (let i = 0; i < servings; i++) {
+        await pH.click('[data-act="serv+"]');
+        await pH.waitForTimeout(70);
+      }
+      await pH.waitForTimeout(250);
+      return pH.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    };
+    const cake = await doubled('warm-chocolate-pudding-cake', 8);
+    const vanilla = cake.find(l => /vanilla/i.test(l)) || '';
+    const water = cake.find(l => /hot water/i.test(l)) || '';
+    chk('one and a half teaspoons doubled is three, not two and a half',
+      /^3\s/.test(vanilla), vanilla);
+    chk('and one and a quarter cups doubled is two and a half',
+      /^2½/.test(water), water);
+
+    const bacon = await doubled('bacon-ranch-chicken-casserole', 6);
+    const slices = bacon.find(l => /bacon/i.test(l)) || '';
+    chk('a range doubles at both ends', /^14\s*[-–]\s*16\b/.test(slices), slices);
+
+    const cass = await doubled('creamy-chicken-casserole', 6);
+    const breasts = cass.find(l => /Chicken Breasts/i.test(l)) || '';
+    chk('including a range whose second half has no unit after it',
+      /^4\s*[-–]\s*8\b/.test(breasts), breasts);
+
+    const lasagne = await doubled('chicken-lasagne', 9);
+    const noodles = lasagne.find(l => /noodles/i.test(l)) || '';
+    chk('and one in the tens', /^20\s*[-–]\s*30\b/.test(noodles), noodles);
+
+    const keto = await doubled('keto-soup', 6);
+    const curry = keto.find(l => /curry/i.test(l)) || '';
+    chk('and one where a unit does follow', /^2\s*[-–]\s*4\b/.test(curry), curry);
+
+    /* A step that opens with what looks like a range is still a step, and
+       R56's rule still governs it: "390 - 3 mins" is an air-fryer setting
+       either way, and reading it as a range would have made it 780 - 6. */
+    await pH.goto(B + '/index.html#fries-in-ninja');
+    await pH.waitForSelector('.checklist--steps');
+    for (let i = 0; i < 4; i++) { await pH.click('[data-act="serv+"]'); await pH.waitForTimeout(70); }
+    await pH.waitForTimeout(250);
+    const fry = await pH.locator('.checklist--steps .checkrow__text').first().textContent();
+    chk('and the air-fryer setting is not a range either',
+      fry.trim() === '390 - 3 mins', fry);
+    await pH.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);
