@@ -3625,6 +3625,7 @@
           if (!res.ok) {
             var e = new Error(data.error || "The kitchen server answered oddly (HTTP " + res.status + ").");
             e.answered = true; /* the server spoke — never retry these */
+            e.status = res.status;
             throw e;
           }
           return data;
@@ -3636,10 +3637,25 @@
           return new Promise(function (r) { setTimeout(r, 3000); })
             .then(function () { return attempt(retriesLeft - 1); });
         }
-        throw new Error(err.answered
+        /* `R107` — carry what happened out to the caller. This function
+           built a fresh Error here and dropped everything it knew, so no
+           caller could tell a refusal that will read the same on every
+           attempt from an outage that clears itself.
+
+           `answered` and `status` are deliberately two facts, not one.
+           `answered` governs RETRYING and is unchanged: the server spoke,
+           so asking again down here would only get the same answer sooner.
+           `status` governs what a caller can SAY, and only a 4xx means the
+           server looked at this payload and refused it — a 503 is a
+           Render service still waking, which is the transient case wearing
+           an HTTP status. */
+        var out = new Error(err.answered
           ? err.message
           : "The kitchen server couldn’t be reached — it may still be waking " +
             "up, which takes about a minute. Try again shortly.");
+        out.answered = !!err.answered;
+        out.status = err.status || 0;
+        throw out;
       }).finally(function () {
         if (timer) clearTimeout(timer);
         if (wakeTimer) clearTimeout(wakeTimer);
@@ -3942,9 +3958,25 @@
       .then(function () {
         S.videoReady = S.videoReady.filter(function (j) { return j.id !== jobId; });
       })
-      .catch(function () {
-        setNotice("Saved on this phone. The kitchen server couldn’t be told " +
-          "yet, so this import stays in the waiting list for now.");
+      .catch(function (err) {
+        /* `R107` — two different failures, and one sentence for both of
+           them. The server either could not be reached, or it looked at the
+           recipe and said no. The first clears by itself; the second never
+           will, and saying "yet ... for now" about a refusal promises a
+           retry that is not coming, while the job sits in the waiting list
+           forever with nobody told why. The server's own words are the most
+           useful thing anybody gets out of this, so they are repeated
+           rather than swallowed — the error was not even bound before. */
+        var st = (err && err.status) || 0;
+        /* A refusal of this recipe, not a server having a bad day: 4xx,
+           less the two that mean "ask again" rather than "no". */
+        var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
+        setNotice(refused
+          ? "Saved on this phone. The kitchen server would not accept it: " +
+            err.message + " That will not clear by itself, so this one " +
+            "stays on this phone."
+          : "Saved on this phone. The kitchen server couldn’t be told " +
+            "yet, so this import stays in the waiting list for now.");
       });
   }
 
