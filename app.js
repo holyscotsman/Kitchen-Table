@@ -3728,21 +3728,35 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
+  /* Three ways out, in order: the phone's own share sheet, the clipboard, a
+     text file. None of them may end in silence — on a phone there is no
+     console to check, and a button that does nothing is indistinguishable
+     from a button that is still thinking. The one exception is deliberate:
+     a share sheet the reader DISMISSED is not a failure, and copying behind
+     their back would be worse than doing nothing. */
   function shareRecipe(r) {
     var text = recipeText(r);
-    if (navigator.share) {
-      navigator.share({ title: r.title, text: text }).catch(function () {});
-      return;
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    var file = function () {
+      downloadBlob(text, r.id + ".txt", "text/plain;charset=utf-8");
+      setNotice("Saved as a text file — this phone wouldn’t share or copy it.");
+    };
+    var copy = function () {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) { file(); return; }
       navigator.clipboard.writeText(text).then(function () {
         setNotice("Recipe copied to the clipboard.");
-      }).catch(function () {
-        downloadBlob(text, r.id + ".txt", "text/plain;charset=utf-8");
+      }).catch(file);
+    };
+    if (navigator.share) {
+      navigator.share({ title: r.title, text: text }).catch(function (err) {
+        /* AbortError is the reader closing the sheet. Anything else is the
+           sheet refusing, and refusing quietly is what this used to do. */
+        var name = (err && err.name) || "";
+        if (name === "AbortError" || /abort|cancel/i.test(name)) return;
+        copy();
       });
       return;
     }
-    downloadBlob(text, r.id + ".txt", "text/plain;charset=utf-8");
+    copy();
   }
 
   var wakeSentinel = null;

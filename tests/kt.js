@@ -182,6 +182,72 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
   }
 
+  console.log('\n== Share never ends in silence (R43) ==');
+  {
+    /* Three ways out, in order: the phone's own share sheet, the clipboard,
+       a text file. The first two failures were swallowed — press Share, the
+       sheet refuses to open, and nothing whatsoever happens. On a phone
+       there is no console to check and no way to tell a broken button from
+       a slow one. */
+    await p.goto(B+'/index.html#chicken-cordon-bleu');
+    await p.reload();
+    await p.waitForSelector('.r-title');
+    /* A share sheet that refuses (not one the user dismissed) must fall
+       through rather than stop. */
+    await p.evaluate(() => {
+      window.__copied = null;
+      navigator.share = () => Promise.reject(
+        Object.assign(new Error('nope'), { name: 'NotAllowedError' }));
+      Object.defineProperty(navigator, 'clipboard', { configurable: true,
+        value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+    });
+    await p.click('[data-act="share"]');
+    await p.waitForTimeout(400);
+    chk('a refused share sheet falls through to the clipboard',
+      (await p.evaluate(() => window.__copied) || '').includes('Cordon'));
+    chk('and says so, rather than leaving you guessing',
+      /copied to the clipboard/i.test(await p.locator('#main-content').textContent()),
+      (await p.locator('#main-content').textContent()).slice(0, 60));
+    /* A share sheet the user simply dismissed is not a failure and must stay
+       quiet — copying behind their back would be worse than doing nothing. */
+    await p.goto(B+'/index.html#chops');
+    await p.reload();
+    await p.waitForSelector('.r-title');
+    await p.evaluate(() => {
+      window.__copied = null;
+      navigator.share = () => Promise.reject(
+        Object.assign(new Error('cancelled'), { name: 'AbortError' }));
+      Object.defineProperty(navigator, 'clipboard', { configurable: true,
+        value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+    });
+    await p.click('[data-act="share"]');
+    await p.waitForTimeout(400);
+    chk('a share the reader cancelled copies nothing and says nothing',
+      (await p.evaluate(() => window.__copied)) === null &&
+      !/copied to the clipboard|saved as a text file/i.test(
+        await p.locator('#main-content').textContent()));
+    /* And the last resort — a text file — is announced too, because a file
+       appearing in Downloads unexplained is its own small mystery. */
+    await p.goto(B+'/index.html#chicken-cordon-bleu');
+    await p.reload();
+    await p.waitForSelector('.r-title');
+    await p.evaluate(() => {
+      delete navigator.share;
+      Object.defineProperty(navigator, 'clipboard', { configurable: true,
+        value: { writeText: () => Promise.reject(new Error('no')) } });
+    });
+    const [dl] = await Promise.all([
+      p.waitForEvent('download'),
+      p.click('[data-act="share"]')
+    ]);
+    chk('with no share sheet and no clipboard, it saves a file',
+      dl.suggestedFilename() === 'chicken-cordon-bleu.txt', dl.suggestedFilename());
+    await p.waitForTimeout(300);
+    chk('and explains that it did',
+      /saved as a text file/i.test(await p.locator('#main-content').textContent()),
+      (await p.locator('#main-content').textContent()).slice(0, 60));
+  }
+
   console.log('\n== A control drawn as on says so (R37) ==');
   {
     /* Criterion 11: state is announced, not just drawn. Three controls in
