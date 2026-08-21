@@ -46,6 +46,21 @@ const CONTRAST = `(() => {
          the colours that tell them apart are the point. */
       ['Menu tag mode','#menu','[data-act="toggle-tagging"]'],
       ['Menu remove mode','#menu','[data-act="toggle-remove"]'],
+      /* `R86` — the rest of what the list had never visited. `R85` found
+         192 failures in the two modes above the moment they were added, so
+         "which states are missing" is a question worth finishing rather
+         than answering once. Sheets and popups each put familiar
+         components on a surface they were not written for, which is
+         exactly the shape of the bug `R85` turned up. */
+      ['Menu sort menu','#menu','[data-act="toggle-sort"]'],
+      ['Menu search, nothing found','#menu','[data-act="toggle-search"]'],
+      ['Week planner, planned','#plan','[data-act="toggle-list"]'],
+      ['Week planner picker','#plan','.slotadd'],
+      ['Week planner meal sheet','#plan','.dayblock .mealcard'],
+      ['Menu tag sheet','#menu','[data-act="open-bulk"]'],
+      /* The one full-screen surface in the app, and the last one the route
+         list had never reached. */
+      ['Recipe photo lightbox','#chicken-cordon-bleu','[data-act="open-lb"]'],
       ['Add screen','#add',null],
       ['Add review form','#add','[data-key="review"]'],
       ['Add from a link','#add','[data-key="link"]'],
@@ -58,10 +73,40 @@ const CONTRAST = `(() => {
          ready-list fetch on #add fails silently, exactly like offline. */
       await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
       const p=await ctx.newPage();
-      await p.addInitScript(a=>{localStorage.setItem('kt.theme',JSON.stringify(a.t));if(a.e)localStorage.setItem('kt.easyRead','true');},{t:theme,e:mode==='easyread'});
+      await p.addInitScript(a=>{
+        localStorage.setItem('kt.theme',JSON.stringify(a.t));
+        if(a.e)localStorage.setItem('kt.easyRead','true');
+        /* The planner's states only exist with meals in them. */
+        const iso=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+        /* And the lightbox only exists with a photo. A 2x2 GIF is enough
+           for a hero, a thumbnail and a full-screen view; the app migrates
+           this legacy key into IndexedDB at boot. */
+        localStorage.setItem('kt.images',JSON.stringify({'chicken-cordon-bleu':
+          'data:image/gif;base64,R0lGODdhAgACAIABAICAgP///ywAAAAAAgACAAACA0QCBQA7'}));
+        localStorage.setItem('kt.plan',JSON.stringify([
+          {id:'pseed1',date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
+          {id:'pseed2',date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
+        ]));
+      },{t:theme,e:mode==='easyread'});
       await p.goto(''+B+'/index.html'+hash);
       await p.waitForTimeout(900);
+      /* Some states need more than one tap to exist. Each one asserts it
+         reached the state rather than silently auditing the screen behind
+         it — a route that never opened is a clean pass on nothing. */
+      if(name==='Menu tag sheet'){
+        await p.click('[data-act="toggle-tagging"]');
+        await p.locator('.rrow').first().click();
+      }
       if(extra){ try{ await p.click(extra,{timeout:4000}); }catch(e){ console.log("  (trigger missing: "+extra+")"); } await p.waitForTimeout(400); }
+      if(name==='Menu search, nothing found'){
+        await p.fill('#menu-search','zzzqqqx'); await p.waitForTimeout(400);
+      }
+      const need={'Recipe photo lightbox':'.lightbox','Menu sort menu':'.sortmenu','Menu search, nothing found':'.emptybox, .empty, #main-content',
+        'Week planner, planned':'.shoplist__items','Week planner picker':'#pick-q',
+        'Week planner meal sheet':'.sheet','Menu tag sheet':'.sheet'}[name];
+      if(need && !(await p.locator(need).count())){
+        console.log('  (state never opened: '+name+' — wanted '+need+')'); total++;
+      }
       const bad=await p.evaluate(CONTRAST);
       console.log('['+mode+'/'+theme+'] '+name+': '+(bad.length?bad.length+' FAILURES':'AA clean'));
       bad.forEach(x=>console.log('    '+x.ratio+':1 (need '+x.need+') '+x.size+'px '+x.sel+' "'+x.txt+'"'));
@@ -94,8 +139,8 @@ const CONTRAST = `(() => {
         localStorage.setItem('kt.theme',JSON.stringify(t));
         const iso=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
         localStorage.setItem('kt.plan',JSON.stringify([
-          {date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
-          {date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
+          {id:'pseed1',date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
+          {id:'pseed2',date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
         ]));
       },theme);
       /* Set the state on screen, THEN switch to paper. Print hides the very

@@ -436,9 +436,13 @@ catch; and since `R46` a growth watcher that renders a synthetic 240-recipe
 book and reports the filter tap — 440–570 ms, so `089`'s unvirtualised
 ruling holds well past the 150 it worried about). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
-video form included — the Menu's tag and remove modes added in `R85`
-after the route list turned out never to have visited either of them,
-which was hiding a meta line at **1.00:1 on all 48 rows in light mode** —
+video form included. The route list is the whole app now: `R85` added the
+Menu's tag and remove modes — hiding a meta line at **1.00:1 on all 48
+rows in light mode** — and `R86` finished the sweep with the sort menu,
+an empty search, the planned week, the picker, the meal sheet, the tag
+sheet and the photo lightbox, each naming the selector that proves it
+opened (the floor immediately caught four routes auditing the screen
+behind a sheet that never opened). —
 **and since `R82` on paper too**, which the audit
 had never looked at: printing under both themes found fourteen failures
 the dark palette was leaking onto white, including the shopping list's

@@ -34,10 +34,10 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const seedPlan = () => {
     const iso = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
     localStorage.setItem('kt.plan', JSON.stringify([
-      { date: iso(0), slot: 'dinner', recipeId: 'chicken-cordon-bleu', servings: 8 },
-      { date: iso(0), slot: 'lunch', recipeId: 'potato-bacon-soup', servings: 6 },
-      { date: iso(1), slot: 'dinner', recipeId: 'chicken-lasagne', servings: 4 },
-      { date: iso(2), slot: 'breakfast', recipeId: 'scones', servings: 12 }
+      { id: 'pseed1', date: iso(0), slot: 'dinner', recipeId: 'chicken-cordon-bleu', servings: 8, titleThen: 'Chicken Cordon Bleu' },
+      { id: 'pseed2', date: iso(0), slot: 'lunch', recipeId: 'potato-bacon-soup', servings: 6, titleThen: 'Potato Bacon Soup' },
+      { id: 'pseed3', date: iso(1), slot: 'dinner', recipeId: 'chicken-lasagne', servings: 4, titleThen: 'Chicken Lasagne' },
+      { id: 'pseed4', date: iso(2), slot: 'breakfast', recipeId: 'scones', servings: 12, titleThen: 'Scones' }
     ]));
   };
 
