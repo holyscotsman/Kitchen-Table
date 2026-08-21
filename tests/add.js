@@ -306,6 +306,59 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('saved through the normal path', JSON.stringify(await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes'))[1].tags))==='["Italian"]');
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== The course was the one guess the app never owned up to (R73) ==');
+  {
+    /* Every other guess an import makes says so. Servings that weren't
+       found are flagged; a split between the two lists that had no headings
+       to go on is flagged; a missing title is flagged. The **course** was
+       not: `guessCategory` falls through to "Dinner" for anything it cannot
+       read, and nothing said a word — so shortbread and tomato soup both
+       arrive filed under Dinner, quietly, and `082` explicitly says a guess
+       is flagged rather than silent. `R65` made the field editable because
+       the app rewrites it; this is the other half — admitting that it did.
+       Where the course IS given, nothing changes: a stated course is not a
+       guess and must not be flagged, which is the check that stops this
+       becoming noise on every import. */
+    const paste = async (text) => {
+      await p.goto(B + '/index.html#add');
+      await p.evaluate(() => sessionStorage.clear());
+      await p.reload();
+      await p.waitForSelector('.pathbtn');
+      await p.click('[data-key="link"]');
+      await p.waitForSelector('#a-paste');
+      await p.fill('#a-paste', text);
+      await p.waitForTimeout(250);
+      await p.click('[data-act="add-paste"]');
+      await p.waitForSelector('#a-title', { timeout: 8000 }).catch(() => {});
+      return p.evaluate(() => ({
+        cat: (document.querySelector('#a-cat') || {}).value,
+        flags: [...document.querySelectorAll('.panel--flag li')].map(e => e.textContent.trim())
+      }));
+    };
+
+    const shortbread = await paste(
+      "Granny's Shortbread\nIngredients:\n250g butter\n110g caster sugar\n" +
+      "Method:\nCream the butter and sugar.\nBake 45 minutes.");
+    chk('a pasted recipe with no course still lands somewhere',
+      shortbread.cat === 'Dinner', shortbread.cat);
+    chk('and says the course was assumed',
+      shortbread.flags.some(f => /^Course —/.test(f)), JSON.stringify(shortbread.flags));
+    chk('in the same words as the servings guess beside it',
+      shortbread.flags.some(f => /Course — .*assumed/i.test(f)) &&
+      shortbread.flags.some(f => /Servings — .*assumed/i.test(f)),
+      JSON.stringify(shortbread.flags));
+
+    /* And the counterpart, so this cannot become noise: a course the source
+       actually states is not a guess. */
+    const stated = await paste(
+      "Sticky Toffee Pudding\nCategory: Dessert\nIngredients:\n200g dates\n" +
+      "Method:\nSteam for an hour.");
+    chk('a course the source states is used',
+      stated.cat === 'Desserts', stated.cat);
+    chk('and is not flagged as a guess',
+      !stated.flags.some(f => /^Course —/.test(f)), JSON.stringify(stated.flags));
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
