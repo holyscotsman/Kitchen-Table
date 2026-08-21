@@ -991,6 +991,89 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== One badly-shaped recipe must not take the book down (R62) ==');
+  {
+    /* The overlay and recipes.json are both hand-editable by design — the
+       download-and-commit workflow depends on it, and the nightly db-sync
+       regenerates the file unattended. So a recipe can arrive with a string
+       where a list belongs: "steps": "Mix and bake." is the natural way to
+       type it wrong. Measured before this: `r.ingredients.map is not a
+       function`, the render dies mid-flight, and the Menu shows ZERO cards
+       — not just the broken recipe, the whole book — while the recipe's own
+       page silently falls back to the front screen with no explanation.
+       Every other storage boundary in this app is coerced (`R21` the plan,
+       `R40` the dismissed imports); this one, holding the recipes, was not. */
+    const ctxB = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pB = await ctxB.newPage();
+    const bErrs = []; pB.on('pageerror', e => bErrs.push(e.message));
+    const GOOD = { id: 'ok-one', title: 'Fine Recipe', category: 'Dinner',
+      contributor: 'Joan', servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+    const BENT = { id: 'typed-by-hand', title: 'Typed By Hand', category: 'Dinner',
+      contributor: 'Joan', servings: '4', ingredients: '1 cup flour',
+      steps: 'Mix and bake.', tags: 'quick, Scottish', flagged: 'check the oven' };
+
+    await pB.goto(B + '/index.html');
+    await pB.evaluate((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
+      [GOOD, BENT]);
+    await pB.goto(B + '/index.html#menu');
+    await pB.reload();
+    await pB.waitForSelector('.rcard', { timeout: 10000 }).catch(() => {});
+    chk('the Menu still lists every recipe',
+      await pB.locator('.rcard').count() === 2,
+      String(await pB.locator('.rcard').count()));
+
+    await pB.goto(B + '/index.html#typed-by-hand');
+    await pB.waitForSelector('.r-title', { timeout: 10000 }).catch(() => {});
+    chk('the bent recipe opens as itself, not the front page',
+      (await pB.locator('.r-title').textContent().catch(() => '')) === 'Typed By Hand');
+    const ing = await pB.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    const stp = await pB.locator('.checklist--steps .checkrow__text').allTextContents();
+    chk('a string of ingredients becomes one line, with its words intact',
+      ing.length === 1 && ing[0].trim() === '1 cup flour', JSON.stringify(ing));
+    chk('and so does a string of steps',
+      stp.length === 1 && stp[0].trim() === 'Mix and bake.', JSON.stringify(stp));
+    /* Read with a short timeout and caught: when this regresses the element
+       is simply absent, and a suite that dies on the wait hides every check
+       after it. */
+    const text = (sel) => pB.locator(sel).first()
+      .textContent({ timeout: 2000 }).catch(() => '');
+    chk('a string of flags is shown as a flag, not swallowed',
+      (await text('.panel--flag')).includes('check the oven'),
+      await text('.panel--flag'));
+    chk('a comma string of tags becomes tags that filter',
+      await pB.locator('.r-tags a[href*="tag="]').count() === 2,
+      String(await pB.locator('.r-tags a[href*="tag="]').count()));
+
+    /* Servings arriving as text must still be a number to step and divide
+       by, or "4" + 1 is "41" and the scaler divides by a string. */
+    await pB.click('[data-act="serv+"]', { timeout: 3000 }).catch(() => {});
+    await pB.waitForTimeout(250);
+    chk('servings written as text still step like a number',
+      /5 (people|person)/.test(await text('.servcard__value, [data-act="serv-edit"]')),
+      await text('.servcard__value, [data-act="serv-edit"]'));
+
+    chk('and nothing threw', bErrs.length === 0, bErrs.join(' | '));
+
+    /* The other source, and the one nobody is watching: the published file
+       itself, regenerated nightly by db-sync. Same shape, same promise. */
+    const bErrs2 = [];
+    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    await ctxF.route('**/recipes.json', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify([GOOD, BENT])
+    }));
+    const pF = await ctxF.newPage();
+    pF.on('pageerror', e => bErrs2.push(e.message));
+    await pF.goto(B + '/index.html#menu');
+    await pF.waitForSelector('.rcard', { timeout: 10000 }).catch(() => {});
+    chk('a bent recipe in the published file is survivable too',
+      await pF.locator('.rcard').count() === 2 && bErrs2.length === 0,
+      (await pF.locator('.rcard').count()) + ' cards; ' + bErrs2.join(' | '));
+    await ctxF.close();
+    await pB.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxB.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);

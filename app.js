@@ -810,7 +810,33 @@
     if (WHO_ALIASES[out.contributor]) out.contributor = WHO_ALIASES[out.contributor];
     if (CAT_ALIASES[out.category]) out.category = CAT_ALIASES[out.category];
     if (CATS.indexOf(out.category) === -1) out.category = "Dinner";
-    if (out.tags && !Array.isArray(out.tags)) delete out.tags;
+    /* `R62` — the lists, coerced at the boundary like every other stored
+       shape in this app (`R21` the plan, `R40` the dismissed imports).
+       Both `recipes.json` and the overlay are hand-editable by design: the
+       download-and-commit workflow depends on it, and db-sync regenerates
+       the file nightly with nobody watching. So "steps": "Mix and bake."
+       arrives sooner or later, and it used to throw mid-render — which
+       took not just that recipe down but the WHOLE MENU with it, while the
+       recipe's own page fell back to the front screen saying nothing.
+       Coerced, never discarded: a string becomes the one line it is, so
+       the words a person typed always survive. */
+    ["ingredients", "steps", "flagged"].forEach(function (k) {
+      if (out[k] === undefined || out[k] === null) return;
+      if (!Array.isArray(out[k])) out[k] = asLines(out[k]);
+    });
+    /* Tags were being DELETED when they weren't a list, which threw away
+       what someone had written. A comma string is how they are typed. */
+    if (out.tags !== undefined && out.tags !== null && !Array.isArray(out.tags)) {
+      out.tags = parseTags(out.tags);
+    }
+    /* Servings is divided by and stepped, so "4" must not stay a string:
+       "4" + 1 is "41". Anything that isn't a sensible count is dropped
+       rather than guessed, which the screen already handles. */
+    if (out.servings !== undefined && out.servings !== null) {
+      var n = parseInt(out.servings, 10);
+      if (n > 0 && n <= 999) out.servings = n;
+      else delete out.servings;
+    }
     return out;
   }
 
