@@ -150,6 +150,95 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await p.locator('button.servcard__value').count() === 1);
   }
 
+  console.log('\n== Two more lines of the definition of done (R49) ==');
+  {
+    /* CLAUDE.md's own checklist. Both of these have been true since the
+       rebuild and neither had a guard. */
+
+    /* "Icon buttons 48×48" — a specific number, not the 44px floor the sweep
+       enforces. An icon button that drifts to 44 still passes every existing
+       check while being smaller than the spec says it may be.
+       One documented exception, pinned rather than waved through: the Main
+       header's theme button sits at 44 beside the 44px app mark, trimmed on
+       Jason's instruction so "Kitchen Table" still fits on one line at 390px.
+       It is checked at exactly 44 — a deliberate exception that is allowed to
+       drift is not an exception, it is a hole. */
+    const MAIN_EXCEPTION = '.themebtn--main';
+    const wrong = [];
+    for (const [name, hash, open] of [
+      ['Main', '#', null], ['Menu', '#menu', null],
+      ['Recipe', '#chicken-cordon-bleu', null],
+      ['Week planner', '#plan', null],
+      ['Menu text sheet', '#menu', '[data-act="open-text"]']
+    ]) {
+      await p.goto(B+'/index.html'+hash);
+      await p.reload();
+      await p.waitForSelector('h1');
+      if (open) { await p.click(open); await p.waitForTimeout(300); }
+      const bad = await p.evaluate((EXC) => {
+        const out = [];
+        document.querySelectorAll('.iconbtn').forEach(el => {
+          if (el.offsetParent === null) return;
+          if (el.matches(EXC)) return;
+          const r = el.getBoundingClientRect();
+          if (Math.round(r.width) !== 48 || Math.round(r.height) !== 48) {
+            out.push((el.getAttribute('aria-label') || el.className) + ' ' +
+              Math.round(r.width) + '×' + Math.round(r.height));
+          }
+        });
+        return out;
+      }, MAIN_EXCEPTION);
+      for (const b of bad) wrong.push(name + ': ' + b);
+    }
+    chk('every icon button is 48×48, not merely over the floor',
+      wrong.length === 0, wrong.slice(0, 3).join(' | '));
+    await p.goto(B+'/index.html');
+    await p.reload();
+    await p.waitForSelector('.main__title');
+    const mainPair = await p.evaluate(() => [
+      document.querySelector('.themebtn--main'), document.querySelector('.applogo')
+    ].map(el => el ? Math.round(el.getBoundingClientRect().height) : null));
+    chk('and the one documented exception is exactly 44, not drifting',
+      mainPair[0] === 44 && mainPair[1] === 44, mainPair.join(', '));
+    chk('which is still what it was trimmed for — the title on one line',
+      await p.evaluate(() => {
+        const t = document.querySelector('.main__title');
+        return t.getBoundingClientRect().height <
+          parseFloat(getComputedStyle(t).lineHeight) * 1.6;
+      }));
+
+    /* "Viewer mode shows no edit affordances at all." A family member reading
+       a recipe must not be able to change it by accident — and must not have
+       to wonder which of the things on screen would. */
+    await p.goto(B+'/index.html#chicken-cordon-bleu');
+    await p.reload();
+    await p.waitForSelector('.r-title');
+    const leaked = await p.evaluate(() => {
+      const sel = ['#e-title', '#e-serves', '[data-act="save"]', '[data-act="add"]',
+        '[data-act="dl-json"]', '[data-act="dl-photos"]', '[data-act="remove"]',
+        '[data-act="e-serv"]', '.delbtn', 'textarea'];
+      return sel.filter(s => document.querySelectorAll(s).length > 0);
+    });
+    chk('a recipe being read offers nothing that would change it',
+      leaked.length === 0, leaked.join(', '));
+    chk('and the one control that opens editing is plainly a switch',
+      await p.getAttribute('[data-act="toggle-edit"]', 'role') === 'switch' ||
+      (await p.getAttribute('[data-act="toggle-edit"]', 'aria-checked')) === 'false',
+      String(await p.getAttribute('[data-act="toggle-edit"]', 'aria-checked')));
+    /* And the same controls really do appear once editing is on, so the
+       check above is measuring absence rather than a wrong selector. */
+    await p.click('[data-act="toggle-edit"]');
+    await p.waitForTimeout(350);
+    const present = await p.evaluate(() => {
+      const sel = ['#e-title', '[data-act="save"]', '[data-act="add"]', 'textarea'];
+      return sel.filter(s => document.querySelectorAll(s).length > 0);
+    });
+    chk('the selectors are real — edit mode shows all of them',
+      present.length === 4, present.join(', '));
+    await p.click('[data-act="toggle-edit"]');
+    await p.waitForTimeout(250);
+  }
+
   console.log('\n== The chrome does not grow with the reading text (R39) ==');
   {
     /* Criterion 13. A−/A+ is for the recipe, not for the app: if the header,
