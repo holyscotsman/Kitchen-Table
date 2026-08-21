@@ -950,9 +950,16 @@ const browserContextWithReduce = (br) =>
     chk('every line that carries one is marked',
       await pK.locator('.keptnote').count() === 4,
       String(await pK.locator('.keptnote').count()));
+    const note = await pK.locator('.scalednote').textContent();
     chk('and the note at the top says how many',
-      /4 lines carry a second amount/.test(await pK.locator('.scalednote').textContent()),
-      await pK.locator('.scalednote').textContent());
+      /Four of these lines carry a second amount/.test(note), note);
+    /* `R77` — and it says it readably. The first version of this sentence
+       ran the two numbers together — "from the original 4. 4 lines carry"
+       — which at 24px reads as "4.4 lines". Two numerals with nothing but
+       punctuation between them is a legibility fault in an app built for
+       low vision, so the rule is the shape, not the wording. */
+    chk('without running two numbers together',
+      !/\d\s*[.,]\s*\d/.test(note), note);
 
     /* A label, not a control. The row is the button; a second tappable
        thing inside it would be a trap, and the 44px floor would apply. */
