@@ -425,8 +425,18 @@
     } else {
       document.documentElement.removeAttribute("data-theme");
     }
+    /* The browser's own chrome follows the theme. A meta tag cannot hold a
+       CSS variable, but it can be told what that variable currently resolves
+       to — which is the difference between reading the palette and repeating
+       it. Repeating it is how the phone's chrome ends up a different green
+       from the page after tokens.css changes, and CLAUDE.md's first rule
+       says colours are never invented outside that file. */
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", S.theme === "light" ? "#F3F6F3" : "#0E1712");
+    if (meta) {
+      var bg = getComputedStyle(document.documentElement)
+        .getPropertyValue("--bg").trim();
+      if (bg) meta.setAttribute("content", bg);
+    }
     applyEasy();
   }
 

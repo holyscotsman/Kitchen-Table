@@ -107,7 +107,12 @@ sanctioned way: a clearly-marked **print palette block appended to
 `tokens.css`** (`--print-ink`, `--print-paper`, `--print-line`) — the first
 and only amendment to that file since the handoff. `style.css` now contains
 **zero hex values anywhere**. The rule stands stronger than before: any colour
-not in `tokens.css` is a question, never a value to invent.
+not in `tokens.css` is a question, never a value to invent — and since `R48`
+it is **enforced rather than remembered**: no hex, no `rgb()`/`hsl()`, no
+named colour outside `tokens.css`, and the two places that genuinely cannot
+hold a CSS variable (the `theme-color` meta, the manifest) are checked to
+still match the token they stand in for. That check found `app.js` repeating
+both theme colours to keep the browser chrome in step; it reads `--bg` now.
 
 ### Built after the first pass
 
@@ -371,8 +376,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **726 functional checks** across eleven
-suites (kt 154, feat 59, add 74, relay 16, quick 32, polish 90, sec 41,
+The suite after the video arc: **736 functional checks** across eleven
+suites (kt 154, feat 59, add 74, relay 16, quick 42, polish 90, sec 41,
 plan 33, video 54, backend 162, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

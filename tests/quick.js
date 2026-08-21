@@ -70,6 +70,75 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   console.log('\n== Tap targets ==');
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
+  console.log('\n== The palette rule, enforced (R48) ==');
+  {
+    /* CLAUDE.md opens with this and calls it "the one rule that keeps getting
+       broken": the palette is tokens.css, every colour is a var(--*), and a
+       colour that is not in tokens.css is a question rather than a value to
+       invent. It has been kept by discipline since the rebuild — style.css
+       carries zero hex today — and by nothing else. This is the guard. */
+    const fsq = require('fs');
+    const pq = require('path');
+    const ROOTQ = pq.join(__dirname, '..');
+    const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const NAMED = /(^|[\s:,(])(red|blue|green|white|black|gray|grey|yellow|orange|purple|pink|brown|silver|gold|navy|teal|olive|lime|aqua|fuchsia|maroon)\s*(;|,|\)|$)/im;
+
+    const style = strip(fsq.readFileSync(pq.join(ROOTQ, 'style.css'), 'utf8'));
+    const hex = style.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+    chk('style.css invents no colour of its own', hex.length === 0, hex.slice(0, 4).join(' '));
+    const funcs = style.match(/\b(rgba?|hsla?)\s*\(/g) || [];
+    chk('and reaches for no rgb() or hsl() either', funcs.length === 0, funcs.slice(0, 3).join(' '));
+    const named = style.match(NAMED);
+    chk('and names none by name', !named, named ? named[0].trim() : '');
+
+    /* The palette itself is allowed hex — it is the palette. */
+    const tokens = strip(fsq.readFileSync(pq.join(ROOTQ, 'tokens.css'), 'utf8'));
+    chk('tokens.css is where the colours actually live',
+      (tokens.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length >= 20);
+
+    /* Two documented exceptions, because a manifest and a meta tag cannot
+       read a CSS variable — and both must still agree with the token they
+       stand in for, or the phone's chrome is a different green from the page. */
+    const bgDark = (tokens.match(/--bg:\s*(#[0-9a-fA-F]{6})/) || [])[1];
+    chk('the dark page colour is readable from the palette', !!bgDark, String(bgDark));
+    const html = fsq.readFileSync(pq.join(ROOTQ, 'index.html'), 'utf8');
+    const meta = (html.match(/name="theme-color"\s+content="(#[0-9a-fA-F]{6})"/) || [])[1];
+    chk('the theme-color meta mirrors it exactly',
+      !!meta && meta.toUpperCase() === String(bgDark).toUpperCase(), meta + ' vs ' + bgDark);
+    const man = JSON.parse(fsq.readFileSync(pq.join(ROOTQ, 'manifest.json'), 'utf8'));
+    chk('and so do both colours in the manifest',
+      man.theme_color.toUpperCase() === String(bgDark).toUpperCase() &&
+      man.background_color.toUpperCase() === String(bgDark).toUpperCase(),
+      man.theme_color + ' / ' + man.background_color);
+    /* Nothing else in the repo may carry a colour literal. */
+    const appjs = fsq.readFileSync(pq.join(ROOTQ, 'app.js'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const appHex = appjs.match(/#[0-9a-fA-F]{6}\b/g) || [];
+    chk('and app.js paints nothing itself', appHex.length === 0, appHex.slice(0, 3).join(' '));
+
+    /* The live proof: the browser chrome follows the palette in both themes,
+       reading it rather than repeating it. */
+    await p.goto(B + '/index.html');
+    await p.waitForSelector('.main__title');
+    const chrome = await p.evaluate(async () => {
+      const read = () => ({
+        meta: document.querySelector('meta[name="theme-color"]').getAttribute('content').trim(),
+        token: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+      });
+      const dark = read();
+      document.querySelector('[data-act="theme"]').click();
+      await new Promise(r => setTimeout(r, 250));
+      const light = read();
+      return { dark, light };
+    });
+    chk('the browser chrome matches the palette in dark',
+      chrome.dark.meta.toUpperCase() === chrome.dark.token.toUpperCase(),
+      JSON.stringify(chrome.dark));
+    chk('and follows it into light',
+      chrome.light.meta.toUpperCase() === chrome.light.token.toUpperCase() &&
+      chrome.light.meta !== chrome.dark.meta, JSON.stringify(chrome.light));
+  }
+
   console.log('\n== How to use it (the help screen) ==');
   await p.goto(B+'/index.html');
   await p.waitForSelector('.main__title');
