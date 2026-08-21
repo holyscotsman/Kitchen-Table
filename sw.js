@@ -15,13 +15,35 @@
  */
 "use strict";
 
-const CACHE = "kt-shell-v2";
+/* Bumped whenever SHELL changes, so the activate handler's clean sweep
+   actually replaces the old shell rather than adding to it (`R89` added
+   the italic face). */
+const CACHE = "kt-shell-v3";
 
 /* How long the book's own request may hold the app up before the cached
  * copy is served instead. Long enough that a healthy connection always
  * wins (the file is ~60KB); short enough that a bad one is never the
  * reader's problem. */
 const NET_FIRST_MS = 2000;
+/* `R89` added the italic face, which this list had never named. It carries
+ * the kept-amount notes on a rescaled recipe — the lines telling a cook
+ * which amounts did NOT change — and the search result's match note. Offline
+ * the browser could not fetch it and synthesised an oblique from the regular
+ * face instead: a slanted approximation of a typeface chosen because the
+ * reader has low vision.
+ *
+ * The Latin-Extended subsets stay out on purpose. No character in the book
+ * needs them, so the browser never asks, and precaching what is never
+ * fetched is weight for nothing.
+ *
+ * Two checks hold this list from both sides: `tests/polish.js` requires
+ * every path here to exist on disk (R10 — addAll is all-or-nothing, so one
+ * bad path means no offline support at all), and requires this list to hold
+ * every file the app is actually seen to request (R89). Nothing here is
+ * maintained by memory.
+ *
+ * NOTE: no quoted strings in comments inside the array — the R10 parser
+ * reads every "..." between the brackets as a path. */
 const SHELL = [
   "./",
   "index.html",
@@ -33,7 +55,8 @@ const SHELL = [
   "favicon.svg",
   "fonts/fonts.css",
   "fonts/atkinson-400.woff2",
-  "fonts/atkinson-700.woff2"
+  "fonts/atkinson-700.woff2",
+  "fonts/atkinson-400i.woff2"
 ];
 
 self.addEventListener("install", (ev) => {

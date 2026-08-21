@@ -1059,6 +1059,15 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     const pathx = require('path');
     const ROOT = pathx.join(__dirname, '..');
 
+    /* The cache name is read from `sw.js`, never written here: `R89` bumped
+       it and two hardcoded copies in this file went stale in the same
+       commit. A test that names a version is a test that breaks on the next
+       one for no reason. */
+    const CACHE_NAME = (fsx.readFileSync(pathx.join(ROOT, 'sw.js'), 'utf8')
+      .match(/const CACHE = "([^"]+)"/) || [, ''])[1];
+    chk('the suite found the shell cache name in sw.js',
+      /^kt-shell-/.test(CACHE_NAME), CACHE_NAME);
+
     /* R10 — the precache list is hand-maintained, and cache.addAll() is
        all-or-nothing: one missing file and the worker's install rejects,
        leaving NO offline support at all, silently. (R5 deleted a file from
@@ -1178,13 +1187,13 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     /* R9 — the recipes are DATA, not shell: a book published an hour ago
        must appear on the next open, not the one after. Doctoring the
        worker's own cache proves which copy wins, without a network. */
-    const doctor = async () => psw.evaluate(async () => {
-      const c = await caches.open('kt-shell-v2');
+    const doctor = async () => psw.evaluate(async (cache) => {
+      const c = await caches.open(cache);
       await c.put('/recipes.json', new Response(JSON.stringify([{ id: 'stale-sentinel',
         title: 'Stale Sentinel Loaf', category: 'Baking', contributor: 'Joan', servings: 4,
         ingredients: ['1 cup flour'], steps: ['Bake.'] }]),
         { headers: { 'content-type': 'application/json' } }));
-    });
+    }, CACHE_NAME);
     await doctor();
     await psw.reload();
     await psw.waitForSelector('.rcard');
@@ -1243,13 +1252,14 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        precisely when it doesn't. */
     console.log('\n== A failed deploy must not delete the book (R52) ==');
     {
-      const cachedDoc = () => psw.evaluate(async (marker) => {
-        const c = await caches.open('kt-shell-v2');
+      const cachedDoc = () => psw.evaluate(async (a) => {
+        const marker = a.marker;
+        const c = await caches.open(a.cache);
         const r = await c.match('index.html');
         const t = r ? await r.text() : '';
         return { has: !!r, app: t.indexOf('id="app"') > -1,
           err: /Pages site/.test(t), marker: t.indexOf(marker) > -1 };
-      }, MARKER);
+      }, { marker: MARKER, cache: CACHE_NAME });
 
       const srv2 = http.createServer(handler);
       await new Promise(r => srv2.listen(PORT, '127.0.0.1', r));
@@ -1320,6 +1330,60 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
         JSON.stringify(guarded));
     }
     await ctxSW.close();
+  }
+
+  console.log('\n== R89 — the offline shell is what the app asks for, not a list ==');
+  {
+    /* `sw.js` precaches a hand-written SHELL array. Hand-written lists go
+       stale — `R82` had just retired one for exactly that reason — and this
+       one was: the app requests `fonts/atkinson-400i.woff2` and the list
+       does not name it. That is the designed italic, and it carries
+       `.keptnote` ("— 42g not adjusted", the lines telling a cook which
+       amounts did NOT rescale) and `.matchnote` ("matches ingredient").
+       Offline, the browser cannot fetch it and synthesises an oblique from
+       the regular face instead — a slanted approximation of a typeface
+       chosen because the reader has low vision.
+       So the check is not "is the list right". It is: **walk the app, note
+       every same-origin file it actually asks for, and require the shell to
+       hold all of them.** A new asset added tomorrow is covered without
+       anyone remembering. */
+    const ctxA = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxA.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pA = await ctxA.newPage();
+    const asked = new Set();
+    pA.on('request', (r) => {
+      const u = r.url();
+      if (u.indexOf(B + '/') === 0) asked.add(u.slice(B.length + 1).split('?')[0]);
+    });
+    const walk = async (hash, ready, extra) => {
+      await pA.goto(B + '/index.html' + hash);
+      await pA.waitForSelector(ready);
+      if (extra) { try { await pA.click(extra, { timeout: 4000 }); } catch (e) {} }
+      await pA.waitForTimeout(400);
+    };
+    await walk('#', '.main__title');
+    await walk('#menu', '.rcard');
+    /* Rescaled, so the kept-amount notes render — that is what pulls the
+       italic face in. */
+    await walk('#potato-bacon-soup', '.r-title', '[data-act="serv+"]');
+    await walk('#menu', '.rcard', '[data-act="toggle-search"]');
+    try { await pA.fill('#menu-search', 'bacn'); await pA.waitForTimeout(450); } catch (e) {}
+    await walk('#plan', '.dayblock');
+    await walk('#add', '.pathbtn');
+    await walk('#help', 'h1');
+    await ctxA.close();
+
+    const swSrc = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'sw.js'), 'utf8');
+    const shellRaw = swSrc.slice(swSrc.indexOf('const SHELL = ['),
+      swSrc.indexOf(']', swSrc.indexOf('const SHELL = [')));
+    const shell = (shellRaw.match(/"[^"]+"/g) || []).map(x => x.slice(1, -1));
+    chk('the walk actually asked for something', asked.size >= 6, [...asked].join(', '));
+    chk('and the shell list was read', shell.length >= 5, shell.join(', '));
+    const missing = [...asked].filter(a => a && a !== 'index.html' &&
+      shell.indexOf(a) === -1 && shell.indexOf('./' + a) === -1);
+    chk('every file the app asks for is in the offline shell',
+      missing.length === 0, missing.join(', '));
   }
 
   console.log('\n== R85 — the danger colour belongs to the destructive mode only ==');
