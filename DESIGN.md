@@ -1,5 +1,20 @@
 # Handoff: Kitchen Table — family recipe site
 
+> ## This is the original handoff, kept as a record
+> **It is not the current spec.** `CLAUDE.md` is, and `README.md` describes the
+> app as it stands. Parts of this document were superseded by Jason after the
+> handoff and are left here unedited on purpose, so the reasoning behind each
+> change stays legible:
+>
+> | This document says | What is true now |
+> |---|---|
+> | six categories — Dinner, Breakfast, Side, Dessert, Snack, Drink | **ten**, and `recipes.json` was migrated (`CLAUDE.md`, "Categories are now ten") |
+> | contributors Mom, Me, Jennifer | **Joan, Jason, Jennifer, Lindsay, Siobhan, Jessica** — and every one of the 48 recipes is Joan's |
+> | *"Open `styleguide.html`"*, *"Compare against `screenshots/`"* | neither was ever committed; `design/components.md` and `design/a11y-criteria.md` are the operative record |
+> | sort by "Quickest first" / "Who it's from" | three sorts: Recently added, A–Z, Course |
+>
+> Everything the palette and the font ask for below still stands, unchanged.
+
 > ## Start here
 > **Read `CLAUDE.md` first.** Copy **`tokens.css`** into the project verbatim and reference every
 > color as `var(--*)`. **Do not generate a palette** — this app is dark forest green

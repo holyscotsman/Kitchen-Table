@@ -189,6 +189,72 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== The book’s vocabulary, copied into a dozen files (R68) ==');
+  {
+    /* Ten courses and six contributors are the book's whole vocabulary, and
+       they are written out in four code files and several documents. Nothing
+       checked they agree, and one had already drifted: **Jessica** was added
+       to the app's contributor list and to a test, and README, CLAUDE.md,
+       CONTENT.md and the gameplan all still said five names. A course list
+       that drifts is worse — the app rewrites an unrecognised course to
+       Dinner, the server rejects the accept outright, and db/migrate dies on
+       the file — so the same recipe would be filed, refused and fatal
+       depending on which copy was consulted. */
+    const fsx = require('fs');
+    const pathx = require('path');
+    const ROOT = pathx.join(__dirname, '..');
+    const read = (f) => fsx.readFileSync(pathx.join(ROOT, f), 'utf8');
+    const listAfter = (src, marker) => {
+      const at = src.indexOf(marker);
+      if (at < 0) return null;
+      const open = src.indexOf('[', at);
+      const close = src.indexOf('];', open);
+      if (open < 0 || close < 0) return null;
+      return (src.slice(open, close).match(/['"]([A-Za-z-]+)['"]/g) || [])
+        .map(x => x.replace(/['"]/g, ''));
+    };
+
+    const cats = {
+      'app.js': listAfter(read('app.js'), 'var CATS = ['),
+      'backend/lib/validate.js': listAfter(read('backend/lib/validate.js'), 'const CATS = ['),
+      'db/migrate.js': listAfter(read('db/migrate.js'), 'const CATS = ['),
+      'tests/video.js': listAfter(read('tests/video.js'), 'const CATS_OK = [')
+    };
+    const truth = cats['app.js'];
+    chk('the app names ten courses', truth && truth.length === 10,
+      JSON.stringify(truth));
+    const catDrift = Object.keys(cats).filter(f =>
+      JSON.stringify(cats[f]) !== JSON.stringify(truth));
+    chk('and every copy of that list agrees, in order',
+      catDrift.length === 0,
+      catDrift.map(f => f + ': ' + JSON.stringify(cats[f])).join(' | '));
+
+    const who = listAfter(read('app.js'), 'var WHO = [');
+    chk('the app names its contributors', who && who.length >= 5, JSON.stringify(who));
+
+    /* The documents state the same two lists as schema, in their own
+       punctuation. They are read back rather than trusted. */
+    const readme = read('README.md');
+    const pipe = (key) => {
+      const m = readme.match(new RegExp('"' + key + '":\\s*"([^"]+)"'));
+      return m ? m[1].split('|').map(x => x.trim()) : null;
+    };
+    chk('the README schema lists the same courses',
+      JSON.stringify(pipe('category')) === JSON.stringify(truth),
+      JSON.stringify(pipe('category')));
+    chk('and the same contributors',
+      JSON.stringify(pipe('contributor')) === JSON.stringify(who),
+      JSON.stringify(pipe('contributor')));
+
+    /* CLAUDE.md states the contributors in a sentence — checked by name, so
+       the sentence may be rewritten but nobody can be left out of it. */
+    const claude = read('CLAUDE.md');
+    const unnamed = (who || []).filter(n =>
+      !new RegExp('\\b' + n + '\\b').test(claude));
+    chk('and CLAUDE.md names every one of them',
+      unnamed.length === 0, unnamed.join(', '));
+  }
+
   console.log('\n== One recipe shape, written down in three places (R66) ==');
   {
     /* A recipe's field list exists three times: `FIELD_ORDER` in app.js (what
