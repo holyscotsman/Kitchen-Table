@@ -41,6 +41,11 @@ const CONTRAST = `(() => {
       ['Recipe download sheet','#bacon-ranch-chicken-casserole','[data-act="open-dl"]'],
       ['Menu text sheet','#menu','[data-act="open-text"]'],
       ['Week planner','#plan',null],
+      /* `R85` — two whole modes the route list had never visited. They are
+         reached from two buttons side by side, one of them destructive, and
+         the colours that tell them apart are the point. */
+      ['Menu tag mode','#menu','[data-act="toggle-tagging"]'],
+      ['Menu remove mode','#menu','[data-act="toggle-remove"]'],
       ['Add screen','#add',null],
       ['Add review form','#add','[data-key="review"]'],
       ['Add from a link','#add','[data-key="link"]'],

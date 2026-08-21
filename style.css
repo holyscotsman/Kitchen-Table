@@ -978,7 +978,8 @@ a.applogo:hover {
   text-wrap: pretty;
 }
 
-/* Remove mode swaps every card for a danger-outlined row. */
+/* Remove mode swaps every card for a danger-outlined row. Tag mode uses the
+   same shape and must NOT use the same colour — see `.rrow--pick` below. */
 .rrow {
   display: flex;
   align-items: center;
@@ -991,6 +992,50 @@ a.applogo:hover {
   color: var(--ink);
   width: 100%;
   text-align: left;
+}
+
+/* `R85` — a row is not a card, and its secondary text has to know that.
+   `.rcard__meta` carries `--card-dim`, which is white at 78% because it is
+   drawn on the dark green recipe card. `.rrow` is not a card: it sits on
+   `--surf`. On the dark theme that is near enough to pass; **on the light
+   theme `--surf` is near-white and the meta line measured 1.00:1** — the
+   text was exactly its own background, on all 48 rows, in both modes. In
+   remove mode that hid the contributor; in tag mode it hid the tag list,
+   which is the one thing you open tag mode to read. Shipped that way, and
+   invisible to the audit because neither mode was ever in its route list. */
+.rrow .rcard__meta {
+  color: var(--dim);
+}
+
+/* `R85` — the same row, for the mode that is not dangerous. Tag and Remove
+   sit next to each other in the Menu's count row: one adds a word, the other
+   deletes a recipe. Tag mode was wearing Remove mode's danger outline and a
+   danger-filled Done, so the harmless mode and the irreversible one looked
+   identical and one sentence of grey text was the whole difference. A danger
+   colour that also means "you are adding tags" has stopped meaning careful.
+   Neutral until chosen, then the app's own selected grammar — the same
+   accent fill the filter chips use. */
+.rrow--pick {
+  border-color: var(--line);
+}
+
+.rrow--pick[aria-pressed="true"] {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.rrow--pick[aria-pressed="true"] .rcard__meta {
+  color: var(--acc-ink);
+}
+
+/* The mode is on: accent, because ending the mode is finishing the task
+   (`R83`), and never danger, because tagging is not dangerous. */
+.textbtn--on {
+  padding: 0 14px;
+  border-radius: var(--r-input);
+  background: var(--acc);
+  color: var(--acc-ink);
 }
 
 .rrow__minus {

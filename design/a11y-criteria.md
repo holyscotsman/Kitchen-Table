@@ -19,6 +19,11 @@ a known gap, not a silent one.
 
 1. **Contrast.** Every new screen/state appears in the contrast audit's route
    list (`tests/contrast.js`) and passes AA in dark, light, and Easy Read —
+   **and "state" means modes, not just screens** (`R85`): the Menu's tag and
+   remove modes had never been in the list, and putting them there returned
+   192 failures at 1.00:1, text exactly its own background colour, shipped.
+   A component reused on a different surface is a new state: `.rcard__meta`
+   is written for the dark green card and was being drawn on `--surf`. —
    **and, if it can be printed, on paper** (`R82`). The print stylesheet used
    to keep a hand-written list of what needed forcing to ink, and lists kept
    by memory go stale: the audit's first run under `media: print` found
