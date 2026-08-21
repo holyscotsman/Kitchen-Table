@@ -8,12 +8,24 @@ on:
   push:
     branches: [main]
 
+# This workflow runs the repository's own code — npm dependencies, a browser,
+# the suites — on every pull request. Nothing it does needs write access, and
+# a workflow that runs code with a write-capable token is the ordinary shape
+# of a supply-chain problem. Stated here rather than left to the repository
+# default, which is a settings page someone can change without reading this.
+permissions:
+  contents: read
+
 jobs:
   suites:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The checkout credential otherwise stays in .git/config for every
+          # later step to find. CI never pushes, so it never needs one.
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
