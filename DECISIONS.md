@@ -268,3 +268,27 @@ accurately, on the axis this app exists to serve — a low-vision reader at
 200% zoom gets a third of the viewport back on the Menu rather than losing
 41% of it to chrome. If Jason wants the reference's literal spacing on
 phones in a tab, say so and it goes back.
+
+## R47 — Paper carries the size the reader chose
+
+**Provisional; one line to reverse.** The print stylesheet carried
+`.recipe { font-size: 12pt }` — a rule that had never once applied. The
+renderer sets the reading size as an inline style, and inline beats a
+stylesheet, so a printed recipe has always come out at whatever the A−/A+
+stepper was showing: 20px at the bottom step, 40px at the top.
+
+Two ways to resolve a rule that lies about itself. Enforce it (`!important`,
+paper always 12pt), or delete it and state what actually happens.
+
+**Deleted.** The behaviour it was hiding is the one §033 would have ruled
+anyway: when preference and legibility collide, legibility wins. Someone who
+set 40px on screen did so because they need it, and a recipe printed at 12pt
+for that reader is a wasted sheet of paper. The stepper's own floor is 20px,
+so nothing prints unreadably small either.
+
+**What it costs if reversed:** one declaration, plus `!important` to make it
+bite. **Why it was taken without asking:** the alternative was leaving a line
+in the stylesheet that states an intent it cannot deliver, which misleads
+whoever reads it next — and choosing 12pt over the reader's own setting is
+the one direction §033 rules out. If Jason wants paper at a fixed size
+regardless of the screen, that is a different ruling and easy to make.
