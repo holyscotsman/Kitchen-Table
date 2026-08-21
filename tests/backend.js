@@ -646,6 +646,66 @@ const { runJob, computeFps } = lib('pipeline');
   }
 
 
+  console.log('\n== The exit codes db-sync reads are the ones export.js writes (R75) ==');
+  {
+    /* The nightly publish turns entirely on a number. `db/export.js --check`
+       exits 0 for "identical", 2 for "genuinely drifted", 3 for "refused to
+       write a book that lost most of itself", and 1 for anything that went
+       wrong; `db-sync.yml` branches on exactly those, and only the 2 branch
+       ever commits. Nobody checks the two files still agree. Change the 2 to
+       a 1 and the workflow reads it as "could not read the database" — the
+       sync errors out every night and **no video-imported recipe ever
+       reaches the family again**, with a red cross nobody is watching as the
+       only sign. */
+    const cp = require('child_process');
+    const root = path.join(__dirname, '..');
+    const wf = fs.readFileSync(
+      path.join(root, '.github', 'workflows', 'db-sync.yml'), 'utf8');
+    const script = fs.readFileSync(path.join(root, 'db', 'export.js'), 'utf8');
+
+    /* Run it for real in the one state that needs no database: unconfigured.
+       This is the case that has to look like a failure and not like "nothing
+       to do", because an unconfigured sync reporting success is precisely
+       how it once went unnoticed for a fortnight. */
+    const env = Object.assign({}, process.env);
+    delete env.KT_DB;
+    const run = cp.spawnSync(process.execPath, ['db/export.js', '--check'],
+      { cwd: root, env, encoding: 'utf8' });
+    chk('unconfigured, --check exits 1 — not 0, and not "drifted"',
+      run.status === 1, 'exit ' + run.status + ' :: ' + (run.stderr || '').trim());
+
+    /* Every literal inside a process.exit(...), including the two that live
+       in a ternary — `process.exit(a === b ? 0 : 2)` — which is exactly the
+       spelling a grep for `exit(2)` would walk straight past. */
+    const writes = [...new Set((script.match(/process\.exit\(([^)]*)\)/g) || [])
+      .reduce((acc, call) => acc.concat(call.match(/\d/g) || []), []))].sort();
+    const reads = [...new Set((wf.match(/"\$code"\s+-eq\s+(\d)/g) || [])
+      .map(x => x.replace(/\D/g, '')))].sort();
+    chk('export.js states its codes and db-sync reads some',
+      writes.length >= 3 && reads.length >= 2,
+      'writes ' + JSON.stringify(writes) + ' reads ' + JSON.stringify(reads));
+    const unknown = reads.filter(c => writes.indexOf(c) === -1);
+    chk('every code the workflow branches on is one the script can produce',
+      unknown.length === 0, unknown.join(', '));
+    chk('including the one that means "go ahead and publish"',
+      reads.indexOf('2') > -1 && writes.indexOf('2') > -1);
+    chk('and the one that means "refused to write"',
+      reads.indexOf('3') > -1 && writes.indexOf('3') > -1);
+
+    /* Anything the workflow does not name must still be loud. A code it has
+       never heard of has to reach the else branch and stop the run, not fall
+       through to a commit. */
+    chk('an unrecognised code errors rather than committing',
+      /else\s*\n\s*echo "::error title=db-sync could not read the database/.test(wf) &&
+      /exit "\$code"/.test(wf));
+    /* And the commit itself is reachable only from the drifted branch. */
+    const commitAt = wf.indexOf('git commit');
+    const gate = wf.lastIndexOf("steps.check.outputs.drift == 'yes'", commitAt);
+    chk('the commit step is gated on the drifted branch alone',
+      commitAt > -1 && gate > -1 && gate < commitAt,
+      'commit at ' + commitAt + ', gate at ' + gate);
+  }
+
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('SUITE CRASH:', e); process.exit(1); });

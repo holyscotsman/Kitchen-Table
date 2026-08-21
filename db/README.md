@@ -111,3 +111,18 @@ be committed — behaves the same way.
 `tests/quick.js` holds the file to it: byte-identical to a canonical
 re-write, no BOM, `FIELD_ORDER` on every recipe, and no field the writers
 would drop on the way out.
+
+## The nightly publish turns on a number
+
+`db/export.js --check` exits **0** for identical, **2** for genuinely
+drifted, **3** for "refused to write a book that lost most of itself", and
+**1** for anything that went wrong. `db-sync.yml` branches on exactly those,
+and **only the 2 branch ever commits**.
+
+Change the 2 to a 1 and the workflow reads it as *could not read the
+database*: the sync errors every night, no video-imported recipe ever
+reaches the family again, and a red cross nobody is watching is the only
+sign. So the two files are checked to still agree (`R75`, `tests/backend.js`)
+— including the detail that the 0 and 2 live inside a ternary,
+`process.exit(a === b ? 0 : 2)`, which a grep for `exit(2)` walks straight
+past.
