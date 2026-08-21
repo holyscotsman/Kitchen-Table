@@ -2855,6 +2855,90 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxN.close();
   }
 
+  console.log('\n== The help made a claim about the book that nothing checked (R109) ==');
+  {
+    /* `R94`, `R102` and this one are the same fault three times: the help
+       describing an app that has moved. Each was found by reading a sentence
+       and going to see. Nothing checked them, so here is the check.
+
+       The one this round found: "A few recipes never said how many they
+       make" — and none of the 48 do. Every recipe in the book carries a
+       count. The BEHAVIOUR it describes is real and reachable (clear the
+       number in Edit mode, or hand-edit recipes.json), but the claim about
+       the collection was not, and a reader could go looking for one of
+       those few forever. It is a condition now, not a census.
+
+       The check below is two-way on purpose: the day a recipe without a
+       count enters the book, a help that says nothing about it fails just
+       as loudly. */
+    const ctxH = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxH.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pH = await ctxH.newPage();
+    const hErrs = []; pH.on('pageerror', e => hErrs.push(e.message));
+
+    await pH.goto(B + '/index.html#help');
+    await pH.waitForSelector('.help__h1');
+    const help = await pH.evaluate(() => document.querySelector('#app').innerText);
+    chk('the help screen was read', help.length > 1500, String(help.length));
+
+    const book = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'recipes.json'), 'utf8'));
+    const without = book.filter(r => !(typeof r.servings === 'number' && r.servings > 0));
+    const census = /\b(a few|some)\b[^.]{0,40}recipes[^.]{0,40}never said how many/i.test(help);
+    chk('the help only claims recipes the book actually has',
+        census === (without.length > 0),
+        'help says some lack a count: ' + census +
+        ' | recipes without one: ' + without.length);
+    chk('and still explains what happens when one does not',
+        /Not given/.test(help) && /switched off/.test(help), '');
+
+    /* And the claim I nearly "corrected" the wrong way. Add recipe IS at the
+       bottom of the All recipes screen — the pill is sticky, pinned to the
+       bottom of the VIEWPORT, so it is there at every scroll position. Read
+       against the page height alone it looks like it sits near the top, two
+       cards down a 7,400px list, and the help looks wrong. It is not. This
+       pins the behaviour the sentence describes so neither the pill nor the
+       sentence can drift away from the other. */
+    await pH.goto(B + '/index.html#menu');
+    await pH.waitForSelector('.rcard');
+    const pill = async () => pH.evaluate(() => {
+      const a = document.querySelector('.addbar');
+      if (!a) return null;
+      const r = a.getBoundingClientRect();
+      return { pos: getComputedStyle(a).position, bottom: Math.round(r.bottom),
+               top: Math.round(r.top), vh: window.innerHeight,
+               text: (a.innerText || '').replace(/\s+/g, ' ').trim() };
+    });
+    const atTop = await pill();
+    chk('Add recipe is on the All recipes screen', !!atTop && /Add recipe/i.test(atTop.text),
+        JSON.stringify(atTop));
+    await pH.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await pH.waitForTimeout(350);
+    const atEnd = await pill();
+    /* "At the bottom of the screen" means the pill starts in the lower part
+       of the viewport and is on it — not that it is contained to the pixel.
+       A sticky bar sitting on the safe-area inset overhangs slightly, and
+       pinning that number would be over-fitting the check to one device. */
+    const low = (x) => x && x.top > x.vh * 0.6 && x.top < x.vh;
+    chk('and it sits at the bottom of the screen, as the help says',
+        low(atTop) && low(atEnd),
+        JSON.stringify([atTop, atEnd]));
+    chk('and stays there through the whole list, so the help sends nobody hunting',
+        atTop.pos === 'sticky' || atTop.pos === 'fixed', String(atTop.pos));
+
+    /* Two more controls the help names by name. */
+    chk('the Aa button the help names is on All recipes',
+        await pH.evaluate(() => [...document.querySelectorAll('#app button')]
+          .some(b => /^Aa$/.test((b.innerText || '').trim()))));
+    await pH.goto(B + '/index.html');
+    await pH.waitForSelector('.main__title');
+    chk('the View all button the help names is on the front page',
+        await pH.evaluate(() => [...document.querySelectorAll('#app a')]
+          .some(a => /view all/i.test(a.innerText || ''))));
+    chk('nothing threw', hErrs.length === 0, hErrs.join(' | '));
+    await ctxH.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

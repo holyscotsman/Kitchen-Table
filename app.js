@@ -2696,16 +2696,22 @@
            Crannachan's method and searching that exact word finds nothing,
            so the old sentence sent a cook looking for a method word to an
            empty screen with no reason for it. */
-        "Type in the search box on the front page. It reads the " +
+        "Type in the search box on the front page, or the one behind the " +
+        "magnifying glass on All recipes. It reads the " +
         "<strong>ingredients and the tags</strong> as well as the name, so " +
         "“bacon” finds the recipes with bacon in them even when the title " +
         "never says so. It doesn’t read the method — searching for a word " +
         "you remember from the steps won’t find it.",
         "Spelling doesn’t have to be perfect, and accents don’t matter — " +
         "“creme” finds crème.",
+        /* `R109` — this said the go key opens the top match, without
+           saying WHERE. It only ever worked on the front page: on All
+           recipes the same key did nothing at all until `R105`, so a
+           reader who tried it there was told the app does something it
+           did not. It works in both boxes now, and the sentence says so. */
         "When what you want is the first one on the list, the keyboard’s " +
-        "<strong>go key</strong> opens it — no need to put the keyboard away " +
-        "and aim at the card.",
+        "<strong>go key</strong> opens it — from either box — with no need " +
+        "to put the keyboard away and aim at the card.",
         "Or browse: tap a person to see their recipes, or a course like " +
         "Dinner or Baking. The <strong>View all</strong> button under the " +
         "names shows the lot."]],
@@ -2723,9 +2729,18 @@
         "change with it. Cooking for two instead of six? Press it twice and " +
         "the recipe does the sums. For a bigger jump, <strong>tap the number " +
         "itself and type it</strong> — 4 to 40 is one number, not thirty-six " +
-        "presses. A few recipes never said how many they make; those say " +
-        "<em>Not given</em>, the − and + are switched off, and the amounts " +
-        "stand exactly as they were written.",
+        /* `R109` — this said "a few recipes never said how many they
+           make", and none of the 48 do: every one carries a count. The
+           behaviour it describes is real and reachable (clear the number
+           in Edit mode, or a hand-edited recipes.json), but the claim
+           about the BOOK was not, and a reader could go looking for one
+           of those few forever. Said as a condition rather than as a
+           census, it is true whether or not such a recipe exists — and
+           `tests/polish.js` now holds the help to recipes.json so the
+           next version of this sentence cannot drift either. */
+        "presses. If a recipe never said how many it makes, it says " +
+        "<em>Not given</em> instead, the − and + are switched off, and the " +
+        "amounts stand exactly as they were written.",
         "Some lines carry a second amount — “1 lb (450g) chicken”, “1 jar " +
         "(16 ounces)”. Whether that one should change too depends on what it " +
         "means, and the app would only be guessing, so it leaves it alone " +
