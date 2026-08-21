@@ -2738,7 +2738,12 @@
       });
       h += "</ul>";
       if (asIs.length) {
-        h += '<p class="hint">As written, not summed:</p>' +
+        /* `R82` — not a hint. `.hint` is hidden on paper, and this line is
+           the only thing separating the lines that were summed from the
+           lines that were not; without it a printed list claims a precision
+           it does not have. The trailing explanation below stays a hint and
+           stays on screen. */
+        h += '<p class="hint listlabel">As written, not summed:</p>' +
              '<ul class="shoplist__items shoplist__items--dim" style="font-size:' +
              readPx + '">' +
              asIs.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ul>";

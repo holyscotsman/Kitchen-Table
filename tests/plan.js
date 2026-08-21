@@ -166,6 +166,35 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     }
   }
 
+  console.log('\n== R82 — a printed list must not claim a precision it lacks ==');
+  {
+    /* The list sums what it safely can and lists the rest as written; the
+       line between the two is a `<p>` that `@media print` hid along with
+       every other `.hint`. On paper the un-summed lines therefore sat in
+       the same column as the summed ones with nothing to say so — a list
+       that reads as arithmetic when half of it is transcription.
+       Checked on paper, because on screen it was always fine. */
+    await p.emulateMedia({ media: 'print' });
+    await p.waitForTimeout(200);
+    const onPaper = await p.evaluate(() => {
+      const els = [].slice.call(document.querySelectorAll('.shoplist p'));
+      const shown = els.filter(e => e.offsetParent !== null || e.getClientRects().length);
+      return {
+        all: els.map(e => e.textContent.trim().slice(0, 30)),
+        shown: shown.map(e => e.textContent.trim().slice(0, 30))
+      };
+    });
+    chk('the "as written, not summed" line survives printing',
+      onPaper.shown.some(t => /as written/i.test(t)), JSON.stringify(onPaper));
+    chk('and the screen-only explanation does not',
+      !onPaper.shown.some(t => /^Same wording/i.test(t)), JSON.stringify(onPaper.shown));
+    /* A floor: both would pass if the list itself failed to render. */
+    chk('and there was a list on the paper at all',
+      await p.evaluate(() => document.querySelectorAll('.shoplist__items li').length) > 3);
+    await p.emulateMedia({ media: 'screen' });
+    await p.waitForTimeout(150);
+  }
+
   console.log('\n== The shopping list had its own parser (R64) ==');
   {
     /* The list sums what it can and lists the rest as written — 130, shipped

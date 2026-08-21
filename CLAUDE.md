@@ -423,9 +423,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **959 functional checks** across eleven
+The suite after the video arc: **962 functional checks** across eleven
 suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 137, sec 52,
-plan 54, video 54, backend 171, zoom 15), plus the perf budget (FCP ~900 ms
+plan 57, video 54, backend 171, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —
@@ -436,7 +436,11 @@ catch; and since `R46` a growth watcher that renders a synthetic 240-recipe
 book and reports the filter tap — 440–570 ms, so `089`'s unvirtualised
 ruling holds well past the 150 it worried about). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
-video form included. Nothing interactive measures under 44px — checked on
+video form included — **and since `R82` on paper too**, which the audit
+had never looked at: printing under both themes found fourteen failures
+the dark palette was leaking onto white, including the shopping list's
+own title at 1.10:1 and all seven of `R60`'s "not adjusted" notes, the
+ones that tell a cook which amounts did *not* rescale. Nothing interactive measures under 44px — checked on
 every screen, not just one (`R16`). All of it
 runs on every pull request via `tests/run.sh`, hermetically — the suites
 stub the kitchen server and abort the Render origin, so CI never wakes the

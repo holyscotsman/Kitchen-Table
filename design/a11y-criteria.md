@@ -18,7 +18,14 @@ a known gap, not a silent one.
 ## Enforced automatically — confirm the new surface is covered
 
 1. **Contrast.** Every new screen/state appears in the contrast audit's route
-   list (`tests/contrast.js`) and passes AA in dark, light, and Easy Read.
+   list (`tests/contrast.js`) and passes AA in dark, light, and Easy Read —
+   **and, if it can be printed, on paper** (`R82`). The print stylesheet used
+   to keep a hand-written list of what needed forcing to ink, and lists kept
+   by memory go stale: the audit's first run under `media: print` found
+   fourteen failures the dark palette was leaking onto white, the worst of
+   them load-bearing text. Print is audited in both themes on purpose —
+   paper is supposed to be theme-independent, so a failure in one theme and
+   not the other *is* the leak.
 2. **Tap targets.** Nothing interactive under 44px; icon buttons 48×48
    (`tests/kt.js` measures every interactive element on every screen —
    `R16` widened it after a control shipped under the floor on a screen the

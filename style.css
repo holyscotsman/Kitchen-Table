@@ -2364,7 +2364,7 @@ input[type="file"].input {
   .sheet,
   .sortmenu,
   .skip-link,
-  .hint,
+  .hint:not(.listlabel),
   .vstamp,
   .art,
   .weeknav,
@@ -2381,10 +2381,6 @@ input[type="file"].input {
   .plan {
     max-width: none;
     padding: 0;
-  }
-
-  .dayhead {
-    color: var(--print-ink) !important;
   }
 
   .mealcard,
@@ -2437,15 +2433,32 @@ input[type="file"].input {
     break-inside: avoid;
   }
 
-  /* These carry --dim / --card-dim, which are near-white on the dark theme and
-     so vanish entirely on paper. */
-  .minilabel,
-  .r-eyebrow,
-  .sourceline,
-  .scalednote,
-  .servcard__value,
-  .statcard__value {
+  /* Paper is black on white, and that is not a list to maintain (`R82`).
+     What stood here was a hand-written list of "these carry --dim /
+     --card-dim, which are near-white on the dark theme and so vanish
+     entirely on paper" — maintained by memory, and by the time anyone
+     looked it was missing eleven things: every tag chip (1.46:1), the flag
+     panel's heading, the plan's eyebrow, the shopping list's own title
+     (1.10:1 — invisible), and all seven of `R60`'s "not adjusted" notes,
+     which are the ones that tell a cook which amounts did NOT rescale.
+     One rule instead of a list. Anything that needs a fill or a border on
+     paper says so in its own rule below; nothing needs a colour. */
+  #app,
+  #app *,
+  #app *::before,
+  #app *::after {
     color: var(--print-ink) !important;
+  }
+
+  /* The chip's tint is a screen fill; on paper it is an outline. */
+  .minitag,
+  .minitag--link {
+    background: none !important;
+  }
+
+  /* A fold's chevron means nothing on a sheet of paper. */
+  .shoplist__head svg {
+    display: none !important;
   }
 
   .checkbox,
