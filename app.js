@@ -1122,8 +1122,12 @@
          themeBtn() +
          '<button type="button" class="iconbtn press' + (S.easyRead ? " is-on" : "") +
          '" data-act="open-text" aria-haspopup="dialog" ' +
+         /* The button wears the "on" styling when Easy Read is on, so it is
+            the button that has to say so: drawn-only state is invisible to
+            the reader this app exists for (criterion 11). */
          'aria-label="Text size, currently ' + FS[effectiveFs()] +
-         ' pixels">Aa</button>' +
+         ' pixels' + (S.easyRead ? ", Easy Read on" : "") +
+         '">Aa</button>' +
          "</div></div>";
 
     if (S.searchOpen) {

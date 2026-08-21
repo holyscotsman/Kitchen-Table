@@ -6,7 +6,12 @@ of gameplan task `034`; the precedent it enforces is `DECISIONS.md` §033:
 
 Two sections. The first is enforced by the suites on every PR — a reviewer
 checks that the new feature is *covered* by them, not that they pass (CI does
-that). The second is manual and cheap. A third section names what the
+that). The second is manual and cheap. **Five items moved from the second
+list to the first between `R23` and `R37`**, and four of those five found a
+real defect on the way: a control under the tap floor, every text field with
+its focus ring switched off, a notice announced twelve times, and Easy Read
+drawn as on while announcing nothing. A reviewer's attention is not a durable
+guarantee; that is the whole argument for moving them. A third section names what the
 VoiceOver pass will add when a physical iPhone is available; until then it is
 a known gap, not a silent one.
 
@@ -42,7 +47,13 @@ a known gap, not a silent one.
    announced. There is exactly one region, `#route-live`, written once per
    distinct message; rendered notices are visible text only. `tests/kt.js`
    counts inserted live regions the way a screen reader sees them.
-8. **Names, labels, focus order and decorative artwork** (`R23`). Every
+8. **State is announced, not just drawn** (`R37`). Every control that picks
+   up "on" styling says so where a screen reader reads it — `aria-pressed`,
+   `aria-checked`, or its own accessible name — and stops saying it when the
+   state goes off. Checked by comparing the on state against the off state,
+   not by looking for the presence of an attribute: an attribute that never
+   changes passes the second test and fails the reader.
+9. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
    every decorative `<svg>` is hidden from the accessibility tree. Checked on
@@ -54,14 +65,11 @@ a known gap, not a silent one.
 
 ## Checked by the reviewer, by hand
 
-9. **No hover-only affordances.** Everything reachable by tap alone.
+10. **No hover-only affordances.** Everything reachable by tap alone.
    (Partly enforced: `tests/polish.js` proves no `a:hover` rule turns a
    filled control invisible.)
-10. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
+11. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
    return focus to the opener. Reuse the existing machinery; don't rebuild it.
-11. **State is announced, not just drawn.** Toggles use `aria-pressed` /
-    `aria-checked` / `role="switch"`; async outcomes land in a `role="status"`
-    region, not only as a visual change.
 12. **Colour is never the only signal** — pair it with a word, a glyph, or a
     weight change.
 13. **Chrome does not scale with reading text.** New UI takes the fixed
@@ -70,10 +78,9 @@ a known gap, not a silent one.
     one column, no faded text, nothing truncated.
 15. **Both themes, by eye.** The automated audit catches ratios, not a
     white-on-white photo overlay or a shadow that vanished.
-16. **Live regions stay quiet.** New renders must not re-announce old
-    notices; a notice fires once, for the action that earned it.
-17. **Print still works** if the feature touches the recipe page — the print
-    stylesheet shows content only, black on white.
+16. **Print still works** if the feature touches the recipe page — the print
+    stylesheet shows content only, black on white. (Enforced for the recipe
+    page itself since `R24`; a new surface that prints needs its own check.)
 
 ## Deferred to the device pass (`035`–`040`, `042`)
 
