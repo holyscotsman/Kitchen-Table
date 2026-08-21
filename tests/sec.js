@@ -197,6 +197,142 @@ const hostile = JSON.stringify({
     await pX.close();
   }
 
+  console.log('\n== The one screen that renders someone else’s server (R54) ==');
+  {
+    /* Every hostile-data check above seeds localStorage — data this device
+       wrote, however it got here. The Add screen is different: its waiting
+       list and its failed-import rows are drawn from JSON the kitchen server
+       sends, and no suite had ever handed that server a hostile answer. The
+       CSP blocks inline handlers, so this is not a script-execution story;
+       it is a "the server can write markup into the family's phone" story,
+       which on a screen someone is reading is enough. */
+    const API = 'https://kt-hostile.test';
+    /* The slash is deliberate: this id has to be wrong in both ways at once
+       — markup when it is drawn, a second path segment when it is fetched. */
+    const BOOM = (n) => 'j' + n + '/x"><img src=x onerror="window.__k' + n + '=1">';
+    const ctxK = await br.newContext({ ...devices['iPhone 13'] });
+    const now = new Date().toISOString();
+    const asked = [];
+    await ctxK.route(API + '/**', (route) => {
+      const req = route.request();
+      const u = new URL(req.url());
+      asked.push(req.method() + ' ' + u.pathname);
+      const json = (body) => route.fulfill({
+        status: 200, contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify(body)
+      });
+      /* A submission is answered with an id that is itself a path. */
+      if (req.method() === 'POST' && u.pathname === '/api/import/video') {
+        return json({ job_id: 'a/b' });
+      }
+      if (u.pathname.indexOf('/api/import/jobs/') === 0) {
+        return json({ id: 'a/b', status: 'queued', eta_seconds: 60, overrun: false });
+      }
+      const failed = u.searchParams.get('status') === 'failed';
+      return json({ jobs: failed
+        ? [{ id: BOOM(2), url: 'https://e.test/v', platform: 'youtube',
+             error_message: 'It did not work.', created_at: now }]
+        : [{ id: BOOM(1), title: 'Hostile Server Soup', platform: 'youtube',
+             created_at: now }] });
+    });
+    const pK = await ctxK.newPage();
+    const kErrs = []; pK.on('pageerror', e => kErrs.push(e.message));
+    let kDialogs = 0; pK.on('dialog', d => { kDialogs++; d.accept(); });
+    await pK.addInitScript((api) =>
+      localStorage.setItem('kt.importApi', JSON.stringify(api)), API);
+    await pK.goto(B + '/index.html#add');
+    await pK.waitForSelector('.pathbtn');
+    await pK.waitForSelector('.vready', { timeout: 10000 });
+
+    /* The floor first: if the lists never drew, everything below is vacuous. */
+    chk('the waiting list and the failed row both drew',
+      await pK.locator('.vready .pathbtn').count() === 1 &&
+      await pK.locator('.vfailed__row').count() === 1,
+      (await pK.locator('.vready .pathbtn').count()) + '/' +
+      (await pK.locator('.vfailed__row').count()));
+    const kFired = () => pK.evaluate(() =>
+      Object.keys(window).filter(k => k.indexOf('__k') === 0));
+    const kBuilt = () => pK.evaluate(() =>
+      document.querySelectorAll('#app img[src="x"], #app script').length);
+    chk('nothing the server sent ran', (await kFired()).length === 0,
+      (await kFired()).join(', '));
+    chk('and nothing the server sent was even built into the page',
+      (await kBuilt()) === 0, String(await kBuilt()));
+    /* Inert is not the same as swallowed — the reader still has to be able
+       to see what the server called this thing. */
+    chk('the draft is still offered by name',
+      (await pK.locator('.vready').textContent()).includes('Hostile Server Soup'));
+    chk('and the failed import still says what happened',
+      (await pK.locator('.vfailed').textContent()).includes('It did not work.'));
+    chk('no dialogs', kDialogs === 0);
+    chk('the Add screen did not throw', kErrs.length === 0, kErrs.join(' | '));
+
+    /* An id does not only get drawn — it rides into the URL of the next
+       request, where a slash in it would address a DIFFERENT endpoint on
+       that server: the app quietly doing the wrong thing rather than
+       failing, which is the failure this book least wants.
+       Two ways in, and they are guarded differently. Ids read back off the
+       page go through parseInt, so a hostile one arrives as a number or as
+       NaN — that has always been true and is worth pinning. */
+    const onePath = (list) => list.length >= 1 &&
+      list.every(x => /^(GET|POST) \/api\/import\/jobs\/[^/]+$/.test(x));
+    asked.length = 0;
+    await pK.locator('.vready .pathbtn').first().click();
+    await pK.waitForTimeout(600);
+    chk('opening a listed draft asks for exactly one job',
+      onePath(asked.filter(x => x.indexOf(' /api/import/jobs/') > -1)),
+      JSON.stringify(asked));
+
+    /* The other way in has no parseInt anywhere near it: the id handed back
+       by a submission is polled straight from the server's own answer. */
+    asked.length = 0;
+    await pK.goto(B + '/index.html#add');
+    await pK.evaluate(() => sessionStorage.clear());
+    await pK.reload();
+    await pK.waitForSelector('.pathbtn[data-key="video"]');
+    await pK.click('.pathbtn[data-key="video"]');
+    await pK.waitForSelector('#a-vurl');
+    await pK.fill('#a-vurl', 'https://youtu.be/hostile');
+    await pK.click('[data-act="video-submit"]');
+    /* The poll runs on a 3.5s tick, so one full turn plus a margin. */
+    await pK.waitForTimeout(5000);
+    const polls = asked.filter(x => x.indexOf('GET /api/import/jobs/') === 0);
+    chk('and the id a submission hands back is polled as one job, whatever it holds',
+      onePath(polls), JSON.stringify(asked));
+    await ctxK.close();
+  }
+
+  console.log('\n== Every attribute the app writes is escaped (R54) ==');
+  {
+    /* The rule behind the case. app.js builds its HTML by concatenation, so
+       an attribute is one missing esc() away from being an element. Every
+       `="' + X +` in the file must pass X through esc(), unless X is on the
+       named list below — booleans, loop indices, and strings this app itself
+       composes, each one checked by hand when it was added here. A new
+       expression is not assumed safe: it fails until someone looks at it. */
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const SAFE = new Set([
+      'i',                                  // loop index
+      'on', 'done', 'S.searchOpen', 'S.sortOpen', 'S.needsLook',
+      'S.easyRead', 'S.editing', 'S.awake', 'S.listOpen',   // booleans
+      '(w || 22)', '(h || 22)',             // svg sizes, numbers
+      'id', 'act', 'cls', 's.key',          // literals passed by the caller
+      'iso',                                // YYYY-MM-DD, built here
+      'menuHash()',                         // built here, values encodeURIComponent'd
+      'trigger.getAttribute("data-act")'    // a selector, never innerHTML
+    ]);
+    const found = [...src.matchAll(/="'\s*\+\s*([^+]{1,60}?)\s*\+/g)]
+      .map(m => m[1].trim());
+    const raw = [...new Set(found.filter(x => !x.startsWith('esc(') && !SAFE.has(x)))];
+    chk('no attribute is written without esc() or a named exemption',
+      raw.length === 0, raw.join(' | '));
+    /* And the floor, so a changed quoting style cannot empty this check. */
+    chk('and the scan actually found the attributes', found.length > 40,
+      String(found.length));
+  }
+
   console.log('\n== What the workflows are allowed to do (R38) ==');
   {
     /* A workflow that runs the repository's own code with a write-capable
