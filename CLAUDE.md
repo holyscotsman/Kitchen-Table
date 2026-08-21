@@ -466,7 +466,12 @@ rows in light mode** — and `R86` finished the sweep with the sort menu,
 an empty search, the planned week, the picker, the meal sheet, the tag
 sheet and the photo lightbox, each naming the selector that proves it
 opened (the floor immediately caught four routes auditing the screen
-behind a sheet that never opened). —
+behind a sheet that never opened). **`R101` made it able to reach the
+rest**: every route had been given the same seeded data, so a state that
+only exists for a particular recipe was structurally unreachable and went
+unmeasured — which is why `R97`'s "Not given" servings card was argued
+from its tokens rather than measured. A route may now carry its own
+`localStorage` seed, and that card is the first to use it. —
 **and since `R82` on paper too**, which the audit
 had never looked at: printing under both themes found fourteen failures
 the dark palette was leaking onto white, including the shopping list's

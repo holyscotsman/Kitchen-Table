@@ -28,7 +28,7 @@ const CONTRAST = `(() => {
   let total=0;
   for(const mode of ['normal','easyread']){
   for(const theme of ['dark','light']){
-    for(const [name,hash,extra] of [
+    for(const [name,hash,extra,seed] of [
       ['Main','#',null],['Menu','#menu',null],
       ['Menu + filter sheet','#menu','[data-act="open-filter"]'],
       ['Recipe','#chicken-cordon-bleu',null],
@@ -67,6 +67,19 @@ const CONTRAST = `(() => {
       ['Add from a photo','#add','[data-key="photo"]'],
       ['Add from a video','#add','[data-key="video"]'],
       ['How to use it','#help',''],
+      /* `R101` — the two states the last rounds added, and the reason the
+         table could not hold them before: every route got the SAME seeded
+         data, so a state that only exists for a particular recipe was
+         unreachable and simply went unmeasured. `R85` found 192 failures
+         the moment two unswept modes were added, so "which states can this
+         audit even reach" is the question, not "are these two fine". The
+         fourth element is that route's own seed. */
+      ['Recipe with no serving count','#ninja-cookies',null,{
+        'kt.recipes': JSON.stringify([{ id:'ninja-cookies', title:'Ninja Cookies',
+          category:'Desserts', contributor:'Joan', servings:'makes about 2 dozen',
+          ingredients:['1 cup butter, softened','3 cups all-purpose flour'],
+          steps:['Cream the butter.','Bake at 400F for 10 minutes.'] }])
+      }],
     ]){
       const ctx=await br.newContext({...devices['iPhone 13']});
       /* Hermetic: the kitchen server is never poked from CI — the app's
@@ -87,7 +100,9 @@ const CONTRAST = `(() => {
           {id:'pseed1',date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
           {id:'pseed2',date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
         ]));
-      },{t:theme,e:mode==='easyread'});
+        /* This route's own seed, last so it can override the shared one. */
+        if(a.s) Object.keys(a.s).forEach(k=>localStorage.setItem(k,a.s[k]));
+      },{t:theme,e:mode==='easyread',s:seed||null});
       await p.goto(''+B+'/index.html'+hash);
       await p.waitForTimeout(900);
       /* Some states need more than one tap to exist. Each one asserts it
@@ -101,7 +116,8 @@ const CONTRAST = `(() => {
       if(name==='Menu search, nothing found'){
         await p.fill('#menu-search','zzzqqqx'); await p.waitForTimeout(400);
       }
-      const need={'Recipe photo lightbox':'.lightbox','Menu sort menu':'.sortmenu','Menu search, nothing found':'.emptybox, .empty, #main-content',
+      const need={'Recipe with no serving count':'.servcard__value--none',
+        'Recipe photo lightbox':'.lightbox','Menu sort menu':'.sortmenu','Menu search, nothing found':'.emptybox, .empty, #main-content',
         'Week planner, planned':'.shoplist__items','Week planner picker':'#pick-q',
         'Week planner meal sheet':'.sheet','Menu tag sheet':'.sheet'}[name];
       if(need && !(await p.locator(need).count())){
