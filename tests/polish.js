@@ -1076,6 +1076,44 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       chk('the precache list covers the app itself', list.includes('app.js') &&
         list.includes('style.css') && list.includes('index.html'));
     }
+    /* `R76` — the shell list was only ever checked in one direction. `R10`
+       proves every file the worker promises to cache exists, because
+       `cache.addAll` is all-or-nothing and one missing path leaves NO
+       offline support at all. Nothing proved the other way round: that
+       everything the app actually reaches for on a cold boot is on the
+       list. Add a stylesheet, an icon, a second script — forget the list —
+       and the outage test above still passes, because recipes still render;
+       the app is just quietly wrong offline, in the typeface or the layout,
+       for exactly the reader it was built for. */
+    {
+      const ctxCold = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pCold = await ctxCold.newPage();
+      const asked = new Set();
+      pCold.on('request', r => {
+        try {
+          const u = new URL(r.url());
+          if (u.origin === new URL(B).origin) asked.add(u.pathname);
+        } catch (e) {}
+      });
+      await pCold.goto(B + '/index.html');
+      await pCold.waitForSelector('.main__title');
+      await pCold.waitForTimeout(1200);
+      const swSrc2 = fsx.readFileSync(pathx.join(ROOT, 'sw.js'), 'utf8');
+      const at2 = swSrc2.indexOf('const SHELL = [');
+      const shell = (swSrc2.slice(at2, swSrc2.indexOf('];', at2)).match(/"([^"]+)"/g) || [])
+        .map(x => x.replace(/"/g, ''))
+        .map(x => (x === './' ? '/index.html' : (x.charAt(0) === '/' ? x : '/' + x)));
+      const unlisted = [...asked].filter(x => shell.indexOf(x) === -1);
+      chk('everything a cold boot asks for is in the offline shell',
+        unlisted.length === 0, unlisted.join(', '));
+      /* A floor, or a boot that fetched nothing would read as a clean pass —
+         and the reverse rule is deliberately NOT asserted: the manifest is
+         on the list and a browser may never ask for it. */
+      chk('and the cold boot really was watched', asked.size >= 6,
+        [...asked].sort().join(', '));
+      await ctxCold.close();
+    }
+
     const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
       '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
       '.woff2': 'font/woff2', '.txt': 'text/plain' };
