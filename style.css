@@ -17,6 +17,17 @@
 
 body {
   min-height: 100vh;
+  /* `R61` — a word too long for its line breaks rather than pushing the
+     page sideways. Inherited, so it covers every screen at once, and it
+     changes nothing for a word that already fits: `break-word` only acts
+     when a word cannot fit on a line of its own.
+     It is needed because the reading size is the reader's choice. Swept at
+     320px — a 640px phone at 200% zoom, which is what WCAG 1.4.10 reflow
+     actually asks for — with Easy Read at the top step, TWENTY of the
+     book's forty-eight recipes scrolled sideways, from +9px to +147px.
+     Almost all of them on one long word in a title: "Casserole",
+     "Chocolate", "Stroganoff", "(Empanadas)". */
+  overflow-wrap: break-word;
 }
 
 h1,

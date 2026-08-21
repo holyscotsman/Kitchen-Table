@@ -67,6 +67,38 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
         r.overflowX + 'px overflow; ' + r.wide.join(', '));
   }
 
+  /* `R61` — every recipe, not one of them.
+     The list above opens `chicken-cordon-bleu` and calls the reflow promise
+     kept. It is one recipe out of forty-eight, and it happens to pass:
+     swept properly, TWENTY of the forty-eight scrolled sideways here, from
+     +9px to +147px — the widest of them a title with a long word in it, at
+     the top step inside Easy Read, which is precisely the reader `041` was
+     written for. Same shape as `R16`'s tap-target finding: a criterion
+     believed to be enforced, enforced on one screen.
+     So the sweep is the book now. It costs about a minute and it is the
+     only version of this check that means what criterion 3 says it means. */
+  {
+    await p.goto(B + '/index.html');
+    const book = await p.evaluate(() => fetch('recipes.json').then(r => r.json()));
+    const over = [];
+    for (const r of book) {
+      await p.goto('about:blank');
+      await p.goto(B + '/index.html#' + r.id);
+      await p.waitForSelector('.r-title');
+      const px = await p.evaluate(() => {
+        const d = document.scrollingElement;
+        return d.scrollWidth - d.clientWidth;
+      });
+      if (px > 1) over.push(r.id + ' +' + px + 'px');
+    }
+    chk('every recipe in the book reflows at 320px, Easy Read, top step',
+      over.length === 0, over.length + ' of ' + book.length + ': ' + over.join(', '));
+    /* A floor: a book that failed to load would otherwise read as a clean
+       pass on nothing at all. */
+    chk('and the sweep really opened the whole book', book.length >= 48,
+      String(book.length));
+  }
+
   await br.close();
   console.log('\n' + '='.repeat(50) + '\nPASS: ' + pass + '   FAIL: ' + fail + '\n' + '='.repeat(50));
   process.exit(fail ? 1 : 0);
