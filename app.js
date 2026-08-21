@@ -2532,9 +2532,18 @@
 
     var sections = [
       ["Finding a recipe",
-       ["Type in the search box on the front page. It looks inside the " +
-        "recipes too, so “bacon” finds anything with bacon in it, not just " +
-        "recipes with bacon in the name.",
+       [/* `R94` — this used to say search "finds anything with bacon in
+           it", which is wider than the app: `matchField` reads the title,
+           the tags and the ingredients, and README.md says so plainly —
+           "steps are deliberately not searched this way". `purée` is in
+           Crannachan's method and searching that exact word finds nothing,
+           so the old sentence sent a cook looking for a method word to an
+           empty screen with no reason for it. */
+        "Type in the search box on the front page. It reads the " +
+        "<strong>ingredients and the tags</strong> as well as the name, so " +
+        "“bacon” finds the recipes with bacon in them even when the title " +
+        "never says so. It doesn’t read the method — searching for a word " +
+        "you remember from the steps won’t find it.",
         "Spelling doesn’t have to be perfect, and accents don’t matter — " +
         "“creme” finds crème.",
         "When what you want is the first one on the list, the keyboard’s " +
