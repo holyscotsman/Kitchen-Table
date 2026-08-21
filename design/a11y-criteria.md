@@ -75,6 +75,13 @@ a known gap, not a silent one.
    filled control invisible.)
 12. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
    return focus to the opener. Reuse the existing machinery; don't rebuild it.
+   (Partly enforced since `R55`: `tests/polish.js` scrolls every sheet to the
+   bottom, upright and on its side, and requires a control that closes it to
+   be fully on screen there, at least 44px, and neither covered nor
+   see-through. Escape and the scrim both close a sheet, but neither is
+   something a person can *see* — on a phone there is no Escape key, and the
+   scrim is drawn as nothing. The Filter sheet failed this: 1134px of chips
+   in a 544px window put Done 590px above the fold.)
 13. **Colour is never the only signal** — pair it with a word, a glyph, or a
     weight change.
 14. **Easy Read survives it.** Open the feature with Easy Read on, top step:

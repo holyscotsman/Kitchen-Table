@@ -1858,12 +1858,26 @@ input[type="file"].input {
   max-width: 520px;
 }
 
+/* Pinned, because the way out has to stay where a person can see it.
+   Measured before this: the Filter sheet is 1134px of chips in a 544px
+   window, so by the time a reader had scrolled down to the tags, Done sat
+   590px above the fold — and the only other way out is the scrim, which is
+   drawn as nothing. On a phone there is no Escape key to fall back on.
+   The negative side margins are exactly the sheet's own padding, so the
+   pinned bar spans the full width and nothing scrolls through the gutters
+   beside it; the -20px top against the +20px padding leaves the resting
+   position identical to before. */
 .sheet__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  margin: -20px calc(-1 * var(--pad)) 18px;
+  padding: 20px var(--pad) 14px;
 }
 
 .sheet__title {
