@@ -4866,6 +4866,51 @@
     }, 250);
   }
 
+  /* The selector that finds a control again after the DOM beneath it has
+     been rebuilt. `data-act` says what the control does; the rest say WHICH
+     one — which ingredient, which chip, which direction. Exactly the
+     vocabulary `openSheet` already uses to find the control it must return
+     the caret to; this is the same question asked on every render rather
+     than only when a sheet closes. Returns null for anything that is not
+     one of the app's controls. */
+  /* What the caret was on, in enough detail to find it again once the DOM
+     beneath it has been rebuilt. `data-act` says what the control does; the
+     rest say WHICH one — which ingredient, which chip, which direction.
+     Same vocabulary `openSheet` uses to find the control it must return to.
+
+     Recorded as VALUES and compared as values, never assembled into a
+     selector string. `recipes.json` is hand-editable by design, so these
+     carry whatever a person put in the file: a tag holding a newline makes
+     `[data-key="sun<LF>dried"]` a CSS syntax error, and querySelector would
+     throw out of the middle of render() — leaving the sheet focus and the
+     draft snapshot at the end of it unrun. Comparing strings cannot fail on
+     any input, which is the whole reason it is done this way. */
+  var FOCUS_ATTRS = ["data-key", "data-i", "data-id", "data-d"];
+
+  function controlMark(el) {
+    if (!el || !el.getAttribute) return null;
+    var act = el.getAttribute("data-act");
+    if (!act) return null;
+    var mark = { act: act, rest: [] };
+    for (var i = 0; i < FOCUS_ATTRS.length; i++) {
+      mark.rest.push(el.getAttribute(FOCUS_ATTRS[i]));
+    }
+    return mark;
+  }
+
+  function findControl(root, mark) {
+    var all = root.querySelectorAll("[data-act]");
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].getAttribute("data-act") !== mark.act) continue;
+      var same = true;
+      for (var j = 0; j < FOCUS_ATTRS.length; j++) {
+        if (all[i].getAttribute(FOCUS_ATTRS[j]) !== mark.rest[j]) { same = false; break; }
+      }
+      if (same) return all[i];
+    }
+    return null;
+  }
+
   function render() {
     var app = document.getElementById("app");
     if (!app) return;
@@ -4881,6 +4926,26 @@
         selEnd = active.selectionEnd;
       } catch (e) {}
     }
+    /* `R106` — and the controls with no id, which is nearly all of them.
+       Every render throws the screen away and builds it again, so the
+       element under the caret stops existing. Only the FIELDS carry ids, so
+       only the fields ever came back: a button re-rendered by its own press
+       dropped the caret onto <body>.
+
+       That is not cosmetic. The servings stepper became a one-shot by
+       keyboard — press + once, the caret is gone, press + again and nothing
+       happens, so four people could never become six — and every ingredient
+       ticked off threw a screen reader back to the top of the page, on the
+       screen someone is standing at a hob using. Both measured before this
+       was written.
+
+       Restored only on the SAME screen. A route change already has its own
+       landing place (the new heading, focused after this returns), and
+       moving the caret here first would have a screen reader announce a
+       control the reader is about to be taken away from. A sheet opening or
+       closing keeps its own contract too: both run after this. */
+    var sameScreen = S.loaded && routeKey(S.route) === S.paintedRoute;
+    var focusMark = !focusId && sameScreen ? controlMark(active) : null;
 
     var html;
     if (S.error) {
@@ -4946,6 +5011,9 @@
           try { el.setSelectionRange(selStart, selEnd); } catch (e) {}
         }
       }
+    } else if (focusMark) {
+      var back = findControl(app, focusMark);
+      if (back) back.focus();
     }
 
     syncSheetFocus();
