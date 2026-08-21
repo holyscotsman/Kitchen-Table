@@ -2281,11 +2281,11 @@
              'data-act="dl" data-k="ingredients" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
              '<button type="button" class="delbtn press" data-act="del" ' +
-             'data-k="ingredients" data-i="' + i + '" aria-label="Remove ingredient ' +
+             'data-key="ingredients" data-i="' + i + '" aria-label="Remove ingredient ' +
              (i + 1) + '">' + I.x() + "</button></div>";
     }).join("");
     h += '<button type="button" class="addline press" data-act="add" ' +
-         'data-k="ingredients">+ Add ingredient</button>';
+         'data-key="ingredients">+ Add ingredient</button>';
 
     h += '<h2 class="r-h2" style="margin-top:22px">Instructions</h2>';
     h += d.steps.map(function (line, i) {
@@ -2295,11 +2295,11 @@
              'data-act="dl" data-k="steps" data-i="' + i + '">' +
              esc(line) + "</textarea>" +
              '<button type="button" class="delbtn press" data-act="del" ' +
-             'data-k="steps" data-i="' + i + '" aria-label="Remove step ' +
+             'data-key="steps" data-i="' + i + '" aria-label="Remove step ' +
              (i + 1) + '">' + I.x() + "</button></div>";
     }).join("");
     h += '<button type="button" class="addline press" data-act="add" ' +
-         'data-k="steps">+ Add step</button>';
+         'data-key="steps">+ Add step</button>';
 
     h += '<div class="field" style="margin-top:22px">' +
          '<label class="field__label" for="e-notes">Notes</label>' +
@@ -4922,6 +4922,16 @@
     var el = ev.target.closest ? ev.target.closest("[data-act]") : null;
     if (!el) return;
     var act = el.getAttribute("data-act");
+    /* `R103` — this reads `data-key`; the INPUT handler below reads
+       `data-k` for its field bindings. Two spellings of one idea, and Edit
+       mode's four list buttons had the input handler's one on them: `key`
+       came back null, `S.draft[null]` is undefined, and every "+ Add
+       ingredient" and "Remove" threw `undefined.push` / `undefined.splice`
+       into a console nobody reads. The buttons looked live, pressed, and
+       did nothing — for the whole of Edit mode, whose entire job is fixing
+       a recipe. The Add screen's review form had it right all along, which
+       is why nothing caught it. The convention, now true in both places:
+       a field binding carries `data-k`, a click action carries `data-key`. */
     var key = el.getAttribute("data-key");
     var idx = parseInt(el.getAttribute("data-i"), 10);
     var r = S.route.name === "recipe" ? byId(S.route.id) : null;

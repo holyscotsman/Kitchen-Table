@@ -1453,7 +1453,12 @@ const browserContextWithReduce = (br) =>
   chk('switch on', await p.getAttribute('[data-act="toggle-edit"]','aria-checked')==='true');
   chk('title field labelled', await p.locator('label[for="e-title"]').count()===1);
   chk('ingredient textareas', await p.locator('[data-k="ingredients"][data-act="dl"]').count()>0);
-  chk('add-ingredient button', await p.locator('[data-act="add"][data-k="ingredients"]').count()===1);
+  /* `data-key`, not `data-k`. The click handler dereferences `data-key`;
+     this check pinned the other spelling, so it went on passing for the
+     entire time the button did nothing at all (`R103`). Pinning the
+     attribute the handler actually reads is what makes it a check rather
+     than a headcount. */
+  chk('add-ingredient button', await p.locator('[data-act="add"][data-key="ingredients"]').count()===1);
   chk('download json button', await p.locator('[data-act="dl-json"]').count()===1);
   chk('serves stepper parity with the review form (R4)',
     await p.locator('[data-act="e-serv"]').count()===2);
