@@ -92,3 +92,22 @@ drops it without a word and the next nightly sync makes that permanent.
 
 If you add a field to a recipe, it goes in all three, and `tests/quick.js`
 will tell you which one you forgot.
+
+## recipes.json is written one way
+
+Three things write that file: the app's **Download updated recipes.json**,
+`db/export.js` on the nightly sync, and a person with an editor. All three
+produce `JSON.stringify(list, null, 2)` plus a newline, with the keys in
+`FIELD_ORDER`.
+
+That is a contract, not a preference (`R74`). `db/export.js --check`
+compares *content* — it parses both sides — so a reformatted file does not
+by itself make the nightly sync think anything drifted. The cost lands
+later and lands hard: the moment a recipe genuinely does change, the write
+is canonical, so **one changed line arrives as a 71KB diff** with the real
+change buried in it. The app's download — the file a family member sends to
+be committed — behaves the same way.
+
+`tests/quick.js` holds the file to it: byte-identical to a canonical
+re-write, no BOM, `FIELD_ORDER` on every recipe, and no field the writers
+would drop on the way out.

@@ -189,6 +189,59 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== recipes.json has to be written the way every writer writes it (R74) ==');
+  {
+    /* Three things write this file: the app's download, `db/export.js` on the
+       nightly sync, and a person with an editor. They all produce
+       `JSON.stringify(list, null, 2)` plus a newline, in `FIELD_ORDER`. A
+       hand-edit with different indentation, or with the keys shuffled, still
+       parses to the same recipes — and then the very next write reformats
+       every line of a 71KB file.
+       `db/export.js --check` compares CONTENT, not bytes — it parses both
+       sides first — so a reformatted file does not by itself make the
+       nightly sync think anything drifted. The cost lands later and lands
+       hard: the moment a recipe genuinely does change, the write is
+       canonical, so **one changed line arrives as a 71KB diff** with the
+       real change buried in it. The same is true of the app's download,
+       which is the file a family member sends to be committed. So the
+       format is a contract, and this is where it is written down. */
+    const fsx = require('fs');
+    const pathx = require('path');
+    const ROOT = pathx.join(__dirname, '..');
+    const rawFile = fsx.readFileSync(pathx.join(ROOT, 'recipes.json'), 'utf8');
+    const book = JSON.parse(rawFile);
+
+    chk('the book parses and holds recipes', Array.isArray(book) && book.length >= 40,
+      String(book.length));
+    chk('and is byte-identical to the way every writer writes it',
+      JSON.stringify(book, null, 2) + '\n' === rawFile,
+      'on disk ' + rawFile.length + ' bytes, rewritten ' +
+      (JSON.stringify(book, null, 2) + '\n').length);
+    chk('with no byte-order mark to confuse a parser',
+      rawFile.charCodeAt(0) !== 0xFEFF);
+
+    /* Key order is not preserved by a reformat, so it needs saying on its
+       own: both writers emit FIELD_ORDER, and a shuffled file would be
+       rewritten wholesale the first time either of them ran. */
+    const appSrc = fsx.readFileSync(pathx.join(ROOT, 'app.js'), 'utf8');
+    const at = appSrc.indexOf('var FIELD_ORDER');
+    const order = (appSrc.slice(appSrc.indexOf('[', at), appSrc.indexOf('];', at))
+      .match(/"([a-zA-Z]+)"/g) || []).map(x => x.replace(/"/g, ''));
+    chk('FIELD_ORDER was found to compare against', order.length >= 12,
+      JSON.stringify(order));
+    const outOfOrder = book.filter(r => {
+      const keys = Object.keys(r);
+      const expect = order.filter(k => Object.prototype.hasOwnProperty.call(r, k));
+      return JSON.stringify(keys) !== JSON.stringify(expect);
+    }).map(r => r.id);
+    chk('every recipe keeps its fields in that order',
+      outOfOrder.length === 0, outOfOrder.slice(0, 4).join(', '));
+    const strays = [...new Set(book.reduce((a, r) =>
+      a.concat(Object.keys(r).filter(k => order.indexOf(k) === -1)), []))];
+    chk('and carries no field the writers would drop on the way out',
+      strays.length === 0, strays.join(', '));
+  }
+
   console.log('\n== The known-wrong-data ledger, checked against the data (R69) ==');
   {
     /* CONTENT.md is the ledger of what is known to be wrong in the book, and

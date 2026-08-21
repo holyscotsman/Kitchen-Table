@@ -417,8 +417,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **918 functional checks** across eleven
-suites (kt 239, feat 65, add 79, relay 16, quick 70, polish 117, sec 52,
+The suite after the video arc: **924 functional checks** across eleven
+suites (kt 239, feat 65, add 79, relay 16, quick 76, polish 117, sec 52,
 plan 51, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
