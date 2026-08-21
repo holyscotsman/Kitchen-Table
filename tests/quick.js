@@ -189,6 +189,83 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== The tutorial has to be true (R63) ==');
+  {
+    /* The Help screen is the one page written for someone who has never been
+       shown the app. It names controls in bold and tells the reader where to
+       find them — and nothing checked that those controls still exist or
+       still say that. A renamed button turns the tutorial into a wild goose
+       chase, silently, for exactly the reader least able to recover from it.
+       Two lies were found writing this: the front page's button says
+       "View all 48 recipes", not "View all recipes"; and the servings
+       paragraph promised that "every amount changes with it", which R56–R60
+       made deliberately untrue — a step's number only scales when a
+       measurement follows it, and 36 ingredient lines carry a second amount
+       the app now explicitly leaves alone. */
+    const NAMED = [
+      ['View all', '#', null],
+      ['Plan the week', '#', null],
+      ['Aa', '#menu', null],
+      ['Add recipe', '#menu', null],
+      ['A−', '#menu', '[data-act="open-text"]'],
+      ['A+', '#menu', '[data-act="open-text"]'],
+      ['Easy Read', '#menu', '[data-act="open-text"]'],
+      ['Servings', '#chicken-cordon-bleu', null],
+      ['Keep screen on while cooking', '#chicken-cordon-bleu', null],
+      ['Share', '#chicken-cordon-bleu', null],
+      ['Download', '#chicken-cordon-bleu', null],
+      ['Edit', '#chicken-cordon-bleu', null],
+      ['Worth double-checking', '#chops', null],
+      ['Type it in', '#add', null],
+      ['From a link', '#add', null],
+      ['From a photo', '#add', null],
+      ['From a video', '#add', null]
+    ];
+    const pH = await ctx.newPage();
+    await pH.goto(B + '/index.html#help');
+    await pH.waitForSelector('.help');
+    const bold = await pH.evaluate(() =>
+      [...document.querySelectorAll('.help strong')].map(e => e.textContent.trim()));
+    chk('the help names controls in bold', bold.length > 12, String(bold.length));
+    /* Every control the table promises is a name the help actually uses —
+       so the table cannot quietly drift away from the page it guards. */
+    const unclaimed = NAMED.filter(n => !bold.includes(n[0])).map(n => n[0]);
+    chk('and the list below is drawn from those names',
+      unclaimed.length === 0, unclaimed.join(', '));
+
+    const missing = [];
+    for (const [name, hash, extra] of NAMED) {
+      await pH.goto('about:blank');
+      await pH.goto(B + '/index.html' + hash);
+      await pH.waitForTimeout(500);
+      if (extra) { await pH.click(extra, { timeout: 4000 }).catch(() => {}); await pH.waitForTimeout(350); }
+      /* Every element's text, not only the leaves: a button that holds an
+         icon and a label has element children, and its words would drop out
+         of a leaf-only sweep — which is how six controls that are plainly
+         on the screen first read as missing. */
+      const found = await pH.evaluate((n) => {
+        const app = document.getElementById('app');
+        if (app && (app.textContent || '').indexOf(n) > -1) return true;
+        return [...document.querySelectorAll('#app [aria-label]')]
+          .some(el => el.getAttribute('aria-label').indexOf(n) > -1);
+      }, name);
+      if (!found) missing.push('"' + name + '" not on ' + hash);
+    }
+    chk('every control the help names is where it says it is',
+      missing.length === 0, missing.join(' | '));
+
+    /* And the claim R56–R60 made untrue, guarded by the words the app
+       itself puts on the line. */
+    await pH.goto(B + '/index.html#help');
+    await pH.waitForSelector('.help');
+    const help = await pH.locator('.help').textContent();
+    chk('the help does not promise that every amount changes',
+      !/every amount changes/i.test(help));
+    chk('and it explains the amounts that do not',
+      /not adjusted/.test(help));
+    await pH.close();
+  }
+
   console.log('\n== The record keeps its own arithmetic (R52) ==');
   {
     /* CLAUDE.md states a running total and then lists the suites it is made
