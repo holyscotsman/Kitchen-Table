@@ -1938,6 +1938,18 @@ input[type="file"].input {
   font-weight: 700;
 }
 
+/* `R83` — the same button, for the word that means the opposite. An accent
+   fill in this app is the thing you opened the screen to press, and three
+   sheets were spending it on "Cancel" — loudest of all in the recipe
+   picker, where the brightest control on a sheet full of recipes said
+   don't. Same size, same place, same reachability (`R55`): only the shout
+   is gone. */
+.donebtn--quiet {
+  background: var(--surf);
+  color: var(--ink);
+  border: var(--bw) solid var(--line);
+}
+
 .grouph {
   font-size: 14px;
   font-weight: 700;

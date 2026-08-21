@@ -1493,7 +1493,7 @@
       '<div class="sheet__inner sheet__inner--narrow">' +
       '<div class="sheet__head"><h2 class="sheet__title" id="bulk-title">Tag ' +
       selCount + (selCount === 1 ? " recipe" : " recipes") + "</h2>" +
-      '<button type="button" class="donebtn press" data-act="close-bulk">Cancel</button></div>' +
+      '<button type="button" class="donebtn donebtn--quiet press" data-act="close-bulk">Cancel</button></div>' +
       '<div class="field">' +
       '<label class="field__label" for="bulk-tags">Tags to add</label>' +
       '<input class="input" id="bulk-tags" data-act="bulk-tags" data-k="tags" ' +
@@ -1839,7 +1839,7 @@
       "PDF — printable page</button>" +
       '<button type="button" class="sheetbtn press" data-act="dl-txt">' +
       "Plain text (.txt)</button>" +
-      '<button type="button" class="sheetbtn sheetbtn--acc press" data-act="close-dl">' +
+      '<button type="button" class="sheetbtn press" data-act="close-dl">' +
       "Cancel</button>" +
       "</div></div>"
     );
@@ -2766,7 +2766,7 @@
       '<div class="sheet__inner sheet__inner--narrow">' +
       '<div class="sheet__head"><h2 class="sheet__title" id="pick-title">' + esc(slot) +
       (S.pickFor ? " · " + esc(prettyDate(S.pickFor.date)) : "") + "</h2>" +
-      '<button type="button" class="donebtn press" data-act="close-pick">Cancel</button></div>' +
+      '<button type="button" class="donebtn donebtn--quiet press" data-act="close-pick">Cancel</button></div>' +
       '<label class="vh" for="pick-q">Search recipes</label>' +
       '<input class="input" id="pick-q" type="search" data-act="pick-q" ' +
       'placeholder="Search recipes" value="' + esc(S.pickQ) + '" autocomplete="off" />' +
