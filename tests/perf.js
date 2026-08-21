@@ -169,7 +169,73 @@ const BUDGET = parseInt(process.env.KT_FCP_BUDGET || '4000', 10);
   }
   await pTap.close();
 
-  const ok = fcpOk && clsOk && tapsOk;
+  /* R46 — 089 ruled the Menu deliberately unvirtualised at 48 recipes, and
+     said to revisit at about 150. A ruling with a trigger nobody watches is a
+     ruling that expires quietly: this is the watcher. A synthetic book four
+     times the real one renders the Menu and takes a filter tap; over budget
+     means the collection has outgrown the decision, and the failure hands
+     over the number rather than an opinion. It is not a regression in the
+     code — it is a message to whoever is reading it years from now. */
+  let growthOk = true;
+  {
+    const pBig = await ctx.newPage();
+    const bigCdp = await ctx.newCDPSession(pBig);
+    await bigCdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    await pBig.goto(B + '/index.html');
+    const seeded = await pBig.evaluate(async () => {
+      const base = await (await fetch('recipes.json')).json();
+      const out = [];
+      for (let copy = 0; copy < 5; copy++) {
+        base.forEach((r, i) => {
+          const c = JSON.parse(JSON.stringify(r));
+          c.id = r.id + (copy ? '-' + copy : '');
+          c.title = r.title + (copy ? ' ' + (copy + 1) : '');
+          out.push(c);
+        });
+      }
+      localStorage.setItem('kt.recipes', JSON.stringify(out));
+      return out.length;
+    });
+    await pBig.goto(B + '/index.html#menu');
+    await pBig.reload();
+    await pBig.waitForSelector('.rcard');
+    const shown = await pBig.locator('.rcard').count();
+    await pBig.click('[data-act="open-filter"]');
+    await pBig.waitForSelector('#filter-sheet');
+    const times = await pBig.evaluate(async () => {
+      const out = [];
+      for (let i = 0; i < 5; i++) {
+        const el = document.querySelector('[data-act="fc"][data-key="Dinner"]');
+        const t = performance.now();
+        el.click();
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        out.push(Math.round(performance.now() - t));
+      }
+      return out;
+    });
+    times.sort((a, b) => a - b);
+    const med = times[Math.floor(times.length / 2)];
+    /* Loose on purpose. The number is printed every run whatever happens, so
+       anyone reading a CI log can see the trend; the gate exists to fire when
+       the collection has genuinely outgrown one re-render, not to measure the
+       runner. A tripwire that cries wolf teaches people to step over it. */
+    const BIG_BUDGET = 1500;
+    console.log('Menu with ' + shown + ' recipes, filter tap: ' + med +
+      ' ms median of ' + times.join('/') + '   Budget: ' + BIG_BUDGET + ' ms');
+    if (shown !== seeded) {
+      console.log('FAIL: the big book did not render (' + shown + ' of ' + seeded + ')');
+      growthOk = false;
+    } else if (med > BIG_BUDGET) {
+      console.log('FAIL: at ' + shown + ' recipes the Menu is past what one ' +
+        're-render can carry. Task 089 ruled it unvirtualised at 48 and said ' +
+        'to revisit near 150 — this is that moment, with the number in hand.');
+      growthOk = false;
+    }
+    await pBig.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await pBig.close();
+  }
+
+  const ok = fcpOk && clsOk && tapsOk && growthOk;
   if (ok) console.log('PASS');
   await br.close();
   process.exit(ok ? 0 : 1);
