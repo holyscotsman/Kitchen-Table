@@ -2813,6 +2813,16 @@ a.bigbtn--quiet:hover {
   overflow-y: auto;
 }
 
+/* `R84` — a flex item shrinks before its container scrolls, and a card's
+   automatic minimum is its min-content height: here the 64px icon slot,
+   because the title and meta truncate and so contribute nothing to it. So
+   "eight cards, scroll for the rest" was really "eight cards crushed to
+   44px with their own text drawn outside the box, over the card below".
+   The list scrolls; the cards keep their height. */
+.picklist > * {
+  flex: none;
+}
+
 /* The shopping list preview (130). */
 .shoplist {
   margin-top: 22px;

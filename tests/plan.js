@@ -166,6 +166,51 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     }
   }
 
+  console.log('\n== R84 — the picker squashed its own recipes ==');
+  {
+    /* `.picklist` is a flex column with `max-height: 46vh; overflow-y:
+       auto`, which reads as "eight cards, scroll for the rest". It is not
+       what happens. Flex items shrink before a container scrolls, and a
+       card's automatic minimum is its min-content height — which here is
+       the 44px icon, because the title and meta truncate and so contribute
+       nothing. So every card was crushed to 44px with its own text drawn
+       27-49px OUTSIDE the box, over the top of the card below it. On the
+       screen you use to plan a week, at every font step.
+       The criterion: a card contains its own words. */
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#plan');
+    await p.waitForSelector('.slotadd');
+    await p.locator('.slotadd').first().click();
+    await p.waitForSelector('#pick-q');
+    await p.waitForTimeout(400);
+    const fit = await p.evaluate(() => {
+      const cards = [].slice.call(document.querySelectorAll('.picklist .mealcard'));
+      const spill = [];
+      const overlap = [];
+      let prev = null;
+      cards.forEach(c => {
+        const cb = c.getBoundingClientRect();
+        [].slice.call(c.querySelectorAll('.rcard__title, .rcard__meta')).forEach(t => {
+          const tb = t.getBoundingClientRect();
+          if (tb.bottom > cb.bottom + 1 || tb.top < cb.top - 1) {
+            spill.push((t.textContent || '').trim().slice(0, 18) + ' +' +
+              Math.round(Math.max(tb.bottom - cb.bottom, cb.top - tb.top)) + 'px outside');
+          }
+        });
+        if (prev && cb.top < prev.bottom - 1) overlap.push(Math.round(prev.bottom - cb.top) + 'px');
+        prev = cb;
+      });
+      return { n: cards.length, spill: spill.slice(0, 4), overlap: overlap.slice(0, 3) };
+    });
+    chk('the picker drew a list to measure', fit.n >= 5, String(fit.n));
+    chk('every card in the picker contains its own words',
+      fit.spill.length === 0, fit.spill.join('; '));
+    chk('and no card is drawn over the one below it',
+      fit.overlap.length === 0, fit.overlap.join('; '));
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(250);
+  }
+
   console.log('\n== R82 — a printed list must not claim a precision it lacks ==');
   {
     /* The list sums what it safely can and lists the rest as written; the
@@ -174,6 +219,18 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        the same column as the summed ones with nothing to say so — a list
        that reads as arithmetic when half of it is transcription.
        Checked on paper, because on screen it was always fine. */
+    /* Self-sufficient on purpose: `S.listOpen` is in-memory, so any block
+       above that navigates leaves the fold shut and this would measure an
+       empty list and call it a pass. */
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#plan');
+    await p.waitForSelector('.dayblock');
+    if (await p.locator('[data-act="toggle-list"]').count()) {
+      if (await p.getAttribute('[data-act="toggle-list"]', 'aria-expanded') !== 'true') {
+        await p.click('[data-act="toggle-list"]');
+      }
+      await p.waitForSelector('.shoplist__items');
+    }
     await p.emulateMedia({ media: 'print' });
     await p.waitForTimeout(200);
     const onPaper = await p.evaluate(() => {
