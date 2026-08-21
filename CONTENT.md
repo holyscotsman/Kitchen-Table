@@ -82,7 +82,7 @@ Transcribed exactly as the source showed, flagged rather than corrected:
 - ~~No recipe has a tag.~~ **37 now carry research-traceable tags** (see the
   research pass below); Joan-memory tags for the ambiguous eleven stay open
   under `076`.
-- **Every recipe is Joan's.** Jason, Jennifer, Lindsay and Siobhan have empty
+- **Every recipe is Joan's.** Jason, Jennifer, Lindsay, Siobhan and Jessica have empty
   sections — task `078`.
 - `hibachi-fried-rice` — the servings count was partly visible but cut off by
   the browser header, so it is both "inferred" (§1) and "almost known".

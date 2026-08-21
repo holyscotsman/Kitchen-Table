@@ -315,7 +315,7 @@ Append an object to `recipes.json` and push. Field order matters for diffs:
   "id": "kebab-case-slug",
   "title": "Recipe Title",
   "category": "Breakfast | Brunch | Lunch | Dinner | Sides | Snacks | Baking | Desserts | Cocktails | Drinks",
-  "contributor": "Joan | Jason | Jennifer | Lindsay | Siobhan",
+  "contributor": "Joan | Jason | Jennifer | Lindsay | Siobhan | Jessica",
   "servings": 4,
   "prepTime": "15 min",
   "cookTime": "30 min",

@@ -175,7 +175,7 @@ These came from Jason directly and supersede the corresponding parts of
   `#menu?tag=…`. Nothing ships pre-tagged.
 - **Photos.** See below.
 - The Main subtitle is "A Simmonds Styled Menu"; the Add pill is smaller.
-- **Contributors are Joan, Jason, Jennifer, Lindsay, and Siobhan.** Every one
+- **Contributors are Joan, Jason, Jennifer, Lindsay, Siobhan and Jessica.** Every one
   of the 48 recipes is Joan's — the handoff's 25/18/5 split was a placeholder
   and was wrong. The other four are sections waiting to be filled, drawn as
   outlined tiles so they recede rather than shouting a zero, and hidden from
@@ -393,8 +393,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **876 functional checks** across eleven
-suites (kt 231, feat 59, add 74, relay 16, quick 57, polish 117, sec 52,
+The suite after the video arc: **882 functional checks** across eleven
+suites (kt 231, feat 59, add 74, relay 16, quick 63, polish 117, sec 52,
 plan 41, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
