@@ -380,7 +380,9 @@ three interaction budgets measured in-page under a 6× CPU throttle —
 check-off 33 ms, servings 50 ms, a filter chip re-rendering all 48 cards
 158 ms — which are tripwires for an architectural regression, not a grade:
 the comment in `tests/perf.js` says exactly what they will and will not
-catch). WCAG AA contrast:
+catch; and since `R46` a growth watcher that renders a synthetic 240-recipe
+book and reports the filter tap — 440–570 ms, so `089`'s unvirtualised
+ruling holds well past the 150 it worried about). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
 video form included. Nothing interactive measures under 44px — checked on
 every screen, not just one (`R16`). All of it
