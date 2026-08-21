@@ -493,6 +493,15 @@
     [0.625, "⅝"], [0.667, "⅔"], [0.75, "¾"], [0.875, "⅞"]
   ];
 
+  /* Small counts read better as words, and a word can never collide with
+     the number in the sentence before it (`R77`). */
+  var COUNT_WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six",
+    "Seven", "Eight", "Nine", "Ten"];
+
+  function spellCount(n) {
+    return COUNT_WORDS[n] || String(n);
+  }
+
   function fmtQty(n) {
     if (n <= 0) return "0";
     var whole = Math.floor(n + 1e-9);
@@ -1944,14 +1953,19 @@
 
     if (S.serves !== r.servings) {
       /* Say how many lines carry an amount that did not move, so the
-         sentence a cook reads matches what the list actually shows. */
+         sentence a cook reads matches what the list actually shows.
+         `R77` — the count is spelled out and the original gets its noun,
+         because the first version of this read "from the original 4. 4
+         lines carry", and two numerals with nothing but punctuation between
+         them is "4.4" to anyone reading at 24px. */
       var keptCount = (r.ingredients || []).filter(function (l) {
         return unscaledExtra(l);
       }).length;
       h += '<p class="scalednote">Amounts adjusted from the original ' +
-           r.servings + "." +
+           r.servings + " serving" + (r.servings === 1 ? "" : "s") + "." +
            (keptCount
-             ? " " + keptCount + (keptCount === 1 ? " line carries" : " lines carry") +
+             ? " " + spellCount(keptCount) +
+               (keptCount === 1 ? " of these lines carries" : " of these lines carry") +
                " a second amount that was left as written — check those."
              : "") +
            '<span class="screen-only"> Tap − / + to change.</span></p>';
