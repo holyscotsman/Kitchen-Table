@@ -186,6 +186,183 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== You could not add or remove a line in Edit mode (R103) ==');
+  {
+    /* Two spellings of one idea, and the wrong one on four buttons.
+
+       The single click handler reads `data-key`. Edit mode's "+ Add
+       ingredient", "+ Add step" and every "Remove" button were written with
+       `data-k` — the spelling the INPUT handler uses for field bindings. So
+       `key` came back null, `S.draft[null]` is undefined, and the handler
+       threw `undefined.push` / `undefined.splice` into a console nobody is
+       reading. The buttons look live, they press, and nothing happens.
+
+       That is Edit mode's whole job. "Changing a recipe" is one of the six
+       help topics and `ADDING.md` walks the family through it; the
+       download-and-commit workflow exists so someone can FIX Joan's
+       recipes. They could retype a line that was already there and nothing
+       else — not delete a wrong one, not add a missing one.
+
+       It hid because the Add screen's review form uses `data-key` on the
+       same controls and works, and the Edit-mode tests only ever edited the
+       title. Checked here by counting fields, and by requiring silence: a
+       swallowed exception is how this survived. */
+    const ctxE = await br.newContext({ ...devices['iPhone 13'] });
+    const pE = await ctxE.newPage();
+    let eErrs = []; pE.on('pageerror', e => eErrs.push(e.message));
+    await ctxE.route('**/*.onrender.com/**', r => r.abort('failed'));
+    await pE.goto(B + '/index.html#ninja-cookies');
+    await pE.waitForSelector('.r-title');
+    await pE.click('[data-act="toggle-edit"]');
+    await pE.waitForSelector('#e-title');
+    const ings = () => pE.evaluate(() => document.querySelectorAll('[id^="e-ing-"]').length);
+    const stps = () => pE.evaluate(() => document.querySelectorAll('[id^="e-step-"]').length);
+
+    const i0 = await ings(), s0 = await stps();
+    chk('the edit form drew its lines', i0 > 2 && s0 > 1, i0 + ' / ' + s0);
+
+    eErrs = [];
+    await pE.click('[data-act="add"][data-k="ingredients"], [data-act="add"][data-key="ingredients"]');
+    await pE.waitForTimeout(300);
+    chk('adding an ingredient adds one', (await ings()) === i0 + 1,
+        i0 + ' -> ' + (await ings()));
+    chk('and it threw nothing doing it', eErrs.length === 0, eErrs.join(' | '));
+
+    eErrs = [];
+    await pE.click('[data-act="del"][data-i="1"][data-k="ingredients"], [data-act="del"][data-i="1"][data-key="ingredients"]');
+    await pE.waitForTimeout(300);
+    chk('removing an ingredient removes one', (await ings()) === i0,
+        (i0 + 1) + ' -> ' + (await ings()));
+    chk('and that threw nothing either', eErrs.length === 0, eErrs.join(' | '));
+
+    eErrs = [];
+    await pE.click('[data-act="del"][data-i="0"][data-k="steps"], [data-act="del"][data-i="0"][data-key="steps"]');
+    await pE.waitForTimeout(300);
+    chk('removing a step removes one', (await stps()) === s0 - 1,
+        s0 + ' -> ' + (await stps()));
+
+    /* And the removal has to be the line that was pressed, not just any. */
+    const firstStep = await pE.inputValue('#e-step-0');
+    chk('the step that went is the one whose button was pressed',
+        firstStep.trim().length > 0 && !/preheat oven to 400/i.test(firstStep),
+        firstStep.slice(0, 40));
+
+    /* The half that must not regress: typing still binds, and Save keeps
+       the shortened lists. */
+    await pE.fill('#e-ing-0', 'CHANGED BY TYPING');
+    await pE.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pE.waitForTimeout(500);
+    const stored = await pE.evaluate(() => {
+      const raw = localStorage.getItem('kt.recipes');
+      if (!raw) return null;
+      return JSON.parse(raw).find(r => r.id === 'ninja-cookies');
+    });
+    chk('typing still binds to the field', !!stored &&
+        stored.ingredients.indexOf('CHANGED BY TYPING') > -1,
+        JSON.stringify((stored || {}).ingredients || []).slice(0, 60));
+    chk('and the saved recipe keeps the shortened lists',
+        !!stored && stored.steps.length === s0 - 1,
+        'steps ' + ((stored || {}).steps || []).length + ', wanted ' + (s0 - 1));
+    chk('nothing threw across the whole edit', eErrs.length === 0, eErrs.join(' | '));
+
+    /* And the guard, written the `R89` way — derived from the handler
+       itself, not from a list someone keeps up to date. Read which actions
+       dereference `key`, walk the app collecting every control it renders,
+       and require each of those to carry one. This is the check that would
+       have caught the four buttons directly, and it covers whatever is
+       added next without anyone remembering. */
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const clickH = src.slice(src.indexOf('document.addEventListener("click"'),
+                             src.indexOf('document.addEventListener("input"'));
+    const needKey = [];
+    const re = /if \(act === "([a-z-]+)"\)([\s\S]{0,400}?)(?=\n    if \(act ===|\n  \}\);)/g;
+    let mm;
+    while ((mm = re.exec(clickH))) if (/\bkey\b/.test(mm[2])) needKey.push(mm[1]);
+    chk('the handler\'s key-using actions were read', needKey.length >= 8,
+        needKey.join(','));
+
+    const seen = new Map();
+    const grab = async (pg) => {
+      (await pg.evaluate(() => [...document.querySelectorAll('[data-act]')].map(e => ({
+        act: e.getAttribute('data-act'), key: e.getAttribute('data-key'),
+        k: e.getAttribute('data-k'), i: e.getAttribute('data-i'), id: e.id,
+        label: (e.getAttribute('aria-label') || e.innerText || '')
+          .replace(/\s+/g, ' ').trim().slice(0, 30)
+      })))).forEach(f =>
+        /* Keyed by everything that distinguishes one control from another.
+           On `act + label` alone the ten ingredient textareas collapsed into
+           a single entry — a textarea has no innerText and no aria-label —
+           so the walk was auditing six representatives and calling it the
+           screen. The assertion below is what caught that. */
+        seen.set([f.act, f.label, f.id, f.i].join('|'), f));
+    };
+    const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxW.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pW = await ctxW.newPage();
+    for (const [hash, ready, clicks] of [
+      ['#', '.main__title', []],
+      ['#menu', '.rcard', ['[data-act="open-filter"]']],
+      ['#menu', '.rcard', ['[data-act="toggle-tagging"]']],
+      ['#chicken-cordon-bleu', '.r-title', ['[data-act="toggle-edit"]']],
+      ['#plan', '.dayblock', ['.slotadd']],
+      ['#add', '.pathbtn', ['[data-key="review"]']]
+    ]) {
+      await pW.goto(B + '/index.html' + hash);
+      await pW.waitForSelector(ready, { timeout: 8000 }).catch(() => {});
+      await pW.waitForTimeout(300);
+      await grab(pW);
+      for (const c of clicks) {
+        try { await pW.click(c, { timeout: 3000 }); await pW.waitForTimeout(300); await grab(pW); }
+        catch (e) {}
+      }
+    }
+    const keyless = [...seen.values()].filter(f => needKey.indexOf(f.act) > -1 && !f.key);
+    chk('the walk saw a real screenful of controls', seen.size >= 40, String(seen.size));
+    chk('every control whose handler needs a key carries one', keyless.length === 0,
+        keyless.map(b => b.act + ' (data-k=' + b.k + ') "' + b.label + '"').join('; '));
+
+    /* The same question the other way round, because a guard that looks one
+       way is the "five classes out of six" mistake `R98` fixed. The INPUT
+       handler reads `data-k`; a field written with `data-key` would be just
+       as dead, and just as quiet. */
+    const inputH = src.slice(src.indexOf('document.addEventListener("input"'));
+    const inputActs = new Set();
+    (inputH.match(/act === "([a-z]+)"/g) || []).forEach(mk =>
+      inputActs.add(mk.replace(/act === "/, '').replace(/"$/, '')));
+    chk('the input handler still binds by data-k',
+        /getAttribute\("data-k"\)/.test(inputH));
+    chk('its actions were read', inputActs.size >= 3, [...inputActs].join(','));
+    const fields = [...seen.values()].filter(f => inputActs.has(f.act));
+    const unbound = fields.filter(f => !f.k);
+    chk('the walk saw the edit and review fields', fields.length >= 10,
+        String(fields.length));
+    chk('and every field the input handler serves carries its binding',
+        unbound.length === 0,
+        unbound.map(f => f.act + ' (data-key=' + f.key + ') "' + f.label + '"').join('; '));
+
+    /* And a third way to be dead, same family: nothing branches on the
+       action AT ALL. Every `data-act` the app renders must be one some
+       handler answers. (The character class has to admit `+` — `serv+` and
+       `fs+` are real actions, and leaving it out reported two false
+       deaths.) */
+    const handledActs = new Set();
+    (src.match(/act === "([a-zA-Z0-9_+-]+)"/g) || []).forEach(mk =>
+      handledActs.add(mk.replace(/act === "/, '').replace(/"$/, '')));
+    chk('the handled actions were read', handledActs.size >= 40,
+        String(handledActs.size));
+    const orphaned = [...new Set([...seen.values()].map(f => f.act))]
+      .filter(a => !handledActs.has(a));
+    chk('every action the app renders has a handler', orphaned.length === 0,
+        orphaned.join(', '));
+    await ctxW.close();
+    await pE.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxE.close();
+  }
+
   console.log('\n== The help undersold what works with no signal (R102) ==');
   {
     /* `R90` added the offline bullet, and it is right about the book: a
