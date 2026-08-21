@@ -186,6 +186,69 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== The help undersold what works with no signal (R102) ==');
+  {
+    /* `R90` added the offline bullet, and it is right about the book: a
+       precached shell means the recipes open in a cellar. Its last sentence
+       is not right about adding one — "Only the four ways of adding a
+       recipe need the internet." One of those four is **Type it in**, which
+       touches the network at no point: a blank form, filled in, saved to
+       localStorage. So does the paste box that `R99` now sends shared text
+       to, the path CLAUDE.md calls the only one that can never break.
+
+       That is the wrong direction for a tutorial to be wrong in. A cook
+       standing in a kitchen the wifi never reaches, with Joan dictating,
+       reads that sentence and does not try — and the one thing this app is
+       for is getting her recipes down.
+
+       Behaviourally, the `R94` way: cut every off-origin request, type a
+       recipe in, and require it to land in the book. Only then hold the
+       help to what was just proved, so a future rewrite has to stay true. */
+    const ctxO = await br.newContext({ ...devices['iPhone 13'] });
+    const pO = await ctxO.newPage();
+    const oErrs = []; pO.on('pageerror', e => oErrs.push(e.message));
+    await pO.goto(B + '/index.html');
+    await pO.waitForTimeout(500);
+    /* Same-origin still resolves — that is the precached shell, which is
+       the whole point. Everything beyond it is unreachable. */
+    await ctxO.route('**/*', (route) => {
+      const u = route.request().url();
+      return u.indexOf(B) === 0 ? route.continue() : route.abort('failed');
+    });
+    await pO.goto(B + '/index.html#add');
+    await pO.waitForSelector('.pathbtn');
+    await pO.click('[data-key="review"]');
+    await pO.waitForSelector('#a-title');
+    await pO.fill('#a-title', 'Offline Test Loaf');
+    await pO.locator('textarea').first().fill('500g flour');
+    await pO.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pO.waitForTimeout(600);
+    const landed = await pO.evaluate(() => {
+      const raw = localStorage.getItem('kt.recipes');
+      return !!raw && JSON.parse(raw).some(r => /Offline Test Loaf/.test(r.title || ''));
+    });
+    chk('a recipe typed in with no internet still reaches the book', landed);
+
+    await pO.goto(B + '/index.html#help');
+    await pO.waitForSelector('h1');
+    const helpText = await pO.evaluate(() => document.body.innerText);
+    chk('the help still says the book itself works with no signal',
+        /no signal at all/i.test(helpText));
+    chk('and no longer claims every way of adding one needs the internet',
+        !/only the four ways of adding/i.test(helpText),
+        (helpText.match(/.{0,60}four ways of adding.{0,60}/i) || [''])[0]);
+    chk('it names typing one in as working without it',
+        /type it in/i.test(helpText) &&
+        /(need the internet|needs? a signal|need to be online)/i.test(helpText),
+        (helpText.match(/.{0,90}need the internet.{0,90}/i) || ['(no such sentence)'])[0]);
+    chk('nothing threw', oErrs.length === 0, oErrs.join(' | '));
+    await pO.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxO.close();
+  }
+
   console.log('\n== A photo that was never committed (R98) ==');
   {
     /* The app already knows this happens — the capture-phase error handler
