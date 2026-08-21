@@ -113,6 +113,85 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     [...document.querySelectorAll('.shoplist__items li')].some(li => /\d\.\d/.test(li.textContent)))));
   chk('the preview says what it is', (await p.locator('.shoplist__head').textContent()).toLowerCase().includes('preview'));
 
+  console.log('\n== The shopping list had its own parser (R64) ==');
+  {
+    /* The list sums what it can and lists the rest as written — 130, shipped
+       honestly as a preview. It did that with a regex of its own, written
+       before R57–R60 taught the recipe screen what a card actually looks
+       like, and it never learned any of it. Two consequences, both silent:
+         "1 to 2 tablespoons milk"  read as ONE tablespoon of a unit called
+           "to", then summed, so a doubled week showed "2 to 2 tablespoons"
+         "1 lb (450g) chicken"      summed with the stale metric riding
+           along inside the text, where no per-line note could reach it
+       One reader for the whole app now: a line is summed only when it is a
+       single plain amount with nothing left behind, and everything else is
+       listed as written, scaled, and says what it kept. */
+    const ctxS = await br.newContext({ ...devices['iPhone 13'] });
+    const pS = await ctxS.newPage();
+    const sErrs = []; pS.on('pageerror', e => sErrs.push(e.message));
+    /* Two meals, planned straight into storage so the search box and the
+       picker are not part of what is being measured here. */
+    await pS.goto(B + '/index.html');
+    await pS.evaluate(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('kt.plan', JSON.stringify([
+        /* frosting serves 8; twelve is one and a half times it */
+        { id: 's1', date: today, slot: 'dinner', recipeId: 'vanilla-frosting',
+          titleThen: 'Vanilla Frosting', servings: 16 },
+        /* stroganoff serves 4, planned for eight */
+        { id: 's2', date: today, slot: 'lunch', recipeId: 'chicken-stroganoff',
+          titleThen: 'Chicken Stroganoff', servings: 8 }
+      ]));
+    });
+    await pS.goto(B + '/index.html#plan');
+    await pS.reload();
+    await pS.waitForSelector('.dayblock');
+    await pS.click('[data-act="toggle-list"]');
+    await pS.waitForSelector('.shoplist__items');
+    const items = await pS.locator('.shoplist__items li').allTextContents();
+
+    chk('the list drew something', items.length > 4, String(items.length));
+    const milk = items.find(l => /milk/i.test(l)) || '';
+    /* The failure shape exactly: both ends the same number, which is what
+       reading "to" as a unit and summing the 1 produced. A correct range
+       legitimately contains the word, so the check has to name the fault
+       rather than the word. */
+    chk('a range is not summed as a unit called "to"',
+      !/(\d+)\s+to\s+\1\b/.test(milk), milk);
+    chk('and it is listed as the range it is, doubled at both ends',
+      /2 to 4 tablespoons/.test(milk), milk);
+
+    const chicken = items.find(l => /chicken breast/i.test(l)) || '';
+    chk('a line carrying a second amount says what it kept',
+      /450g not adjusted/.test(chicken), chicken);
+    chk('and it is not silently merged into a sum',
+      /^2 lb \(450g\)/.test(chicken.trim()), chicken);
+
+    /* The half that must not regress: a plain line still sums. */
+    await pS.evaluate(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('kt.plan', JSON.stringify([
+        { id: 'p1', date: today, slot: 'dinner', recipeId: 'chicken-cordon-bleu',
+          titleThen: 'A', servings: 4 },
+        { id: 'p2', date: today, slot: 'lunch', recipeId: 'chicken-cordon-bleu',
+          titleThen: 'B', servings: 4 }
+      ]));
+    });
+    await pS.reload();
+    await pS.waitForSelector('.dayblock');
+    await pS.click('[data-act="toggle-list"]');
+    await pS.waitForSelector('.shoplist__items');
+    const twice = await pS.locator('.shoplist__items li').allTextContents();
+    const cheese = twice.find(l => /Swiss cheese/i.test(l)) || '';
+    chk('the same recipe planned twice still sums into one line',
+      /^12 slices Swiss cheese/.test(cheese.trim()), cheese);
+    chk('no decimal quantities anywhere in the list',
+      !twice.some(l => /\d\.\d/.test(l)), twice.filter(l => /\d\.\d/.test(l)).join(' | '));
+    chk('and the list threw nothing', sErrs.length === 0, sErrs.join(' | '));
+    await pS.evaluate(() => localStorage.removeItem('kt.plan'));
+    await ctxS.close();
+  }
+
   console.log('\n== A plan that could not be kept must not say it was (R45) ==');
   {
     /* R44's shape, one key over. The plan goes through the same save() that

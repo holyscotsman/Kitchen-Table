@@ -2567,16 +2567,32 @@
       if (!r) return;
       var mult = r.servings ? e.servings / r.servings : 1;
       (r.ingredients || []).forEach(function (line) {
-        var m = String(line).match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*([a-zA-Z]*)\s+(.*)$/);
-        if (!m || !m[3]) { asIs.push(scaleLine(line, mult)); return; }
-        var n;
-        if (m[1].indexOf("/") > -1) {
-          var parts = m[1].trim().split(/\s+/);
-          var fr = parts[parts.length - 1].split("/");
-          n = (parts.length > 1 ? parseFloat(parts[0]) : 0) + parseFloat(fr[0]) / parseFloat(fr[1]);
-        } else n = parseFloat(m[1]);
-        var key = fold(m[2]) + "|" + fold(m[3]);
-        if (!sums[key]) sums[key] = { qty: 0, unit: m[2], rest: m[3] };
+        var text = String(line);
+        /* `R64` — one reader for the whole app. This list used to carry a
+           quantity regex of its own, written before `R57`–`R60` taught the
+           recipe screen what a card actually looks like, and it never
+           learned any of it: "1 to 2 tablespoons milk" was read as ONE
+           tablespoon of a unit called "to" and then summed, so a doubled
+           week showed "2 to 2 tablespoons".
+           A line is summed only when it is a single plain amount with
+           nothing left behind. A range and a handwritten mixed number both
+           open with a number and mean something a running total cannot
+           hold; a line carrying a second amount would smuggle a stale one
+           into a merged entry where no per-line note could reach it. All of
+           those are listed as written, scaled, and say what they kept. */
+        var kept = Math.abs(mult - 1) < 0.001 ? "" : unscaledExtra(text);
+        var q = kept ? null : readQty(text, 0);
+        var plain = q &&
+          /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)$/.test(text.slice(0, q.len));
+        var tail = plain ? text.slice(q.len).match(/^\s*([a-zA-Z]*)\s+(.*)$/) : null;
+        if (!tail || !tail[2]) {
+          asIs.push(scaleLine(text, mult) +
+            (kept ? " — " + kept + " not adjusted" : ""));
+          return;
+        }
+        var n = qtyValue(text.slice(0, q.len));
+        var key = fold(tail[1]) + "|" + fold(tail[2]);
+        if (!sums[key]) sums[key] = { qty: 0, unit: tail[1], rest: tail[2] };
         sums[key].qty += n * mult;
       });
     });
