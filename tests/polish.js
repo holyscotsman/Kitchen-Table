@@ -637,6 +637,77 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pPr.close();
   }
 
+  console.log('\n== Reduced motion, proven by the browser (R51) ==');
+  {
+    /* The static half — every `animation:` rule is named in the
+       prefers-reduced-motion block — has been checked since the motion arc.
+       That is the CSS being self-consistent, not the motion actually
+       stopping: a selector that no longer matches, a rule that arrives later
+       with higher specificity, and the list still reads complete while the
+       page still moves. This asks the browser. */
+    const ctxM = await br.newContext({ ...devices['iPhone 13'], reducedMotion: 'reduce' });
+    const pM = await ctxM.newPage();
+    await pM.goto(B + '/index.html');
+    await pM.waitForSelector('.main__title');
+    const still = async (page) => page.evaluate(() => {
+      const moving = [];
+      document.querySelectorAll('*').forEach(el => {
+        const c = getComputedStyle(el);
+        if (c.animationName && c.animationName !== 'none') {
+          moving.push((el.className || el.tagName) + ' ' + c.animationName);
+        }
+      });
+      return moving;
+    });
+    /* Every screen, and the two states that arm an animation on purpose. */
+    const moving = [];
+    for (const [name, hash, open] of [
+      ['Main', '#', null], ['Menu', '#menu', null],
+      ['Recipe', '#chicken-cordon-bleu', null],
+      ['Week planner', '#plan', null], ['Add', '#add', null],
+      ['Menu + filter sheet', '#menu', '[data-act="open-filter"]'],
+      ['Recipe + download sheet', '#bacon-ranch-chicken-casserole', '[data-act="open-dl"]']
+    ]) {
+      await pM.goto(B + '/index.html' + hash);
+      await pM.reload();
+      await pM.waitForSelector('h1');
+      if (open) { await pM.click(open); await pM.waitForTimeout(250); }
+      for (const m of await still(pM)) moving.push(name + ': ' + m);
+    }
+    chk('with reduced motion asked for, nothing on any screen animates',
+      moving.length === 0, moving.slice(0, 3).join(' | '));
+    /* Ticking an ingredient arms a tick animation; under reduce it must arm
+       nothing. */
+    await pM.goto(B + '/index.html#chicken-cordon-bleu');
+    await pM.reload();
+    await pM.waitForSelector('.checkrow');
+    await pM.locator('.checkrow').first().click();
+    await pM.waitForTimeout(150);
+    chk('and neither does ticking something off', (await still(pM)).length === 0,
+      (await still(pM)).slice(0, 2).join(' | '));
+    await ctxM.close();
+
+    /* The counterpart, so the check above is measuring the media query and
+       not an app that simply never animates: with motion allowed, the same
+       actions do move something. */
+    const ctxA = await br.newContext({ ...devices['iPhone 13'], reducedMotion: 'no-preference' });
+    const pA = await ctxA.newPage();
+    await pA.goto(B + '/index.html#chicken-cordon-bleu');
+    await pA.waitForSelector('.checkrow');
+    await pA.locator('.checkrow').first().click();
+    const movedSomewhere = await pA.evaluate(() => {
+      const seen = [];
+      document.querySelectorAll('*').forEach(el => {
+        const c = getComputedStyle(el);
+        if (c.animationName && c.animationName !== 'none') seen.push(c.animationName);
+      });
+      return seen;
+    });
+    chk('and with motion allowed, something really does animate',
+      movedSomewhere.length > 0, movedSomewhere.slice(0, 3).join(', '));
+    await ctxA.close();
+  }
+
   console.log('\n== Keep screen on, across a text message (R50) ==');
   {
     /* iOS drops a wake lock whenever the tab is backgrounded and never
