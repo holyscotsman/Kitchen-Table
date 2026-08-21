@@ -249,6 +249,53 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== Every key the app reads, filled with rubbish (R40) ==');
+  {
+    /* R12 closed the recipe overlay, R13 the draft snapshot, R21 the plan.
+       This finishes the sweep: EVERY key the app reads gets garbage of the
+       wrong shape, and the app has to boot, render and stay usable. A phone
+       that has held this app for a year, through a dozen versions, is the
+       device most likely to be carrying something the current code did not
+       write. */
+    const ctxJunk = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pJunk = await ctxJunk.newPage();
+    await ctxJunk.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const junkErrs = []; pJunk.on('pageerror', e => junkErrs.push(e.message));
+    await pJunk.goto(B + '/index.html');
+    await pJunk.evaluate(() => {
+      const junk = '"a string where a list belongs"';
+      ['kt.theme', 'kt.fsIndex', 'kt.easyRead', 'kt.recipes', 'kt.plan',
+       'kt.dismissedImports', 'kt.images', 'kt.tagCase'].forEach(k =>
+        localStorage.setItem(k, junk));
+      sessionStorage.setItem('kt.addDraft', junk);
+    });
+    for (const [name, hash, sel] of [['Main', '#', '.main__title'],
+      ['Menu', '#menu', '.rcard'], ['Recipe', '#chicken-cordon-bleu', '.r-title'],
+      ['Week planner', '#plan', '.dayblock'], ['Add', '#add', 'h1'],
+      ['How to use it', '#help', '.help__h1']]) {
+      await pJunk.goto(B + '/index.html' + hash);
+      await pJunk.reload();
+      await pJunk.waitForSelector(sel, { timeout: 10000 })
+        .catch(() => { junkErrs.push(name + ' never rendered'); });
+    }
+    chk('every screen still boots on a phone full of rubbish',
+      junkErrs.length === 0, junkErrs.slice(0, 2).join(' | '));
+    /* And the controls that read those keys still work rather than throwing
+       the first time they are touched. */
+    await pJunk.goto(B + '/index.html#menu');
+    await pJunk.reload();
+    await pJunk.waitForSelector('.rcard');
+    chk('the book is the published one, not the rubbish',
+      await pJunk.locator('.rcard').count() === 48,
+      String(await pJunk.locator('.rcard').count()));
+    await pJunk.click('[data-act="open-text"]');
+    await pJunk.waitForSelector('[data-act="fs+"]');
+    await pJunk.click('[data-act="fs+"]');
+    await pJunk.waitForTimeout(200);
+    chk('the text stepper still steps', junkErrs.length === 0, junkErrs.join(' | '));
+    await ctxJunk.close();
+  }
+
   console.log('\n== When the app itself cannot start (R29) ==');
   {
     /* Every other failure in this app has a sentence. The one that never did

@@ -367,9 +367,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **687 functional checks** across eleven
-suites (kt 149, feat 59, add 74, relay 16, quick 32, polish 74, sec 41,
-plan 27, video 51, backend 153, zoom 10), plus the perf budget (FCP ~900 ms
+The suite after the video arc: **693 functional checks** across eleven
+suites (kt 149, feat 59, add 74, relay 16, quick 32, polish 77, sec 41,
+plan 27, video 54, backend 153, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —
