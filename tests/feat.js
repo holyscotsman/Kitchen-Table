@@ -239,6 +239,82 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('garbage still finds nothing', await p.locator('.rcard').count()===0);
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== A removed recipe left its photo behind (R71) ==');
+  {
+    /* Photos live outside the recipe records on purpose, so removing a
+       recipe never touched its picture. Two costs, both silent. The photo
+       stays in storage for good — and storage is the thing that produces
+       the "this phone has no room left" message that stops a save. And
+       **Download photos hands the family files that nothing references**:
+       it walks every picture in storage, so a photo whose recipe is gone is
+       saved, dropped into images/, committed, and sits there forever with
+       no recipe pointing at it.
+       Removing now takes the photo with it, and the confirm says so when
+       there is one to lose — this app does not delete anything a person was
+       not told about. */
+    const ctxP = await br.newContext({ ...devices['iPhone 13'] });
+    const pP = await ctxP.newPage();
+    const pErrs = []; pP.on('pageerror', e => pErrs.push(e.message));
+    let asked = '';
+    pP.on('dialog', d => { asked = d.message(); d.accept(); });
+    const seedPhoto = (page, id) => page.evaluate(([rid, jpg]) => new Promise(res => {
+      const req = indexedDB.open('kt', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('images'); };
+      req.onsuccess = () => {
+        const tx = req.result.transaction('images', 'readwrite');
+        tx.objectStore('images').put('data:image/jpeg;base64,' + jpg, rid);
+        tx.oncomplete = () => res(true);
+      };
+    }), [id, JPG]);
+    const inStore = (page, id) => page.evaluate((rid) => new Promise(res => {
+      const req = indexedDB.open('kt', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('images'); };
+      req.onsuccess = () => {
+        const g = req.result.transaction('images', 'readonly')
+          .objectStore('images').get(rid);
+        g.onsuccess = () => res(!!g.result);
+        g.onerror = () => res(false);
+      };
+    }), id);
+
+    await pP.goto(B + '/index.html');
+    await seedPhoto(pP, 'crepes');
+    await seedPhoto(pP, 'scones');
+    await pP.goto(B + '/index.html#menu');
+    await pP.reload();
+    await pP.waitForSelector('.rcard');
+    await pP.click('[data-act="toggle-remove"]');
+    await pP.waitForSelector('.rrow');
+    await pP.locator('.rrow', { hasText: 'Crepes' }).first().click();
+    await pP.waitForTimeout(600);
+    chk('the confirm says the photo goes too', /photo/i.test(asked), asked);
+    chk('and the photo really is gone', !(await inStore(pP, 'crepes')));
+    chk('while another recipe keeps hers', await inStore(pP, 'scones'));
+
+    /* Belt and braces for the pictures already orphaned before this: the
+       download offers what the book can actually reference, and nothing
+       else. */
+    await pP.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await seedPhoto(pP, 'ghost-recipe-that-does-not-exist');
+    await pP.goto(B + '/index.html#chicken-cordon-bleu');
+    await pP.reload();
+    await pP.waitForSelector('.r-title');
+    await pP.click('[data-act="toggle-edit"]');
+    await pP.waitForTimeout(300);
+    const files = [];
+    pP.on('download', d => files.push(d.suggestedFilename()));
+    await pP.click('[data-act="dl-photos"]');
+    await pP.waitForTimeout(1600);
+    chk('Download photos offers the ones the book still has',
+      files.indexOf('scones.jpg') > -1, JSON.stringify(files));
+    chk('and not a photo of a recipe that is gone',
+      files.indexOf('ghost-recipe-that-does-not-exist.jpg') === -1,
+      JSON.stringify(files));
+    chk('removing a photo threw nothing', pErrs.length === 0, pErrs.join(' | '));
+    await pP.evaluate(() => localStorage.clear());
+    await ctxP.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
