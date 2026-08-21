@@ -348,6 +348,37 @@ async function freshPage(br, opts) {
     await ctx.close();
   }
 
+  console.log('\n== Dismiss on a phone carrying rubbish (R40) ==');
+  {
+    /* The last unguarded storage key. kt.dismissedImports is a list of ids;
+       a value of the wrong shape reaches .push and throws, so the Dismiss
+       button breaks the first time it is pressed — on the one screen whose
+       whole job is to make a failure go away quietly. */
+    const FAILED = [{
+      id: 77, url: 'https://youtu.be/junk', platform: 'youtube',
+      created_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+      error_message: 'That video is private, so it can’t be fetched.'
+    }];
+    const { ctx, p } = await freshPage(br, { failed: FAILED });
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await p.goto(B + '/index.html#add');
+    await p.evaluate(() =>
+      localStorage.setItem('kt.dismissedImports', '"not a list at all"'));
+    await p.reload();
+    await p.waitForSelector('.vfailed', { timeout: 12000 });
+    chk('the failure still shows with a rotten dismissed-list',
+      await p.locator('.vfailed').count() === 1);
+    await p.click('[data-act="video-dismiss"]');
+    await p.waitForTimeout(300);
+    chk('Dismiss works rather than throwing',
+      await p.locator('.vfailed').count() === 0 && errs.length === 0,
+      errs.join(' | '));
+    chk('and the key is a list again afterwards',
+      await p.evaluate(() => Array.isArray(JSON.parse(
+        localStorage.getItem('kt.dismissedImports') || 'null'))));
+    await ctx.close();
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);

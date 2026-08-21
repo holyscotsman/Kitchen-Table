@@ -3189,7 +3189,7 @@
        sentence. Dismissed ones stay dismissed on this device. */
     kitchenFetch("/api/import/jobs?status=failed", { timeout: 12000 }, true)
       .then(function (data) {
-        var seen = load(K.dismissed, []);
+        var seen = dismissedIds();
         var jobs = ((data && data.jobs) || []).filter(function (j) {
           return seen.indexOf(j.id) === -1;
         });
@@ -3200,8 +3200,19 @@
       .catch(function () { /* the same silence is fine here */ });
   }
 
+  /* The last of the storage keys to be coerced at its boundary (R12 did the
+     recipe overlay, R13 the draft snapshot, R21 the plan). A phone that has
+     carried this app through a dozen versions is the one most likely to hold
+     something the current code never wrote — and here the cost of trusting it
+     was the Dismiss button throwing the first time it was pressed, on the one
+     screen whose whole job is making a failure go away quietly. */
+  function dismissedIds() {
+    var v = load(K.dismissed, []);
+    return Array.isArray(v) ? v.filter(function (x) { return typeof x === "number"; }) : [];
+  }
+
   function dismissFailedJob(id) {
-    var seen = load(K.dismissed, []);
+    var seen = dismissedIds();
     if (seen.indexOf(id) === -1) seen.push(id);
     save(K.dismissed, seen.slice(-100));
     S.videoFailed = S.videoFailed.filter(function (j) { return j.id !== id; });
