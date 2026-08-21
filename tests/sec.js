@@ -197,6 +197,46 @@ const hostile = JSON.stringify({
     await pX.close();
   }
 
+  console.log('\n== What the workflows are allowed to do (R38) ==');
+  {
+    /* A workflow that runs the repository's own code with a write-capable
+       token is the ordinary shape of a supply-chain problem: `checks` runs on
+       every pull request, installs npm dependencies and drives a browser, and
+       inherited whatever the repository's default token permissions happen to
+       be. Nothing it does needs write. Stated per workflow, because a default
+       that is safe today can be changed in a settings page by someone who has
+       never read this file. */
+    const fsw = require('fs');
+    const pw = require('path');
+    const dir = pw.join(__dirname, '..', '.github', 'workflows');
+    const files = fsw.readdirSync(dir).filter(f => /\.ya?ml$/.test(f));
+    chk('there are workflows to check', files.length >= 3, files.join(', '));
+    const noPerms = [], writers = [];
+    for (const f of files) {
+      const src = fsw.readFileSync(pw.join(dir, f), 'utf8');
+      const block = (src.match(/^permissions:\n((?:[ \t]+.*\n)+)/m) || [])[1];
+      if (!block) { noPerms.push(f); continue; }
+      /* Only db-sync commits, and only contents. Anything else claiming a
+         write scope is a question, not a default. */
+      const scopes = block.split('\n').map(l => l.trim()).filter(Boolean);
+      for (const line of scopes) {
+        if (/:\s*write\b/.test(line) && f !== 'db-sync.yml' &&
+            !/security-events/.test(line)) writers.push(f + ': ' + line);
+      }
+    }
+    chk('every workflow says what it is allowed to do', noPerms.length === 0,
+      noPerms.join(', '));
+    chk('and only the one that commits may write',
+      writers.length === 0, writers.join(' | '));
+    /* The checkout credential outlives the step that fetched the code — with
+       a read-only token that is bounded, but CI has no reason to keep it. */
+    const ci = fsw.readFileSync(pw.join(dir, 'ci.yml'), 'utf8');
+    chk('CI does not leave a git credential lying about for later steps',
+      /persist-credentials:\s*false/.test(ci));
+    chk('and CI itself is read-only',
+      /^permissions:\n\s+contents:\s+read\s*$/m.test(ci), 'see ci.yml');
+  }
+
   /* 052 — the CSP must exist and keep its load-bearing lines. The exact
      policy lives in index.html; this guards against it being weakened or
      dropped in a refactor, not against every possible retune. */
