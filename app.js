@@ -2451,6 +2451,13 @@
   }
 
   function saveDraft(r) {
+    /* Each save speaks for itself. `S.notice` lives until the route
+       changes, so without this the sentence from the LAST save is still on
+       screen after the next one — "the list changed, so the check marks
+       were cleared" sitting under an edit that changed no list. A message
+       that has stopped being true is the same fault as one that was never
+       true. */
+    S.notice = "";
     var updated = {};
     Object.keys(r).forEach(function (k) { updated[k] = r[k]; });
     updated.title = S.draft.title.trim() || r.title;
@@ -2482,12 +2489,40 @@
     var tags = parseTags(S.draft.tags);
     if (tags.length) updated.tags = tags; else delete updated.tags;
 
+    /* `R104` — the ticks belong to the list that was on screen. They are
+       keyed by position and cleared only when you LEAVE the recipe, so a
+       line deleted in Edit mode slides every tick below it up one: tick
+       butter and sugar, delete butter, and the brown sugar you never
+       touched comes back ticked. Measured exactly that. Skipping an
+       ingredient is the harm — an un-ticked line only gets checked twice —
+       so a list that changed loses its ticks, each list independently,
+       because fixing a step is no reason to forget which ingredients are
+       already in the bowl. `R103` is what made this reachable: while the
+       delete button threw, the list could not change under you. */
+    var hadTicks = Object.keys(S.checkedIng).length > 0 ||
+                   Object.keys(S.checkedStep).length > 0;
+    var same = function (a, b) {
+      a = a || []; b = b || [];
+      return a.length === b.length && a.every(function (x, i) { return x === b[i]; });
+    };
+    var ingMoved = !same(updated.ingredients, r.ingredients);
+    var stepMoved = !same(updated.steps, r.steps);
+    if (ingMoved) S.checkedIng = {};
+    if (stepMoved) S.checkedStep = {};
+
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
     });
     if (hasCount(updated)) S.serves = updated.servings;
     if (persistRecipes()) {
       S.saved = true;
+      /* Said, not done quietly: someone who ticked their way down the
+         ingredients and finds the ticks gone should know why, rather than
+         think the app lost their place. Only when something was actually
+         cleared, and only once the save is real (`R44`). */
+      if (hadTicks && (ingMoved || stepMoved)) {
+        setNotice("The list changed, so the check marks were cleared.");
+      }
     } else {
       S.saved = false;
       setNotice(RECIPES_FULL_MSG);

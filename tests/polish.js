@@ -186,6 +186,106 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== A deleted line took another line\u2019s tick with it (R104) ==');
+  {
+    /* The ticks are keyed by position and cleared only when you LEAVE the
+       recipe, so a line deleted in Edit mode slides every tick below it up
+       one. Tick butter and sugar, delete butter, come back:
+
+           [x] 1 cup granulated sugar
+           [x] 1 cup packed brown sugar     <- never touched
+           [ ] 2 large eggs
+
+       The brown sugar reads as done and gets skipped. Skipping an
+       ingredient is the harm; an un-ticked line only gets checked twice.
+       `R103` is what made this reachable — while the delete button threw,
+       the list could not change under you, which is why this arrives with
+       it rather than before it. */
+    const ctxK = await br.newContext({ ...devices['iPhone 13'] });
+    const pK = await ctxK.newPage();
+    const kErrs = []; pK.on('pageerror', e => kErrs.push(e.message));
+    await ctxK.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const ticks = () => pK.evaluate(() =>
+      [...document.querySelectorAll('.bodygrid__ing li')].map(li => ({
+        text: li.textContent.trim().slice(0, 30),
+        done: li.className.indexOf('done') > -1 ||
+              li.getAttribute('aria-pressed') === 'true' ||
+              !!li.querySelector('[aria-pressed="true"]')
+      })));
+    const stepTicks = () => pK.evaluate(() =>
+      [...document.querySelectorAll('.bodygrid__steps li, .r-steps li')].filter(li =>
+        li.className.indexOf('done') > -1 ||
+        li.getAttribute('aria-pressed') === 'true').length);
+
+    await pK.goto(B + '/index.html#ninja-cookies');
+    await pK.waitForSelector('.r-title');
+    await pK.locator('.bodygrid__ing li').nth(0).click();
+    await pK.locator('.bodygrid__ing li').nth(1).click();
+    await pK.waitForTimeout(250);
+    const before = await ticks();
+    chk('two ingredients were ticked', before.filter(x => x.done).length === 2,
+        JSON.stringify(before.slice(0, 3)));
+
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('#e-title');
+    await pK.click('[data-act="del"][data-key="ingredients"][data-i="0"]');
+    await pK.waitForTimeout(250);
+    await pK.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pK.waitForTimeout(500);
+    /* The visible notice, not body text: `announce()` also writes the
+       sentence into the aria-live region, which keeps what was last spoken
+       and is hidden from sight. Reading innerText picks that up and reports
+       a notice that is no longer on screen. */
+    const noticeText = () => pK.evaluate(() => {
+      const n = document.querySelector('.notice');
+      return n ? n.textContent.trim() : '';
+    });
+    chk('and the app says the marks were cleared',
+        /check marks were cleared/i.test(await noticeText()),
+        (await noticeText()) || '(no notice)');
+
+    /* Save does not leave Edit mode — go back to the reading view to look. */
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('.bodygrid__ing li');
+    await pK.waitForTimeout(250);
+    const after = await ticks();
+    const falsely = after.filter(x => x.done &&
+      !before.some(b => b.done && b.text === x.text));
+    chk('no line is ticked that nobody ticked', falsely.length === 0,
+        JSON.stringify(falsely.map(x => x.text)));
+    chk('the shortened list really is shorter', after.length === before.length - 1,
+        before.length + ' -> ' + after.length);
+
+    /* The half that must not regress: an edit that leaves the lists alone
+       keeps your place. Fixing a typo in the title is no reason to forget
+       which ingredients are already in the bowl. */
+    await pK.locator('.bodygrid__ing li').nth(0).click();
+    await pK.waitForTimeout(200);
+    chk('a tick was set again', (await ticks()).filter(x => x.done).length === 1);
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('#e-title');
+    await pK.fill('#e-title', 'Ninja Cookies (renamed)');
+    await pK.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pK.waitForTimeout(500);
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('.bodygrid__ing li');
+    await pK.waitForTimeout(250);
+    chk('a title-only edit keeps the ticks',
+        (await ticks()).filter(x => x.done).length === 1,
+        JSON.stringify((await ticks()).filter(x => x.done).map(x => x.text)));
+    chk('and says nothing about clearing them', !(await noticeText()),
+        await noticeText());
+    chk('nothing threw', kErrs.length === 0, kErrs.join(' | '));
+    await pK.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxK.close();
+  }
+
   console.log('\n== You could not add or remove a line in Edit mode (R103) ==');
   {
     /* Two spellings of one idea, and the wrong one on four buttons.
