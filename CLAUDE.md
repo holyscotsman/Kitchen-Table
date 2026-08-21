@@ -218,6 +218,20 @@ written never says "Saved" or "planned", because a change reported as kept
 and silently dropped is the worst thing this app could do to a book of
 someone's recipes.
 
+### Stored shapes are coerced at the boundary
+
+Every key this app reads back — the plan (`R21`), the dismissed imports
+(`R40`), and since `R62` **the recipes themselves** — is coerced where it is
+read, not trusted. `recipes.json` and `kt.recipes` are hand-editable *by
+design*: the download-and-commit workflow depends on it, and `db-sync`
+regenerates the file nightly with nobody watching. So a recipe arrives
+sooner or later with `"steps": "Mix and bake."`, and before `R62` that threw
+mid-render — taking not just that recipe down but **the whole Menu**, while
+the recipe's own page fell back to the front screen saying nothing.
+`normalizeRecipe()` coerces `ingredients`, `steps`, `flagged`, `tags` and
+`servings`. It **coerces, never discards**: a string becomes the one line it
+is, so the words a person typed always survive.
+
 ### The overlay is authoritative
 
 `kt.recipes` holds "the full edited recipe set", so when it exists it replaces
@@ -379,8 +393,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **834 functional checks** across eleven
-suites (kt 212, feat 59, add 74, relay 16, quick 47, polish 112, sec 52,
+The suite after the video arc: **843 functional checks** across eleven
+suites (kt 221, feat 59, add 74, relay 16, quick 47, polish 112, sec 52,
 plan 33, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
