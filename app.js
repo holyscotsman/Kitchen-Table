@@ -2451,6 +2451,13 @@
   }
 
   function saveDraft(r) {
+    /* Each save speaks for itself. `S.notice` lives until the route
+       changes, so without this the sentence from the LAST save is still on
+       screen after the next one — "the list changed, so the check marks
+       were cleared" sitting under an edit that changed no list. A message
+       that has stopped being true is the same fault as one that was never
+       true. */
+    S.notice = "";
     var updated = {};
     Object.keys(r).forEach(function (k) { updated[k] = r[k]; });
     updated.title = S.draft.title.trim() || r.title;
@@ -2482,12 +2489,40 @@
     var tags = parseTags(S.draft.tags);
     if (tags.length) updated.tags = tags; else delete updated.tags;
 
+    /* `R104` — the ticks belong to the list that was on screen. They are
+       keyed by position and cleared only when you LEAVE the recipe, so a
+       line deleted in Edit mode slides every tick below it up one: tick
+       butter and sugar, delete butter, and the brown sugar you never
+       touched comes back ticked. Measured exactly that. Skipping an
+       ingredient is the harm — an un-ticked line only gets checked twice —
+       so a list that changed loses its ticks, each list independently,
+       because fixing a step is no reason to forget which ingredients are
+       already in the bowl. `R103` is what made this reachable: while the
+       delete button threw, the list could not change under you. */
+    var hadTicks = Object.keys(S.checkedIng).length > 0 ||
+                   Object.keys(S.checkedStep).length > 0;
+    var same = function (a, b) {
+      a = a || []; b = b || [];
+      return a.length === b.length && a.every(function (x, i) { return x === b[i]; });
+    };
+    var ingMoved = !same(updated.ingredients, r.ingredients);
+    var stepMoved = !same(updated.steps, r.steps);
+    if (ingMoved) S.checkedIng = {};
+    if (stepMoved) S.checkedStep = {};
+
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
     });
     if (hasCount(updated)) S.serves = updated.servings;
     if (persistRecipes()) {
       S.saved = true;
+      /* Said, not done quietly: someone who ticked their way down the
+         ingredients and finds the ticks gone should know why, rather than
+         think the app lost their place. Only when something was actually
+         cleared, and only once the save is real (`R44`). */
+      if (hadTicks && (ingMoved || stepMoved)) {
+        setNotice("The list changed, so the check marks were cleared.");
+      }
     } else {
       S.saved = false;
       setNotice(RECIPES_FULL_MSG);
@@ -4831,6 +4866,51 @@
     }, 250);
   }
 
+  /* The selector that finds a control again after the DOM beneath it has
+     been rebuilt. `data-act` says what the control does; the rest say WHICH
+     one — which ingredient, which chip, which direction. Exactly the
+     vocabulary `openSheet` already uses to find the control it must return
+     the caret to; this is the same question asked on every render rather
+     than only when a sheet closes. Returns null for anything that is not
+     one of the app's controls. */
+  /* What the caret was on, in enough detail to find it again once the DOM
+     beneath it has been rebuilt. `data-act` says what the control does; the
+     rest say WHICH one — which ingredient, which chip, which direction.
+     Same vocabulary `openSheet` uses to find the control it must return to.
+
+     Recorded as VALUES and compared as values, never assembled into a
+     selector string. `recipes.json` is hand-editable by design, so these
+     carry whatever a person put in the file: a tag holding a newline makes
+     `[data-key="sun<LF>dried"]` a CSS syntax error, and querySelector would
+     throw out of the middle of render() — leaving the sheet focus and the
+     draft snapshot at the end of it unrun. Comparing strings cannot fail on
+     any input, which is the whole reason it is done this way. */
+  var FOCUS_ATTRS = ["data-key", "data-i", "data-id", "data-d"];
+
+  function controlMark(el) {
+    if (!el || !el.getAttribute) return null;
+    var act = el.getAttribute("data-act");
+    if (!act) return null;
+    var mark = { act: act, rest: [] };
+    for (var i = 0; i < FOCUS_ATTRS.length; i++) {
+      mark.rest.push(el.getAttribute(FOCUS_ATTRS[i]));
+    }
+    return mark;
+  }
+
+  function findControl(root, mark) {
+    var all = root.querySelectorAll("[data-act]");
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].getAttribute("data-act") !== mark.act) continue;
+      var same = true;
+      for (var j = 0; j < FOCUS_ATTRS.length; j++) {
+        if (all[i].getAttribute(FOCUS_ATTRS[j]) !== mark.rest[j]) { same = false; break; }
+      }
+      if (same) return all[i];
+    }
+    return null;
+  }
+
   function render() {
     var app = document.getElementById("app");
     if (!app) return;
@@ -4846,6 +4926,26 @@
         selEnd = active.selectionEnd;
       } catch (e) {}
     }
+    /* `R106` — and the controls with no id, which is nearly all of them.
+       Every render throws the screen away and builds it again, so the
+       element under the caret stops existing. Only the FIELDS carry ids, so
+       only the fields ever came back: a button re-rendered by its own press
+       dropped the caret onto <body>.
+
+       That is not cosmetic. The servings stepper became a one-shot by
+       keyboard — press + once, the caret is gone, press + again and nothing
+       happens, so four people could never become six — and every ingredient
+       ticked off threw a screen reader back to the top of the page, on the
+       screen someone is standing at a hob using. Both measured before this
+       was written.
+
+       Restored only on the SAME screen. A route change already has its own
+       landing place (the new heading, focused after this returns), and
+       moving the caret here first would have a screen reader announce a
+       control the reader is about to be taken away from. A sheet opening or
+       closing keeps its own contract too: both run after this. */
+    var sameScreen = S.loaded && routeKey(S.route) === S.paintedRoute;
+    var focusMark = !focusId && sameScreen ? controlMark(active) : null;
 
     var html;
     if (S.error) {
@@ -4911,6 +5011,9 @@
           try { el.setSelectionRange(selStart, selEnd); } catch (e) {}
         }
       }
+    } else if (focusMark) {
+      var back = findControl(app, focusMark);
+      if (back) back.focus();
     }
 
     syncSheetFocus();
@@ -5456,13 +5559,30 @@
       render();
       return;
     }
-    if (ev.key === "Enter" && (t.id === "main-search" || t.id === "menu-q")) {
+    /* Enter means "I have finished typing". On a phone the Return key is
+       labelled Go, the on-screen keyboard is standing over the results, and
+       the gesture has to do something. It opened the top hit on Main and did
+       NOTHING on the Menu — the screen with the search button on it — because
+       the id tested here was `menu-q`, which is that field's `data-act`, not
+       its id (`menu-search`). One string, two namespaces: the same confusion
+       `R103` found going the other way, and no element has ever carried that
+       id, so the branch had never once been true.
+
+       Guarded on there actually being a search term, because the Menu's list
+       is `a.rcard` whether anyone has searched or not: without the guard,
+       Enter in an empty search box would open whichever recipe happened to
+       sort first, which is not what the reader asked for. Main is safe by
+       construction — it draws no cards until a query — but the precondition
+       is the same sentence on both screens, so it is said once, out loud.
+
+       The keyboard goes away either way. A search matching nothing prints
+       "No recipes match" in exactly the place the keyboard was covering. */
+    if (ev.key === "Enter" && (t.id === "main-search" || t.id === "menu-search")) {
+      if (!t.value.trim()) return;
+      ev.preventDefault();
+      t.blur();
       var first = document.querySelector("#app a.rcard[href]");
-      if (first) {
-        ev.preventDefault();
-        t.blur();
-        location.hash = first.getAttribute("href");
-      }
+      if (first) location.hash = first.getAttribute("href");
       return;
     }
     if (ev.key === "Escape" && t.id === "serv-input") {

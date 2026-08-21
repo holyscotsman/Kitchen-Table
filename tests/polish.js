@@ -186,6 +186,106 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== A deleted line took another line\u2019s tick with it (R104) ==');
+  {
+    /* The ticks are keyed by position and cleared only when you LEAVE the
+       recipe, so a line deleted in Edit mode slides every tick below it up
+       one. Tick butter and sugar, delete butter, come back:
+
+           [x] 1 cup granulated sugar
+           [x] 1 cup packed brown sugar     <- never touched
+           [ ] 2 large eggs
+
+       The brown sugar reads as done and gets skipped. Skipping an
+       ingredient is the harm; an un-ticked line only gets checked twice.
+       `R103` is what made this reachable — while the delete button threw,
+       the list could not change under you, which is why this arrives with
+       it rather than before it. */
+    const ctxK = await br.newContext({ ...devices['iPhone 13'] });
+    const pK = await ctxK.newPage();
+    const kErrs = []; pK.on('pageerror', e => kErrs.push(e.message));
+    await ctxK.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const ticks = () => pK.evaluate(() =>
+      [...document.querySelectorAll('.bodygrid__ing li')].map(li => ({
+        text: li.textContent.trim().slice(0, 30),
+        done: li.className.indexOf('done') > -1 ||
+              li.getAttribute('aria-pressed') === 'true' ||
+              !!li.querySelector('[aria-pressed="true"]')
+      })));
+    const stepTicks = () => pK.evaluate(() =>
+      [...document.querySelectorAll('.bodygrid__steps li, .r-steps li')].filter(li =>
+        li.className.indexOf('done') > -1 ||
+        li.getAttribute('aria-pressed') === 'true').length);
+
+    await pK.goto(B + '/index.html#ninja-cookies');
+    await pK.waitForSelector('.r-title');
+    await pK.locator('.bodygrid__ing li').nth(0).click();
+    await pK.locator('.bodygrid__ing li').nth(1).click();
+    await pK.waitForTimeout(250);
+    const before = await ticks();
+    chk('two ingredients were ticked', before.filter(x => x.done).length === 2,
+        JSON.stringify(before.slice(0, 3)));
+
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('#e-title');
+    await pK.click('[data-act="del"][data-key="ingredients"][data-i="0"]');
+    await pK.waitForTimeout(250);
+    await pK.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pK.waitForTimeout(500);
+    /* The visible notice, not body text: `announce()` also writes the
+       sentence into the aria-live region, which keeps what was last spoken
+       and is hidden from sight. Reading innerText picks that up and reports
+       a notice that is no longer on screen. */
+    const noticeText = () => pK.evaluate(() => {
+      const n = document.querySelector('.notice');
+      return n ? n.textContent.trim() : '';
+    });
+    chk('and the app says the marks were cleared',
+        /check marks were cleared/i.test(await noticeText()),
+        (await noticeText()) || '(no notice)');
+
+    /* Save does not leave Edit mode — go back to the reading view to look. */
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('.bodygrid__ing li');
+    await pK.waitForTimeout(250);
+    const after = await ticks();
+    const falsely = after.filter(x => x.done &&
+      !before.some(b => b.done && b.text === x.text));
+    chk('no line is ticked that nobody ticked', falsely.length === 0,
+        JSON.stringify(falsely.map(x => x.text)));
+    chk('the shortened list really is shorter', after.length === before.length - 1,
+        before.length + ' -> ' + after.length);
+
+    /* The half that must not regress: an edit that leaves the lists alone
+       keeps your place. Fixing a typo in the title is no reason to forget
+       which ingredients are already in the bowl. */
+    await pK.locator('.bodygrid__ing li').nth(0).click();
+    await pK.waitForTimeout(200);
+    chk('a tick was set again', (await ticks()).filter(x => x.done).length === 1);
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('#e-title');
+    await pK.fill('#e-title', 'Ninja Cookies (renamed)');
+    await pK.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /save/i.test(x.innerText));
+      if (b) b.click();
+    });
+    await pK.waitForTimeout(500);
+    await pK.click('[data-act="toggle-edit"]');
+    await pK.waitForSelector('.bodygrid__ing li');
+    await pK.waitForTimeout(250);
+    chk('a title-only edit keeps the ticks',
+        (await ticks()).filter(x => x.done).length === 1,
+        JSON.stringify((await ticks()).filter(x => x.done).map(x => x.text)));
+    chk('and says nothing about clearing them', !(await noticeText()),
+        await noticeText());
+    chk('nothing threw', kErrs.length === 0, kErrs.join(' | '));
+    await pK.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxK.close();
+  }
+
   console.log('\n== You could not add or remove a line in Edit mode (R103) ==');
   {
     /* Two spellings of one idea, and the wrong one on four buttons.
@@ -2342,6 +2442,336 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     }
     await p.goto(B + '/index.html');
     await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
+  }
+
+  console.log('\n== Pressing Go on the Menu search did nothing (R105) ==');
+  {
+    /* The Return key on an iPhone reads "Go". The keyboard is standing over
+       the bottom half of the screen, the results are behind it, and pressing
+       Go was the obvious move. On Main it opened the top hit. On the Menu —
+       the screen with the search BUTTON on it, the one you reach in order to
+       search — it did nothing at all: no navigation, and the keyboard did not
+       even drop.
+
+       The handler asked `t.id === "menu-q"`. That string is the field's
+       `data-act`; its id is `menu-search`. No element in this app has ever
+       carried the id `menu-q`, so that half of the condition had never once
+       been true. It reads plausibly because `pick-q` genuinely is both an id
+       and a data-act, which is how the two namespaces got confused. */
+    const ctxG = await br.newContext({ ...devices['iPhone 13'] });
+    const pG = await ctxG.newPage();
+    const gErrs = []; pG.on('pageerror', e => gErrs.push(e.message));
+    await ctxG.route('**/*.onrender.com/**', r => r.abort('failed'));
+
+    const goSearch = async (hash, opener, field, term) => {
+      await pG.goto(B + '/index.html' + hash);
+      await pG.waitForSelector('.rcard, .searchfield');
+      if (opener) { await pG.click(opener); await pG.waitForSelector(field); }
+      await pG.fill(field, term);
+      await pG.waitForTimeout(350);
+      const first = await pG.evaluate(() => {
+        const a = document.querySelector('#app a.rcard[href]');
+        return a ? a.getAttribute('href') : null;
+      });
+      await pG.focus(field);
+      await pG.keyboard.press('Enter');
+      await pG.waitForTimeout(450);
+      return { first, hash: await pG.evaluate(() => location.hash) };
+    };
+
+    const menu = await goSearch('#menu', '[data-act="toggle-search"]', '#menu-search', 'chicken');
+    chk('the Menu search found something to open', !!menu.first, String(menu.first));
+    chk('Go on the Menu opens the top result', menu.hash === menu.first,
+        menu.hash + ' , wanted ' + menu.first);
+
+    /* The half that must not regress. */
+    const main = await goSearch('', null, '#main-search', 'chicken');
+    chk('Go on Main still opens the top result', main.hash === main.first,
+        main.hash + ' , wanted ' + main.first);
+
+    /* An empty box has no top result — only the list you were already
+       looking at. The Menu draws all 48 as `a.rcard` whether anyone has
+       searched or not, so an unguarded fix would answer Go by opening
+       whichever recipe happened to sort first. */
+    await pG.goto(B + '/index.html#menu');
+    await pG.waitForSelector('.rcard');
+    await pG.click('[data-act="toggle-search"]');
+    await pG.waitForSelector('#menu-search');
+    await pG.focus('#menu-search');
+    await pG.keyboard.press('Enter');
+    await pG.waitForTimeout(400);
+    chk('Go on an empty search box opens nothing',
+        (await pG.evaluate(() => location.hash)).indexOf('#menu') === 0,
+        await pG.evaluate(() => location.hash));
+
+    /* A search matching nothing prints its sentence exactly where the
+       keyboard is. Go has to get the keyboard out of the way of the answer,
+       which means blurring even when there is nowhere to go. */
+    await pG.fill('#menu-search', 'zzzqqq');
+    await pG.waitForTimeout(350);
+    await pG.focus('#menu-search');
+    await pG.keyboard.press('Enter');
+    await pG.waitForTimeout(400);
+    chk('a search matching nothing says so',
+        /no recipes match/i.test(await pG.evaluate(() => document.body.innerText)));
+    chk('and Go puts the keyboard away so it can be read',
+        await pG.evaluate(() => document.activeElement.id !== 'menu-search'),
+        await pG.evaluate(() => document.activeElement.id || document.activeElement.tagName));
+    chk('nothing threw', gErrs.length === 0, gErrs.join(' | '));
+
+    /* The guard, written the `R89`/`R103` way — derived from the source, not
+       from a list someone maintains. Every id this app LOOKS UP has to be an
+       id it can actually RENDER. That is the whole shape of this bug, and of
+       any future one where a `data-act`, a class or a stale name is tested
+       against `.id`.
+
+       Rendered ids are collected as literals plus the prefixes of the
+       templated ones (`id="e-ing-' + i + '"` covers `e-ing-0`), because a
+       generated id is still an id the app can produce. The reference regex
+       requires a real property access before `id` so that `job_id ===
+       "number"` is not read as an id lookup. */
+    const fs = require('fs'), path = require('path');
+    const appSrc = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const htmlSrc = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+    const looked = new Set();
+    let m;
+    const reGet = /getElementById\(\s*"([^"]+)"/g;
+    while ((m = reGet.exec(appSrc))) looked.add(m[1]);
+    const reEq = /(?:^|[^A-Za-z0-9_$])(?:[A-Za-z_$][A-Za-z0-9_$]*\.)?id\s*===\s*"([^"]+)"/g;
+    while ((m = reEq.exec(appSrc))) {
+      /* `typeof j.id === "number"` is a type test, not an id lookup — and
+         the guard finding that first is the point of writing the negative
+         check below rather than trusting a clean run. */
+      if (/typeof\s*$/.test(appSrc.slice(Math.max(0, m.index - 12), m.index + 1))) continue;
+      looked.add(m[1]);
+    }
+
+    const literal = new Set(), prefix = [];
+    const reHas = /id="([^"]*)"/g;
+    for (const src of [appSrc, htmlSrc]) {
+      reHas.lastIndex = 0;
+      while ((m = reHas.exec(src))) {
+        const v = m[1];
+        if (/['"]\s*\+/.test(v)) {          // id="e-ing-' + i + '"
+          const stem = v.split(/['"]/)[0];
+          if (stem) prefix.push(stem);
+        } else if (v) literal.add(v);
+      }
+    }
+
+    chk('the id lookups were read out of the source', looked.size >= 10,
+        [...looked].join(','));
+    chk('and the ids the app renders were too', literal.size >= 20,
+        String(literal.size));
+
+    const orphan = [...looked].filter(id =>
+      !literal.has(id) && !prefix.some(pre => id.indexOf(pre) === 0));
+    chk('every id the app looks up is one it can render',
+        orphan.length === 0, orphan.join(', '));
+
+    /* And the guard has to be able to fail: `menu-q` is the exact string
+       this round removed, and it must still be reported as an orphan if it
+       ever comes back. */
+    const wouldCatch = !literal.has('menu-q') &&
+      !prefix.some(pre => 'menu-q'.indexOf(pre) === 0);
+    chk('the guard would still catch the string that caused this',
+        wouldCatch === true);
+  }
+
+  console.log('\n== Every press threw the caret onto <body> (R106) ==');
+  {
+    /* Every render throws the screen away and builds it again, so the
+       element under the caret stops existing. Focus was carried across by
+       id — and only the FIELDS carry ids, so only the fields ever came
+       back. A button re-rendered by its own press dropped the caret onto
+       <body>.
+
+       Not cosmetic. The servings stepper became a ONE-SHOT by keyboard:
+       press + once, the caret is gone, press + again and nothing happens,
+       so four people could never become six. And every ingredient ticked
+       off threw a screen reader back to the top of the page — on the screen
+       someone is standing at a hob using, ticking a line at a time.
+
+       A control is found again the way `openSheet` already finds the one it
+       must return to: by its action plus whatever says WHICH one. */
+    const ctxF = await br.newContext();      // desktop context: a real keyboard
+    const pF = await ctxF.newPage();
+    const fErrs = []; pF.on('pageerror', e => fErrs.push(e.message));
+    await ctxF.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const at = () => pF.evaluate(() => {
+      const a = document.activeElement;
+      if (!a || a === document.body) return 'BODY';
+      return (a.getAttribute && a.getAttribute('data-act')
+        ? a.getAttribute('data-act') + (a.getAttribute('data-i') !== null
+            ? '#' + a.getAttribute('data-i') : '')
+        : a.tagName);
+    });
+
+    await pF.goto(B + '/index.html#chicken-cordon-bleu');
+    await pF.waitForSelector('.r-title');
+    const serves = () => pF.evaluate(() =>
+      document.querySelector('.servcard__value').textContent.trim());
+    const start = parseInt(await serves(), 10);
+    await pF.focus('[data-act="serv+"]');
+    for (let k = 0; k < 3; k++) { await pF.keyboard.press('Enter'); await pF.waitForTimeout(220); }
+    chk('three presses of + move the servings three times',
+        parseInt(await serves(), 10) === start + 3,
+        start + ' -> ' + (await serves()));
+    chk('and the caret is still on the button that was pressed',
+        (await at()) === 'serv+', await at());
+
+    await pF.goto(B + '/index.html#chicken-cordon-bleu');
+    await pF.waitForSelector('.r-title');
+    await pF.evaluate(() => document.querySelectorAll('.bodygrid__ing .checkrow')[2].focus());
+    await pF.keyboard.press('Enter');
+    await pF.waitForTimeout(250);
+    chk('ticking a line off keeps the caret on that line',
+        (await at()) === 'chk-i#2', await at());
+    chk('and the line really was ticked', await pF.evaluate(() =>
+      document.querySelectorAll('.bodygrid__ing [aria-pressed="true"]').length) === 1);
+
+    /* The contracts this must not break, all three of which run AFTER the
+       render and therefore win: a route lands on its heading, a sheet takes
+       the caret when it opens, and a closing sheet hands it back. */
+    await pF.goto(B + '/index.html#menu');
+    await pF.waitForSelector('.rcard');
+    await pF.click('.rcard');
+    await pF.waitForSelector('.r-title');
+    await pF.waitForTimeout(250);
+    chk('opening a recipe still lands on its heading',
+        (await at()) === 'H1', await at());
+
+    /* And lands there ONCE. Focusing a control here first and then moving on
+       to the heading would have a screen reader announce something the
+       reader is about to be taken away from — invisible to a final-state
+       check, so the landings are counted rather than sampled.
+
+       The theme button is the case that makes this real rather than
+       theoretical: it is the one control drawn on EVERY screen, so its
+       selector matches on the destination too. Press Back with the caret on
+       it and, without the same-screen guard, the destination's theme button
+       is announced before the heading takes over. Measured both ways —
+       ["H1:"] with the guard, ["BUTTON:theme","H1:"] without. */
+    await pF.focus('[data-act="theme"]');
+    await pF.evaluate(() => {
+      window.__landings = [];
+      document.addEventListener('focusin', e => window.__landings.push(
+        e.target.tagName + ':' + (e.target.getAttribute('data-act') || '')));
+    });
+    await pF.goBack();
+    await pF.waitForSelector('.rcard');
+    await pF.waitForTimeout(450);
+    const landings = await pF.evaluate(() => window.__landings || []);
+    chk('and navigating announces one landing place, not two',
+        landings.length === 1 && landings[0].indexOf('H1') === 0,
+        JSON.stringify(landings));
+
+    await pF.click('[data-act="open-filter"]');
+    await pF.waitForTimeout(350);
+    chk('a sheet still takes the caret when it opens',
+        await pF.evaluate(() => !!document.activeElement.closest('.sheet')));
+    await pF.evaluate(() => document.querySelector('.sheet .chip').focus());
+    const chipWas = await at();
+    await pF.keyboard.press('Enter');
+    await pF.waitForTimeout(350);
+    chk('and a chip keeps its place across the render it causes',
+        (await at()) === chipWas && chipWas !== 'BODY', chipWas + ' -> ' + (await at()));
+    chk('nothing threw', fErrs.length === 0, fErrs.join(' | '));
+
+    /* The guard: the caret can only come back to a control the mark picks
+       out ALONE. Compared in-page exactly as `controlMark`/`findControl`
+       compare — by attribute VALUES, never by an assembled selector — so a
+       control that starts distinguishing itself by some new attribute is
+       reported here rather than quietly becoming un-restorable.
+
+       Scrims are excluded, and only scrims: a sheet's backdrop is drawn as a
+       button so a tap dismisses, which makes it a second control carrying
+       the sheet's close action. It is never a place the caret returns to,
+       because closing a sheet has its own contract that runs afterwards. */
+    const ambiguous = async () => pF.evaluate(() => {
+      const ATTRS = ['data-key', 'data-i', 'data-id', 'data-d'];
+      const all = [...document.querySelectorAll('#app [data-act]')];
+      const mark = el => [el.getAttribute('data-act')]
+        .concat(ATTRS.map(a => el.getAttribute(a))).join('\u0000');
+      const out = [];
+      all.forEach(el => {
+        if (el.id) return;                       // ids take the other path
+        if (el.classList.contains('scrim')) return;
+        const m = mark(el);
+        if (all.filter(x => mark(x) === m).length !== 1) out.push(m.replace(/\u0000/g, '|'));
+      });
+      return [...new Set(out)];
+    });
+
+    let counted = 0, bad = [];
+    for (const h of ['', '#menu', '#chicken-cordon-bleu', '#plan', '#add', '#help']) {
+      await pF.goto(B + '/index.html' + h);
+      await pF.waitForTimeout(600);
+      counted += await pF.evaluate(() => document.querySelectorAll('#app [data-act]').length);
+      bad = bad.concat(await ambiguous());
+    }
+    await pF.goto(B + '/index.html#chicken-cordon-bleu');
+    await pF.waitForSelector('.r-title');
+    await pF.click('[data-act="toggle-edit"]');
+    await pF.waitForTimeout(450);
+    counted += await pF.evaluate(() => document.querySelectorAll('#app [data-act]').length);
+    bad = bad.concat(await ambiguous());
+
+    chk('the walk reached the app\'s controls', counted > 60, String(counted));
+    chk('every control the caret can return to is addressable alone',
+        bad.length === 0, [...new Set(bad)].join(' ; '));
+
+    /* And the guard has to be able to fail. */
+    await pF.evaluate(() => {
+      const b = document.createElement('button');
+      b.setAttribute('data-act', 'toggle-edit');
+      document.querySelector('#app').appendChild(b);
+    });
+    chk('the guard reports a control it cannot tell apart',
+        (await ambiguous()).length === 1, JSON.stringify(await ambiguous()));
+
+    /* And the mark is compared as VALUES, never assembled into a selector.
+       `recipes.json` is hand-editable by design — that is the whole
+       download-and-commit workflow — and `normalizeRecipe` runs `parseTags`
+       only when tags are NOT already a list, so a tag holding a newline
+       goes into the book exactly as written. Built as a selector that read
+       `[data-key="sun<LF>dried"]`, which is a CSS syntax error, so pressing
+       the chip threw out of the MIDDLE of render(): the screen was left
+       standing but the sheet focus and the draft snapshot at the end of it
+       never ran. Losing the caret is a shrug; a convenience that can take
+       down a render is not. Caught by `tests/sec.js`'s escaping guard
+       before it shipped, which is exactly what that guard is for. */
+    const ctxT = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxT.route('**/*.onrender.com/**', r => r.abort('failed'));
+    await ctxT.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: 'twoline', title: 'Two Line Tag', category: 'Dinner',
+        contributor: 'Joan', servings: 4, ingredients: ['a'], steps: ['b'],
+        tags: ['sun\ndried']
+      }]));
+    });
+    const pT = await ctxT.newPage();
+    const tErrs = []; pT.on('pageerror', e => tErrs.push(e.message));
+    await pT.goto(B + '/index.html#menu');
+    await pT.waitForSelector('.rcard');
+    await pT.click('[data-act="open-filter"]');
+    await pT.waitForSelector('[data-act="ft"]');
+    chk('a hand-edited tag can carry a newline into the book',
+        (await pT.getAttribute('[data-act="ft"]', 'data-key')).indexOf('\n') > -1);
+    tErrs.length = 0;
+    await pT.evaluate(() => {
+      const c = document.querySelector('[data-act="ft"]');
+      c.focus(); c.click();
+    });
+    await pT.waitForTimeout(500);
+    chk('and pressing its chip does not throw out of the render',
+        tErrs.length === 0, tErrs.join(' | ').slice(0, 120));
+    chk('the filter still applied', await pT.evaluate(
+      () => location.hash.indexOf('tag=') > -1 ||
+            document.querySelector('[data-act="ft"]').getAttribute('aria-pressed') === 'true'),
+      await pT.evaluate(() => location.hash));
+    await ctxT.close();
   }
 
   chk('no JS errors', errs.length===0, errs.join(' | '));
