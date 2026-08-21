@@ -292,3 +292,36 @@ in the stylesheet that states an intent it cannot deliver, which misleads
 whoever reads it next — and choosing 12pt over the reader's own setting is
 the one direction §033 rules out. If Jason wants paper at a fixed size
 regardless of the screen, that is a different ruling and easy to make.
+
+## R56 — A step's number scales only when a measurement follows it
+
+**Provisional; the gate is one argument to remove.** The README documented
+"scale the leading number" in steps as well as ingredients, with a worked
+example — *"Bake 2 cups of…" scales in the steps too* — and the rule was
+written for a step that opens with an amount.
+
+`recipes.json` contains a step it was never written for. *Fries in Ninja*
+step one is `390 - 3 mins`: an air-fryer setting, not an amount. Doubling the
+recipe rendered **780 - 3 mins**. Halving it rendered **195 - 3 mins**.
+Sweeping all 48 recipes, it is the only step in the whole book that starts
+with a number, and it is a temperature.
+
+Three ways out. Stop scaling steps entirely — simplest, but deletes a
+documented feature and would silently break `Bake 2 cups of…` if an imported
+prose step ever opens that way, which is exactly what video imports produce.
+Special-case temperatures — a blocklist, so every unit nobody thought of
+fails open, in the wrong direction. Or **require a measurement word after the
+number**, which is what shipped: an allowlist, so anything unrecognised is
+left as written.
+
+**The list is deliberately short and unambiguous.** A unit that fails to
+match costs a step that doesn't scale; a unit that matches wrongly costs an
+invented number in a book of someone's recipes. Those are not the same price,
+so bare single letters that could be words (`c`, `t`, `l`) were left out even
+though handwritten cards use them.
+
+**What it costs if reversed:** delete the `unitsOnly` argument at the two
+step call sites. **Why it was taken without asking:** the alternative was
+shipping a recipe book that tells someone to run an air fryer at 780°F, and
+no reading of the spec asks for that — CLAUDE.md's own definition of done
+says the stepper "rescales **ingredient** quantities".

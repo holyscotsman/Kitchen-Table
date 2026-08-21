@@ -509,11 +509,37 @@
     return best ? whole + best : String(whole);
   }
 
-  function scaleLine(text, mult) {
+  /* A leading number in a STEP is only an amount if a measurement follows
+     it. The README promises instruction quantities scale — "Bake 2 cups
+     of…" — and they still do; the rule simply refuses to guess. It has to,
+     because the collection contains a step it was never written for:
+     `fries-in-ninja` opens with "390 - 3 mins", which is an air-fryer
+     SETTING. Doubling the recipe made it 780; halving it made it 195.
+     Sweeping all 48 recipes, that is the only step in the book that starts
+     with a number at all, and it is a temperature.
+     Deliberately short and unambiguous: a unit that fails to match costs a
+     step that doesn't scale, and a unit that matches wrongly costs an
+     invented number in a book of someone's recipes. Those are not the same
+     price. Ingredient lines are not gated by this — a leading number there
+     IS an amount, by definition. */
+  var STEP_UNIT = new RegExp("^[\\s.]*(?:" + [
+    "cups?", "tbsp", "tbs", "tablespoons?", "tsp", "teaspoons?",
+    "oz", "ounces?", "lbs?", "pounds?", "g", "grams?", "kg", "ml",
+    "litres?", "liters?", "pints?", "pt", "quarts?", "qt", "gallons?",
+    "cloves?", "cans?", "tins?", "jars?", "bottles?", "boxes?", "bags?",
+    "packets?", "packages?", "pkgs?", "sticks?", "slices?", "strips?",
+    "sheets?", "rashers?", "fillets?", "pieces?", "scoops?", "drops?",
+    "dashes?", "pinches?", "handfuls?", "sprigs?", "bunches?", "heads?",
+    "stalks?", "eggs?"
+  ].join("|") + ")\\b", "i");
+
+  function scaleLine(text, mult, unitsOnly) {
     if (Math.abs(mult - 1) < 0.001) return text;
-    return String(text).replace(
+    var whole = String(text);
+    return whole.replace(
       /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/,
       function (m) {
+        if (unitsOnly && !STEP_UNIT.test(whole.slice(m.length))) return m;
         var n;
         if (m.indexOf("/") >= 0) {
           var parts = m.trim().split(/\s+/);
@@ -1789,7 +1815,7 @@
       return '<li><button type="button" class="checkrow press" aria-pressed="' +
              done + '" data-act="chk-s" data-i="' + i + '">' +
              '<span class="stepnum' + pop + '">' + (done ? I.check(16) : i + 1) + "</span>" +
-             '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
+             '<span class="checkrow__text">' + esc(scaleLine(line, mult, true)) +
              "</span></button></li>";
     }).join("") + "</ol></section>";
 
@@ -3751,7 +3777,7 @@
     }
     lines.push("", "INSTRUCTIONS");
     (r.steps || []).forEach(function (s, i) {
-      lines.push(i + 1 + ". " + scaleLine(s, mult));
+      lines.push(i + 1 + ". " + scaleLine(s, mult, true));
     });
     if (r.notes) lines.push("", "NOTES", r.notes);
     if (r.flagged && r.flagged.length) {

@@ -661,6 +661,84 @@ const browserContextWithReduce = (br) =>
   await p.waitForTimeout(200);
   chk('back to original clears the note', await p.locator('.scalednote').count()===0);
 
+  console.log('\n== Scaling must not invent an oven temperature (R56) ==');
+  {
+    /* The README promises instruction quantities scale too — "Bake 2 cups
+       of…" — and the rule was "scale the leading number". The collection
+       contains a step the rule was never written for: `fries-in-ninja` step
+       one is "390 - 3 mins", which is a Ninja air-fryer SETTING, not an
+       amount. Doubling the recipe made it 780. Halving it made it 195.
+       Sweeping all 48 recipes, that is the only step in the book that starts
+       with a number, and it is a temperature — so the leading number in a
+       step is scaled now only when a measurement word follows it. */
+    const pN = await ctx.newPage();
+    const stepsAt = async (n) => {
+      await pN.goto(B + '/index.html#fries-in-ninja');
+      await pN.waitForSelector('.checklist--steps');
+      const cur = await pN.evaluate(() => {
+        const m = (document.querySelector('.servcard__value, [data-act="serv-edit"]')
+          || {}).textContent || '';
+        return parseInt(m, 10);
+      });
+      const d = n - (isNaN(cur) ? 4 : cur);
+      for (let i = 0; i < Math.abs(d); i++) {
+        await pN.click(d > 0 ? '[data-act="serv+"]' : '[data-act="serv-"]');
+        await pN.waitForTimeout(90);
+      }
+      await pN.waitForTimeout(200);
+      return pN.locator('.checklist--steps .checkrow__text').allTextContents();
+    };
+    const asWritten = await stepsAt(4);
+    chk('the air-fryer setting reads 390 as written',
+      asWritten[0].indexOf('390') === 0, asWritten[0]);
+    const doubled = await stepsAt(8);
+    chk('doubling the recipe does not double the temperature',
+      doubled[0].indexOf('390') === 0, doubled[0]);
+    const halved = await stepsAt(2);
+    chk('and halving it does not halve the temperature',
+      halved[0].indexOf('390') === 0, halved[0]);
+    chk('the timings in that step are left alone too',
+      doubled.join(' | ') === asWritten.join(' | '),
+      doubled.join(' | '));
+
+    /* The promise the README makes is still kept where it means something:
+       a step that opens with a real amount does scale. Seeded, because no
+       recipe in the book currently has one — an imported prose step is
+       where this will first show up. */
+    await pN.evaluate(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: 'scale-probe', title: 'Scale Probe', category: 'Baking',
+        contributor: 'Joan', servings: 4,
+        ingredients: ['2 cups flour'],
+        steps: ['2 cups of the flour go in first.', '350 degrees, 20 minutes.',
+          '9x13 pan, greased.']
+      }]));
+    });
+    await pN.goto(B + '/index.html#scale-probe');
+    await pN.reload();
+    await pN.waitForSelector('.checklist--steps');
+    await pN.click('[data-act="serv+"]');
+    await pN.waitForTimeout(120);
+    await pN.click('[data-act="serv+"]');
+    await pN.waitForTimeout(120);
+    await pN.click('[data-act="serv+"]');
+    await pN.waitForTimeout(120);
+    await pN.click('[data-act="serv+"]');
+    await pN.waitForTimeout(250);
+    const probe = await pN.locator('.checklist--steps .checkrow__text').allTextContents();
+    chk('a step that opens with a real amount still scales',
+      probe[0].indexOf('4 cups') === 0, probe[0]);
+    chk('a step that opens with a temperature does not',
+      probe[1].indexOf('350') === 0, probe[1]);
+    chk('and neither does a pan size',
+      probe[2].indexOf('9x13') === 0, probe[2]);
+    const ing = await pN.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    chk('while the ingredient list scales as it always did',
+      ing[0].indexOf('4 cups') === 0, ing[0]);
+    await pN.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await pN.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);

@@ -82,6 +82,15 @@ and no faded grey text anywhere. A−/A+ keeps working inside it.
 ingredient *and* instruction quantity adjusts with it — "Bake 2 cups of…" scales
 in the steps too. Lines with no leading number are left alone, which is correct.
 
+A step's leading number scales **only when a measurement follows it** (`R56`).
+The rule used to be "scale the leading number", and the book contains a step it
+was never written for: *Fries in Ninja* opens with `390 - 3 mins`, which is an
+air-fryer setting. Doubling the recipe made it 780; halving it made it 195. It
+is the only step in all 48 recipes that starts with a number, and it is a
+temperature — so the leading number in a step now scales where the meaning is
+plain and is left as Joan wrote it everywhere else. Ingredient lines are
+untouched by this: a leading number there *is* an amount.
+
 **Tap any ingredient or step to check it off** while you cook. That state is
 deliberately per-visit and resets when you leave the recipe.
 
