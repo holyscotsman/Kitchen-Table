@@ -2410,7 +2410,8 @@
         "<strong>go key</strong> opens it — no need to put the keyboard away " +
         "and aim at the card.",
         "Or browse: tap a person to see their recipes, or a course like " +
-        "Dinner or Baking. <strong>View all recipes</strong> shows the lot."]],
+        "Dinner or Baking. The <strong>View all</strong> button under the " +
+        "names shows the lot."]],
 
       ["Making the writing bigger",
        ["On the All recipes screen, tap <strong>Aa</strong> at the top. " +
@@ -2421,11 +2422,16 @@
         "The sun/moon button switches between the dark and light look."]],
 
       ["Cooking from a recipe",
-       ["<strong>Servings</strong> at the top: press − or + and every amount " +
-        "changes with it. Cooking for two instead of six? Press it twice and " +
+       ["<strong>Servings</strong> at the top: press − or + and the amounts " +
+        "change with it. Cooking for two instead of six? Press it twice and " +
         "the recipe does the sums. For a bigger jump, <strong>tap the number " +
         "itself and type it</strong> — 4 to 40 is one number, not thirty-six " +
         "presses.",
+        "Some lines carry a second amount — “1 lb (450g) chicken”, “1 jar " +
+        "(16 ounces)”. Whether that one should change too depends on what it " +
+        "means, and the app would only be guessing, so it leaves it alone " +
+        "and writes <strong>not adjusted</strong> on the line. That is it " +
+        "being careful, not being wrong.",
         "<strong>Tap any ingredient or step to tick it off</strong> while " +
         "you cook. The ticks clear themselves when you leave the recipe — " +
         "they’re for this once, not forever.",
