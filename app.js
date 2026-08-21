@@ -2699,7 +2699,17 @@
       '<span>Shopping list <span class="shoplist__tag">preview</span></span>' +
       (S.listOpen ? I.chevD() : I.chevR()) + "</button>";
     if (S.listOpen) {
-      h += '<ul class="shoplist__items">';
+      /* `R79` — these lines are the recipe's own words, rescaled to the
+         servings planned, and this is the screen you read them on in the
+         shop. So they carry the A−/A+ step exactly the way `.recipe` does
+         (`R78`'s rule: recipe text scales wherever it appears). The head
+         button, the hints and the day headings stay put — they are chrome,
+         and criterion 9 says chrome does not move. Set inline because the
+         step is state; it reaches print for the same reason the recipe's
+         does, which DECISIONS §033 already settled: paper carries the size
+         the reader chose. */
+      var readPx = FS[effectiveFs()] + "px";
+      h += '<ul class="shoplist__items" style="font-size:' + readPx + '">';
       keys.forEach(function (k) {
         var s = sums[k];
         h += "<li>" + esc(fmtQty(s.qty)) + (s.unit ? " " + esc(s.unit) : "") +
@@ -2707,7 +2717,9 @@
       });
       h += "</ul>";
       if (asIs.length) {
-        h += '<p class="hint">As written, not summed:</p><ul class="shoplist__items shoplist__items--dim">' +
+        h += '<p class="hint">As written, not summed:</p>' +
+             '<ul class="shoplist__items shoplist__items--dim" style="font-size:' +
+             readPx + '">' +
              asIs.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ul>";
       }
       h += '<p class="hint">Same wording and unit sum together; everything else is listed as written.</p>';

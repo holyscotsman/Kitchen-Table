@@ -2823,10 +2823,12 @@ a.bigbtn--quiet:hover {
   padding: 0 16px 12px;
 }
 
+/* No font-size here: `R79` gives the list the reader's chosen step as an
+   inline size on the <ul>, and a rule on the <li> would beat that
+   inheritance and pin every line back at 17px. */
 .shoplist__items li {
   padding: 7px 0;
   border-top: 1px solid var(--line);
-  font-size: 17px;
   line-height: 1.45;
 }
 
