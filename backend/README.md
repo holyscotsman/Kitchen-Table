@@ -170,7 +170,19 @@ patient stranger submitting one link every thirty seconds forever, and
 each import spends real money on the keys in Render's dashboard. So a
 day's importing is capped — **40 in any 24 hours**, counted in the
 database (an in-memory tally would reset on every spin-down and forgive
-anyone willing to wait). `KT_DAY_CAP` moves it. Past the cap the answer
+anyone willing to wait). `KT_DAY_CAP` moves it.
+
+That cap bounds the **money**. It does not, on its own, stop one stranger
+spending the whole forty and leaving the family locked out of their own
+importer until tomorrow — so since `R91` a single caller may take at most
+**15 of the day's 40** (`KT_CALLER_DAY_CAP` moves it), which always leaves
+at least 25 for everybody else. That one is a *fairness* valve rather than
+a spending wall, so it is counted in memory: a spin-down forgiving someone
+costs nothing, because the forty is still counted in the database either
+way. It is only worth building because of `R81` — before that the caller
+key was the leftmost `X-Forwarded-For` entry, so anyone could rotate a
+header and be a new caller on every request. It is deliberately generous,
+because a household shares one address. Past the cap the answer
 is a plain sentence pointing at the two ways in that never touch the
 server at all — typing a recipe in, and importing from a photo — and the
 importer opens again as the day rolls forward. A count the server cannot
