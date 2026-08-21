@@ -2553,6 +2553,16 @@ input[type="file"].input {
   color: var(--dim);
 }
 
+/* `R60` — an amount on an ingredient line that the scaler left as written.
+   Full-strength ink, not a faded aside: it is the one part of a rescaled
+   line a cook has to think about. Italic and its own words carry the
+   distinction, so nothing here depends on colour. */
+.keptnote {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--acc);
+}
+
 /* ============================================== The a:hover ink guard
 
    tokens.css carries the handoff's `a:hover { color: var(--acc) }` — right

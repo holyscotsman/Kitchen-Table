@@ -33,6 +33,10 @@ const CONTRAST = `(() => {
       ['Menu + filter sheet','#menu','[data-act="open-filter"]'],
       ['Recipe','#chicken-cordon-bleu',null],
       ['Recipe flagged','#chops',null],
+      /* R60 — the kept-amount note only exists on a rescaled recipe, so it
+         needs a route of its own. One tap on + is enough to be off the
+         original count; this one carries seven of them. */
+      ['Recipe rescaled','#potato-bacon-soup','[data-act="serv+"]'],
       ['Recipe edit','#chicken-cordon-bleu','[data-act="toggle-edit"]'],
       ['Recipe download sheet','#bacon-ranch-chicken-casserole','[data-act="open-dl"]'],
       ['Menu text sheet','#menu','[data-act="open-text"]'],

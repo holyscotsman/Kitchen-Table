@@ -30,6 +30,10 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     ['Menu + filter sheet', '#menu', '.rcard', '[data-act="open-filter"]'],
     ['Menu + text sheet', '#menu', '.rcard', '[data-act="open-text"]'],
     ['Recipe', '#chicken-cordon-bleu', '.r-title', null],
+    /* R60 — a rescaled recipe carries the kept-amount notes, which add text
+       to lines that were already the longest on the screen. This one is the
+       book's densest: seven notes on fourteen ingredients. */
+    ['Recipe rescaled', '#potato-bacon-soup', '.r-title', '[data-act="serv+"]'],
     ['Recipe + download sheet', '#chicken-cordon-bleu', '.r-title', '[data-act="open-dl"]'],
     ['Recipe edit', '#chicken-cordon-bleu', '.r-title', '[data-act="toggle-edit"]'],
     ['Add', '#add', '.pathbtn', null],
