@@ -253,6 +253,48 @@ async function freshPage(br, opts) {
     await ctx.close();
   }
 
+  {
+    /* `R99` — the manifest asks for `text`, and the check just below proves
+       it. Shared text with no address in it was then thrown away: the query
+       is stripped from the address bar before the URL match runs, so a
+       recipe someone selected in Notes and shared into the app arrived at
+       the front screen with nothing on it and no way back to what they
+       sent. The words themselves are exactly what the paste box takes —
+       the one import path that needs no network at all. */
+    const { ctx, p, stub } = await freshPage(br, {});
+    const typed = "Granny's Shortbread\n\n225g butter\n110g caster sugar\n" +
+                  "340g plain flour\n\nCream the butter and sugar, work in " +
+                  "the flour, press into a tin, bake at 150C for 45 minutes.";
+    await p.goto(B + '/index.html?text=' + encodeURIComponent(typed));
+    await p.waitForTimeout(1200);
+    const got = await p.evaluate(() => {
+      const t = document.querySelector('#a-paste');
+      return { hash: location.hash, search: location.search,
+               paste: t ? t.value : null,
+               heading: (document.querySelector('#app h1') || {}).textContent };
+    });
+    chk('shared text with no link still opens the importer',
+        got.hash === '#add', got.hash + ' / ' + got.heading);
+    chk('and the words arrive in the paste box',
+        !!got.paste && got.paste.indexOf('Shortbread') > -1,
+        JSON.stringify((got.paste || '').slice(0, 40)));
+    chk('every line of it, not just the first',
+        !!got.paste && got.paste.indexOf('45 minutes') > -1);
+    chk('the query is consumed either way', got.search === '');
+    chk('and nothing was sent anywhere', stub.posts.length === 0);
+    await ctx.close();
+  }
+  {
+    /* A share carrying neither an address nor any words is still nothing to
+       act on, and must not open an empty importer. */
+    const { ctx, p } = await freshPage(br, {});
+    await p.goto(B + '/index.html?text=' + encodeURIComponent('   '));
+    await p.waitForTimeout(800);
+    chk('an empty share leaves the app on the front screen',
+        await p.evaluate(() => location.hash) !== '#add');
+    await ctx.close();
+  }
+
   console.log('\n== Manifest carries the share target ==');
   {
     const res = await (await br.newPage()).request.get(B + '/manifest.json');
