@@ -1322,6 +1322,86 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxSW.close();
   }
 
+  console.log('\n== R83 — the accent fill marks the action you came for ==');
+  {
+    /* One colour carries one meaning in this app: an accent fill is the
+       thing you opened the screen to press. Every sheet's head or foot
+       carries one — and in three of them the word on it was **Cancel**.
+       The recipe picker is the clearest: "Dinner · Monday 17", a list of
+       48 recipes, and the brightest control on the sheet says don't. For a
+       reader with low vision, who goes to the biggest highest-contrast
+       target, the app was pointing at the exit.
+       "Done" wearing it is right — that is finishing the task. "Cancel"
+       wearing it is the same pixels meaning the opposite thing.
+       The rule is about the word, so the check reads the word. */
+    const NEGATION = /^(cancel|never mind|discard|not now|forget it)$/i;
+    const sheets = [
+      ['Filter', async () => {
+        await p.goto(B + '/index.html#menu'); await p.waitForSelector('.rcard');
+        await p.click('[data-act="open-filter"]'); await p.waitForSelector('#filter-sheet');
+      }],
+      ['Text size', async () => {
+        await p.goto(B + '/index.html#menu'); await p.waitForSelector('.rcard');
+        await p.click('[data-act="open-text"]'); await p.waitForSelector('.sheet');
+      }],
+      ['Download', async () => {
+        await p.goto(B + '/index.html#chicken-cordon-bleu'); await p.waitForSelector('.r-title');
+        await p.click('[data-act="open-dl"]'); await p.waitForSelector('.sheet');
+      }],
+      ['Recipe picker', async () => {
+        await p.goto(B + '/index.html#plan'); await p.waitForSelector('.slotadd');
+        await p.locator('.slotadd').first().click(); await p.waitForSelector('#pick-q');
+      }],
+      ['Bulk tag', async () => {
+        await p.goto(B + '/index.html#menu'); await p.waitForSelector('.rcard');
+        await p.click('[data-act="toggle-tagging"]');
+        await p.locator('.rrow, .rcard').first().click();
+        await p.click('[data-act="open-bulk"]'); await p.waitForSelector('.sheet');
+      }]
+    ];
+    const shouting = [];
+    const tooSmall = [];
+    let opened = 0;
+    for (const [name, open] of sheets) {
+      await p.goto('about:blank');
+      let ok = true;
+      try { await open(); await p.waitForTimeout(450); } catch (e) { ok = false; }
+      if (!ok) { shouting.push(name + ': never opened'); continue; }
+      opened++;
+      const found = await p.evaluate(() => {
+        const acc = getComputedStyle(document.documentElement)
+          .getPropertyValue('--acc').trim();
+        const norm = (c) => {
+          const d = document.createElement('span');
+          d.style.color = c; document.body.appendChild(d);
+          const v = getComputedStyle(d).color; d.remove(); return v;
+        };
+        const accRGB = norm(acc);
+        const sheet = document.querySelector('.sheet');
+        if (!sheet) return null;
+        return [].slice.call(sheet.querySelectorAll('button, a')).map(el => {
+          const cs = getComputedStyle(el);
+          const b = el.getBoundingClientRect();
+          return { label: (el.textContent || '').trim(),
+                   accent: cs.backgroundColor === accRGB,
+                   h: Math.round(b.height), w: Math.round(b.width) };
+        });
+      });
+      if (!found) { shouting.push(name + ': no sheet'); continue; }
+      found.filter(f => f.accent && NEGATION.test(f.label))
+        .forEach(f => shouting.push(name + ': "' + f.label + '" wears the accent fill'));
+      /* The fix must not be to shrink or hide the way out — R55 settled
+         that a visible exit is not optional. */
+      found.filter(f => NEGATION.test(f.label) && (f.h < 44 || f.w < 44))
+        .forEach(f => tooSmall.push(name + ': "' + f.label + '" ' + f.w + 'x' + f.h));
+    }
+    chk('every sheet opened for the sweep', opened === sheets.length, String(opened));
+    chk('no sheet gives the accent fill to a control that abandons the task',
+      shouting.length === 0, shouting.join('; '));
+    chk('and the way out is still a full-size target everywhere',
+      tooSmall.length === 0, tooSmall.join('; '));
+  }
+
   console.log('\n== R80 — the sort menu keeps the app\'s own focus contract ==');
   {
     /* Every sheet in this app traps Tab, closes on Escape and hands focus

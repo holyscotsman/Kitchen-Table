@@ -37,7 +37,14 @@ this page doesn't have, that is a design conversation, not a CSS file to grow.
   48×48 (`.iconbtn`). No hover-only affordances anywhere — iPhone has no
   hover.
 - **Primary action:** `.bigbtn` / `.actbtn--primary` — accent fill,
-  `--acc-ink` text.
+  `--acc-ink` text. **The accent fill means "the thing you opened this
+  screen to press"** (`R83`), and that is a rule about the word on the
+  button, not its position: `Done` finishing a task may wear it, `Cancel`
+  never may. Three sheets were spending it on Cancel — loudest in the
+  recipe picker, where the brightest control on a sheet full of recipes
+  said don't, which is precisely where a reader with low vision aims
+  first. `.donebtn--quiet` is the same button for that word: same size,
+  same place, same reachability (`R55`), without the shout.
 - **Secondary:** `.actbtn` / `.outlinebtn` — outlined, `--surf`.
 - **Switch:** `.switch`, 64×36, knob 26px, `role="switch"` +
   `aria-checked`.
