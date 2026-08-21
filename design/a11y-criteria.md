@@ -92,7 +92,13 @@ a known gap, not a silent one.
 13. **Colour is never the only signal** — pair it with a word, a glyph, or a
     weight change.
 14. **Easy Read survives it.** Open the feature with Easy Read on, top step:
-    one column, no faded text, nothing truncated.
+    one column, no faded text, nothing truncated. (Partly enforced since
+    `R67`: `tests/polish.js` asserts **nothing renders in italics** under
+    Easy Read, with the counterpart that those same notes *are* italic with
+    it off — so the check is measuring the setting and not an app that
+    happens to have no italics. All three the app had were explanatory
+    notes, which is the text this reader most needs to read easily; upright
+    and bold now, the same treatment Easy Read already gave `.hint`.)
 15. **Both themes, by eye.** The automated audit catches ratios, not a
     white-on-white photo overlay or a shadow that vanished.
 16. **Print still works** if the feature touches the recipe page — the print
