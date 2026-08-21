@@ -148,8 +148,14 @@ existing component vocabulary — no new colours, type sizes, or patterns.
   Reached from the Menu's "Aa" button, which now opens a Text size sheet
   holding both the A−/A+ stepper and the Easy Read switch.
 - **Sheet focus management** — every sheet traps Tab, closes on Escape, and
-  returns focus to the control that opened it. The sort menu also dismisses on
-  an outside tap.
+  returns focus to the control that opened it. **Since `R80` the sort menu is
+  on that same contract**, which it had never been: it is drawn as a popup
+  (no scrim, dismissed by an outside tap) and that was allowed to decide the
+  keyboard's behaviour too, so focus never entered it and Tab walked out of an
+  open `role="menu"` into the page behind. How a thing is drawn and where the
+  keyboard is are two different questions. The outside tap stays outside the
+  contract on purpose — it has landed on something the reader meant to use, so
+  it dismisses without dragging the caret back.
 - **A confirm step on Remove** was flagged as an open question in the README and
   never resolved. A `confirm()` was added, since removal is otherwise undoable.
 
@@ -417,9 +423,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **949 functional checks** across eleven
-suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 130, sec 52,
-plan 54, video 54, backend 169, zoom 14), plus the perf budget (FCP ~900 ms
+The suite after the video arc: **957 functional checks** across eleven
+suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 137, sec 52,
+plan 54, video 54, backend 169, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

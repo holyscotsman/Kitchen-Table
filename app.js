@@ -1510,7 +1510,7 @@
 
   function sortMenuHtml() {
     return (
-      '<div class="sortmenu" role="menu" aria-label="Sort recipes" ' +
+      '<div class="sortmenu" id="sort-menu" role="menu" aria-label="Sort recipes" ' +
       'style="top:calc(100% + 8px); left:0">' +
       SORTS.map(function (s) {
         var on = s.key === S.sort;
@@ -1560,16 +1560,29 @@
     S[flag] = false;
     openSheetId = null;
     render();
-    if (sheetReturn) {
-      var back = document.querySelector(sheetReturn);
-      if (back) back.focus();
-      sheetReturn = null;
-    }
+    restoreSheetFocus();
+  }
+
+  /* Split out of closeSheet because one path closes without going through
+     it: choosing a sort re-renders via the hash, and the caret still has to
+     come back. */
+  function restoreSheetFocus() {
+    if (!sheetReturn) return;
+    var back = document.querySelector(sheetReturn);
+    if (back) back.focus();
+    sheetReturn = null;
   }
 
   function activeSheet() {
-    /* The lightbox is a dialog on the same trap/Escape/return contract. */
-    return document.querySelector('.sheet[role="dialog"], .lightbox[role="dialog"]');
+    /* The lightbox is a dialog on the same trap/Escape/return contract, and
+       since `R80` so is the sort menu. That one is drawn as a popup rather
+       than a sheet — no scrim, dismissed by an outside tap — but it is an
+       open `role="menu"`, and it took none of the contract: focus stayed on
+       <body>, Tab walked out of it into the page behind, and closing it
+       dropped the caret at the top of the document. How a thing is drawn
+       and where the keyboard is are two different questions. */
+    return document.querySelector(
+      '.sheet[role="dialog"], .lightbox[role="dialog"], .sortmenu[role="menu"]');
   }
 
   /* Called after every render: move focus into a sheet the first time it
@@ -1579,7 +1592,15 @@
     if (!sheet) { openSheetId = null; return; }
     if (openSheetId === sheet.id) return;
     openSheetId = sheet.id;
-    var first = sheet.querySelector(FOCUSABLE);
+    /* A menu opens on the option already chosen — that is where a reader
+       expects to land, and it says which one is current without them having
+       to go looking. Scoped to menu items on purpose: `aria-checked` is
+       also how the switches are written (Easy Read, Keep screen on), and a
+       bare `[aria-checked="true"]` would have made the Text size sheet open
+       on a different control depending on whether Easy Read happened to be
+       on. Everything else opens on its first control. */
+    var first = sheet.querySelector('[role="menuitemradio"][aria-checked="true"]') ||
+                sheet.querySelector(FOCUSABLE);
     if (first) first.focus();
   }
 
@@ -4639,8 +4660,21 @@
     }
     if (act === "open-filter") { openSheet("filterOpen", el); return; }
     if (act === "close-filter") { closeSheet("filterOpen"); return; }
-    if (act === "toggle-sort") { S.sortOpen = !S.sortOpen; render(); return; }
-    if (act === "sort") { S.sort = key; S.sortOpen = false; syncMenuHash(); return; }
+    if (act === "toggle-sort") {
+      if (S.sortOpen) closeSheet("sortOpen"); else openSheet("sortOpen", el);
+      return;
+    }
+    if (act === "sort") {
+      S.sort = key;
+      /* syncMenuHash re-renders through the hash, so the close has to be the
+         state change alone — then hand the caret back to the button that
+         opened the menu, the same as every sheet does. */
+      S.sortOpen = false;
+      openSheetId = null;
+      syncMenuHash();
+      restoreSheetFocus();
+      return;
+    }
     if (act === "fw") {
       var iw = S.who.indexOf(key);
       if (iw > -1) S.who.splice(iw, 1); else S.who.push(key);
@@ -5151,14 +5185,20 @@
     else if (S.tagManageOpen) { S.tagEditing = ""; S.tagEditVal = ""; closeSheet("tagManageOpen"); }
     else if (S.pickOpen) { S.pickFor = null; closeSheet("pickOpen"); }
     else if (S.mealOpen) { S.mealFor = null; closeSheet("mealOpen"); }
-    else if (S.sortOpen) { S.sortOpen = false; render(); }
+    else if (S.sortOpen) closeSheet("sortOpen");
   });
 
-  /* The sort menu is a popup, not a sheet — a tap anywhere else dismisses it. */
+  /* The sort menu is a popup, not a sheet — a tap anywhere else dismisses it.
+     Deliberately NOT through closeSheet: an outside tap has landed on
+     something the reader meant to use, and yanking the caret back to the
+     Sort button would fight them for it. The stored trigger is dropped so a
+     later close cannot restore it to a control that is long gone. */
   document.addEventListener("click", function (ev) {
     if (!S.sortOpen) return;
     if (ev.target.closest && ev.target.closest('.sortmenu, [data-act="toggle-sort"]')) return;
     S.sortOpen = false;
+    openSheetId = null;
+    sheetReturn = null;
     render();
   }, true);
 
