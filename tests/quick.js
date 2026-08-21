@@ -189,6 +189,77 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== One recipe shape, written down in three places (R66) ==');
+  {
+    /* A recipe's field list exists three times: `FIELD_ORDER` in app.js (what
+       the download writes), `FIELD_ORDER` in db/export.js (what the database
+       writes back), and the column list in db/migrate.js (what the database
+       stores). Nothing checked that they agree, and the cost of them drifting
+       is silent and permanent: a field the app can write but the exporter
+       doesn't know about survives on one phone and is gone the moment the
+       nightly sync regenerates the file. Same shape as `R64`'s two parsers
+       for one job, one layer down.
+       `R65` is why this is worth pinning now: it added three fields to a form,
+       and if any of them had been missing from FIELD_ORDER the download would
+       have dropped them without a word. */
+    const fsx = require('fs');
+    const pathx = require('path');
+    const ROOT = pathx.join(__dirname, '..');
+    const listIn = (file, marker) => {
+      const src = fsx.readFileSync(pathx.join(ROOT, file), 'utf8');
+      const at = src.indexOf(marker);
+      if (at < 0) return null;
+      const open = src.indexOf('[', at);
+      const close = src.indexOf('];', open);
+      if (open < 0 || close < 0) return null;
+      return (src.slice(open, close).match(/['"]([a-zA-Z]+)['"]/g) || [])
+        .map(x => x.replace(/['"]/g, ''));
+    };
+    const appOrder = listIn('app.js', 'var FIELD_ORDER');
+    const dbOrder = listIn('db/export.js', 'const FIELD_ORDER');
+    chk('both field orders were found', !!appOrder && !!dbOrder && appOrder.length >= 12,
+      JSON.stringify({ app: appOrder && appOrder.length, db: dbOrder && dbOrder.length }));
+    chk('the app and the exporter agree on the recipe shape, in order',
+      JSON.stringify(appOrder) === JSON.stringify(dbOrder),
+      JSON.stringify(appOrder) + ' vs ' + JSON.stringify(dbOrder));
+
+    /* And the database stores every one of them. Tags and id are handled
+       apart from the column list on purpose — tags are their own table, and
+       the id is the key — so they are named here rather than assumed. */
+    const migrate = fsx.readFileSync(pathx.join(ROOT, 'db', 'migrate.js'), 'utf8');
+    const snake = (k) => k.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+    const unstored = (appOrder || []).filter(k => {
+      if (k === 'id' || k === 'tags' || k === 'contributor') return false;
+      return migrate.indexOf(snake(k)) === -1;
+    });
+    chk('and the database stores every field the app writes',
+      unstored.length === 0, unstored.join(', '));
+
+    /* The half that catches tomorrow's field: anything a form can write has
+       to be in the list, or the download drops it silently. */
+    const pS = await ctx.newPage();
+    const writes = new Set();
+    await pS.goto(B + '/index.html#add');
+    await pS.evaluate(() => sessionStorage.clear());
+    await pS.reload();
+    await pS.waitForSelector('.pathbtn');
+    await pS.click('[data-key="review"]');
+    await pS.waitForSelector('#a-title');
+    (await pS.evaluate(() => [...document.querySelectorAll('[data-k]')]
+      .map(e => e.getAttribute('data-k')))).forEach(k => writes.add(k));
+    await pS.goto(B + '/index.html#chicken-cordon-bleu');
+    await pS.waitForSelector('.r-title');
+    await pS.click('[data-act="toggle-edit"]');
+    await pS.waitForSelector('#e-title');
+    (await pS.evaluate(() => [...document.querySelectorAll('[data-k]')]
+      .map(e => e.getAttribute('data-k')))).forEach(k => writes.add(k));
+    await pS.close();
+    const dropped = [...writes].filter(k => (appOrder || []).indexOf(k) === -1);
+    chk('every field a form can write survives the download',
+      dropped.length === 0, dropped.join(', '));
+    chk('and the forms really were read', writes.size >= 10, String(writes.size));
+  }
+
   console.log('\n== The tutorial has to be true (R63) ==');
   {
     /* The Help screen is the one page written for someone who has never been
