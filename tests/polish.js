@@ -175,7 +175,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
   console.log('\n== Colour is never the only signal (task 043) ==');
   await p.goto(B+'/index.html#chops'); await p.waitForSelector('.r-title');
-  chk('flagged panel carries a heading, not just a colour', /Worth double-checking|No ingredients were captured/.test(await p.locator('.panel--flag').first().textContent()));
+  chk('flagged panel carries a heading, not just a colour', /Worth double-checking|No ingredients listed/.test(await p.locator('.panel--flag').first().textContent()));
   await p.goto(B+'/index.html'); await p.waitForSelector('.who-tile');
   chk('empty contributor tile invites in words, not colour (058)', (await p.locator('.who-tile--empty').first().textContent()).includes('None yet'));
   await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
@@ -2772,6 +2772,87 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
             document.querySelector('[data-act="ft"]').getAttribute('aria-pressed') === 'true'),
       await pT.evaluate(() => location.hash));
     await ctxT.close();
+  }
+
+  console.log('\n== The empty states asserted things that were not true (R108) ==');
+  {
+    /* A missing list gets a panel that says so loudly — that is 071, and it
+       is right. What it said was not.
+
+       "This recipe's list didn't survive transcription" is a guess about a
+       CAUSE, and a wrong one for every recipe that was never transcribed:
+       all 48 shipped ones. It was unreachable prose until `R103` made Edit
+       mode's Remove button work, and now anybody can empty a list in a few
+       taps and be told an import they never ran went wrong. It also named
+       Joan, in a book with six contributors.
+
+       And "This recipe has ingredients but no method" is contradicted by
+       the panel directly above it the moment both lists are empty — two
+       sentences on one screen, one of them false, whichever way you read
+       it.
+
+       An empty state says what is MISSING and what to do about it. How it
+       came to be missing is the flag machinery's job (`R82`), and that
+       speaks from what was recorded rather than from a guess. */
+    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxN.route('**/*.onrender.com/**', r => r.abort('failed'));
+    await ctxN.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([
+        { id: 'noing', title: 'No List', category: 'Dinner', contributor: 'Jennifer',
+          servings: 4, ingredients: [], steps: ['Bake it.'] },
+        { id: 'nowt', title: 'Nothing At All', category: 'Dinner', contributor: 'Lindsay',
+          servings: 4, ingredients: [], steps: [] },
+        { id: 'nosteps', title: 'No Method', category: 'Dinner', contributor: 'Siobhan',
+          servings: 4, ingredients: ['2 cups flour'], steps: [] }
+      ]));
+    });
+    const pN = await ctxN.newPage();
+    const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
+    const panels = async (id) => {
+      await pN.goto(B + '/index.html#' + id);
+      await pN.waitForSelector('.r-title');
+      return pN.evaluate(() => ({
+        ing: (document.querySelector('section.bodygrid__ing') || {}).innerText || '',
+        all: (document.querySelector('#app') || {}).innerText || ''
+      }));
+    };
+
+    const one = await panels('noing');
+    chk('a recipe with no ingredients still says so loudly',
+        /No ingredients listed/i.test(one.ing), one.ing.slice(0, 80));
+    chk('and no longer blames a transcription that never happened',
+        !/transcription/i.test(one.all), one.all.slice(0, 160));
+    chk('and asks for the contributor this recipe actually names',
+        /Jennifer’s original/.test(one.all) && !/Joan/.test(one.all),
+        (one.all.match(/If you have [^,]{0,24}/) || [''])[0]);
+
+    const none = await panels('nowt');
+    chk('with both lists empty, both panels appear',
+        /No ingredients listed/i.test(none.all) && /No instructions listed/i.test(none.all));
+    chk('and neither claims the other list exists',
+        !/has ingredients but no method/i.test(none.all), none.all.slice(0, 200));
+    chk('and it asks for that recipe\'s own contributor',
+        /Lindsay’s original/.test(none.all) && !/Jennifer/.test(none.all));
+
+    const steps = await panels('nosteps');
+    chk('a recipe with ingredients but no steps still gets the steps panel',
+        /No instructions listed/i.test(steps.all));
+    chk('and its ingredients are drawn, not panelled',
+        /2 cups flour/.test(steps.all) && !/No ingredients listed/i.test(steps.all));
+    chk('nothing threw across the three', nErrs.length === 0, nErrs.join(' | '));
+
+    /* The guard: no empty-state panel may name a contributor the recipe does
+       not, which is how "Joan" survived into a six-contributor book. */
+    const WHO = ['Joan', 'Jason', 'Jennifer', 'Lindsay', 'Siobhan', 'Jessica'];
+    const strays = [];
+    for (const [id, mine] of [['noing', 'Jennifer'], ['nowt', 'Lindsay'], ['nosteps', 'Siobhan']]) {
+      const t = (await panels(id)).all;
+      WHO.filter(w => w !== mine && t.indexOf(w + '’s original') > -1)
+         .forEach(w => strays.push(id + ' names ' + w));
+    }
+    chk('no panel names anybody but the recipe\'s own contributor',
+        strays.length === 0, strays.join(', '));
+    await ctxN.close();
   }
 
   chk('no JS errors', errs.length===0, errs.join(' | '));

@@ -2132,11 +2132,22 @@
       /* 071: four recipes arrived with no ingredient list at all. Say so
          loudly — this is missing content, not an empty section — and say how
          it gets fixed. The pointer is prose, not a button: Viewer mode shows
-         no edit affordances, and that rule outranks convenience. */
-      h += '<div class="panel panel--flag"><h2>No ingredients were captured</h2>' +
-           "<p>This recipe’s list didn’t survive transcription. If you have " +
-           "Joan’s original, turn on <strong>Edit</strong> at the top of this " +
-           "page and type the ingredients in — the field will be waiting.</p></div>";
+         no edit affordances, and that rule outranks convenience.
+
+         `R108` — but say only what is TRUE. This claimed the list "didn't
+         survive transcription", which is a guess about a cause, and a wrong
+         one for every recipe that was never transcribed — all 48 shipped
+         ones — reachable by anybody now that `R103` made Edit mode's Remove
+         button work. And it named Joan for a book with six contributors.
+         An empty state says what is MISSING and what to do; how it came to
+         be missing is the flag machinery's job, and that speaks from what
+         was recorded rather than from a guess. */
+      var whose = ((r.contributor || "").trim() ? r.contributor.trim() + "’s" : "the");
+      h += '<div class="panel panel--flag"><h2>No ingredients listed</h2>' +
+           "<p>Nothing is written down for this one yet. If you have " +
+           esc(whose) + " original, turn on <strong>Edit</strong> at the top " +
+           "of this page and type the ingredients in — the field will be " +
+           "waiting.</p></div>";
     }
     h += "</section>";
 
@@ -2148,9 +2159,13 @@
        theoretical), and a heading over an empty list tells the reader
        nothing at all — least of all that something is missing. */
     if (!(r.steps || []).length) {
-      h += '<div class="panel panel--flag"><h2>No instructions were captured</h2>' +
-           "<p>This recipe has ingredients but no method. If you know how " +
-           "it goes, turn on <strong>Edit</strong> at the top of this page " +
+      /* `R108` — "has ingredients but no method" was contradicted by the
+         panel directly above it the moment both lists were empty, which
+         `R103` made reachable in two taps. It says what is missing here and
+         nothing about what is not. */
+      h += '<div class="panel panel--flag"><h2>No instructions listed</h2>' +
+           "<p>There is no method written down for this one yet. If you know " +
+           "how it goes, turn on <strong>Edit</strong> at the top of this page " +
            "and write the steps in.</p></div></section>";
     } else {
     h += '<ol class="checklist checklist--steps' + scaled + '">' +
