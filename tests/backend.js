@@ -383,6 +383,81 @@ const { runJob, computeFps } = lib('pipeline');
       !/const body = await readJson\(req\)/.test(src));
   }
 
+  console.log('\n== The server answered, over real HTTP (R41) ==');
+  {
+    /* Everything above reads the server's source or calls its pure parts.
+       This starts the actual process and talks to it — no database, no
+       network, no keys — because a router, a status code and a header are
+       claims about behaviour, and reading them is not the same as seeing
+       them. Without KT_DB the server is designed to boot anyway and answer
+       503 with a sentence, which makes this the one configuration that can
+       be exercised hermetically. */
+    const { spawn } = require('child_process');
+    const PORT = 8891;
+    const srv = spawn(process.execPath,
+      [path.join(__dirname, '..', 'backend', 'server.js')],
+      { env: Object.assign({}, process.env, {
+          PORT: String(PORT), KT_NO_POT: '1', KT_DB: '', DATABASE_URL: '',
+          ANTHROPIC_API_KEY: '', GROQ_API_KEY: '', YT_API_KEY: '' }),
+        stdio: ['ignore', 'pipe', 'pipe'] });
+    const base = 'http://127.0.0.1:' + PORT;
+    const up = async () => {
+      for (let i = 0; i < 60; i++) {
+        try { await fetch(base + '/api/health'); return true; }
+        catch (e) { await new Promise(r => setTimeout(r, 100)); }
+      }
+      return false;
+    };
+    const ready = await up();
+    chk('it boots with no database at all, rather than crash-looping', ready);
+
+    if (ready) {
+      const health = await fetch(base + '/api/health');
+      const body = await health.json();
+      chk('health answers 200 and says what is missing',
+        health.status === 200 && body.ok === false &&
+        body.missing.indexOf('KT_DB') > -1, JSON.stringify(body.missing || []));
+      chk('and every answer carries its hardening headers',
+        health.headers.get('x-content-type-options') === 'nosniff' &&
+        health.headers.get('referrer-policy') === 'no-referrer' &&
+        health.headers.get('cache-control') === 'no-store',
+        [...health.headers].map(h => h[0]).join(','));
+
+      const missing = await fetch(base + '/api/nothing-here');
+      chk('an unknown path is a plain 404, not a stack trace',
+        missing.status === 404 && (await missing.json()).error === 'not found');
+
+      const noDb = await fetch(base + '/api/import/jobs?status=failed');
+      const noDbBody = await noDb.json();
+      chk('import routes say the database is missing, in words',
+        noDb.status === 503 && /KT_DB/.test(noDbBody.error), noDbBody.error);
+
+      const pre = await fetch(base + '/api/import/video', { method: 'OPTIONS' });
+      chk('the preflight answers without touching the database',
+        pre.status === 204 &&
+        pre.headers.get('access-control-allow-methods').indexOf('POST') > -1);
+
+      const wrongWay = await fetch(base + '/api/health', { method: 'POST' });
+      chk('a POST to a GET route is a 404, never an accident',
+        wrongWay.status === 404 || wrongWay.status === 503,
+        String(wrongWay.status));
+
+      /* The limiter is 120 a minute per address; the app's own polling is
+         about 17. Proven by exceeding it rather than by reading it. */
+      let sawLimit = 0;
+      for (let i = 0; i < 130; i++) {
+        const r = await fetch(base + '/api/health');
+        if (r.status === 429) { sawLimit = i; break; }
+      }
+      chk('a loop hits the wall, and not before it should',
+        sawLimit >= 110 && sawLimit <= 129, 'first 429 at request ' + sawLimit);
+      const walled = await fetch(base + '/api/health');
+      chk('and the wall says something a person could act on',
+        walled.status === 429 && /minute/i.test((await walled.json()).error));
+    }
+    srv.kill('SIGKILL');
+  }
+
   console.log('\n== PO-token plumbing ==');
   chk('KT_NO_POT forces bare calls', media.potArgs().length === 0);
   {

@@ -120,6 +120,15 @@ downloaded (audio → Groq Whisper; ~40 deduped frames → the Anthropic API). V
 30 minutes are refused. All media is deleted the moment extraction ends,
 success or failure.
 
+## Checked without a database
+
+`tests/backend.js` starts this server for real — no `KT_DB`, no keys, no
+network — and talks to it over HTTP. That is possible because of a design
+choice worth keeping: **without a database the server boots anyway** and
+answers 503 with a sentence, rather than crash-looping a red deploy. So the
+router, the status codes, the hardening headers and the rate limiter are
+checked by being *used*, not by being read (`R41`).
+
 ## What this API trusts
 
 There is no login anywhere in Kitchen Table, and this server doesn't invent
