@@ -3566,11 +3566,56 @@
     render();
   }
 
+  /* `R87` — the kitchen server's answers are shapes, not promises.
+     `R62` settled this for stored data: every key this app reads back is
+     coerced where it is read, never trusted. The server is the same kind of
+     input and more so — it is remote, deployed separately, and can be a
+     version ahead of or behind the page asking it. `normalizeDraft` already
+     guards the draft that becomes a recipe; the job LISTS did not, and they
+     are rendered directly.
+     What that cost: an answer of `{jobs: "none"}` — a rename, a half-done
+     deploy, an error body shaped like success — left a string in
+     `S.videoReady`, and the next render called `.map` on it. Not the render
+     that fetched it: that one throws inside a `.then` with a `.catch`
+     behind it, so the failure is swallowed and the bad value simply waits.
+     It detonates on the reader's next tap, and takes down the Add screen —
+     the way into the book for every new recipe. An entry of `null` in an
+     otherwise fine list did the same on `.id`.
+     What it does NOT do is throw entries away for having an id it did not
+     expect. The server's ids are bigints today and every handler here reads
+     them with `parseInt`, but a boundary that silently drops what it cannot
+     parse turns a future schema change into an empty waiting list with no
+     explanation — and it would also drop the one case worth keeping on
+     screen: an id carrying markup, which `R54` renders escaped on purpose.
+     An entry needs to be an object with an id; the id arrives as sent. */
+  function normalizeJobs(v) {
+    if (!Array.isArray(v)) return [];
+    var out = [];
+    v.forEach(function (j) {
+      if (!j || typeof j !== "object" || Array.isArray(j)) return;
+      var id = typeof j.id === "number" && isFinite(j.id) ? j.id : asText(j.id);
+      if (id === "") return;
+      out.push({
+        id: id,
+        title: asText(j.title),
+        platform: j.platform === "instagram" ? "instagram" : "youtube",
+        created_at: asText(j.created_at),
+        status: asText(j.status),
+        /* The failed card reads these two by these names; keeping the
+           server's spelling is the point of a boundary, not a rename. */
+        error_message: asText(j.error_message),
+        url: asText(j.url),
+        result_json: (j.result_json && typeof j.result_json === "object") ? j.result_json : null
+      });
+    });
+    return out.slice(0, 50);
+  }
+
   /* The Add screen's waiting list — refreshed on arrival, quietly. */
   function fetchVideoReady() {
     kitchenFetch("/api/import/jobs?status=ready_for_review", { timeout: 12000 }, true)
       .then(function (data) {
-        var jobs = (data && data.jobs) || [];
+        var jobs = normalizeJobs(data && data.jobs);
         var before = JSON.stringify(S.videoReady);
         S.videoReady = jobs;
         if (S.route.name === "add" && JSON.stringify(jobs) !== before) render();
@@ -3583,7 +3628,7 @@
     kitchenFetch("/api/import/jobs?status=failed", { timeout: 12000 }, true)
       .then(function (data) {
         var seen = dismissedIds();
-        var jobs = ((data && data.jobs) || []).filter(function (j) {
+        var jobs = normalizeJobs(data && data.jobs).filter(function (j) {
           return seen.indexOf(j.id) === -1;
         });
         var before = JSON.stringify(S.videoFailed);

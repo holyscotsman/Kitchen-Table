@@ -237,7 +237,23 @@ written never says "Saved" or "planned", because a change reported as kept
 and silently dropped is the worst thing this app could do to a book of
 someone's recipes.
 
-### Stored shapes are coerced at the boundary
+### Stored shapes are coerced at the boundary — and so are the server's
+
+**`R87` extended this rule past storage to the one remote input.** The
+kitchen server is deployed separately and can be a version ahead of or
+behind the page asking it, so its answers are shapes, not promises.
+`normalizeDraft` already guarded the draft that becomes a recipe; the job
+*lists* did not, and they are rendered directly — so `{jobs: "none"}` left
+a string in `S.videoReady` and the next render called `.map` on it. Not the
+render that fetched it: that one throws inside a `.then` with a `.catch`
+behind it, so the failure is swallowed and the bad value simply waits, then
+takes down the Add screen on the reader's next tap. `normalizeJobs()`
+coerces both lists now. It deliberately does **not** discard an entry whose
+id it cannot parse: a boundary that silently drops what it does not
+recognise turns a schema change into an empty waiting list with no
+explanation, and `R54` renders exactly such an id, escaped, on purpose.
+
+
 
 Every key this app reads back — the plan (`R21`), the dismissed imports
 (`R40`), and since `R62` **the recipes themselves** — is coerced where it is
@@ -423,9 +439,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **972 functional checks** across eleven
+The suite after the video arc: **982 functional checks** across eleven
 suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 144, sec 52,
-plan 60, video 54, backend 171, zoom 15), plus the perf budget (FCP ~900 ms
+plan 60, video 64, backend 171, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —
