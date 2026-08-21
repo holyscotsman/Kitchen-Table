@@ -25,7 +25,14 @@ a known gap, not a silent one.
    sweep never visited).
 3. **Reflow.** The new screen holds at 320px viewport (200% zoom) at the top
    font step inside Easy Read — no horizontal scroll, no clipped text
-   (`tests/zoom.js`; add the new route to its screen list).
+   (`tests/zoom.js`; add the new route to its screen list). Since `R61` the
+   suite also walks **every recipe in the book**, not one of them: the list
+   of routes opened a single recipe, and swept properly **20 of the 48
+   scrolled sideways**, from +9px to +147px — almost all on one long word in
+   a title at a size the reader chose. The same shape as `R16`'s tap-target
+   finding, and the same lesson: a criterion enforced on one screen is not
+   enforced. A new screen whose content varies per record needs its check to
+   vary with it too.
 4. **Escaping.** Any new interpolation of user or imported text goes through
    `esc()` (`tests/sec.js` carries the hostile fixtures; extend them if the
    feature stores a new kind of string).
