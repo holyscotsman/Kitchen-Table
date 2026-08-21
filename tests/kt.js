@@ -661,6 +661,108 @@ const browserContextWithReduce = (br) =>
   await p.waitForTimeout(200);
   chk('back to original clears the note', await p.locator('.scalednote').count()===0);
 
+  console.log('\n== R93 — the scaler, over the whole book ==');
+  {
+    /* `R56`-`R60` found four real scaling bugs, every one by hand: an air
+       fryer set to 780°F, `1-1/2 tsp` doubling to `2-1/2`, a lasagne whose
+       entire sauce never scaled, and 28 lines contradicting themselves.
+       Amounts are the most consequential thing this app computes — get one
+       wrong and the food is wrong — and the checks above cover a single
+       recipe. This sweeps all 48.
+       Three invariants, and it is worth being exact about what each one is
+       worth, because mutation testing cut the first one down to size:
+         - **an amount survives**: a line that starts with a quantity still
+           starts with one at 1 serving and at 40. Testing for an empty
+           LINE was not enough — a quantity can round away to nothing and
+           leave " tsp salt" behind, which is a deleted amount in a recipe.
+           This is the invariant that bites.
+         - **no garbage**: no NaN, no undefined, no Infinity anywhere.
+         - **the book is shown as written**: at a recipe's own count the
+           screen matches `recipes.json` line for line. `scaleLine`
+           short-circuits at mult 1, so this is NOT evidence the arithmetic
+           is right — it catches a scaler that rewrites or mutates the text
+           it was only meant to read. It compares against the published
+           file, never against what the DOM showed a moment ago: a
+           transformation applied consistently matches itself, and the
+           first version of this check did exactly that and passed.
+       What none of them catch, stated plainly: a value scaled *wrongly*
+       still passes. `R58`'s 390°F→780°F and `R59`'s unscaled sauce would
+       sail through all three. Those needed a person reading a recipe, and
+       they still do. This is a tripwire, not a proof.
+       Driven in-page rather than through the harness: the same sweep costs
+       140 seconds of Playwright round-trips and 2 seconds this way. */
+    await p.goto(B + '/index.html');
+    const book = await p.evaluate(() => fetch('recipes.json').then(r => r.json()));
+    const trips = [], junk = [], gone = [];
+    let linesSeen = 0, swept = 0;
+    for (const r of book) {
+      await p.goto(B + '/index.html#' + r.id);
+      await p.waitForSelector('.r-title');
+      const res = await p.evaluate((target) => {
+        const read = () => [].slice.call(document.querySelectorAll('.checkrow__text'))
+          .map(e => e.textContent.trim());
+        const set = (n) => {
+          const b = document.querySelector('[data-act="serv-edit"]');
+          if (!b) return false;
+          b.click();
+          const si = document.getElementById('serv-input');
+          if (!si) return false;
+          si.value = String(n);
+          si.dispatchEvent(new Event('input', { bubbles: true }));
+          si.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+          return true;
+        };
+        const orig = read();
+        if (!set(1)) return null;
+        const one = read();
+        set(40);
+        const forty = read();
+        set(target);
+        return { orig: orig, one: one, forty: forty, back: read() };
+      }, r.servings);
+      if (!res || !res.orig.length) continue;
+      swept++;
+      linesSeen += res.orig.length;
+      /* Compared against the PUBLISHED file, not against what the DOM
+         showed a moment ago — mutation testing caught that too. A scaler
+         that rewrote every line identically on the way in and out matched
+         itself perfectly; only recipes.json can say what the book actually
+         holds. */
+      (r.ingredients || []).forEach(function (published, i) {
+        if (res.back[i] !== published) {
+          trips.push(r.id + ' [' + i + '] book says "' + String(published).slice(0, 34) +
+            '", screen shows "' + String(res.back[i]).slice(0, 34) + '"');
+        }
+      });
+      /* An amount is a leading digit or a vulgar fraction. Testing only for
+         an empty LINE was not enough — mutation testing caught that: make
+         a tiny amount round away to "" and the line still reads " tsp
+         salt", which is a quantity silently deleted from a recipe and
+         exactly the kind of thing this sweep exists to notice. */
+      const hasAmount = (t) => /^[\d¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]/.test(t.trim());
+      [['1', res.one], ['40', res.forty]].forEach(function (pair) {
+        pair[1].forEach(function (t, i) {
+          if (/\bNaN\b|\bundefined\b|\bInfinity\b/.test(t)) {
+            junk.push(r.id + ' at ' + pair[0] + ': "' + t.slice(0, 50) + '"');
+          }
+          if (!t) gone.push(r.id + ' at ' + pair[0] + ': line ' + i + ' scaled to nothing');
+          else if (hasAmount(res.orig[i] || '') && !hasAmount(t)) {
+            gone.push(r.id + ' at ' + pair[0] + ': "' + (res.orig[i] || '').slice(0, 34) +
+              '" lost its amount -> "' + t.slice(0, 34) + '"');
+          }
+        });
+      });
+    }
+    chk('the sweep really read the book', swept >= 44 && linesSeen >= 300,
+      swept + ' recipes, ' + linesSeen + ' lines');
+    chk('at its own count, every recipe shows exactly what the book says',
+      trips.length === 0, trips.slice(0, 3).join(' ; '));
+    chk('and no amount scales into nonsense at 1 or at 40',
+      junk.length === 0, junk.slice(0, 3).join(' ; '));
+    chk('and no line loses its amount, or itself, at either end',
+      gone.length === 0, gone.slice(0, 3).join(' ; '));
+  }
+
   console.log('\n== Scaling must not invent an oven temperature (R56) ==');
   {
     /* The README promises instruction quantities scale too — "Bake 2 cups
