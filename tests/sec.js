@@ -138,7 +138,11 @@ const hostile = JSON.stringify({
         image: 'javascript:window.__ximg=1'
       }]));
       /* And the planner, whose entries carry their own copies. */
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (function () {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+          '-' + String(d.getDate()).padStart(2, '0');
+      })();
       localStorage.setItem('kt.plan', JSON.stringify([
         { id: 'p1', date: today, slot: 'dinner', recipeId: id,
           titleThen: 'Evil Cake', servings: '4' + boom('serv') },
