@@ -339,6 +339,109 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     await ctxS.close();
   }
 
+  console.log('\n== A planned recipe that never said how many it serves (R97) ==');
+  {
+    /* Same root as the recipe screen's: normalizeRecipe deletes a servings
+       value it cannot read, and the plan filled the hole with one. The meal
+       card read "Dinner · serves 1" — a number nobody chose — and the meal
+       sheet offered a stepper for it, which moved that number while the
+       shopping list went on using the recipe's amounts exactly as written,
+       because a multiplier with no base is 1. */
+    const ctxC = await br.newContext({ ...devices['iPhone 13'] });
+    const pC = await ctxC.newPage();
+    const cErrs = []; pC.on('pageerror', e => cErrs.push(e.message));
+    await pC.goto(B + '/index.html');
+    await pC.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.servings = 'makes about 2 dozen';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+      const d = new Date();
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+      localStorage.setItem('kt.plan', JSON.stringify([
+        { id: 'c1', date: today, slot: 'dinner', recipeId: 'ninja-cookies',
+          titleThen: 'Ninja Cookies', servings: 4 }
+      ]));
+    });
+    await pC.goto('about:blank');
+    await pC.goto(B + '/index.html#plan');
+    await pC.waitForSelector('.mealcard');
+    const meta = (await pC.locator('.mealcard .rcard__meta').first().textContent()).trim();
+    chk('the meal card does not invent a serving count', !/serves/i.test(meta), meta);
+    chk('but it still says which meal it is', /dinner/i.test(meta), meta);
+
+    await pC.click('.mealcard');
+    await pC.waitForSelector('.sheet[role="dialog"]');
+    const sheet = await pC.evaluate(() => ({
+      value: (document.querySelector('.sheet .servcard__value') || {}).textContent || '',
+      plusOff: !!(document.querySelector('[data-act="meal-serv+"]') || {}).disabled,
+      minusOff: !!(document.querySelector('[data-act="meal-serv-"]') || {}).disabled,
+      body: (document.querySelector('.sheet') || {}).innerText || ''
+    }));
+    chk('the meal sheet does not either', !/\d+\s+(people|person)/.test(sheet.value),
+        sheet.value);
+    chk('and its stepper is off, both ways', sheet.plusOff && sheet.minusOff);
+    chk('and it says why', /does not record/i.test(sheet.body));
+    chk('the word "undefined" never reaches the plan',
+        !/\bundefined\b/.test(await pC.evaluate(() => document.body.innerText)));
+
+    /* The half that must not regress. */
+    await pC.evaluate(() => {
+      localStorage.removeItem('kt.recipes');
+      const d = new Date();
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+      localStorage.setItem('kt.plan', JSON.stringify([
+        { id: 'c2', date: today, slot: 'dinner', recipeId: 'ninja-cookies',
+          titleThen: 'Ninja Cookies', servings: 12 }
+      ]));
+    });
+    await pC.goto('about:blank');
+    await pC.goto(B + '/index.html#plan');
+    await pC.waitForSelector('.mealcard');
+    const meta2 = (await pC.locator('.mealcard .rcard__meta').first().textContent()).trim();
+    chk('a recipe with a real count still shows the planned servings',
+        /serves 12/.test(meta2), meta2);
+    await pC.click('.mealcard');
+    await pC.waitForSelector('.sheet[role="dialog"]');
+    const sheet2 = await pC.evaluate(() => ({
+      value: (document.querySelector('.sheet .servcard__value') || {}).textContent || '',
+      plusOff: !!(document.querySelector('[data-act="meal-serv+"]') || {}).disabled
+    }));
+    chk('and its sheet still shows and steps it',
+        /12 people/.test(sheet2.value) && !sheet2.plusOff, sheet2.value);
+    /* The picker is where you choose the recipe in the first place, and it
+       was the one row still writing the raw value: `" · serves " + r.servings`,
+       unescaped, which for a countless recipe reads "serves undefined". */
+    await pC.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.servings = 'makes about 2 dozen';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+      localStorage.removeItem('kt.plan');
+    });
+    await pC.goto('about:blank');
+    await pC.goto(B + '/index.html#plan');
+    await pC.waitForSelector('[data-act="plan-pick"]');
+    await pC.click('[data-act="plan-pick"]');
+    await pC.waitForSelector('.picklist .mealcard');
+    const pick = (await pC.locator('.picklist .rcard__meta').first().textContent()).trim();
+    chk('the picker does not say "serves undefined"', !/undefined/.test(pick), pick);
+    chk('and it still names the course', /desserts/i.test(pick), pick);
+
+    chk('nothing threw', cErrs.length === 0, cErrs.join(' | '));
+    await pC.evaluate(() => {
+      localStorage.removeItem('kt.plan');
+      localStorage.removeItem('kt.recipes');
+    });
+    await ctxC.close();
+  }
+
   console.log('\n== One unit, two spellings, two lines (R96) ==');
   {
     /* The summing key was the unit exactly as written, so "cups" and "cup"

@@ -697,6 +697,14 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  /* `R97` — does the book actually say how many this makes? normalizeRecipe
+     deletes a servings value it cannot read, so the answer is genuinely no
+     for a hand-edited or half-known recipe, and every screen that shows a
+     count or offers to rescale has to ask before it does either. */
+  function hasCount(r) {
+    return !!r && typeof r.servings === "number" && r.servings > 0;
+  }
+
   function byId(id) {
     for (var i = 0; i < S.recipes.length; i++) {
       if (S.recipes[i].id === id) return S.recipes[i];
@@ -2003,21 +2011,33 @@
     /* The number itself is a control: stepping from 4 to 40 is thirty-six
        taps, which is not a serving stepper, it is a punishment. Tapping the
        number types it instead; the ± buttons stay for small adjustments. */
+    /* `R97` — the book does not always say. normalizeRecipe deletes a
+       servings value it cannot read, and the screen used to fill the hole
+       with four: the card read "4 people" for a recipe that never said
+       four, the stepper ran, and the note underneath announced amounts
+       adjusted "from the original undefined servings" while every quantity
+       sat exactly where it was. There is no base to scale from, so the
+       honest thing is to say so and not offer the control. */
+    var counted = hasCount(r);
     h += '<div class="servcard"><div class="servcard__text">' +
          '<p class="minilabel">Servings' + fieldFlagChip("servings", fieldFlags) + "</p>" +
-         (S.servEdit
-           ? '<input class="servcard__input" id="serv-input" type="number" ' +
-             'inputmode="numeric" min="1" max="40" step="1" data-act="serv-set" ' +
-             'aria-label="Number of servings — type a number" value="' + esc(S.serves) + '" />'
-           : '<button type="button" class="servcard__value press" data-act="serv-edit" ' +
-             'aria-label="Serves ' + S.serves + '. Tap to type a different number">' +
-             S.serves + " " + (S.serves === 1 ? "person" : "people") + "</button>") +
+         (!counted
+           ? '<p class="servcard__value servcard__value--none">Not given</p>'
+           : S.servEdit
+             ? '<input class="servcard__input" id="serv-input" type="number" ' +
+               'inputmode="numeric" min="1" max="40" step="1" data-act="serv-set" ' +
+               'aria-label="Number of servings — type a number" value="' + esc(S.serves) + '" />'
+             : '<button type="button" class="servcard__value press" data-act="serv-edit" ' +
+               'aria-label="Serves ' + S.serves + '. Tap to type a different number">' +
+               S.serves + " " + (S.serves === 1 ? "person" : "people") + "</button>") +
          "</div>" +
          '<button type="button" class="servbtn press" data-act="serv-" ' +
-         'aria-label="Fewer servings"' + (S.serves <= 1 ? " disabled" : "") + ">" +
+         'aria-label="Fewer servings"' +
+         (!counted || S.serves <= 1 ? " disabled" : "") + ">" +
          I.minus(24) + "</button>" +
          '<button type="button" class="servbtn press" data-act="serv+" ' +
-         'aria-label="More servings"' + (S.serves >= 40 ? " disabled" : "") + ">" +
+         'aria-label="More servings"' +
+         (!counted || S.serves >= 40 ? " disabled" : "") + ">" +
          I.plus(24) + "</button></div>";
 
     if (r.prepTime) {
@@ -2030,7 +2050,13 @@
     }
     h += "</div>";
 
-    if (S.serves !== r.servings) {
+    if (!counted) {
+      /* Not a warning and not an apology — the state of the book, and what
+         follows from it for the person cooking. */
+      h += '<p class="scalednote">This recipe does not record how many it ' +
+           "serves, so the amounts below are exactly as written and cannot " +
+           "be rescaled.</p>";
+    } else if (S.serves !== r.servings) {
       /* Say how many lines carry an amount that did not move, so the
          sentence a cook reads matches what the list actually shows.
          `R77` — the count is spelled out and the original gets its noun,
@@ -2416,7 +2442,17 @@
     var updated = {};
     Object.keys(r).forEach(function (k) { updated[k] = r[k]; });
     updated.title = S.draft.title.trim() || r.title;
-    updated.servings = Math.min(40, Math.max(1, parseInt(S.draft.servings, 10) || r.servings));
+    /* `R97` — a recipe with no count must not gain one by being edited.
+       This read `parseInt(...) || r.servings` inside a clamp, and with
+       nothing on either side of the `||` that arithmetic is NaN — which
+       JSON.stringify writes as `"servings": null`, straight into the
+       overlay and then into the recipes.json somebody commits. A field the
+       book does not have stays absent; 0 and a blank field still fall back
+       to what the recipe had, exactly as before. */
+    var typed = parseInt(S.draft.servings, 10);
+    if (typed >= 1) updated.servings = Math.min(40, typed);
+    else if (hasCount(r)) updated.servings = r.servings;
+    else delete updated.servings;
     updated.contributor = S.draft.contributor.trim() || r.contributor;
     updated.ingredients = S.draft.ingredients.filter(function (x) { return x.trim(); });
     updated.steps = S.draft.steps.filter(function (x) { return x.trim(); });
@@ -2437,7 +2473,7 @@
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
     });
-    S.serves = updated.servings;
+    if (hasCount(updated)) S.serves = updated.servings;
     if (persistRecipes()) {
       S.saved = true;
     } else {
@@ -2553,12 +2589,15 @@
       ? '<img class="rcard__thumb" src="' + esc(src) + '" alt="" loading="lazy" ' +
         'width="64" height="64" decoding="async" />'
       : '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>";
+    /* `R97` — the slot's own count is only meaningful if the recipe has one
+       to scale from. Without it the plan showed "serves 1", a number nobody
+       chose and nothing acts on, so the slot says what it is and stops. */
     return '<button type="button" class="mealcard press" data-act="plan-meal" ' +
       'data-key="' + esc(entry.id) + '">' + lead +
       '<span class="rcard__body">' +
       '<span class="rcard__title">' + esc(r.title) + "</span>" +
-      '<span class="rcard__meta">' + esc(cap(entry.slot)) + " · serves " +
-      esc(entry.servings) + "</span></span>" +
+      '<span class="rcard__meta">' + esc(cap(entry.slot)) +
+      (hasCount(r) ? " · serves " + esc(entry.servings) : "") + "</span></span>" +
       '<span class="rcard__chev">' + I.chevR() + "</span></button>";
   }
 
@@ -2622,7 +2661,9 @@
         "change with it. Cooking for two instead of six? Press it twice and " +
         "the recipe does the sums. For a bigger jump, <strong>tap the number " +
         "itself and type it</strong> — 4 to 40 is one number, not thirty-six " +
-        "presses.",
+        "presses. A few recipes never said how many they make; those say " +
+        "<em>Not given</em>, the − and + are switched off, and the amounts " +
+        "stand exactly as they were written.",
         "Some lines carry a second amount — “1 lb (450g) chicken”, “1 jar " +
         "(16 ounces)”. Whether that one should change too depends on what it " +
         "means, and the app would only be guessing, so it leaves it alone " +
@@ -2904,7 +2945,8 @@
           'data-key="' + esc(r.id) + '">' +
           '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>" +
           '<span class="rcard__body"><span class="rcard__title">' + esc(r.title) + "</span>" +
-          '<span class="rcard__meta">' + esc(r.category) + " · serves " + r.servings +
+          '<span class="rcard__meta">' + esc(r.category) +
+          (hasCount(r) ? " · serves " + esc(r.servings) : "") +
           "</span></span></button>";
       }).join("") +
       (hits.length ? "" : '<p class="emptystate">No recipes match.</p>') +
@@ -2932,17 +2974,27 @@
       '<button type="button" class="donebtn press" data-act="close-meal">Done</button></div>' +
       '<p class="hint" style="margin-top:0">' + esc(cap(entry.slot)) + " · " +
       esc(prettyDate(entry.date)) + "</p>" +
-      /* 125: the meal's own servings, not the recipe's default. */
+      /* 125: the meal's own servings, not the recipe's default. `R97`: and
+         only when the recipe gives a count to scale from — otherwise this
+         card set a number that changed nothing anywhere. */
       '<div class="servcard"><div class="servcard__text">' +
       '<p class="minilabel">Serving</p>' +
-      '<p class="servcard__value">' + esc(entry.servings) + " " +
-      (entry.servings === 1 ? "person" : "people") + "</p></div>" +
+      (hasCount(r)
+        ? '<p class="servcard__value">' + esc(entry.servings) + " " +
+          (entry.servings === 1 ? "person" : "people") + "</p>"
+        : '<p class="servcard__value servcard__value--none">Not given</p>') +
+      "</div>" +
       '<button type="button" class="servbtn press" data-act="meal-serv-" ' +
-      'aria-label="Fewer people"' + (entry.servings <= 1 ? " disabled" : "") + ">" +
+      'aria-label="Fewer people"' +
+      (!hasCount(r) || entry.servings <= 1 ? " disabled" : "") + ">" +
       I.minus(24) + "</button>" +
       '<button type="button" class="servbtn press" data-act="meal-serv+" ' +
-      'aria-label="More people"' + (entry.servings >= 40 ? " disabled" : "") + ">" +
+      'aria-label="More people"' +
+      (!hasCount(r) || entry.servings >= 40 ? " disabled" : "") + ">" +
       I.plus(24) + "</button></div>" +
+      (hasCount(r) ? "" :
+        '<p class="hint">This recipe does not record how many it serves, so ' +
+        "the shopping list uses its amounts exactly as written.</p>") +
       '<div class="sheet__foot">' +
       (r ? '<a class="bigbtn press" style="margin-bottom:10px" href="#' + esc(r.id) + '">Open the recipe</a>' : "") +
       '<button type="button" class="outlinebtn outlinebtn--danger press" data-act="plan-remove" ' +
