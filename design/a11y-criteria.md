@@ -65,6 +65,15 @@ a known gap, not a silent one.
    header, the back link and the stepper exactly where they were. Labels
    *inside* the recipe do scale, because they are the recipe — that
    distinction is the point, so it is asserted rather than assumed.
+   **And the other half of it** (`R78`): recipe text scales *wherever it
+   appears*, which includes the boxes you type it into. The mechanism is
+   one line — the screen's wrapper carries the step in px and everything
+   inside is em — and the Add / review screen simply never had it, so its
+   title, ingredients, steps and servings sat at 13.6px whatever the reader
+   had chosen. A new screen that shows or edits recipe text inherits this
+   or it is broken for the person the app was built for; the two forms are
+   measured against each other at more than one step, with a floor so they
+   cannot pass by both being wrong.
 10. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;

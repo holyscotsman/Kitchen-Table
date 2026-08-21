@@ -2977,6 +2977,16 @@
     var d = S.addDraft;
     h += '<p class="addscreen__lead">Check this over, then save it.</p>';
 
+    /* `R78` — and the same SIZE as Edit mode. The recipe screen puts the
+       stepper's px on `.recipe` and lets everything inside be em; this
+       screen never did, so the whole review form sat at body 16px and its
+       inputs at 0.85em of that — 13.6px, at every step, including the top
+       one. Someone who has set the text to 40px because they cannot read
+       24px was typing a recipe into 13.6px boxes, on the one screen the
+       family is pointed at in ADDING.md. */
+    h += '<div class="reviewform" style="font-size:' +
+         FS[effectiveFs()] + 'px">';
+
     if (d.flagged && d.flagged.length) {
       h += '<div class="panel panel--flag" style="margin-bottom:16px">' +
            "<h2>Worth double-checking</h2><ul>" +
@@ -3087,6 +3097,7 @@
          "Save to my recipes</button>";
     h += '<button type="button" class="outlinebtn press" data-act="add-back">' +
          "Start over</button>";
+    h += "</div>"; // .reviewform
     h += "</div>";
     return h;
   }
