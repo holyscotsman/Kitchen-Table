@@ -339,6 +339,112 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     await ctxS.close();
   }
 
+  console.log('\n== One unit, two spellings, two lines (R96) ==');
+  {
+    /* The summing key was the unit exactly as written, so "cups" and "cup"
+       were two different units and the same ingredient came out twice —
+       "1½ cups water" and "1 cup water", one line apart, on the list you
+       read in the shop. Twelve such splits exist in the 48-recipe book;
+       four are a bare plural, three are an abbreviation of the same word.
+       Doing that arithmetic is the whole job of the list.
+
+       What must NOT merge is the other half of this, and it is why the
+       collapse works off a named list rather than a stemmer: "teaspoons
+       minced garlic" and "cloves minced garlic" are different units and
+       cannot be added, and "large egg" / "medium egg" are not units at all
+       — just the first word of the line, where the parser looks. */
+    const ctxU = await br.newContext({ ...devices['iPhone 13'] });
+    const pU = await ctxU.newPage();
+    const uErrs = []; pU.on('pageerror', e => uErrs.push(e.message));
+    await pU.goto(B + '/index.html');
+    await pU.evaluate(() => {
+      const d = new Date();
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+      /* Each at its own servings, so nothing rescales and the amounts on the
+         list are the amounts in the book. */
+      const mk = (n, recipeId, slot, servings) =>
+        ({ id: 'u' + n, date: today, slot, recipeId, titleThen: recipeId, servings });
+      localStorage.setItem('kt.plan', JSON.stringify([
+        mk(1, 'boiled-eggs-in-ninja', 'dinner', 4),        // 1.5 cups water
+        mk(2, 'chicken-lasagne', 'lunch', 9),              // 1 cup water
+        mk(3, 'chicken-stroganoff', 'breakfast', 4)        // 2 tbsp olive oil
+      ]));
+    });
+    await pU.goto(B + '/index.html#plan');
+    await pU.reload();
+    await pU.waitForSelector('.dayblock');
+    await pU.click('[data-act="toggle-list"]');
+    await pU.waitForSelector('.shoplist__items');
+    let uItems = await pU.locator('.shoplist__items li').allTextContents();
+
+    const water = uItems.filter(l => /\bwater$/i.test(l.trim()));
+    chk('one unit spelled two ways sums into one line', water.length === 1,
+        JSON.stringify(water));
+    chk('and it carries the whole amount', /^2\u00bd cups water$/.test((water[0]||'').trim()),
+        water[0] || '(none)');
+
+    /* The other half of the same fixture: shepherd's pie writes the word out
+       where the stroganoff abbreviates it. */
+    await pU.evaluate(() => {
+      const d = new Date();
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+      const plan = JSON.parse(localStorage.getItem('kt.plan'));
+      plan.push({ id: 'u4', date: today, slot: 'dinner', recipeId: 'shepherds-pie',
+                  titleThen: 'shepherds-pie', servings: 6 });   // 2 tablespoons olive oil
+      localStorage.setItem('kt.plan', JSON.stringify(plan));
+    });
+    await pU.reload();
+    await pU.waitForSelector('.dayblock');
+    await pU.click('[data-act="toggle-list"]');
+    await pU.waitForSelector('.shoplist__items');
+    uItems = await pU.locator('.shoplist__items li').allTextContents();
+    const oil = uItems.filter(l => /olive oil$/i.test(l.trim()));
+    chk('an abbreviation and the word it stands for sum together', oil.length === 1,
+        JSON.stringify(oil));
+    chk('and the merged line says the unit in full',
+        /^4 tablespoons olive oil$/.test((oil[0]||'').trim()), oil[0] || '(none)');
+
+    /* Now the guard. Different units, and words that are not units at all. */
+    await pU.evaluate(() => {
+      const d = new Date();
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+      const mk = (n, recipeId, slot, servings) =>
+        ({ id: 'g' + n, date: today, slot, recipeId, titleThen: recipeId, servings });
+      localStorage.setItem('kt.plan', JSON.stringify([
+        mk(1, 'creamy-chicken-casserole', 'dinner', 6),   // 3 teaspoons minced garlic
+        mk(2, 'shrimp-etouffee', 'lunch', 4),             // 4 cloves minced garlic
+        mk(3, 'pork-schnitzel', 'breakfast', 2)           // 1 large egg
+      ]));
+    });
+    await pU.reload();
+    await pU.waitForSelector('.dayblock');
+    await pU.click('[data-act="toggle-list"]');
+    await pU.waitForSelector('.shoplist__items');
+    uItems = await pU.locator('.shoplist__items li').allTextContents();
+    const garlic = uItems.filter(l => /minced garlic$/i.test(l.trim()));
+    chk('teaspoons and cloves are never added together', garlic.length === 2,
+        JSON.stringify(garlic));
+    chk('a word in the unit slot that is not a unit is left alone',
+        uItems.some(l => /^1 large egg$/.test(l.trim())),
+        JSON.stringify(uItems.filter(l => /egg$/i.test(l))));
+    /* Inflecting to agree with the total must not run the other way: a card
+       says "½ cup", never "½ cups". Only a BARE fraction counts —
+       "1¾ cups" is one and three quarters and is rightly plural, which is
+       why this anchors — and it names the plurals rather than matching any
+       word ending in s, so an ingredient simply called "chives" cannot be
+       mistaken for a unit. */
+    const plural = /^[\u00bc\u00bd\u00be\u2153\u2154\u215b\u215c\u215d\u215e]\s+(cups|teaspoons|tablespoons|ounces|pounds|slices|cloves|grams)\b/;
+    chk('a fraction of a unit stays singular',
+        !uItems.some(l => plural.test(l.trim())),
+        JSON.stringify(uItems.filter(l => plural.test(l.trim()))));
+    chk('and none of it threw', uErrs.length === 0, uErrs.join(' | '));
+    await pU.evaluate(() => localStorage.removeItem('kt.plan'));
+    await ctxU.close();
+  }
+
   console.log('\n== A plan that could not be kept must not say it was (R45) ==');
   {
     /* R44's shape, one key over. The plan goes through the same save() that

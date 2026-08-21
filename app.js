@@ -719,6 +719,62 @@
     return out.replace(/[æœøßđþ]/g, function (c) { return MAP[c] || c; });
   }
 
+  /* The units the shopping list may treat as one thing.
+
+     The list keyed on the unit exactly as written, so "cups" and "cup" were
+     two different units and the same ingredient came out twice — "1½ cups
+     water" and "1 cup water", one line apart, on the page you read in the
+     shop. Twelve such splits exist in the 48 recipes as they stand; four are
+     a bare plural and three are an abbreviation of the same word.
+
+     Two rules keep this safe. It only ever collapses SPELLINGS OF ONE UNIT —
+     never a conversion, so tablespoons are never folded into cups and no
+     amount is ever restated in a unit the recipe did not use. And it works
+     off this named list rather than a stemmer, because the word in the unit
+     slot is simply the first word of the line and is often not a unit at all:
+     "3 teaspoons minced garlic" and "4 cloves minced garlic" must stay two
+     lines, and so must "1 large egg" and "1 medium egg". Anything not named
+     here keeps its own literal text and can only ever merge with itself. */
+  var UNITS = (function () {
+    var map = {};
+    [
+      ["teaspoon", "teaspoons", ["tsp", "tsps"]],
+      ["tablespoon", "tablespoons", ["tbsp", "tbsps", "tbs"]],
+      ["cup", "cups", []],
+      ["ounce", "ounces", ["oz"]],
+      ["pound", "pounds", ["lb", "lbs"]],
+      ["gram", "grams", ["g"]],
+      ["kilogram", "kilograms", ["kg"]],
+      ["milliliter", "milliliters", ["ml", "millilitre", "millilitres"]],
+      ["liter", "liters", ["litre", "litres"]],
+      ["pint", "pints", []],
+      ["quart", "quarts", ["qt"]],
+      ["gallon", "gallons", []],
+      ["clove", "cloves", []],
+      ["slice", "slices", []],
+      ["can", "cans", []],
+      ["jar", "jars", []],
+      ["tin", "tins", []],
+      ["tube", "tubes", []],
+      ["package", "packages", ["pkg", "pkgs"]],
+      ["stick", "sticks", []],
+      ["sprig", "sprigs", []],
+      ["stalk", "stalks", []],
+      ["ear", "ears", []],
+      ["strip", "strips", []],
+      ["head", "heads", []],
+      ["bunch", "bunches", []],
+      ["pinch", "pinches", []],
+      ["dash", "dashes", []]
+    ].forEach(function (row) {
+      var forms = { one: row[0], many: row[1] };
+      map[row[0]] = forms;
+      map[row[1]] = forms;
+      row[2].forEach(function (abbr) { map[abbr] = forms; });
+    });
+    return map;
+  })();
+
   /* One edit (missing, extra, wrong, or swapped letter) counts as a match for
      terms of 5+ letters — short words stay exact or they match everything. */
   function nearWord(word, term) {
@@ -2706,10 +2762,30 @@
     return h;
   }
 
+  /* How a summed line says its unit. A known unit agrees with the total, and
+     when two spellings merged into this line it is written out in full,
+     because neither original spelling is the whole truth of it any more. A
+     line that never met a second spelling keeps the words the recipe used,
+     abbreviation and all: nothing is rewritten that did not have to be, and
+     anything not in UNITS is left exactly as written.
+
+     Agreeing means at or below one, singular — a recipe card says "½ cup",
+     never "½ cups", and a list that rewrote it that way would be correcting
+     the kitchen's grammar in the wrong direction. */
+  function unitWord(s) {
+    if (!s.forms) return s.unit;
+    var known = fold(s.unit) === s.forms.one || fold(s.unit) === s.forms.many;
+    if (!s.mixed && !known) return s.unit;
+    return s.qty <= 1.001 ? s.forms.one : s.forms.many;
+  }
+
   /* 130 — the summing spike, shipped honestly as a preview. Lines whose
      quantity, unit and remaining text all agree get summed at each meal's own
      servings; everything else is listed as written. Failure modes are in
-     DECISIONS.md 130 — nothing here guesses. */
+     DECISIONS.md 130 — nothing here guesses. `R96`: "agree" is judged after
+     UNITS resolves the unit, so one unit spelled two ways is one line —
+     which is a wider net for the SAME rule, not a looser one. Nothing is
+     summed here that a person reading the two lines would not have added. */
   function shoppingHtml() {
     var days = weekDays(S.planWeekOffset).map(isoDate);
     var entries = S.plan.filter(function (e) { return days.indexOf(e.date) > -1; });
@@ -2746,8 +2822,16 @@
           return;
         }
         var n = qtyValue(text.slice(0, q.len));
-        var key = fold(tail[1]) + "|" + fold(tail[2]);
-        if (!sums[key]) sums[key] = { qty: 0, unit: tail[1], rest: tail[2] };
+        var forms = UNITS[fold(tail[1])];
+        var key = (forms ? forms.one : fold(tail[1])) + "|" + fold(tail[2]);
+        if (!sums[key]) {
+          sums[key] = { qty: 0, unit: tail[1], forms: forms || null,
+                        mixed: false, rest: tail[2] };
+        } else if (fold(sums[key].unit) !== fold(tail[1])) {
+          /* Two spellings met here, so the line can no longer be written in
+             whichever one happened to come first. */
+          sums[key].mixed = true;
+        }
         sums[key].qty += n * mult;
       });
     });
@@ -2776,7 +2860,7 @@
       h += '<ul class="shoplist__items" style="font-size:' + readPx + '">';
       keys.forEach(function (k) {
         var s = sums[k];
-        h += "<li>" + esc(fmtQty(s.qty)) + (s.unit ? " " + esc(s.unit) : "") +
+        h += "<li>" + esc(fmtQty(s.qty)) + (s.unit ? " " + esc(unitWord(s)) : "") +
              " " + esc(s.rest) + "</li>";
       });
       h += "</ul>";
@@ -2791,7 +2875,8 @@
              readPx + '">' +
              asIs.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ul>";
       }
-      h += '<p class="hint">Same wording and unit sum together; everything else is listed as written.</p>';
+      h += '<p class="hint">The same ingredient in the same unit sums together;' +
+           " everything else is listed as written.</p>";
     }
     h += "</section>";
     return h;
