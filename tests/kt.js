@@ -150,6 +150,63 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await p.locator('button.servcard__value').count() === 1);
   }
 
+  console.log('\n== A control drawn as on says so (R37) ==');
+  {
+    /* Criterion 11: state is announced, not just drawn. Three controls in
+       this app pick up "on" styling; each is checked for what a screen
+       reader would actually hear, since a general "has some aria attribute"
+       rule passes on labels that never change and proves nothing. */
+    await p.goto(B+'/index.html#menu');
+    await p.reload();
+    await p.waitForSelector('[data-act="open-text"]');
+
+    /* 1 — the search toggle already carries aria-pressed. */
+    const searchOff = await p.getAttribute('[data-act="toggle-search"]', 'aria-pressed');
+    await p.click('[data-act="toggle-search"]');
+    await p.waitForTimeout(250);
+    chk('the search button says whether it is open',
+      searchOff === 'false' &&
+      await p.getAttribute('[data-act="toggle-search"]', 'aria-pressed') === 'true');
+    await p.click('[data-act="toggle-search"]');
+    await p.waitForTimeout(200);
+
+    /* 2 — the Filter button's "on" is a count, and the count is text inside
+       the button, so it reaches the accessible name. */
+    await p.click('[data-act="open-filter"]');
+    await p.waitForSelector('#filter-sheet');
+    await p.click('[data-act="fc"][data-key="Dinner"]');
+    await p.waitForTimeout(200);
+    await p.click('.donebtn');
+    await p.waitForTimeout(250);
+    chk('the Filter button says how many filters are on',
+      /1/.test(await p.locator('[data-act="open-filter"]').textContent()),
+      await p.locator('[data-act="open-filter"]').textContent());
+    await p.click('[data-act="clear-filters"]');
+    await p.waitForTimeout(250);
+
+    /* 3 — Easy Read. The button wears the "on" styling and, before this
+       round, announced nothing about the mode: a screen-reader user could
+       not tell Easy Read from ordinary reading. */
+    const beforeName = await p.getAttribute('[data-act="open-text"]', 'aria-label');
+    await p.click('[data-act="open-text"]');
+    await p.waitForSelector('[data-act="toggle-easy"], .switch');
+    await p.locator('[data-act="toggle-easy"], .switch').first().click();
+    await p.waitForTimeout(300);
+    await p.click('[data-act="close-text"]').catch(()=>{});
+    await p.waitForTimeout(250);
+    const afterName = await p.getAttribute('[data-act="open-text"]', 'aria-label');
+    chk('turning Easy Read on changes what its button announces',
+      afterName !== beforeName && /easy read/i.test(afterName || ''),
+      beforeName + ' → ' + afterName);
+    await p.evaluate(() => localStorage.removeItem('kt.easyRead'));
+    await p.reload();
+    await p.waitForSelector('[data-act="open-text"]');
+    chk('and with it off the button says nothing about it',
+      !/easy read/i.test(
+        await p.getAttribute('[data-act="open-text"]', 'aria-label') || ''),
+      await p.getAttribute('[data-act="open-text"]', 'aria-label'));
+  }
+
   console.log('\n== A notice is said once, for the action that earned it (R36) ==');
   {
     /* Criterion 16. Every state change here is a full re-render, so a
