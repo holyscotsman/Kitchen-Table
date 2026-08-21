@@ -4420,11 +4420,28 @@
     return route.name + ":" + (route.id || "");
   }
 
+  /* Where the position is filed. The Menu is not one screen — it is every
+     list the filters and the sort can make, all behind the name "menu", so
+     filing them all under that name gave the six of them one shared number.
+     Scroll the whole 48-card book, then ask Main for Desserts, and the
+     six-card list inherited an offset far past its own end: the browser
+     clamped it to the bottom, and the reader arrived at the LAST recipe of a
+     list they had just asked for, heading and search box above the viewport.
+     menuHash() is already the canonical description of the list on screen —
+     the same string the address carries — so it is what the position belongs
+     to. Read live rather than from the route object on purpose: chip taps
+     rewrite the list without a navigation, and the position that gets saved
+     has to follow the list actually being read. */
+  function scrollKey() {
+    if (S.route.name === "menu") return "menu:" + menuHash();
+    return routeKey(S.route);
+  }
+
   window.addEventListener("scroll", function () {
     if (scrollTick) return;
     scrollTick = setTimeout(function () {
       scrollTick = null;
-      scrollPos[routeKey(S.route)] = window.scrollY;
+      scrollPos[scrollKey()] = window.scrollY;
     }, 120);
   }, { passive: true });
 
@@ -4486,6 +4503,8 @@
     var next = parseHash();
     var changedRecipe = next.name !== "recipe" || next.id !== S.route.id;
     var changedRoute = routeKey(next) !== routeKey(S.route);
+    /* The list being left, before the block below adopts the incoming one. */
+    var leaving = S.route.name === "menu" ? menuHash() : "";
 
     if (next.name === "menu") {
       /* Sort travels with the filters, and resets with them: a bare #menu
@@ -4514,6 +4533,12 @@
         S.cats = [];
         S.tags = [];
       }
+      /* Menu to Menu is not the same screen twice if the list changed: the
+         address is the same name carrying different filters, so nothing above
+         had counted it as navigation and the block at the end of this
+         function — scroll, focus, announcement — never ran for it. A list you
+         have just asked for is a new screen. */
+      if (!changedRoute && menuHash() !== leaving) changedRoute = true;
     }
 
     /* Arriving at Add resets the transient state, then restores whatever the
@@ -4573,7 +4598,7 @@
     if (changedRoute) {
       /* After the frame, so the fresh screen's full height exists — a
          same-tick scrollTo can clamp against a layout that hasn't settled. */
-      var backTo = scrollPos[routeKey(next)] || 0;
+      var backTo = scrollPos[scrollKey()] || 0;
       window.scrollTo(0, backTo);
       if (backTo && window.requestAnimationFrame) {
         requestAnimationFrame(function () { window.scrollTo(0, backTo); });
