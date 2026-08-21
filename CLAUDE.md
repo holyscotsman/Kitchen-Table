@@ -66,7 +66,10 @@ here. Where anything ever disagreed, `tokens.css` won — and still does.
 - [ ] Dark mode default; light mode toggles and persists
 - [ ] Recipe instruction text is **24px at the default step** (this was raised deliberately — do not lower it)
 - [ ] A− / A+ steps 20 → 40px and persists
-- [ ] Nothing interactive under 44px; icon buttons 48×48
+- [ ] Nothing interactive under 44px; icon buttons 48×48 — **with one
+      documented exception**: Main's theme button and app mark sit at 44, trimmed
+      so "Kitchen Table" fits on one line at 390px. Both are enforced at exactly
+      those numbers (`R49`), because an exception allowed to drift is a hole.
 - [ ] Zero hover-only affordances (iPhone has no hover)
 - [ ] Viewer mode shows no edit affordances at all
 - [ ] Servings stepper rescales ingredient quantities, opening at each recipe's own count
@@ -376,8 +379,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **736 functional checks** across eleven
-suites (kt 154, feat 59, add 74, relay 16, quick 42, polish 90, sec 41,
+The suite after the video arc: **742 functional checks** across eleven
+suites (kt 160, feat 59, add 74, relay 16, quick 42, polish 90, sec 41,
 plan 33, video 54, backend 162, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
