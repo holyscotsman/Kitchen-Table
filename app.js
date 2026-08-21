@@ -2736,11 +2736,20 @@
         "file is published — and <strong>Undo all my changes on this " +
         "phone</strong> brings it back until then.",
         /* And the promise the machinery already keeps but nobody was told
-           about: a precached shell means the book opens with no signal. */
+           about: a precached shell means the book opens with no signal.
+           `R102` — the last sentence used to read "Only the four ways of
+           adding a recipe need the internet", and one of those four is
+           Type it in, which touches the network at no point. So does the
+           paste box. That is the wrong direction for a tutorial to be
+           wrong in: someone in a kitchen with no signal, with Joan
+           dictating, reads it and does not try — and getting her recipes
+           down is the one thing this app is for. */
         "The book lives on your phone once you have opened it, so it works " +
         "with <strong>no signal at all</strong> — in a cellar, on a ferry, " +
-        "in a kitchen the wifi never reaches. Only the four ways of adding " +
-        "a recipe need the internet."]]
+        "in a kitchen the wifi never reaches. <strong>Typing a recipe in " +
+        "works with no signal too</strong>, and so does pasting one into " +
+        "the box under <em>From a link</em>. It is the other three ways — " +
+        "from a link, from a photo, from a video — that need the internet."]]
     ];
 
     h += sections.map(function (sec) {
