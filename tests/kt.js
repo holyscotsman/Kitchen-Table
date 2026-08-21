@@ -1160,6 +1160,109 @@ const browserContextWithReduce = (br) =>
     await pE.close();
   }
 
+  console.log('\n== Two recipes with the same id, and only one survived (R70) ==');
+  {
+    /* recipes.json is hand-edited by design — download, edit, commit — and
+       copying a recipe block to make a variant while forgetting to change
+       the id is the natural way to get two of them. Measured before this:
+       both drew on the Menu, `#twin` opened the first, and **editing it
+       overwrote the second as well** — a whole recipe, its own ingredients
+       and steps, silently replaced by a copy of the other. Remove took both
+       too. db/migrate refuses a duplicate id, but only when someone runs it;
+       the app is where the loss happens first.
+       Suffixed at the boundary now, which is the convention the kitchen
+       server already uses when the same thing happens to it: "a duplicate
+       the family can see and delete beats a recipe silently replaced". */
+    const mk = (t) => ({ id: 'twin', title: t, category: 'Dinner',
+      contributor: 'Joan', servings: 4,
+      ingredients: ['1 cup ' + t], steps: ['Cook ' + t] });
+
+    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pT = await ctxT.newPage();
+    const tErrs = []; pT.on('pageerror', e => tErrs.push(e.message));
+    pT.on('dialog', d => d.accept());
+    await pT.goto(B + '/index.html');
+    await pT.evaluate((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
+      [mk('First Twin'), mk('Second Twin')]);
+    await pT.goto(B + '/index.html#menu');
+    await pT.reload();
+    await pT.waitForSelector('.rcard');
+    chk('both recipes are on the Menu, under their own names',
+      JSON.stringify(await pT.locator('.rcard__title').allTextContents()) ===
+        JSON.stringify(['First Twin', 'Second Twin']),
+      JSON.stringify(await pT.locator('.rcard__title').allTextContents()));
+    const hrefs = await pT.locator('.rcard').evaluateAll(els =>
+      els.map(e => e.getAttribute('href')));
+    chk('and they have different addresses',
+      hrefs.length === 2 && hrefs[0] !== hrefs[1], JSON.stringify(hrefs));
+
+    /* The one that matters: correcting one must not rewrite the other. */
+    await pT.goto(B + '/index.html' + hrefs[0]);
+    await pT.waitForSelector('.r-title');
+    await pT.click('[data-act="toggle-edit"]');
+    await pT.waitForSelector('#e-title');
+    await pT.fill('#e-title', 'EDITED');
+    await pT.click('[data-act="save"]');
+    await pT.waitForTimeout(500);
+    const kept = await pT.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes')).map(r => r.title + '|' + r.ingredients[0]));
+    chk('editing one leaves the other exactly as it was',
+      kept.length === 2 && /Second Twin/.test(kept.join(' ')),
+      JSON.stringify(kept));
+
+    /* And the family is told, rather than left to notice. */
+    await pT.goto(B + '/index.html' + hrefs[1]);
+    await pT.waitForSelector('.r-title', { timeout: 5000 }).catch(() => {});
+    chk('the second one says why its address changed',
+      /same id|duplicate id/i.test(await pT.locator('.panel--flag').textContent().catch(() => '')),
+      await pT.locator('.panel--flag').textContent().catch(() => '(no flag)'));
+
+    /* Removing one must not take both. */
+    await pT.goto(B + '/index.html#menu');
+    await pT.waitForSelector('.rcard');
+    await pT.click('[data-act="toggle-remove"]');
+    await pT.waitForSelector('.rrow');
+    await pT.locator('.rrow').first().click();
+    await pT.waitForTimeout(500);
+    chk('removing one leaves the other',
+      await pT.locator('.rrow').count() === 1,
+      String(await pT.locator('.rrow').count()));
+    await pT.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxT.close();
+
+    /* The published file is the copy that is actually hand-edited, so it
+       gets the same promise. */
+    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    await ctxF.route('**/recipes.json', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify([mk('First Twin'), mk('Second Twin')])
+    }));
+    const pF = await ctxF.newPage();
+    const fErrs = []; pF.on('pageerror', e => fErrs.push(e.message));
+    await pF.goto(B + '/index.html#menu');
+    await pF.waitForSelector('.rcard');
+    chk('a duplicate id in the published file is survivable too',
+      await pF.locator('.rcard').count() === 2 && fErrs.length === 0,
+      (await pF.locator('.rcard').count()) + ' cards; ' + fErrs.join(' | '));
+    await ctxF.close();
+
+    /* And nothing is renamed that did not need to be — the real book keeps
+       every id it shipped with, which is what the hash routes depend on. */
+    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    const pN = await ctxN.newPage();
+    await pN.goto(B + '/index.html#menu');
+    await pN.waitForSelector('.rcard');
+    const same = await pN.evaluate(async () => {
+      const shipped = await (await fetch('recipes.json')).json();
+      const drawn = [...document.querySelectorAll('.rcard')]
+        .map(a => (a.getAttribute('href') || '').slice(1));
+      return shipped.every(r => drawn.indexOf(r.id) > -1);
+    });
+    chk('and no recipe in the real book was renamed', same);
+    chk('none of it threw', tErrs.length === 0, tErrs.join(' | '));
+    await ctxN.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);

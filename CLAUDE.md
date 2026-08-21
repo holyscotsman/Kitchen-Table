@@ -232,6 +232,14 @@ the recipe's own page fell back to the front screen saying nothing.
 `servings`. It **coerces, never discards**: a string becomes the one line it
 is, so the words a person typed always survive.
 
+The same applies to **two recipes with the same id** (`R70`), which used to be
+one recipe: `byId` found the first, the second could never be opened, and
+saving the first wrote over both — a whole recipe silently replaced by a copy
+of the other. They are suffixed at the boundary now (`twin`, `twin-2`), which
+is the convention the kitchen server already uses for the same collision, with
+the reason written onto the recipe so nobody has to guess why its address looks
+odd. It rides into the next download, where the suffixed id fixes the file.
+
 ### The overlay is authoritative
 
 `kt.recipes` holds "the full edited recipe set", so when it exists it replaces
@@ -396,8 +404,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **889 functional checks** across eleven
-suites (kt 231, feat 59, add 74, relay 16, quick 70, polish 117, sec 52,
+The suite after the video arc: **897 functional checks** across eleven
+suites (kt 239, feat 59, add 74, relay 16, quick 70, polish 117, sec 52,
 plan 41, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

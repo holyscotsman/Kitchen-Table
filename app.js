@@ -800,7 +800,39 @@
   function applyOverlay() {
     var overlay = load(K.recipes, null);
     var list = Array.isArray(overlay) ? overlay : (Array.isArray(S.base) ? S.base : []);
-    S.recipes = list.map(normalizeRecipe).filter(Boolean);
+    S.recipes = dedupeIds(list.map(normalizeRecipe).filter(Boolean));
+  }
+
+  /* `R70` — two recipes with the same id used to be one recipe. `byId` found
+     the first, so the second could never be opened, and saving the first
+     wrote over BOTH: a whole recipe, its own ingredients and steps, silently
+     replaced by a copy of the other. Remove took both as well.
+     `recipes.json` is hand-edited by design — download, edit, commit — and
+     copying a block to make a variant without changing the id is the natural
+     way to get there. `db/migrate.js` refuses a duplicate, but only when
+     somebody runs it; the app is where the loss happens first.
+     Suffixed instead, which is the convention the kitchen server already
+     uses when the same thing happens to it: a duplicate the family can see
+     and delete beats a recipe silently replaced. The reason is written onto
+     the recipe, so nobody has to guess why its address looks odd — and it
+     rides into the next download, where the suffixed id fixes the file. */
+  function dedupeIds(list) {
+    var used = {};
+    return list.map(function (r) {
+      if (!r.id || !used[r.id]) { if (r.id) used[r.id] = true; return r; }
+      var n = 2;
+      while (used[r.id + "-" + n]) n++;
+      var newId = r.id + "-" + n;
+      used[newId] = true;
+      var out = {};
+      Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+      out.id = newId;
+      out.flagged = (Array.isArray(r.flagged) ? r.flagged.slice() : []).concat(
+        "Two recipes in the book had the same id (“" + r.id + "”), so this " +
+        "one is at “" + newId + "” instead. Give it an id of its own next " +
+        "time the file is edited.");
+      return out;
+    });
   }
 
   function normalizeRecipe(r) {
