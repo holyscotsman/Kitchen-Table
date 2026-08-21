@@ -1151,7 +1151,19 @@
   function orderFields(recipe) {
     var out = {};
     FIELD_ORDER.forEach(function (k) {
-      if (recipe[k] !== undefined && recipe[k] !== "") out[k] = recipe[k];
+      /* `R100` — null goes too. This file has two writers: here, and
+         `rowToRecipe` in db/export.js for the nightly sync. That one already
+         dropped null; this one kept it, so a recipe carrying "notes": null —
+         which a hand edit leaves, and recipes.json is hand-editable by
+         design — came out of the phone with the key and out of the sync
+         without it. Commit the phone's file and `node db/export.js --check`
+         reports DIFFERS over a difference nothing can see, the next sync
+         rewrites the file to strip them, and the one after that is a
+         spurious commit in a book of someone's recipes. The two writers
+         agree now, and a check holds them to it. */
+      if (recipe[k] !== undefined && recipe[k] !== null && recipe[k] !== "") {
+        out[k] = recipe[k];
+      }
     });
     /* A locally attached photo becomes a repo path, not a base64 blob — the
        committed recipes.json stays readable and small. */
