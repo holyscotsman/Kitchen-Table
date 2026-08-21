@@ -150,6 +150,38 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await p.locator('button.servcard__value').count() === 1);
   }
 
+  console.log('\n== The chrome does not grow with the reading text (R39) ==');
+  {
+    /* Criterion 13. A−/A+ is for the recipe, not for the app: if the header,
+       the buttons and the labels grew with it, the top step would spend the
+       screen on chrome and leave less room for the words than the step
+       before it. Measured on the screen where the stepper lives. */
+    await p.goto(B+'/index.html#chicken-cordon-bleu');
+    await p.reload();
+    await p.waitForSelector('.recipe');
+    const shot = () => p.evaluate(() => {
+      const px = (sel) => {
+        const el = document.querySelector(sel);
+        return el ? Math.round(parseFloat(getComputedStyle(el).fontSize) * 100) / 100 : null;
+      };
+      return { recipe: px('.recipe'), back: px('.backlink'), head: px('.rhead'),
+               label: px('.minilabel'), step: px('[data-act="fs+"]') };
+    });
+    const small = await shot();
+    for (let i = 0; i < 3; i++) { await p.click('[data-act="fs+"]'); await p.waitForTimeout(150); }
+    const big = await shot();
+    chk('the recipe text really did grow', big.recipe > small.recipe,
+      small.recipe + ' → ' + big.recipe);
+    chk('and the chrome around it did not',
+      big.back === small.back && big.head === small.head && big.step === small.step,
+      JSON.stringify(small) + ' → ' + JSON.stringify(big));
+    /* The minilabel lives inside .recipe and is meant to scale with it —
+       stated, so a future reader knows which side of the line it is on. */
+    chk('labels inside the recipe do scale, because they are the recipe',
+      big.label > small.label, small.label + ' → ' + big.label);
+    await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
+  }
+
   console.log('\n== A control drawn as on says so (R37) ==');
   {
     /* Criterion 11: state is announced, not just drawn. Three controls in
