@@ -1688,6 +1688,111 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       missing.length === 0, missing.join(', '));
   }
 
+  console.log('\n== R100 — two writers, one file ==');
+  {
+    /* `recipes.json` has two authors. The phone writes it through
+       `orderFields` in app.js when someone presses "Download updated
+       recipes.json"; the nightly `db-sync` writes it through `rowToRecipe`
+       in db/export.js. Each carries its own hand-typed FIELD_ORDER, in two
+       files, with nothing binding them — the same shape of gap `R89` closed
+       for the offline shell, and this project's stated position is that a
+       list nobody checks goes stale.
+
+       They already disagreed. Not about the fields, but about emptiness:
+       app.js dropped `undefined` and `""`, db/export.js dropped `null` as
+       well. So a recipe carrying `"notes": null` — which a hand edit leaves,
+       and which recipes.json is hand-editable BY DESIGN — came out of the
+       phone with the key and out of the sync without it. Commit the phone's
+       file, run `node db/export.js --check`, and it reports DIFFERS over a
+       difference nothing can see; the next sync rewrites the file to strip
+       them, and the one after that is a spurious commit in a book of
+       someone's recipes.
+
+       So the check is not "are the two lists the same today". It is: the
+       lists must be identical, they must cover every key a recipe actually
+       carries, and **the two writers must produce the same file from the
+       same recipe.** */
+    const fs = require('fs'), path = require('path');
+    const root = path.join(__dirname, '..');
+    const appSrc = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+    const appRaw = appSrc.slice(appSrc.indexOf('var FIELD_ORDER = ['),
+      appSrc.indexOf(']', appSrc.indexOf('var FIELD_ORDER = [')));
+    const appOrder = (appRaw.match(/"[^"]+"/g) || []).map(x => x.slice(1, -1));
+    const exp = require(path.join(root, 'db', 'export.js'));
+
+    chk('the app\'s field list was read', appOrder.length >= 10, appOrder.join(','));
+    chk('and the exporter\'s', (exp.FIELD_ORDER || []).length >= 10);
+    chk('the two writers agree on the fields, and their order',
+        JSON.stringify(appOrder) === JSON.stringify(exp.FIELD_ORDER),
+        JSON.stringify(appOrder) + ' vs ' + JSON.stringify(exp.FIELD_ORDER));
+
+    /* Anything a recipe actually carries has to be on the list, or the
+       download deletes it from the book. */
+    const book = JSON.parse(fs.readFileSync(path.join(root, 'recipes.json'), 'utf8'));
+    const inBook = new Set();
+    book.forEach(r => Object.keys(r).forEach(k => inBook.add(k)));
+    chk('every field the book carries is on the list',
+        [...inBook].every(k => appOrder.indexOf(k) > -1),
+        [...inBook].filter(k => appOrder.indexOf(k) === -1).join(','));
+
+    /* And anything the kitchen server can hand back, since an accepted
+       import reaches recipes.json through the sync. */
+    const vSrc = fs.readFileSync(path.join(root, 'backend', 'lib', 'validate.js'), 'utf8');
+    const emitted = new Set((vSrc.match(/\bout\.([A-Za-z]+)\s*=/g) || [])
+      .map(m => m.replace(/\bout\./, '').replace(/\s*=$/, '')));
+    (vSrc.match(/for \(const k of \[([^\]]+)\]/g) || []).forEach(g => {
+      (g.match(/"[^"]+"/g) || []).forEach(x => emitted.add(x.slice(1, -1)));
+    });
+    chk('the server\'s fields were read', emitted.size >= 8, [...emitted].join(','));
+    chk('and every one of them is on the list too',
+        [...emitted].every(k => appOrder.indexOf(k) > -1),
+        [...emitted].filter(k => appOrder.indexOf(k) === -1).join(','));
+
+    /* The one that matters: the same recipe, through both writers. */
+    const ctxD = await br.newContext({ ...devices['iPhone 13'], acceptDownloads: true });
+    await ctxD.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const pD = await ctxD.newPage();
+    await pD.goto(B + '/index.html');
+    await pD.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.notes = null;
+      one.source = null;
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+    });
+    await pD.goto('about:blank');
+    await pD.goto(B + '/index.html#ninja-cookies');
+    await pD.waitForSelector('.r-title');
+    await pD.click('[data-act="toggle-edit"]');
+    await pD.waitForSelector('[data-act="dl-json"]');
+    const [dl] = await Promise.all([
+      pD.waitForEvent('download'),
+      pD.click('[data-act="dl-json"]')
+    ]);
+    const fromPhone = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'))
+      .find(x => x.id === 'ninja-cookies');
+    const fromSync = exp.rowToRecipe({
+      id: fromPhone.id, title: fromPhone.title, category: fromPhone.category,
+      contributor: fromPhone.contributor, servings: fromPhone.servings,
+      prep_time: fromPhone.prepTime || null, cook_time: fromPhone.cookTime || null,
+      ingredients: fromPhone.ingredients, steps: fromPhone.steps,
+      notes: null, flagged: fromPhone.flagged || [], source: null,
+      image: fromPhone.image || null, tags: fromPhone.tags || []
+    });
+    chk('the phone really did write a file', !!fromPhone && !!fromPhone.title);
+    chk('a field that is null is written by neither writer',
+        !('notes' in fromPhone) && !('source' in fromPhone),
+        JSON.stringify(Object.keys(fromPhone)));
+    chk('so the two of them produce the same recipe',
+        JSON.stringify(Object.keys(fromPhone)) === JSON.stringify(Object.keys(fromSync)),
+        JSON.stringify(Object.keys(fromPhone)) + '\n      vs ' +
+        JSON.stringify(Object.keys(fromSync)));
+    await pD.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxD.close();
+  }
+
   console.log('\n== R85 — the danger colour belongs to the destructive mode only ==');
   {
     /* The Menu has two modes behind two buttons sitting side by side in the
