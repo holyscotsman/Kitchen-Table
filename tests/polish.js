@@ -637,6 +637,79 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pPr.close();
   }
 
+  console.log('\n== Keep screen on, across a text message (R50) ==');
+  {
+    /* iOS drops a wake lock whenever the tab is backgrounded and never
+       restores it, so the app re-requests on return — otherwise the switch
+       silently stops working the first time someone answers a text
+       mid-recipe, which is the exact moment a kitchen needs it.
+       Honest about what this proves: the handler, not the platform. Chromium
+       here does not fire a real visibilitychange for a backgrounded tab
+       (measured), so the event is dispatched with visibilityState overridden.
+       The browser firing it at all is a platform guarantee; what could
+       actually regress is what this app does when it arrives — including the
+       two cases where it must do NOTHING. */
+    const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+    const pW = await ctxW.newPage();
+    await pW.goto(B + '/index.html#chicken-cordon-bleu');
+    await pW.waitForSelector('.r-title');
+    const hasWake = await pW.locator('[data-act="toggle-wake"]').count();
+    if (!hasWake) {
+      chk('wake control absent in this browser — nothing to prove', true);
+    } else {
+      await pW.evaluate(() => {
+        window.__asked = 0;
+        const real = navigator.wakeLock.request.bind(navigator.wakeLock);
+        navigator.wakeLock.request = (t) => { window.__asked++; return real(t); };
+        window.__vis = 'visible';
+        Object.defineProperty(document, 'visibilityState',
+          { configurable: true, get: () => window.__vis });
+        window.__background = async () => {
+          window.__vis = 'hidden';
+          document.dispatchEvent(new Event('visibilitychange'));
+          await new Promise(r => setTimeout(r, 100));
+          window.__vis = 'visible';
+          document.dispatchEvent(new Event('visibilitychange'));
+          await new Promise(r => setTimeout(r, 300));
+        };
+      });
+      await pW.click('[data-act="toggle-wake"]');
+      await pW.waitForTimeout(500);
+      const onFirst = await pW.getAttribute('[data-act="toggle-wake"]', 'aria-checked');
+      const askedAfterTap = await pW.evaluate(() => window.__asked);
+      chk('the switch turns on', onFirst === 'true', String(onFirst));
+
+      await pW.evaluate(() => window.__background());
+      chk('answering a text and coming back re-takes the lock',
+        (await pW.evaluate(() => window.__asked)) > askedAfterTap,
+        askedAfterTap + ' → ' + await pW.evaluate(() => window.__asked));
+      chk('and the switch still reads on',
+        await pW.getAttribute('[data-act="toggle-wake"]', 'aria-checked') === 'true');
+
+      /* The two silences. An over-eager re-acquire would either overrule the
+         reader or keep a phone awake on a screen that is not a recipe. */
+      await pW.click('[data-act="toggle-wake"]');
+      await pW.waitForTimeout(300);
+      const askedAfterOff = await pW.evaluate(() => window.__asked);
+      await pW.evaluate(() => window.__background());
+      chk('turned off, it stays off through a backgrounding',
+        (await pW.evaluate(() => window.__asked)) === askedAfterOff &&
+        await pW.getAttribute('[data-act="toggle-wake"]', 'aria-checked') === 'false',
+        askedAfterOff + ' → ' + await pW.evaluate(() => window.__asked));
+
+      await pW.click('[data-act="toggle-wake"]');
+      await pW.waitForTimeout(400);
+      await pW.click('.backlink');
+      await pW.waitForSelector('.rcard');
+      const askedOnMenu = await pW.evaluate(() => window.__asked);
+      await pW.evaluate(() => window.__background());
+      chk('and it never wakes a screen that is not a recipe',
+        (await pW.evaluate(() => window.__asked)) === askedOnMenu,
+        askedOnMenu + ' → ' + await pW.evaluate(() => window.__asked));
+    }
+    await ctxW.close();
+  }
+
   console.log('\n== Paper carries the size the reader chose (R47) ==');
   {
     /* R24 checked what prints and in what colour, never at what size — and
