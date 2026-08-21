@@ -133,7 +133,11 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        picker are not part of what is being measured here. */
     await pS.goto(B + '/index.html');
     await pS.evaluate(() => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (function () {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+          '-' + String(d.getDate()).padStart(2, '0');
+      })();
       localStorage.setItem('kt.plan', JSON.stringify([
         /* frosting serves 8; twelve is one and a half times it */
         { id: 's1', date: today, slot: 'dinner', recipeId: 'vanilla-frosting',
@@ -169,7 +173,11 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
 
     /* The half that must not regress: a plain line still sums. */
     await pS.evaluate(() => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (function () {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+          '-' + String(d.getDate()).padStart(2, '0');
+      })();
       localStorage.setItem('kt.plan', JSON.stringify([
         { id: 'p1', date: today, slot: 'dinner', recipeId: 'chicken-cordon-bleu',
           titleThen: 'A', servings: 4 },
@@ -238,6 +246,71 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     chk('and the meal is really there after a reload',
       await pP.locator('.mealcard').count() >= 1);
     await ctxP.close();
+  }
+
+  console.log('\n== The week is the reader’s week, not UTC’s (R72) ==');
+  {
+    /* A week planner has to agree with the calendar on the wall. The app's
+       own date code reads local parts — getFullYear/getMonth/getDate — and
+       never touches toISOString, which would hand back the UTC day: for a
+       family five hours behind, every evening after seven would land on
+       tomorrow, and one hour ahead, the first hour after midnight would land
+       on yesterday. It was right; nothing said so, and nothing stopped the
+       next refactor from reaching for the shorter spelling.
+       Checked on two clocks a full day apart. On the same instant, Kiritimati
+       (UTC+14) and Niue (UTC-11) are on different dates, so a UTC-based app
+       cannot be right in both. The suites had the same assumption in their
+       own seeding and now compute the day the way the app does. */
+    for (const zone of ['Pacific/Kiritimati', 'Pacific/Niue']) {
+      const ctxZ = await br.newContext({ ...devices['iPhone 13'], timezoneId: zone });
+      const pZ = await ctxZ.newPage();
+      const zErrs = []; pZ.on('pageerror', e => zErrs.push(e.message));
+      await pZ.goto(B + '/index.html#plan');
+      await pZ.waitForSelector('.dayblock');
+      const localToday = await pZ.evaluate(() => {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+          '-' + String(d.getDate()).padStart(2, '0');
+      });
+      const marked = await pZ.evaluate(() => {
+        const el = document.querySelector('.dayblock--today');
+        return el ? (el.getAttribute('data-date') || el.textContent.trim().slice(0, 40)) : null;
+      });
+      chk('exactly one day is marked today in ' + zone,
+        await pZ.locator('.dayblock--today').count() === 1,
+        String(await pZ.locator('.dayblock--today').count()));
+
+      /* Plan into today's dinner slot and see where it lands. */
+      await pZ.locator('.dayblock--today .slotadd').first().click();
+      await pZ.waitForSelector('#pick-q');
+      await pZ.locator('.picklist .mealcard').first().click();
+      await pZ.waitForTimeout(400);
+      const stored = await pZ.evaluate(() => {
+        const plan = JSON.parse(localStorage.getItem('kt.plan') || '[]');
+        return plan.length ? plan[plan.length - 1].date : null;
+      });
+      chk('a meal planned for today is stored under the local date in ' + zone,
+        stored === localToday, stored + ' vs local ' + localToday);
+      chk('and it draws on the day marked today in ' + zone,
+        await pZ.locator('.dayblock--today .mealcard').count() === 1,
+        'marked: ' + marked);
+      chk('nothing threw in ' + zone, zErrs.length === 0, zErrs.join(' | '));
+      await pZ.evaluate(() => localStorage.removeItem('kt.plan'));
+      await ctxZ.close();
+    }
+
+    /* And the rule, so the shorter spelling cannot come back: the app writes
+       no dates in UTC. Every timestamp it handles comes FROM the server
+       already formatted; every date it composes is the reader's. */
+    {
+      const src = require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'app.js'), 'utf8');
+      chk('app.js composes no date in UTC',
+        src.indexOf('toISOString') === -1 && src.indexOf('toUTCString') === -1,
+        'found one');
+      chk('and its own date builder reads local parts',
+        /function isoDate[\s\S]{0,200}getFullYear\(\)[\s\S]{0,120}getDate\(\)/.test(src));
+    }
   }
 
   console.log('\n== Print view (129) ==');
