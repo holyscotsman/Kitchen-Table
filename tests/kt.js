@@ -1391,6 +1391,61 @@ const browserContextWithReduce = (br) =>
   chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()>=1);
   chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
 
+  /* `R88` — the empty states, held to the same bar as the full ones.
+     Two faults, both about telling a reader something that is not true.
+     The "Tap to check off as you go" hint sat ABOVE the branch, so on all
+     four of the recipes with no ingredient list it invited a reader to tap
+     items that are not there, directly above a panel explaining that there
+     are none. And the Instructions section had no empty state at all: a
+     recipe with no steps rendered a heading and an empty list, in silence.
+     No recipe in the book is stepless today, but `recipes.json` is
+     hand-editable by design and `R62` exists because that is not
+     theoretical — a nightly sync, a bad merge, an import saved early. */
+  {
+    const ing = await p.locator('section.bodygrid__ing').textContent();
+    chk('and it does not invite a tap on the nothing that is there',
+      !/Tap to check off/.test(ing), ing.replace(/\s+/g, ' ').slice(0, 90));
+    /* The full list still gets its hint — the fix must be the condition,
+       not the removal. */
+    await p.goto(B + '/index.html#chicken-cordon-bleu');
+    await p.waitForSelector('.r-title');
+    chk('while a recipe that HAS ingredients still says how to use them',
+      /Tap to check off/.test(await p.locator('section.bodygrid__ing').textContent()));
+
+    /* A stepless recipe, made the way one actually arrives: through the
+       overlay the download-and-commit workflow writes. */
+    await p.evaluate(() => {
+      const one = {
+        id: 'stepless-test', title: 'Stepless Test', category: 'Dinner',
+        contributor: 'Joan', servings: 4, ingredients: ['1 cup flour'], steps: []
+      };
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+    });
+    /* The overlay is read at boot, and a hash-only goto is a same-document
+       navigation — so this has to be a real load or the app looks the
+       recipe up in the published file and falls back to the front screen. */
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#stepless-test');
+    let steps = 'DID NOT OPEN';
+    try {
+      await p.waitForSelector('.r-title', { timeout: 10000 });
+      steps = await p.evaluate(() => {
+        const h = [].slice.call(document.querySelectorAll('.r-h2'))
+          .find(x => /Instruction/i.test(x.textContent));
+        return h ? (h.parentElement.textContent || '').replace(/\s+/g, ' ').trim() : 'NO SECTION';
+      });
+    } catch (e) { /* one FAIL line below, not a dead suite */ }
+    chk('a recipe with no instructions says so rather than showing a blank',
+      /No instructions were captured/i.test(steps), steps.slice(0, 100));
+    chk('and it does not tell you to tap steps that are not there',
+      !/Tap to check off/.test(steps) || /ingredient/i.test(steps), steps.slice(0, 60));
+    /* Clearing the key is not enough: `S.recipes` was read at boot, so the
+       next section's hash-only navigation would still be looking at a book
+       with one recipe in it. Hand the suite back the published book. */
+    await p.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await p.goto('about:blank');
+  }
+
   console.log('\n== Back from a recipe returns the list you left (R22) ==');
   await p.goto(B+'/index.html#menu?cat=Desserts');
   await p.waitForSelector('.rcard');
