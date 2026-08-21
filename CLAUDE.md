@@ -204,7 +204,10 @@ drop into `images/` alongside it.
 `imageFor()` prefers the local photo over the published path, so a picture
 shows the moment it is attached rather than after a commit. localStorage is
 only a few megabytes; a quota failure returns a plain message telling the user
-to download and commit what they have.
+to download and commit what they have. Since `R44` the **recipe overlay** does
+the same: a save that could not be written never says "Saved", because a
+change reported as kept and silently dropped is the worst thing this app
+could do to a book of someone's recipes.
 
 ### The overlay is authoritative
 
@@ -367,8 +370,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **711 functional checks** across eleven
-suites (kt 154, feat 59, add 74, relay 16, quick 32, polish 81, sec 41,
+The suite after the video arc: **717 functional checks** across eleven
+suites (kt 154, feat 59, add 74, relay 16, quick 32, polish 87, sec 41,
 plan 27, video 54, backend 162, zoom 10), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

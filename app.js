@@ -146,11 +146,15 @@
     }
   }
 
+  /* Returns false when the write did not happen. Preferences can shrug that
+     off; the recipe overlay cannot — see persistRecipes. */
   function save(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch (e) {
       /* Private browsing — preferences just won't persist. */
+      return false;
     }
   }
 
@@ -660,8 +664,17 @@
     return out;
   }
 
+  /* The family's own words, and the one write in this app whose failure is
+     never acceptable in silence. A swallowed quota error means the button
+     says Saved, the screen shows the change, and it is gone on the next
+     load — data loss wearing the face of success. The photo path has said
+     this out loud since task 011; this is the same courtesy for the text. */
+  var RECIPES_FULL_MSG = "This phone has no room left, so that change was " +
+    "not kept. Download your recipes and commit them, then use “Undo all my " +
+    "changes on this phone” to make room.";
+
   function persistRecipes() {
-    save(K.recipes, S.recipes);
+    return save(K.recipes, S.recipes);
   }
 
   /* ---- photos ----
@@ -2044,9 +2057,13 @@
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
     });
-    persistRecipes();
     S.serves = updated.servings;
-    S.saved = true;
+    if (persistRecipes()) {
+      S.saved = true;
+    } else {
+      S.saved = false;
+      setNotice(RECIPES_FULL_MSG);
+    }
   }
 
   /* ======================================================================
@@ -2850,7 +2867,13 @@
     }
 
     S.recipes = S.recipes.concat([recipe]);
-    persistRecipes();
+    if (!persistRecipes()) {
+      /* Keep the draft on screen rather than pretending it landed. */
+      S.recipes = S.recipes.filter(function (x) { return x.id !== recipe.id; });
+      S.addError = RECIPES_FULL_MSG;
+      render();
+      return;
+    }
     /* A video import tells the kitchen server its draft was accepted, so
        the database gets the reviewed version and the job leaves the
        waiting list. The local save above never waits on it. */
