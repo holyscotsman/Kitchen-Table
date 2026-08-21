@@ -1147,7 +1147,7 @@
     if (S.sortOpen) h += sortMenuHtml();
     h += "</div>";
 
-    if (S.notice) h += '<p class="hint" role="status">' + esc(S.notice) + "</p>";
+    if (S.notice) h += '<p class="hint">' + esc(S.notice) + "</p>";
     h += "</div></header>";
 
     var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
@@ -1648,7 +1648,7 @@
       /* Notices must reach edit mode too — the quota failure on attaching a
          photo happens here, and a warning nobody can see is a silent loss. */
       if (S.notice) {
-        h += '<p class="notice" role="status" style="margin-top:16px">' +
+        h += '<p class="notice" style="margin-top:16px">' +
              esc(S.notice) + "</p>";
       }
       h += "</div>";
@@ -1799,7 +1799,7 @@
          I.download() + "Download</button></div>";
 
     if (S.notice) {
-      h += '<p class="notice" role="status" style="margin-top:16px">' +
+      h += '<p class="notice" style="margin-top:16px">' +
            esc(S.notice) + "</p>";
     }
 
@@ -2319,7 +2319,7 @@
     h += '<button type="button" class="outlinebtn press planprint" data-act="plan-print">' +
          "Print this week</button>";
 
-    if (S.notice) h += '<p class="notice" role="status">' + esc(S.notice) + "</p>";
+    if (S.notice) h += '<p class="notice">' + esc(S.notice) + "</p>";
     h += "</div>";
 
     if (S.pickOpen) h += pickSheetHtml();
@@ -2469,7 +2469,7 @@
       h += '<p class="notice notice--bad" role="alert">' + esc(S.addError) + "</p>";
     }
     if (S.addBusy) {
-      h += '<p class="notice" role="status">' + esc(S.addBusy) + "</p>";
+      h += '<p class="notice">' + esc(S.addBusy) + "</p>";
     }
 
     if (S.addStep === "choose") {
@@ -2477,7 +2477,7 @@
          badge, grown into the list it stood for). */
       /* A submission that died unwatched is owed a sentence, not silence. */
       if (S.videoFailed.length) {
-        h += '<div class="panel panel--flag vfailed" role="status">' +
+        h += '<div class="panel panel--flag vfailed">' +
              "<h2>" + (S.videoFailed.length === 1 ? "An import didn’t work"
                : S.videoFailed.length + " imports didn’t work") + "</h2>" +
              S.videoFailed.map(function (j) {
@@ -2594,7 +2594,7 @@
 
     if (S.addStep === "video") {
       if (S.videoWaking) {
-        h += '<p class="notice" role="status">Waking up the kitchen server — it ' +
+        h += '<p class="notice">Waking up the kitchen server — it ' +
              "falls asleep when nobody’s used it for a while. This can take up " +
              "to a minute.</p>";
       }
@@ -2604,7 +2604,7 @@
         var st = S.videoJob.status;
         var idx = st === "transcribing" ? 1 : st === "extracting" ? 2 : 0;
         var names = ["Fetching the video", "Listening to it", "Writing up the recipe"];
-        h += '<div class="panel vprog" role="status"><h2>' +
+        h += '<div class="panel vprog"><h2>' +
              (st === "queued" ? "Waiting its turn…" : "Working on it…") + "</h2>" +
              '<ol class="vprog__list">' +
              names.map(function (nm, i) {
@@ -3884,9 +3884,37 @@
     return "Kitchen Table";
   }
 
+  var lastAnnounced = "";
+
   function announce(text) {
     var live = document.getElementById("route-live");
+    lastAnnounced = String(text || "").trim();
     if (live) live.textContent = text;
+  }
+
+  /* The one live region, written once per distinct message.
+     Every state change here is a full re-render, so a role="status" INSIDE
+     the rendered HTML is a brand-new live region each time — and a screen
+     reader announces a live region as it appears. Measured before this: one
+     notice, twelve ordinary re-renders, twelve announcements of the same
+     sentence (criterion 16, "a notice fires once, for the action that earned
+     it"). The visible message stays exactly where it was; only the speaking
+     moved to the single stable region outside #app.
+     Never clears: emptying the region right after a route announcement would
+     cut that announcement off mid-sentence. */
+  function announceOnce(text) {
+    var t = String(text || "").trim();
+    if (!t || t === lastAnnounced) return;
+    announce(t);
+  }
+
+  /* Whatever the screen is currently saying that a person needs to hear. */
+  function liveMessage() {
+    if (S.notice) return S.notice;
+    if (S.addBusy) return S.addBusy;
+    if (S.videoWaking) return "Waking up the kitchen server.";
+    if (S.videoJob && S.videoJob.stage) return S.videoJob.stage;
+    return "";
   }
 
   /* Sets the one transient message slot and speaks it. Both callers live on
@@ -3973,6 +4001,9 @@
 
     S.route = next;
     S.notice = "";
+    /* A new screen starts listening again: the same sentence on a later
+       visit is new information, not a repeat. */
+    lastAnnounced = "";
 
     if (next.name === "recipe") {
       var r = byId(next.id);
@@ -4109,6 +4140,10 @@
     }
 
     app.innerHTML = html;
+
+    /* Anything the screen is now saying, said once — the rendered copy is
+       visible only, and this is the part a screen reader hears. */
+    announceOnce(liveMessage());
 
     /* Every flag is consumed by exactly one paint. A sheet slides up when it
        opens and then stays put, so ticking a filter chip inside it does not
