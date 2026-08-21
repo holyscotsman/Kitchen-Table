@@ -379,6 +379,105 @@ async function freshPage(br, opts) {
     await ctx.close();
   }
 
+  console.log('\n== R87 — the server\'s answers are shapes, not promises ==');
+  {
+    /* `R62` established the rule for stored data: every key this app reads
+       back is coerced where it is read, never trusted. The kitchen server
+       is the same kind of input and more so — it is remote, it is deployed
+       separately, and it can be a version ahead of or behind the page
+       asking. `normalizeDraft` already guards the draft that becomes a
+       recipe. The **job lists** did not: `S.videoReady = jobs` took
+       whatever arrived, and the Add screen then called `.map` on it and
+       read `.id` and `.title` off each entry.
+       So a server that answered `{jobs: "none"}` — a rename, a half-done
+       deploy, an error body — did not produce an empty list. It threw
+       inside render, and the Add screen, the way into the book for every
+       new recipe, went blank. The failure mode `R62` was written to end.
+       Each shape below is checked against the same bar: the screen still
+       draws, and the four ways in are still on it. */
+    const SHAPES = [
+      ['a string where the list should be', { jobs: 'none' }],
+      ['a number', { jobs: 7 }],
+      ['an object', { jobs: { id: 7 } }],
+      ['no jobs key at all', { total: 0 }],
+      ['a list with holes in it', { jobs: [null, 3, 'x'] }],
+      ['entries with no fields', { jobs: [{}, {}] }],
+      ['a body that is not an object', 'not json at all'],
+      ['entries whose fields are the wrong types',
+        { jobs: [{ id: { n: 1 }, title: [1, 2], platform: 9, created_at: 'soon' }] }]
+    ];
+    for (const [what, body] of SHAPES) {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', (route) => {
+        const u = new URL(route.request().url());
+        if (u.pathname === '/api/import/jobs') {
+          return route.fulfill({ status: 200, contentType: 'application/json',
+            headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+        }
+        return route.fulfill({ status: 404, contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' }, body: '{"error":"not found"}' });
+      });
+      const p = await ctx.newPage();
+      const errs = [];
+      p.on('pageerror', e => errs.push(String(e.message)));
+      await p.addInitScript((api) => localStorage.setItem('kt.importApi', JSON.stringify(api)), API);
+      let drew = 0;
+      try {
+        await p.goto(B + '/index.html#add');
+        await p.waitForSelector('.pathbtn', { timeout: 8000 });
+        await p.waitForTimeout(600);
+        /* The screen being up is not the question. The list arrives AFTER
+           the first render, and `fetchVideoReady` has a `.catch` on it — so
+           a throw inside that render is swallowed and the bad value simply
+           stays in `S.videoReady`, waiting. What it takes down is the NEXT
+           render, which is the reader's next tap. So tap something. */
+        await p.click('[data-act="theme"]');
+        await p.waitForTimeout(350);
+        drew = await p.locator('.pathbtn[data-key]').count();
+      } catch (e) { drew = -1; }
+      chk('the Add screen survives ' + what,
+        drew >= 4 && errs.length === 0,
+        'paths ' + drew + (errs.length ? ' :: ' + errs[0].slice(0, 70) : ''));
+      await ctx.close();
+    }
+
+    /* And the other half of the rule, which cost a broken suite to learn:
+       a boundary that DROPS what it cannot parse is worse than one that
+       passes it through. The first version of the normalizer required a
+       numeric id — reasonable, since every handler reads ids with
+       `parseInt` — and it silently swallowed a job whose id was a string.
+       That turns a future schema change into an empty waiting list with no
+       explanation. A job the server says is ready gets shown. */
+    {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', (route) => {
+        const u = new URL(route.request().url());
+        const body = u.pathname === '/api/import/jobs' &&
+          u.searchParams.get('status') === 'ready_for_review'
+          ? { jobs: [{ id: 'uuid-not-a-number', title: 'Soup From The Future',
+                       platform: 'youtube', created_at: new Date().toISOString() }] }
+          : { jobs: [] };
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+      });
+      const p = await ctx.newPage();
+      const errs = [];
+      p.on('pageerror', e => errs.push(String(e.message)));
+      await p.addInitScript((api) => localStorage.setItem('kt.importApi', JSON.stringify(api)), API);
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      let shown = 0;
+      try {
+        await p.waitForSelector('.vready', { timeout: 8000 });
+        shown = await p.locator('.vready .pathbtn').count();
+      } catch (e) { shown = 0; }
+      chk('a job with an id this build did not expect is still shown, not swallowed',
+        shown === 1, String(shown));
+      chk('and showing it threw nothing', errs.length === 0, errs.join(' | ').slice(0, 80));
+      await ctx.close();
+    }
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);
