@@ -2004,15 +2004,20 @@
 
     h += '<div class="bodygrid">';
 
+    var hasIng = (r.ingredients || []).length > 0;
     h += '<section class="bodygrid__ing"><h2 class="r-h2">Ingredients' +
          fieldFlagChip("ingredients", fieldFlags) + "</h2>" +
-         '<p class="hint">Tap to check off as you go</p>';
+         /* `R88` — only when there is something to tap. This sat above the
+            branch, so all four recipes with no ingredient list invited a
+            reader to check off items that are not there, directly above the
+            panel explaining that there are none. */
+         (hasIng ? '<p class="hint">Tap to check off as you go</p>' : "");
     /* A rescale changes the numbers in place, which is easy to miss at any font
        size and very easy to miss at 40px. The list flashes once so the change
        is seen rather than merely made. */
     var scaled = S.pulseScale ? " is-rescaled" : "";
 
-    if ((r.ingredients || []).length) {
+    if (hasIng) {
       h += '<ul class="checklist' + scaled + '">' + r.ingredients.map(function (line, i) {
         var done = !!S.checkedIng[i];
         var pop = S.pulseRow === "i:" + i ? " is-ticked" : "";
@@ -2043,6 +2048,17 @@
 
     h += '<section><h2 class="r-h2">Instructions' +
          fieldFlagChip("steps", fieldFlags) + "</h2>";
+    /* `R88` — the same courtesy the ingredients section has had since 071.
+       No recipe in the book is stepless today, but `recipes.json` is
+       hand-editable by design (`R62` exists because that is not
+       theoretical), and a heading over an empty list tells the reader
+       nothing at all — least of all that something is missing. */
+    if (!(r.steps || []).length) {
+      h += '<div class="panel panel--flag"><h2>No instructions were captured</h2>' +
+           "<p>This recipe has ingredients but no method. If you know how " +
+           "it goes, turn on <strong>Edit</strong> at the top of this page " +
+           "and write the steps in.</p></div></section>";
+    } else {
     h += '<ol class="checklist checklist--steps' + scaled + '">' +
          (r.steps || []).map(function (line, i) {
       var done = !!S.checkedStep[i];
@@ -2053,6 +2069,7 @@
              '<span class="checkrow__text">' + esc(scaleLine(line, mult, true)) +
              "</span></button></li>";
     }).join("") + "</ol></section>";
+    }
 
     h += "</div>";
 
