@@ -454,6 +454,36 @@ const { runJob, computeFps } = lib('pipeline');
       const walled = await fetch(base + '/api/health');
       chk('and the wall says something a person could act on',
         walled.status === 429 && /minute/i.test((await walled.json()).error));
+
+      /* `R81` — a wall you can walk around is scenery.
+         X-Forwarded-For is a list the CLIENT can start and every proxy
+         appends to: what arrives is `<whatever the client sent>, <what the
+         proxy saw>`. Keying the limiter on the leftmost entry keys it on
+         the half the caller wrote, so rotating a fake header gives a
+         hostile loop a fresh bucket on every request and it never meets
+         the wall at all — with a paid Whisper call and a paid Opus call
+         sitting behind it, per video.
+         Simulated the way it actually arrives: a forged prefix, then the
+         address the trusted proxy in front of this server appended. */
+      let spoofWall = -1;
+      for (let i = 0; i < 130; i++) {
+        const r = await fetch(base + '/api/health', {
+          headers: { 'x-forwarded-for': '10.9.8.' + (i % 250) + ', 203.0.113.7' }
+        });
+        if (r.status === 429) { spoofWall = i; break; }
+      }
+      chk('a forged X-Forwarded-For cannot walk around the wall',
+        spoofWall >= 110 && spoofWall <= 129,
+        spoofWall < 0 ? 'never walled in 130 requests' : 'walled at ' + spoofWall);
+
+      /* And the floor, which matters just as much: the cheap "fix" is to
+         ignore the header and key everything on the socket — which behind
+         one proxy is a single address, so the first person to poll would
+         wall the whole family. A different visitor must still get through. */
+      const neighbour = await fetch(base + '/api/health', {
+        headers: { 'x-forwarded-for': '198.51.100.4' } });
+      chk('and one visitor hitting the wall does not wall their neighbour',
+        neighbour.status === 200, String(neighbour.status));
     }
     srv.kill('SIGKILL');
   }

@@ -149,7 +149,23 @@ conversation, not a patch here.
 
 **What bounds the bill** is separate, and worth saying plainly, because
 every other limit here bounds a *burst* rather than a total: 120 requests
-a minute per address, eight jobs queued at once. None of those stops a
+a minute per address, eight jobs queued at once.
+
+*Per address* means something specific, and it was wrong until `R81`.
+`X-Forwarded-For` is a list the **client** can start and every proxy
+appends to, so what reaches this server is
+`<whatever the caller sent>, <what the proxy actually saw>`. Keying the
+limiter on the leftmost entry keys it on the half the caller wrote: a
+rotating fake header gave a hostile loop a fresh bucket on every request,
+and the wall was never met. The last entry is the one the trusted proxy
+appended, and that is what the limiter keys on now. **That assumes exactly
+one proxy hop** — browser → Render → here, which is this deployment. Put a
+CDN in front and the last entry becomes the CDN's edge address, shared by
+everybody, so that change means counting hops rather than taking the end.
+Both directions are held by tests: the forged header must not walk around
+the wall, and one visitor hitting it must not wall their neighbour (which
+is what ignoring the header altogether would do, since behind one proxy
+that leaves a single address for the whole family). None of those stops a
 patient stranger submitting one link every thirty seconds forever, and
 each import spends real money on the keys in Render's dashboard. So a
 day's importing is capped — **40 in any 24 hours**, counted in the

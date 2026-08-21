@@ -102,9 +102,28 @@ function send(res, status, body) {
  * polling, a wall against loops. Render terminates TLS in front of us, so
  * the caller is the first hop of x-forwarded-for. */
 const limiter = makeLimiter(120, 60000);
+/* The RIGHTMOST entry, not the leftmost (`R81`). X-Forwarded-For is a list
+ * the *client* can start and every proxy appends to, so what arrives here is
+ * `<whatever the caller sent>, <what the proxy actually saw>`. The leftmost
+ * entry is therefore written by the caller: keying the rate limiter on it
+ * hands a hostile loop a fresh bucket for every forged header, and the wall
+ * — the only thing between a script and a paid Whisper call plus a paid
+ * model call, per video — is never met.
+ *
+ * The last entry is the one the trusted proxy in front of this server
+ * appended, which makes it the only one worth keying on. That assumes
+ * exactly one such hop, which is this deployment: the browser talks to
+ * Render and Render talks to us. Putting a CDN in front would add a hop and
+ * make the last entry the CDN's edge rather than the visitor, at which point
+ * this needs to count hops instead of taking the end.
+ *
+ * With no header at all, the socket address is the truth. */
 function callerIp(req) {
   const fwd = req.headers["x-forwarded-for"];
-  if (fwd) return String(fwd).split(",")[0].trim();
+  if (fwd) {
+    const hops = String(fwd).split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
   return (req.socket && req.socket.remoteAddress) || "?";
 }
 
