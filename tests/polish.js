@@ -2444,6 +2444,141 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
   }
 
+  console.log('\n== Pressing Go on the Menu search did nothing (R105) ==');
+  {
+    /* The Return key on an iPhone reads "Go". The keyboard is standing over
+       the bottom half of the screen, the results are behind it, and pressing
+       Go was the obvious move. On Main it opened the top hit. On the Menu —
+       the screen with the search BUTTON on it, the one you reach in order to
+       search — it did nothing at all: no navigation, and the keyboard did not
+       even drop.
+
+       The handler asked `t.id === "menu-q"`. That string is the field's
+       `data-act`; its id is `menu-search`. No element in this app has ever
+       carried the id `menu-q`, so that half of the condition had never once
+       been true. It reads plausibly because `pick-q` genuinely is both an id
+       and a data-act, which is how the two namespaces got confused. */
+    const ctxG = await br.newContext({ ...devices['iPhone 13'] });
+    const pG = await ctxG.newPage();
+    const gErrs = []; pG.on('pageerror', e => gErrs.push(e.message));
+    await ctxG.route('**/*.onrender.com/**', r => r.abort('failed'));
+
+    const goSearch = async (hash, opener, field, term) => {
+      await pG.goto(B + '/index.html' + hash);
+      await pG.waitForSelector('.rcard, .searchfield');
+      if (opener) { await pG.click(opener); await pG.waitForSelector(field); }
+      await pG.fill(field, term);
+      await pG.waitForTimeout(350);
+      const first = await pG.evaluate(() => {
+        const a = document.querySelector('#app a.rcard[href]');
+        return a ? a.getAttribute('href') : null;
+      });
+      await pG.focus(field);
+      await pG.keyboard.press('Enter');
+      await pG.waitForTimeout(450);
+      return { first, hash: await pG.evaluate(() => location.hash) };
+    };
+
+    const menu = await goSearch('#menu', '[data-act="toggle-search"]', '#menu-search', 'chicken');
+    chk('the Menu search found something to open', !!menu.first, String(menu.first));
+    chk('Go on the Menu opens the top result', menu.hash === menu.first,
+        menu.hash + ' , wanted ' + menu.first);
+
+    /* The half that must not regress. */
+    const main = await goSearch('', null, '#main-search', 'chicken');
+    chk('Go on Main still opens the top result', main.hash === main.first,
+        main.hash + ' , wanted ' + main.first);
+
+    /* An empty box has no top result — only the list you were already
+       looking at. The Menu draws all 48 as `a.rcard` whether anyone has
+       searched or not, so an unguarded fix would answer Go by opening
+       whichever recipe happened to sort first. */
+    await pG.goto(B + '/index.html#menu');
+    await pG.waitForSelector('.rcard');
+    await pG.click('[data-act="toggle-search"]');
+    await pG.waitForSelector('#menu-search');
+    await pG.focus('#menu-search');
+    await pG.keyboard.press('Enter');
+    await pG.waitForTimeout(400);
+    chk('Go on an empty search box opens nothing',
+        (await pG.evaluate(() => location.hash)).indexOf('#menu') === 0,
+        await pG.evaluate(() => location.hash));
+
+    /* A search matching nothing prints its sentence exactly where the
+       keyboard is. Go has to get the keyboard out of the way of the answer,
+       which means blurring even when there is nowhere to go. */
+    await pG.fill('#menu-search', 'zzzqqq');
+    await pG.waitForTimeout(350);
+    await pG.focus('#menu-search');
+    await pG.keyboard.press('Enter');
+    await pG.waitForTimeout(400);
+    chk('a search matching nothing says so',
+        /no recipes match/i.test(await pG.evaluate(() => document.body.innerText)));
+    chk('and Go puts the keyboard away so it can be read',
+        await pG.evaluate(() => document.activeElement.id !== 'menu-search'),
+        await pG.evaluate(() => document.activeElement.id || document.activeElement.tagName));
+    chk('nothing threw', gErrs.length === 0, gErrs.join(' | '));
+
+    /* The guard, written the `R89`/`R103` way — derived from the source, not
+       from a list someone maintains. Every id this app LOOKS UP has to be an
+       id it can actually RENDER. That is the whole shape of this bug, and of
+       any future one where a `data-act`, a class or a stale name is tested
+       against `.id`.
+
+       Rendered ids are collected as literals plus the prefixes of the
+       templated ones (`id="e-ing-' + i + '"` covers `e-ing-0`), because a
+       generated id is still an id the app can produce. The reference regex
+       requires a real property access before `id` so that `job_id ===
+       "number"` is not read as an id lookup. */
+    const fs = require('fs'), path = require('path');
+    const appSrc = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const htmlSrc = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+    const looked = new Set();
+    let m;
+    const reGet = /getElementById\(\s*"([^"]+)"/g;
+    while ((m = reGet.exec(appSrc))) looked.add(m[1]);
+    const reEq = /(?:^|[^A-Za-z0-9_$])(?:[A-Za-z_$][A-Za-z0-9_$]*\.)?id\s*===\s*"([^"]+)"/g;
+    while ((m = reEq.exec(appSrc))) {
+      /* `typeof j.id === "number"` is a type test, not an id lookup — and
+         the guard finding that first is the point of writing the negative
+         check below rather than trusting a clean run. */
+      if (/typeof\s*$/.test(appSrc.slice(Math.max(0, m.index - 12), m.index + 1))) continue;
+      looked.add(m[1]);
+    }
+
+    const literal = new Set(), prefix = [];
+    const reHas = /id="([^"]*)"/g;
+    for (const src of [appSrc, htmlSrc]) {
+      reHas.lastIndex = 0;
+      while ((m = reHas.exec(src))) {
+        const v = m[1];
+        if (/['"]\s*\+/.test(v)) {          // id="e-ing-' + i + '"
+          const stem = v.split(/['"]/)[0];
+          if (stem) prefix.push(stem);
+        } else if (v) literal.add(v);
+      }
+    }
+
+    chk('the id lookups were read out of the source', looked.size >= 10,
+        [...looked].join(','));
+    chk('and the ids the app renders were too', literal.size >= 20,
+        String(literal.size));
+
+    const orphan = [...looked].filter(id =>
+      !literal.has(id) && !prefix.some(pre => id.indexOf(pre) === 0));
+    chk('every id the app looks up is one it can render',
+        orphan.length === 0, orphan.join(', '));
+
+    /* And the guard has to be able to fail: `menu-q` is the exact string
+       this round removed, and it must still be reported as an orphan if it
+       ever comes back. */
+    const wouldCatch = !literal.has('menu-q') &&
+      !prefix.some(pre => 'menu-q'.indexOf(pre) === 0);
+    chk('the guard would still catch the string that caused this',
+        wouldCatch === true);
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

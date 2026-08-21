@@ -5491,13 +5491,30 @@
       render();
       return;
     }
-    if (ev.key === "Enter" && (t.id === "main-search" || t.id === "menu-q")) {
+    /* Enter means "I have finished typing". On a phone the Return key is
+       labelled Go, the on-screen keyboard is standing over the results, and
+       the gesture has to do something. It opened the top hit on Main and did
+       NOTHING on the Menu — the screen with the search button on it — because
+       the id tested here was `menu-q`, which is that field's `data-act`, not
+       its id (`menu-search`). One string, two namespaces: the same confusion
+       `R103` found going the other way, and no element has ever carried that
+       id, so the branch had never once been true.
+
+       Guarded on there actually being a search term, because the Menu's list
+       is `a.rcard` whether anyone has searched or not: without the guard,
+       Enter in an empty search box would open whichever recipe happened to
+       sort first, which is not what the reader asked for. Main is safe by
+       construction — it draws no cards until a query — but the precondition
+       is the same sentence on both screens, so it is said once, out loud.
+
+       The keyboard goes away either way. A search matching nothing prints
+       "No recipes match" in exactly the place the keyboard was covering. */
+    if (ev.key === "Enter" && (t.id === "main-search" || t.id === "menu-search")) {
+      if (!t.value.trim()) return;
+      ev.preventDefault();
+      t.blur();
       var first = document.querySelector("#app a.rcard[href]");
-      if (first) {
-        ev.preventDefault();
-        t.blur();
-        location.hash = first.getAttribute("href");
-      }
+      if (first) location.hash = first.getAttribute("href");
       return;
     }
     if (ev.key === "Escape" && t.id === "serv-input") {
