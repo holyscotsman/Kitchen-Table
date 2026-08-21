@@ -181,6 +181,13 @@ merges the two, so "italian" can be folded into "Italian" after the fact.
 The switch in the mode strip on any recipe turns on Edit mode. Viewer mode shows
 no edit affordances at all.
 
+Edit mode and the Add review screen carry **the same field set** (`R65`), which
+is enforced now rather than intended: title, course, who it's from, servings,
+prep and cook time, ingredients, steps, notes, tags, photo. Course, prep and
+cook used to exist only on the way *in*, so a recipe filed under the wrong
+course could not be moved from the app at all — and course is the one field the
+app itself rewrites, since anything it doesn't recognise becomes Dinner.
+
 **Edits save to this browser only. Nothing is written back to the repository.**
 Change a recipe, press Save, and it persists on that device. To make an edit
 real for everyone, press **Download updated recipes.json** and commit that file:

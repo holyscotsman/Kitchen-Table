@@ -1074,6 +1074,92 @@ const browserContextWithReduce = (br) =>
     await ctxB.close();
   }
 
+  console.log('\n== Edit mode could not fix the field the app rewrites (R65) ==');
+  {
+    /* CLAUDE.md says the Add review screen "reuses the Edit-mode field set",
+       and it does not: Add has Course, Prep time and Cook time; Edit has
+       none of the three. So a recipe filed under the wrong course cannot be
+       moved from the app at all — and course is precisely the field the app
+       itself rewrites, because normalizeRecipe defaults anything it doesn't
+       recognise to Dinner. A family member who spots a dessert filed under
+       Dinner has no way to fix it short of downloading the JSON, editing it
+       by hand and committing. The times are the same story, smaller: they
+       print on the recipe page and could only ever be set by an importer. */
+    const pE = await ctx.newPage();
+    const eErrs = []; pE.on('pageerror', e => eErrs.push(e.message));
+    pE.on('dialog', d => d.accept());
+    const openEdit = async (id) => {
+      await pE.goto(B + '/index.html#' + id);
+      await pE.waitForSelector('.r-title');
+      if (!(await pE.locator('#e-title').count())) {
+        await pE.click('[data-act="toggle-edit"]');
+        await pE.waitForSelector('#e-title');
+      }
+    };
+    await openEdit('chicken-cordon-bleu');
+
+    /* The rule, and the reason the gap existed: the two field sets are meant
+       to be one field set. Compared by what they WRITE, not by their ids. */
+    const editKeys = await pE.evaluate(() =>
+      [...document.querySelectorAll('.recipe [data-k]')].map(e => e.getAttribute('data-k')));
+    await pE.goto(B + '/index.html#add');
+    await pE.evaluate(() => sessionStorage.clear());
+    await pE.reload();
+    await pE.waitForSelector('.pathbtn');
+    await pE.click('[data-key="review"]');
+    await pE.waitForSelector('#a-title');
+    const addKeys = await pE.evaluate(() =>
+      [...document.querySelectorAll('.addscreen [data-k]')].map(e => e.getAttribute('data-k')));
+    const missing = [...new Set(addKeys)].filter(k => editKeys.indexOf(k) === -1);
+    chk('every field the review screen writes, edit mode can write too',
+      missing.length === 0, missing.join(', '));
+    chk('and the comparison actually found the fields',
+      new Set(addKeys).size >= 8, String(new Set(addKeys).size));
+
+    await openEdit('chicken-cordon-bleu');
+    chk('edit mode offers a Course control', await pE.locator('#e-cat').count() === 1);
+    chk('with all ten courses on it',
+      await pE.locator('#e-cat option').count() === 10,
+      String(await pE.locator('#e-cat option').count()));
+    chk('and prep and cook time', await pE.locator('#e-prep').count() === 1 &&
+      await pE.locator('#e-cook').count() === 1);
+
+    /* Guarded: when these are missing the checks above already say so, and
+       a suite that dies on the wait hides everything after it. */
+    await pE.selectOption('#e-cat', 'Desserts', { timeout: 3000 }).catch(() => {});
+    await pE.fill('#e-prep', '15 min', { timeout: 3000 }).catch(() => {});
+    await pE.fill('#e-cook', '35 min', { timeout: 3000 }).catch(() => {});
+    await pE.click('[data-act="save"]');
+    await pE.waitForTimeout(500);
+    const eyebrow = await pE.locator('.r-eyebrow, .recipe').first().textContent();
+    chk('changing the course sticks', /Desserts/.test(eyebrow), eyebrow.slice(0, 60));
+    /* Back to the reader's side of the switch: edit mode is showing the
+       form, and a value typed into an input is not text on the page. */
+    await pE.click('[data-act="toggle-edit"]');
+    await pE.waitForTimeout(350);
+    const viewed = await pE.locator('.recipe').textContent();
+    chk('and the times show on the page a reader sees',
+      /15 min/.test(viewed) && /35 min/.test(viewed), viewed.slice(0, 80));
+
+    /* And it is really saved, not merely drawn. */
+    await pE.reload();
+    await pE.waitForSelector('.r-title');
+    chk('all three survive a reload',
+      /Desserts/.test(await pE.locator('.recipe').textContent()) &&
+      /15 min/.test(await pE.locator('.recipe').textContent()) &&
+      /35 min/.test(await pE.locator('.recipe').textContent()));
+
+    /* The course is a real filter, so moving a recipe has to move it in the
+       Menu as well — otherwise the fix is cosmetic. */
+    await pE.goto(B + '/index.html#menu?cat=Desserts');
+    await pE.waitForSelector('.rcard');
+    chk('and the Menu files it under its new course',
+      (await pE.locator('.rcard').allTextContents()).some(t => /Cordon Bleu/.test(t)));
+    await pE.evaluate(() => localStorage.removeItem('kt.recipes'));
+    chk('editing threw nothing', eErrs.length === 0, eErrs.join(' | '));
+    await pE.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);
