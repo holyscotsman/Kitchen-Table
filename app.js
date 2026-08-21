@@ -3672,6 +3672,7 @@
     d.prepTime = dur(node.prepTime);
     d.cookTime = dur(node.cookTime || node.totalTime);
     d.category = guessCategory(text(node.recipeCategory));
+    if (!d.category) { d.category = "Dinner"; d.flagged.push(COURSE_GUESS); }
     d.notes = text(node.description);
     return capDraft(d);
   }
@@ -3724,9 +3725,14 @@
     return d;
   }
 
+  /* Returns "" when the text does not say. The caller applies the default
+     AND flags it, because `082` is plain about this: a guess is disclosed,
+     never silent — and every other guess an import makes already is. The
+     course was the exception, so shortbread and tomato soup both arrived
+     filed under Dinner without a word (`R73`). */
   function guessCategory(raw) {
     var v = String(raw || "").toLowerCase().trim();
-    if (!v) return "Dinner";
+    if (!v) return "";
     /* Recipe sites emit singular categories — "Dessert", "Side dish", "Drink".
        Our names are plural, so match the stem as well or every import lands in
        Dinner. */
@@ -3741,8 +3747,13 @@
     if (/cocktail|martini|negroni/.test(v)) return "Cocktails";
     if (/smoothie|juice|tea|coffee|lemonade/.test(v)) return "Drinks";
     if (/bake|bread|scone|muffin/.test(v)) return "Baking";
-    return "Dinner";
+    return "";
   }
+
+  /* One sentence for the one field, used by every import path so they read
+     alike beside the servings flag they sit next to. */
+  var COURSE_GUESS = "Course — none was given; Dinner was assumed. " +
+    "Change it above if it belongs somewhere else.";
 
   /* ---- from a photo: in-browser OCR, lazily loaded ---- */
 
@@ -3932,6 +3943,7 @@
     var section = null;
     var sawHeadings = false;
     var sawServings = false;
+    var sawCourse = false;
 
     /* Meta lines claim their field and leave the flow: serves, times. */
     function claimMeta(line) {
@@ -3947,6 +3959,16 @@
       if (m && m[1].length < 25) { d.prepTime = m[1].trim(); return true; }
       m = line.match(/^(?:cook|bake|total)(?:\s*time\s*:?|\s*:)\s*(.+)$/i);
       if (m && m[1].length < 25) { d.cookTime = m[1].trim(); return true; }
+      /* A course, when the page says one. Recipe sites write it as
+         "Category: Dessert" or "Course: Side dish"; the colon is what keeps
+         this from swallowing a step. Cuisine is deliberately not read — it
+         is a tag, not a course. */
+      m = line.match(/^(?:category|course|meal type|type)\s*:\s*(.{1,40})$/i);
+      if (m) {
+        var c = guessCategory(m[1]);
+        if (c) { d.category = c; sawCourse = true; }
+        return true;
+      }
       return false;
     }
 
@@ -4003,6 +4025,7 @@
     if (!sawServings) {
       d.flagged.push("Servings — no count was found; 4 was assumed.");
     }
+    if (!sawCourse) d.flagged.push(COURSE_GUESS);
     if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("Ingredients — none were picked up."); }
     if (!d.steps.length) { d.steps = [""]; d.flagged.push("Steps — none were picked up."); }
     d.notes = notes.join(" ");
