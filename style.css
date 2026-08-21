@@ -1270,9 +1270,20 @@ a.applogo:hover {
   gap: 10px;
 }
 
+/* `R78` — the number being edited has to be readable while you edit it.
+   `min-width: 0` let this box shrink to 41px on a 390px phone, and 36 of
+   those pixels were `.input`'s own padding and border: five pixels of
+   window for a two-digit number. Three fields share that row and this is
+   the one whose field also carries two 48px buttons, so it lost every
+   time. It clipped at every font step; only Easy Read's single column
+   saved it, and that is the mode most readers never turn on.
+   The floor is in `em` so it tracks the A−/A+ step, and it is sized from
+   the smallest step — where the 36px of fixed chrome is the largest share
+   of the box. With a real minimum the row wraps instead of crushing the
+   field, which is the correct answer at 390px anyway. */
 .servrow__n {
   flex: 1;
-  min-width: 0;
+  min-width: 3.6em;
   text-align: center;
 }
 
@@ -1536,6 +1547,14 @@ a.applogo:hover {
   max-width: 820px;
   margin: 0 auto;
   padding: 22px var(--pad) 60px;
+}
+
+/* `R78` — the review form carries the A−/A+ step exactly the way `.recipe`
+   does: the px is set inline because the step is state, and everything
+   inside is em. That is what makes this field set match Edit mode at every
+   size instead of sitting at a fixed 13.6px. */
+.reviewform {
+  margin-top: 4px;
 }
 
 .addscreen__h1 {

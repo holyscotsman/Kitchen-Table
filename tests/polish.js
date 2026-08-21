@@ -1322,6 +1322,113 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxSW.close();
   }
 
+  console.log('\n== R78 — a number field can show its own number ==');
+  {
+    /* Found by looking at a screenshot of edit mode. The Serves box between
+       the − and + buttons measured 41px, of which 32px was `.input`'s side
+       padding and 4px its border: five pixels of window for a fifteen-pixel
+       digit. The number being edited was a sliver.
+       Three fields share that row, and `flex: 1 1 120px` crushed the one
+       whose field also has to carry two 48px buttons. It clipped at every
+       font step; only Easy Read's wrap to one column saved it, and Easy
+       Read is the mode most readers never turn on.
+       The criterion is deliberately not about servings: a number input must
+       be able to show the largest value it will accept. Narrower than that
+       is a field you cannot read while you type into it. */
+    const steps = [['default step', null], ['top step', '4']];
+    const forms = [
+      ['Edit mode', '#chicken-cordon-bleu', '.r-title', '[data-act="toggle-edit"]'],
+      ['Add review', '#add', '.pathbtn', '[data-key="review"]']
+    ];
+    /* Seed, then load. Both halves matter: a draft survives in
+       sessionStorage and #add resumes it rather than showing the path
+       picker, and a goto that only changes the hash is a same-document
+       navigation — the app keeps the step it booted with, so a storage
+       write followed by a hash goto measures the PREVIOUS iteration's
+       size. The blank page in between forces the real load. */
+    const openForm = async (hash, ready, open, fsIndex) => {
+      await p.goto(B + '/index.html');
+      await p.evaluate((v) => {
+        if (v === null) localStorage.removeItem('kt.fsIndex');
+        else localStorage.setItem('kt.fsIndex', v);
+        sessionStorage.removeItem('kt.addDraft');
+      }, fsIndex);
+      await p.goto('about:blank');
+      await p.goto(B + '/index.html' + hash);
+      await p.waitForSelector(ready);
+      await p.click(open);
+    };
+    for (const [stepName, fsIndex] of steps) {
+      for (const [where, hash, ready, open] of forms) {
+        await openForm(hash, ready, open, fsIndex);
+        const label = where + ' at the ' + stepName;
+        let nums = [];
+        /* Caught, not awaited bare: if the form stops rendering, that is one
+           FAIL line, not a dead suite. */
+        try {
+          await p.waitForSelector('input[type="number"]', { timeout: 8000 });
+          nums = await p.evaluate(() => {
+            const cvs = document.createElement('canvas').getContext('2d');
+            return [].slice.call(document.querySelectorAll('input[type="number"]')).map(el => {
+              const cs = getComputedStyle(el);
+              cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+              const room = el.clientWidth
+                - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+              const widest = el.getAttribute('max') || el.value || '';
+              return { id: el.id || el.name || '(unnamed)', widest,
+                       room: Math.round(room),
+                       need: Math.round(cvs.measureText(widest).width) };
+            });
+          });
+        } catch (e) { nums = []; }
+        chk(label + ': there is a number field to measure', nums.length > 0);
+        const tight = nums.filter(n => n.room < n.need);
+        chk(label + ': every number field can show its largest value',
+          tight.length === 0,
+          tight.map(n => n.id + ' "' + n.widest + '" needs ' + n.need
+                         + 'px, has ' + n.room).join('; '));
+      }
+    }
+    /* The root cause, asserted directly rather than through its symptom.
+       Edit mode puts the stepper's px on `.recipe`; the review form never
+       carried it, so its inputs were 0.85em of body 16px — 13.6px at the
+       top step as readily as at the bottom. The two forms are the same
+       field set and they have to be the same size. */
+    for (const [stepName, fsIndex] of steps) {
+      const sizes = {};
+      for (const [where, hash, ready, open, probe] of [
+        ['edit', '#chicken-cordon-bleu', '.r-title', '[data-act="toggle-edit"]', '#e-title'],
+        ['add', '#add', '.pathbtn', '[data-key="review"]', '#a-title']
+      ]) {
+        await openForm(hash, ready, open, fsIndex);
+        try {
+          await p.waitForSelector(probe, { timeout: 8000 });
+          sizes[where] = await p.evaluate(
+            (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize),
+            probe);
+        } catch (e) { sizes[where] = -1; }
+      }
+      chk('the review form is the same size as edit mode at the ' + stepName,
+        sizes.add > 0 && Math.abs(sizes.add - sizes.edit) < 0.5,
+        'edit ' + sizes.edit + 'px vs add ' + sizes.add + 'px');
+    }
+    /* A floor, so the pair above cannot pass by both being wrong: the top
+       step really is bigger than the default. */
+    {
+      const seen = [];
+      for (const v of ['0', '4']) {
+        await openForm('#add', '.pathbtn', '[data-key="review"]', v);
+        await p.waitForSelector('#a-title');
+        seen.push(await p.evaluate(
+          () => parseFloat(getComputedStyle(document.getElementById('a-title')).fontSize)));
+      }
+      chk('and the review form actually moves when the step does',
+        seen[1] > seen[0] * 1.5, seen.join(' -> '));
+    }
+    await p.goto(B + '/index.html');
+    await p.evaluate(() => localStorage.removeItem('kt.fsIndex'));
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
