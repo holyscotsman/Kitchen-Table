@@ -35,7 +35,14 @@ a known gap, not a silent one.
    as the only cue, which is exactly what criterion 12 says can never stand
    alone. The one deliberate exception stays: route headings take programmatic
    focus and are not interactive, so they draw nothing.
-7. **Names, labels, focus order and decorative artwork** (`R23`). Every
+7. **Live regions stay quiet** (`R36`). A notice fires once, for the action
+   that earned it. In an app that re-renders everything on every state
+   change, that means live regions live **outside** `#app` — a `role="status"`
+   in the rendered HTML is a new live region on every render, and each one is
+   announced. There is exactly one region, `#route-live`, written once per
+   distinct message; rendered notices are visible text only. `tests/kt.js`
+   counts inserted live regions the way a screen reader sees them.
+8. **Names, labels, focus order and decorative artwork** (`R23`). Every
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
    every decorative `<svg>` is hidden from the accessibility tree. Checked on
@@ -47,8 +54,10 @@ a known gap, not a silent one.
 
 ## Checked by the reviewer, by hand
 
-8. **No hover-only affordances.** Everything reachable by tap alone.
-9. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
+9. **No hover-only affordances.** Everything reachable by tap alone.
+   (Partly enforced: `tests/polish.js` proves no `a:hover` rule turns a
+   filled control invisible.)
+10. **Sheets/dialogs** follow the house contract: trap Tab, close on Escape,
    return focus to the opener. Reuse the existing machinery; don't rebuild it.
 11. **State is announced, not just drawn.** Toggles use `aria-pressed` /
     `aria-checked` / `role="switch"`; async outcomes land in a `role="status"`

@@ -150,6 +150,66 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await p.locator('button.servcard__value').count() === 1);
   }
 
+  console.log('\n== A notice is said once, for the action that earned it (R36) ==');
+  {
+    /* Criterion 16. Every state change here is a full re-render, so a
+       role="status" inside the rendered HTML is a NEW live region each time —
+       and a screen reader announces a live region as it appears. Tick ten
+       ingredients with a notice on screen and the notice is read ten times.
+       Counted the way a screen reader sees it: how many live regions get
+       inserted carrying that text. */
+    await p.goto(B+'/index.html#plan');
+    await p.reload();
+    await p.waitForSelector('.dayblock');
+    await p.evaluate(() => {
+      window.__spoken = [];
+      const seen = new WeakSet();
+      const read = (root) => {
+        (root.matches && root.matches('[role="status"], [aria-live]') ? [root] : [])
+          .concat([...(root.querySelectorAll
+            ? root.querySelectorAll('[role="status"], [aria-live]') : [])])
+          .forEach(el => {
+            if (seen.has(el)) return;
+            seen.add(el);
+            const t = (el.textContent || '').trim();
+            if (t) window.__spoken.push(t);
+          });
+      };
+      new MutationObserver(muts => {
+        muts.forEach(m => {
+          m.addedNodes.forEach(n => { if (n.nodeType === 1) read(n); });
+          if (m.type === 'characterData' && m.target.parentElement) read(m.target.parentElement);
+        });
+      }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+    /* Earn a notice: planning a meal says so. */
+    await p.click('[data-act="plan-pick"]');
+    await p.waitForSelector('[data-act="plan-assign"]');
+    await p.locator('[data-act="plan-assign"]').first().click();
+    await p.waitForTimeout(400);
+    const notice = (await p.locator('#main-content').textContent());
+    chk('planning a meal says so', /planned for/i.test(notice), notice.slice(0, 60));
+    await p.evaluate(() => window.__spoken = []);   // ignore the one it earned
+    /* Then six ordinary things that re-render the screen. */
+    for (let i = 0; i < 6; i++) {
+      await p.click('[data-act="week-next"]');
+      await p.waitForTimeout(120);
+      await p.click('[data-act="week-prev"]');
+      await p.waitForTimeout(120);
+    }
+    const spoken = await p.evaluate(() => window.__spoken);
+    const repeats = spoken.filter(t => /planned for/i.test(t)).length;
+    chk('an old notice is not read out again on every re-render',
+      repeats === 0, repeats + ' repeats: ' + spoken.slice(0, 2).join(' | '));
+    chk('and the message is still on the screen where it was put',
+      /planned for/i.test(await p.locator('#main-content').textContent()));
+    /* Said once is not the same as said never: the one stable region outside
+       #app is what carries it, and it must actually have carried it. */
+    chk('and it did reach the live region, once',
+      /planned for/i.test(await p.locator('#route-live').textContent()),
+      await p.locator('#route-live').textContent());
+  }
+
   console.log('\n== A search you can send to someone (R34) ==');
   await p.goto(B+'/index.html#menu');
   await p.reload();
