@@ -80,3 +80,15 @@ Pruning is never the default for precisely that second case.
   the next architecture step and is tracked in `GAMEPLAN.md`.
 - The schema already includes `kitchen.menu_plan` for the calendar, with
   per-meal servings and survival of recipe deletion designed in.
+
+## The recipe shape is written down three times
+
+`FIELD_ORDER` in `app.js` (what the download writes), `FIELD_ORDER` in
+`db/export.js` (what the database writes back), and the column list in
+`db/migrate.js` (what the database stores). They have to agree, and since
+`R66` they are checked to — including the half that catches tomorrow's
+field: **anything a form can write must be in the list**, or the download
+drops it without a word and the next nightly sync makes that permanent.
+
+If you add a field to a recipe, it goes in all three, and `tests/quick.js`
+will tell you which one you forgot.
