@@ -1548,6 +1548,59 @@ const browserContextWithReduce = (br) =>
     await p.goto('about:blank');
   }
 
+  console.log('\n== R94 — the tutorial must not promise a wider search than there is ==');
+  {
+    /* `README.md` is exact and the code agrees with it: search reads
+       **titles, ingredients and tags**, and "steps are deliberately not
+       searched this way". The in-app help said something else — that it
+       "looks inside the recipes too, so 'bacon' finds anything with bacon
+       in it" — and *anything* is a promise the app does not keep.
+       It is not hypothetical. `purée` appears in Crannachan's method, and
+       searching the book for that exact word, accents and all, returns
+       nothing at all. A cook looking for the thing they half-remember from
+       the method gets an empty screen and no reason for it.
+       Same class as `R63` and `R90`: the tutorial is held to what the app
+       does. Checked behaviourally rather than by wording, so a rewrite has
+       to stay true — the word is taken from a recipe's steps at runtime. */
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html');
+    await p.waitForSelector('#main-search');
+    const book = await p.evaluate(() => fetch('recipes.json').then(r => r.json()));
+    /* A word that appears in some recipe's steps and in no title, tag or
+       ingredient line anywhere — the exact case the promise gets wrong. */
+    const inSearched = new Set();
+    book.forEach(r => {
+      [r.title].concat(r.tags || []).concat(r.ingredients || []).forEach(t =>
+        String(t).toLowerCase().split(/[^a-z]+/).forEach(w => w && inSearched.add(w)));
+    });
+    let stepOnly = '';
+    for (const r of book) {
+      for (const line of (r.steps || [])) {
+        const w = String(line).toLowerCase().split(/[^a-z]+/)
+          .find(x => x.length >= 6 && !inSearched.has(x));
+        if (w) { stepOnly = w; break; }
+      }
+      if (stepOnly) break;
+    }
+    chk('the book contains a word that lives only in a method', !!stepOnly, stepOnly);
+    await p.fill('#main-search', stepOnly);
+    await p.waitForTimeout(450);
+    const hits = await p.evaluate(() => document.querySelectorAll('.cardgrid > *').length);
+    chk('and searching for it finds nothing, as README says it should',
+      hits === 0, stepOnly + ' -> ' + hits + ' hits');
+
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#help');
+    await p.waitForSelector('h1');
+    const help = (await p.locator('#app').textContent()).replace(/\s+/g, ' ');
+    chk('so the tutorial does not claim search finds anything at all',
+      !/finds anything/i.test(help),
+      (help.match(/[^.]*finds anything[^.]*\./i) || ['—'])[0].slice(0, 90));
+    chk('and it names what search actually reads',
+      /ingredient/i.test(help) && /tag/i.test(help),
+      help.slice(0, 60));
+  }
+
   console.log('\n== R90 — the tutorial owes the reader the whole app ==');
   {
     /* `R63` held the help page to being *accurate*. This holds it to being
