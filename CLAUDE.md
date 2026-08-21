@@ -466,7 +466,17 @@ rows in light mode** — and `R86` finished the sweep with the sort menu,
 an empty search, the planned week, the picker, the meal sheet, the tag
 sheet and the photo lightbox, each naming the selector that proves it
 opened (the floor immediately caught four routes auditing the screen
-behind a sheet that never opened). **`R101` made it able to reach the
+behind a sheet that never opened). **`R110` finished the sweep** with five: a
+plan that outlived its recipe, a recipe with nothing written down, a
+photo that failed *while the lightbox was open*, the **waiting card** a
+reader sits in front of for minutes while a video is written up, and
+the sentence shown when a link is one the server cannot take. The last
+three needed the audit to reach past `R101`'s seed, which answers
+"which recipe" and not "what did the wire do" or "what was half-done
+when the page reloaded": a route may now stub the **network**, and seed
+**sessionStorage** as well as local. All clean; and the floor caught
+the first attempt at the lightbox route auditing the screen behind a
+lightbox that never opened. **`R101` made it able to reach the
 rest**: every route had been given the same seeded data, so a state that
 only exists for a particular recipe was structurally unreachable and went
 unmeasured — which is why `R97`'s "Not given" servings card was argued

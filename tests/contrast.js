@@ -28,7 +28,7 @@ const CONTRAST = `(() => {
   let total=0;
   for(const mode of ['normal','easyread']){
   for(const theme of ['dark','light']){
-    for(const [name,hash,extra,seed] of [
+    for(const [name,hash,extra,seed,net] of [
       ['Main','#',null],['Menu','#menu',null],
       ['Menu + filter sheet','#menu','[data-act="open-filter"]'],
       ['Recipe','#chicken-cordon-bleu',null],
@@ -80,11 +80,83 @@ const CONTRAST = `(() => {
           ingredients:['1 cup butter, softened','3 cups all-purpose flour'],
           steps:['Cream the butter.','Bake at 400F for 10 minutes.'] }])
       }],
+      /* `R110` — two more states only a seed can reach, both of them a
+         familiar component put on a surface it was not written for, which
+         is the exact shape `R85` found 192 failures in.
+
+         A plan outlives its recipe (task 127): the slot degrades to the
+         name it was planned under and says "No longer in the book" — a
+         `.rcard__meta` on a surface that exists nowhere else in the app.
+
+         And a recipe with nothing written down draws BOTH of `R108`'s
+         panels at once, a heading and a paragraph inside `.panel--flag`
+         that the flagged route does not carry. */
+      ['Week planner, a plan that outlived its recipe','#plan',null,{
+        'kt.plan': JSON.stringify([{ id:'pgone', date:new Date().toISOString().slice(0,10),
+          slot:'dinner', recipeId:'no-such-recipe', servings:4,
+          titleThen:'Granny’s Clootie Dumpling' }])
+      }],
+      ['Recipe with nothing written down','#nowt',null,{
+        'kt.recipes': JSON.stringify([{ id:'nowt', title:'Nothing At All',
+          category:'Dinner', contributor:'Lindsay', servings:4,
+          ingredients:[], steps:[] }])
+      }],
+      /* And the state this audit could not reach at all until it could stub
+         the NETWORK as well as the storage — the seed `R101` added answers
+         "which recipe", not "what did the wire do". `R98` wrote this branch
+         for a real case its own comment describes: the hero button is
+         painted before the 404 comes back, so a photo can already be open
+         full screen when it fails, and a dialog is not something to yank
+         away underneath someone.
+
+         Reached deterministically rather than by racing a timer: the first
+         request for the photo is answered with a real image marked
+         `no-store`, so the hero paints; the lightbox opening must go back
+         to the wire for it, and that request is refused. */
+      /* `R111` — the two Add-screen states left. The waiting card is not an
+         edge case: it is where a reader sits for MINUTES while a video is
+         written up, and `CLAUDE.md` requires a cold start to read as
+         "waking up the kitchen…" rather than as an error — wording nothing
+         had ever contrast-checked. The refusal beside it is the other half:
+         the sentence shown when a link is not one the server can take. */
+      ['Add, waiting on the kitchen server','#add',null,{
+        'session:kt.addDraft': JSON.stringify({ step:'video',
+          videoUrl:'https://youtu.be/vid1', videoJob:{ id:7, status:'transcribing' } })
+      }],
+      ['Add, a link the server will not take','#add','[data-key="video"]',null],
+      ['Recipe photo that failed while open','#chicken-cordon-bleu','[data-act="open-lb"]',
+        { 'kt.images': '{}',
+          'kt.recipes': JSON.stringify([{ id:'chicken-cordon-bleu',
+            title:'Chicken Cordon Bleu', category:'Dinner', contributor:'Joan',
+            servings:4, ingredients:['4 large chicken breasts'],
+            steps:['Bake it.'], image:'images/chicken-cordon-bleu.jpg' }]) },
+        { url: '**/images/**', holdMs: 4000 }],
     ]){
       const ctx=await br.newContext({...devices['iPhone 13']});
       /* Hermetic: the kitchen server is never poked from CI — the app's
          ready-list fetch on #add fails silently, exactly like offline. */
       await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
+      /* `R110` — a route may stub the wire as well as the storage.
+         The photo is left HANGING and then refused: the request never
+         completes, so the hero button is painted with nothing in it yet,
+         which is exactly `R98`'s case — the button exists before the
+         failure comes back, so the lightbox can already be open when it
+         does.
+
+         The first cut served the hero a real image marked `no-store` and
+         refused everything after, on the theory that the lightbox would
+         have to go back to the wire for it. `no-store` governs the HTTP
+         cache; it does not stop a browser reusing an image it has already
+         decoded for an identical `src` in the same document. Locally it
+         re-fetched and the state opened; in CI it did not, and four routes
+         audited the screen behind a lightbox that was never there. Never
+         letting it load leaves nothing to reuse — a state, not a race. */
+      if(net){
+        await ctx.route(net.url, async r => {
+          await new Promise(x=>setTimeout(x, net.holdMs||2500));
+          return r.abort('failed');
+        });
+      }
       const p=await ctx.newPage();
       await p.addInitScript(a=>{
         localStorage.setItem('kt.theme',JSON.stringify(a.t));
@@ -100,8 +172,14 @@ const CONTRAST = `(() => {
           {id:'pseed1',date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
           {id:'pseed2',date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
         ]));
-        /* This route's own seed, last so it can override the shared one. */
-        if(a.s) Object.keys(a.s).forEach(k=>localStorage.setItem(k,a.s[k]));
+        /* This route's own seed, last so it can override the shared one.
+           `R111` — a `session:` prefix writes to sessionStorage instead,
+           which is where the half-finished import lives (gameplan 084): the
+           waiting card is restored from it at boot, and there is no other
+           way to be standing in front of that screen without a server. */
+        if(a.s) Object.keys(a.s).forEach(k=>k.indexOf('session:')===0
+          ? sessionStorage.setItem(k.slice(8),a.s[k])
+          : localStorage.setItem(k,a.s[k]));
       },{t:theme,e:mode==='easyread',s:seed||null});
       await p.goto(''+B+'/index.html'+hash);
       await p.waitForTimeout(900);
@@ -116,12 +194,28 @@ const CONTRAST = `(() => {
       if(name==='Menu search, nothing found'){
         await p.fill('#menu-search','zzzqqqx'); await p.waitForTimeout(400);
       }
+      if(name==='Add, a link the server will not take'){
+        /* Refused in the page, before any request — the app knows the two
+           platforms it can fetch, so this needs no server to reach. */
+        await p.fill('#a-vurl','https://example.com/not-a-video');
+        await p.click('[data-act="video-submit"]');
+        await p.waitForTimeout(500);
+      }
       const need={'Recipe with no serving count':'.servcard__value--none',
+        'Week planner, a plan that outlived its recipe':'.mealcard--gone',
+        'Recipe with nothing written down':'.panel--flag',
+        'Recipe photo that failed while open':'.lightbox__gone',
+        'Add, waiting on the kitchen server':'.vprog',
+        'Add, a link the server will not take':'.notice--bad',
         'Recipe photo lightbox':'.lightbox','Menu sort menu':'.sortmenu','Menu search, nothing found':'.emptybox, .empty, #main-content',
         'Week planner, planned':'.shoplist__items','Week planner picker':'#pick-q',
         'Week planner meal sheet':'.sheet','Menu tag sheet':'.sheet'}[name];
-      if(need && !(await p.locator(need).count())){
-        console.log('  (state never opened: '+name+' — wanted '+need+')'); total++;
+      /* Wait for the state rather than sampling once: a state that arrives
+         off a network failure lands when the failure does, not on a fixed
+         timer. It still fails loudly if it never arrives. */
+      if(need){
+        try{ await p.waitForSelector(need,{timeout:6000}); }
+        catch(e){ console.log('  (state never opened: '+name+' — wanted '+need+')'); total++; }
       }
       const bad=await p.evaluate(CONTRAST);
       console.log('['+mode+'/'+theme+'] '+name+': '+(bad.length?bad.length+' FAILURES':'AA clean'));
