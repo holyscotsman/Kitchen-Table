@@ -21,7 +21,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, postDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, postDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -46,6 +46,7 @@ function stubKitchen(ctx, opts) {
     }
     if (req.method() === 'POST' && /\/accept$/.test(u.pathname)) {
       o.accepted.push({ path: u.pathname, body: req.postDataJSON() });
+      if (o.failAccept) return json(o.failAccept.status, { error: o.failAccept.error });
       return json(200, { ok: true, id: 'video-test-soup' });
     }
     return json(404, { error: 'not found' });
@@ -603,6 +604,84 @@ async function freshPage(br, opts) {
       chk('and showing it threw nothing', errs.length === 0, errs.join(' | ').slice(0, 80));
       await ctx.close();
     }
+  }
+
+  console.log('\n== A refusal is not an outage (R107) ==');
+  {
+    /* Save on a video draft writes to this phone and then tells the server,
+       so the database gets the reviewed recipe and the job leaves the
+       waiting list. That call can fail two ways, and they are not the same
+       thing: the server could not be REACHED, or the server LOOKED at the
+       recipe and said no. `validateRecipe` refuses a contributor over 60
+       characters, a notes field over 2000, a list over 100 items, a
+       servings outside 1-40 — every one of them reachable from the review
+       screen.
+
+       Both got the same sentence: "couldn't be told YET ... stays in the
+       waiting list FOR NOW". For a refusal that is a promise of a retry
+       that is never coming. The job sits in the waiting list forever, the
+       server said exactly what was wrong, and the app threw the words away
+       — the error was not even bound in the catch.
+
+       kitchenFetch has always known the difference: it marks an answered
+       error so it will not retry one. It then built a fresh Error and
+       dropped the flag on the floor, so no caller could act on it. */
+    const stages = [
+      { id: 7, status: 'downloading', eta_seconds: 95, overrun: false },
+      { id: 7, status: 'ready_for_review', result_json: READY_RESULT }
+    ];
+    const saveThrough = async (opts) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      await p.click('.pathbtn[data-key="video"]');
+      await p.fill('#a-vurl', 'https://youtu.be/vid1');
+      await p.click('[data-act="video-submit"]');
+      await p.waitForSelector('#a-title', { timeout: 20000 });
+      await p.click('[data-act="add-save"]');
+      await p.waitForTimeout(2200);
+      const notice = await p.evaluate(() => {
+        const n = document.querySelector('.notice');
+        return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+      });
+      const saved = await p.evaluate(() => {
+        const raw = localStorage.getItem('kt.recipes');
+        return raw ? !!JSON.parse(raw).find(r => r.id === 'video-test-soup') : false;
+      });
+      await ctx.close();
+      return { notice, saved, stub, errs: p.errs };
+    };
+
+    const refused = await saveThrough({
+      polls: stages,
+      failAccept: { status: 400, error: 'servings must be a whole number 1–40' }
+    });
+    chk('a refusal repeats what the server actually said',
+      /servings must be a whole number/.test(refused.notice), refused.notice);
+    chk('and does not promise a retry that is not coming',
+      !/\byet\b|for now/i.test(refused.notice), refused.notice);
+    chk('and still says the recipe is safe on this phone',
+      /saved on this phone/i.test(refused.notice) && refused.saved === true,
+      refused.notice + ' | stored=' + refused.saved);
+    chk('the refusal was not retried', refused.stub.accepted.length === 1,
+      String(refused.stub.accepted.length));
+
+    const unreachable = await saveThrough({
+      polls: stages,
+      failAccept: { status: 503, error: '' }
+    });
+    chk('an outage still says it will keep waiting',
+      /yet|for now/i.test(unreachable.notice), unreachable.notice);
+    chk('and the two failures no longer read identically',
+      unreachable.notice !== refused.notice,
+      JSON.stringify([refused.notice.slice(0, 40), unreachable.notice.slice(0, 40)]));
+
+    const fine = await saveThrough({ polls: stages });
+    chk('a save the server accepts says nothing about failing',
+      !/would not accept|couldn.t be told/i.test(fine.notice), fine.notice);
+    chk('nothing threw across all three', refused.errs.length === 0 &&
+      unreachable.errs.length === 0 && fine.errs.length === 0,
+      refused.errs.concat(unreachable.errs, fine.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
