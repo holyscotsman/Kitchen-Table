@@ -2042,6 +2042,27 @@
          '<input class="input" id="e-title" data-act="d" data-k="title" value="' +
          esc(d.title) + '" /></div>';
 
+    /* `R65` — Course, and the times. CLAUDE.md says the review screen
+       "reuses the Edit-mode field set", and for a long time it did not:
+       Course, Prep time and Cook time existed only on the way IN. So a
+       recipe filed under the wrong course could not be moved from the app
+       at all — and course is exactly the field the app itself rewrites,
+       since normalizeRecipe defaults anything it doesn't recognise to
+       Dinner. Same controls as the review screen, deliberately: one field
+       set, one grammar, wherever a recipe is corrected. */
+    h += '<div class="fieldrow">' +
+         '<div class="field"><label class="field__label" for="e-cat">Course</label>' +
+         '<select class="input" id="e-cat" data-act="d" data-k="category">' +
+         CATS.map(function (c) {
+           return '<option' + (c === d.category ? " selected" : "") + ">" + esc(c) + "</option>";
+         }).join("") + "</select></div>" +
+         '<div class="field"><label class="field__label" for="e-from">From</label>' +
+         '<input class="input" id="e-from" data-act="d" data-k="contributor" list="who-list-e" value="' +
+         esc(d.contributor) + '" />' +
+         '<datalist id="who-list-e">' +
+         WHO.map(function (w) { return '<option value="' + esc(w) + '"></option>'; }).join("") +
+         "</datalist></div></div>";
+
     h += '<div class="fieldrow">' +
          '<div class="field"><label class="field__label" for="e-serves">Serves</label>' +
          /* Same one-tap stepper as the review form (R3) — parity, so the
@@ -2056,9 +2077,12 @@
          'data-d="1" aria-label="More servings"' +
          (parseInt(d.servings, 10) >= 40 ? " disabled" : "") + ">" + I.plus(24) + "</button>" +
          "</div></div>" +
-         '<div class="field"><label class="field__label" for="e-from">From</label>' +
-         '<input class="input" id="e-from" data-act="d" data-k="contributor" value="' +
-         esc(d.contributor) + '" /></div></div>';
+         '<div class="field"><label class="field__label" for="e-prep">Prep time</label>' +
+         '<input class="input" id="e-prep" data-act="d" data-k="prepTime" value="' +
+         esc(d.prepTime || "") + '" /></div>' +
+         '<div class="field"><label class="field__label" for="e-cook">Cook time</label>' +
+         '<input class="input" id="e-cook" data-act="d" data-k="cookTime" value="' +
+         esc(d.cookTime || "") + '" /></div></div>';
 
     h += '<h2 class="r-h2">Ingredients</h2>';
     h += d.ingredients.map(function (line, i) {
@@ -2224,8 +2248,11 @@
   function startDraft(r) {
     S.draft = {
       title: r.title,
+      category: r.category,
       servings: r.servings,
       contributor: r.contributor,
+      prepTime: r.prepTime || "",
+      cookTime: r.cookTime || "",
       ingredients: (r.ingredients || []).slice(),
       steps: (r.steps || []).slice(),
       notes: r.notes || "",
@@ -2244,6 +2271,15 @@
     updated.steps = S.draft.steps.filter(function (x) { return x.trim(); });
     if (S.draft.notes.trim()) updated.notes = S.draft.notes.trim();
     else delete updated.notes;
+    /* `R65` — course and the times. Course only moves to something the app
+       recognises: an unknown value would be silently rewritten to Dinner on
+       the next load, which is the whole reason this field had to become
+       editable. An emptied time is a removal, not a blank string. */
+    if (CATS.indexOf(S.draft.category) > -1) updated.category = S.draft.category;
+    ["prepTime", "cookTime"].forEach(function (k) {
+      var v = String(S.draft[k] || "").trim();
+      if (v) updated[k] = v; else delete updated[k];
+    });
     var tags = parseTags(S.draft.tags);
     if (tags.length) updated.tags = tags; else delete updated.tags;
 
