@@ -51,6 +51,44 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   }
   chk('menu scroll position restored', Math.abs(back-y)<200, y+' -> '+back);
 
+  /* A different list is a different screen. The saved position was filed
+     under the screen's NAME, so all six Menus shared one number: scroll the
+     whole 48-card book, then ask Main for Desserts, and the six-card list
+     opened at its own end — the browser clamped the inherited offset to the
+     bottom of a shorter page, putting the heading, the search box and the
+     first four recipes above the viewport. A list you have just asked for
+     has no place to return to; it starts at the top. */
+  await p.goto(B+'/index.html#menu'); await p.waitForSelector('.rcard');
+  await p.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+  await p.waitForTimeout(400);
+  await p.evaluate(()=>{location.hash='#menu?cat=Desserts';});
+  await p.waitForTimeout(500);
+  let land = await p.evaluate(()=>window.scrollY);
+  chk('a freshly filtered Menu opens at the top', land<50, 'landed at '+Math.round(land));
+  chk('its first card is on screen', await p.evaluate(()=>{
+    const c=document.querySelector('.rcard');
+    return !!c && c.getBoundingClientRect().top>0;
+  }));
+
+  /* ...and the promise this must not cost: a filtered list you leave for a
+     recipe still gives you back your place in it. */
+  await p.goto(B+'/index.html#menu?cat=Dinner'); await p.waitForSelector('.rcard');
+  await p.evaluate(()=>window.scrollTo(0,1400));
+  await p.waitForTimeout(400);
+  const fy = await p.evaluate(()=>window.scrollY);
+  await p.click('.rcard >> nth=4');
+  await p.waitForSelector('.r-title');
+  await p.goBack();
+  await p.waitForSelector('.rcard');
+  let fback = 0;
+  for (let t = 0; t < 20; t++) {
+    await p.waitForTimeout(150);
+    fback = await p.evaluate(()=>window.scrollY);
+    if (Math.abs(fback-fy) < 200) break;
+  }
+  chk('a filtered list still restores its own place', Math.abs(fback-fy)<200,
+      fy+' -> '+fback);
+
   console.log('\n== Reset local changes ==');
   await p.goto(B+'/index.html#chicken-cordon-bleu'); await p.waitForSelector('.r-title');
   await p.click('[data-act="toggle-edit"]'); await p.waitForTimeout(300);
