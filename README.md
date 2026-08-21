@@ -99,6 +99,14 @@ scale. Before this, doubling turned `7-8 slices of bacon` into `14-8 slices`,
 and — the one that still looked like an amount — `1-1/2 teaspoons vanilla` into
 `2-1/2 teaspoons`, when one and a half doubled is three.
 
+A quantity behind a label is still a quantity (`R58`). Cards label their
+sections — `For the sauce: 6 tablespoons butter`, `Brine: 3 cups water` — and
+twelve lines across three recipes do, none of which scaled at all, because only
+the start of the line was ever read. Doubling Chicken Lasagne served eighteen
+people from a sauce still made for nine, silently. When an ingredient line opens
+with no quantity, the first number followed by a measurement is now taken as the
+amount. Steps are deliberately not searched this way.
+
 **Tap any ingredient or step to check it off** while you cook. That state is
 deliberately per-visit and resets when you leave the recipe.
 

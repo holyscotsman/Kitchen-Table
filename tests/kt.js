@@ -800,6 +800,68 @@ const browserContextWithReduce = (br) =>
     await pH.close();
   }
 
+  console.log('\n== A quantity behind a label is still a quantity (R58) ==');
+  {
+    /* Cards label their sections. "For the sauce: 6 tablespoons butter",
+       "Brine: 3 cups water", "Sauce: 1/8 teaspoon dill weed" — twelve lines
+       across three recipes, and not one of them scaled, because the scaler
+       only ever looked at the start of the line. Doubling Chicken Lasagne
+       served eighteen people from a sauce still made for nine, and said
+       nothing about it: six of its fourteen ingredients simply did not move.
+       That is the quietest of the three scaling faults and the worst of
+       them — the other two at least look wrong. */
+    const pL = await ctx.newPage();
+    const doubled = async (id, servings) => {
+      await pL.goto(B + '/index.html#' + id);
+      await pL.waitForSelector('.checklist');
+      for (let i = 0; i < servings; i++) {
+        await pL.click('[data-act="serv+"]');
+        await pL.waitForTimeout(60);
+      }
+      await pL.waitForTimeout(250);
+      return pL.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    };
+
+    const las = await doubled('chicken-lasagne', 9);
+    const sauce = las.filter(l => /^For the sauce:/.test(l));
+    chk('the lasagne sauce is six labelled lines', sauce.length === 6, String(sauce.length));
+    chk('butter doubles behind its label',
+      sauce.some(l => /For the sauce: 12 tablespoons butter/.test(l)), sauce.join(' | '));
+    chk('and so does a mixed number behind one',
+      sauce.some(l => /For the sauce: 3 tablespoons minced garlic/.test(l)), sauce.join(' | '));
+    chk('and a bare fraction',
+      sauce.some(l => /For the sauce: 1 teaspoon poultry seasoning/.test(l)), sauce.join(' | '));
+    chk('and one that lands on a kitchen fraction',
+      sauce.some(l => /For the sauce: 1½ teaspoons? salt/.test(l)), sauce.join(' | '));
+    chk('every labelled sauce line moved',
+      sauce.every(l => !/: (6 tablespoons|1 1\/2|1\/2 teaspoon|3\/4 teaspoon|5 cups)/.test(l)),
+      sauce.join(' | '));
+
+    const brine = (await doubled('pork-chops-white-wine', 4)).filter(l => /^Brine:/.test(l));
+    chk('the brine doubles too',
+      brine.length === 2 && brine.every(l => /: 6 (tbsp|cups)/.test(l)), brine.join(' | '));
+
+    const schn = (await doubled('pork-schnitzel', 2)).filter(l => /^Sauce:/.test(l));
+    chk('and the schnitzel sauce, hyphenated mixed number and all',
+      schn.some(l => /Sauce: 3 teaspoons all-purpose flour/.test(l)), schn.join(' | '));
+    chk('including the eighth of a teaspoon',
+      schn.some(l => /Sauce: ¼ teaspoon dill weed/.test(l)), schn.join(' | '));
+
+    /* The search is for ingredients only. R56 settled what a step's leading
+       number means; hunting through the rest of a sentence for something
+       that looks like an amount is a different and much freer licence, and
+       this app does not take it. */
+    await pL.goto(B + '/index.html#fries-in-ninja');
+    await pL.waitForSelector('.checklist--steps');
+    for (let i = 0; i < 4; i++) { await pL.click('[data-act="serv+"]'); await pL.waitForTimeout(60); }
+    await pL.waitForTimeout(250);
+    const steps = await pL.locator('.checklist--steps .checkrow__text').allTextContents();
+    chk('steps are not searched for quantities mid-sentence',
+      steps.join(' | ') === '390 - 3 mins | Fries - 6 mins | Add fish - 9 mins (turn after 5)',
+      steps.join(' | '));
+    await pL.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);
