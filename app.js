@@ -5550,10 +5550,24 @@
     var sp = new URLSearchParams(location.search);
     var text = [sp.get("url"), sp.get("text"), sp.get("title")]
       .filter(Boolean).join(" ");
-    if (!text) return null;
+    /* Trimmed, not merely non-empty: a share carrying only whitespace has
+       nothing to act on, and since `R99` an unmatched text opens the paste
+       box — so " " would otherwise land the reader in an empty importer
+       they never asked for. */
+    if (!text.trim()) return null;
     try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
     var m = text.match(/https?:\/\/[^\s"'<>]+/i);
-    if (!m) return null;
+    if (!m) {
+      /* `R99` — no address in it, so the words ARE the recipe. The manifest
+         asks for `text`, which is what makes the app an option in the share
+         sheet for a selection rather than a link; throwing that selection
+         away landed the reader on the front screen with nothing on it and
+         no way back to what they had sent. It goes to the paste box, which
+         is the import path that needs no network at all. Pre-filled, not
+         parsed: the URL path pre-fills too, and only a video ever submits
+         itself. */
+      return { text: text };
+    }
     var url = m[0].replace(/[),.;!?]+$/, "");
     return { url: url, video: /youtube\.com|youtu\.be|instagram\.com|instagr\.am/i.test(url) };
   }
@@ -5592,7 +5606,8 @@
           submitVideo();
         } else {
           S.addStep = "link";
-          S.addUrl = shared.url;
+          if (shared.url) S.addUrl = shared.url;
+          else S.addPaste = shared.text;
           render();
         }
       }
