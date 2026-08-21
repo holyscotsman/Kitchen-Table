@@ -522,7 +522,9 @@
      invented number in a book of someone's recipes. Those are not the same
      price. Ingredient lines are not gated by this — a leading number there
      IS an amount, by definition. */
-  var STEP_UNIT = new RegExp("^[\\s.]*(?:" + [
+  /* The hyphen in the character class is for compounds a card writes as one
+     word — "15-ounce can", "10-oz tin" — which are amounts like any other. */
+  var STEP_UNIT = new RegExp("^[\\s.-]*(?:" + [
     "cups?", "tbsp", "tbs", "tablespoons?", "tsp", "teaspoons?",
     "oz", "ounces?", "lbs?", "pounds?", "g", "grams?", "kg", "ml",
     "litres?", "liters?", "pints?", "pt", "quarts?", "qt", "gallons?",
@@ -591,6 +593,46 @@
     return null;
   }
 
+  /* `R60` — what the scaler deliberately did NOT touch.
+     Twenty-eight ingredient lines in the book carry a second amount after
+     the one that scales: "1 lb (450g) chicken breast", "1 cup (2 sticks)
+     butter", "1 jar (16 ounces) Picante Sauce". Some are conversions of the
+     same amount and would want scaling; some are pack sizes and must not
+     be. Telling those apart is a judgement about meaning, not a parsing
+     question, and getting it wrong invents a number — so this app does what
+     it does everywhere else and says so instead of guessing. Returns the
+     amount it left alone ("450g"), or "" when there isn't one. */
+  function unscaledExtra(text) {
+    var s = String(text);
+    var from = -1;
+    var q = readQty(s, 0);
+    if (q) {
+      from = q.len;
+    } else {
+      for (var i = 0; i < s.length; i++) {
+        if (!isQtyStart(s, i)) continue;
+        var qq = readQty(s, i);
+        if (qq && STEP_UNIT.test(s.slice(i + qq.len))) { from = i + qq.len; break; }
+      }
+      if (from < 0) return "";
+    }
+    for (var j = from; j < s.length; j++) {
+      if (!isQtyStart(s, j)) continue;
+      var q2 = readQty(s, j);
+      if (!q2) continue;
+      var u = s.slice(j + q2.len).match(STEP_UNIT);
+      if (u) return (s.substr(j, q2.len) + u[0]).replace(/^[\s.]+|[\s.]+$/g, "");
+    }
+    return "";
+  }
+
+  /* The first character of a number, never the middle of one. */
+  function isQtyStart(s, i) {
+    var c = s.charAt(i);
+    if (c < "0" || c > "9") return false;
+    return !(i > 0 && /[\d.]/.test(s.charAt(i - 1)));
+  }
+
   function scaleLine(text, mult, unitsOnly) {
     if (Math.abs(mult - 1) < 0.001) return text;
     var s = String(text);
@@ -617,9 +659,7 @@
        this app does not take it. */
     if (unitsOnly) return s;
     for (var i = 0; i < s.length; i++) {
-      var c = s.charAt(i);
-      if (c < "0" || c > "9") continue;
-      if (i > 0 && /[\d.]/.test(s.charAt(i - 1))) continue;   // mid-number
+      if (!isQtyStart(s, i)) continue;
       var qq = readQty(s, i);
       if (qq && STEP_UNIT.test(s.slice(i + qq.len))) {
         return s.slice(0, i) + qq.scale(mult) + s.slice(i + qq.len);
@@ -1836,8 +1876,18 @@
     h += "</div>";
 
     if (S.serves !== r.servings) {
+      /* Say how many lines carry an amount that did not move, so the
+         sentence a cook reads matches what the list actually shows. */
+      var keptCount = (r.ingredients || []).filter(function (l) {
+        return unscaledExtra(l);
+      }).length;
       h += '<p class="scalednote">Amounts adjusted from the original ' +
-           r.servings + '.<span class="screen-only"> Tap − / + to change.</span></p>';
+           r.servings + "." +
+           (keptCount
+             ? " " + keptCount + (keptCount === 1 ? " line carries" : " lines carry") +
+               " a second amount that was left as written — check those."
+             : "") +
+           '<span class="screen-only"> Tap − / + to change.</span></p>';
     }
 
     if ("wakeLock" in navigator) {
@@ -1862,10 +1912,17 @@
       h += '<ul class="checklist' + scaled + '">' + r.ingredients.map(function (line, i) {
         var done = !!S.checkedIng[i];
         var pop = S.pulseRow === "i:" + i ? " is-ticked" : "";
+        /* `R60` — an amount on this line the scaler left alone, named
+           rather than hidden. Only while the recipe is actually rescaled:
+           at the original count nothing has moved and there is nothing to
+           check. A label, not a control — the row itself is the button. */
+        var kept = Math.abs(mult - 1) < 0.001 ? "" : unscaledExtra(line);
         return '<li><button type="button" class="checkrow press" aria-pressed="' +
                done + '" data-act="chk-i" data-i="' + i + '">' +
                '<span class="checkbox' + pop + '">' + (done ? I.check(18) : "") + "</span>" +
                '<span class="checkrow__text">' + esc(scaleLine(line, mult)) +
+               (kept ? '<span class="keptnote"> — ' + esc(kept) +
+                 " not adjusted</span>" : "") +
                "</span></button></li>";
       }).join("") + "</ul>";
     } else {
@@ -3845,7 +3902,11 @@
     if (r.cookTime) lines.push("Cook: " + r.cookTime);
     lines.push("", "INGREDIENTS");
     if ((r.ingredients || []).length) {
-      r.ingredients.forEach(function (i) { lines.push("- " + scaleLine(i, mult)); });
+      r.ingredients.forEach(function (i) {
+        var kept = Math.abs(mult - 1) < 0.001 ? "" : unscaledExtra(i);
+        lines.push("- " + scaleLine(i, mult) +
+          (kept ? " (" + kept + " not adjusted)" : ""));
+      });
     } else {
       lines.push("(not captured for this recipe)");
     }

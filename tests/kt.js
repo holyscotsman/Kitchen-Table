@@ -912,6 +912,85 @@ const browserContextWithReduce = (br) =>
     await pR.close();
   }
 
+  console.log('\n== The amounts the scaler did not touch, said out loud (R60) ==');
+  {
+    /* Twenty-eight ingredient lines carry a second amount after the one
+       that scales: "1 lb (450g) chicken breast", "1 cup (2 sticks) butter",
+       "1 jar (16 ounces) Picante Sauce". Some are conversions of the same
+       amount and would want scaling; some are pack sizes and must not be.
+       Telling those apart is a judgement about meaning, not a parsing
+       question, and getting it wrong invents a number — so the app does
+       what it does everywhere else and says so instead of guessing.
+       Before this the line simply contradicted itself: "2 lb (450g)". */
+    const pK = await ctx.newPage();
+    const open = async (id) => {
+      await pK.goto(B + '/index.html#' + id);
+      await pK.waitForSelector('.checklist');
+    };
+    const bump = async (n) => {
+      for (let i = 0; i < n; i++) { await pK.click('[data-act="serv+"]'); await pK.waitForTimeout(60); }
+      await pK.waitForTimeout(250);
+    };
+
+    await open('chicken-stroganoff');
+    chk('at the original count nothing is marked',
+      await pK.locator('.keptnote').count() === 0,
+      String(await pK.locator('.keptnote').count()));
+    chk('and the scaled note is not there either',
+      await pK.locator('.scalednote').count() === 0);
+
+    await bump(4);
+    const rows = await pK.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    const chicken = rows.find(l => /chicken breast/i.test(l)) || '';
+    chk('a doubled line names the amount it did not change',
+      /^2 lb \(450g\) chicken breast.*450g not adjusted/.test(chicken), chicken);
+    chk('it names the value rather than showing a bare marker',
+      (await pK.locator('.keptnote').first().textContent()).includes('450g'),
+      await pK.locator('.keptnote').first().textContent());
+    chk('every line that carries one is marked',
+      await pK.locator('.keptnote').count() === 4,
+      String(await pK.locator('.keptnote').count()));
+    chk('and the note at the top says how many',
+      /4 lines carry a second amount/.test(await pK.locator('.scalednote').textContent()),
+      await pK.locator('.scalednote').textContent());
+
+    /* A label, not a control. The row is the button; a second tappable
+       thing inside it would be a trap, and the 44px floor would apply. */
+    chk('the mark is a label, not something to tap',
+      await pK.locator('.keptnote button, .keptnote a').count() === 0 &&
+      await pK.evaluate(() => {
+        const n = document.querySelector('.keptnote');
+        return n.tagName === 'SPAN' && !n.hasAttribute('data-act');
+      }));
+
+    /* Back where it started, there is nothing to check and nothing said. */
+    for (let i = 0; i < 4; i++) { await pK.click('[data-act="serv-"]'); await pK.waitForTimeout(60); }
+    await pK.waitForTimeout(250);
+    chk('stepping back to the original clears the marks',
+      await pK.locator('.keptnote').count() === 0 &&
+      await pK.locator('.scalednote').count() === 0);
+
+    /* A recipe with no such lines says nothing extra — the sentence has to
+       match what the list actually shows. */
+    await open('chicken-cordon-bleu');
+    await bump(2);
+    chk('a recipe with none of them gets no extra sentence',
+      await pK.locator('.keptnote').count() === 0 &&
+      !/second amount/.test(await pK.locator('.scalednote').textContent()),
+      await pK.locator('.scalednote').textContent());
+
+    /* Paper and the plain-text download carry it too: the cook away from
+       the screen is the one who most needs to know. */
+    await open('chicken-stroganoff');
+    await bump(4);
+    await pK.emulateMedia({ media: 'print' });
+    chk('it survives onto paper',
+      await pK.evaluate(() =>
+        getComputedStyle(document.querySelector('.keptnote')).display !== 'none'));
+    await pK.emulateMedia({ media: 'screen' });
+    await pK.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);

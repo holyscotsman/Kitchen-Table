@@ -112,6 +112,16 @@ A range is a range however it is written (`R59`). `7-8`, `2 - 4`, `1 to 2`,
 ends scale. Four more lines were reading as `2 to 2` and `3 - 2` on a doubled
 recipe, which is not a range at all.
 
+**An amount the app did not change says so** (`R60`). Twenty-eight ingredient
+lines carry a second amount after the one that scales — `1 lb (450g) chicken
+breast`, `1 cup (2 sticks) butter`, `1 jar (16 ounces) Picante Sauce`. Some are
+conversions of the same amount and would want scaling; some are pack sizes and
+must not be. Telling those apart is a judgement about meaning, and getting it
+wrong invents a number, so the app names what it left alone instead of guessing:
+`2 lb (450g) chicken breast — 450g not adjusted`. The note appears only while
+the recipe is rescaled, the sentence at the top says how many lines carry one,
+and both reach the printed page and the plain-text download.
+
 **Tap any ingredient or step to check it off** while you cook. That state is
 deliberately per-visit and resets when you leave the recipe.
 

@@ -325,3 +325,36 @@ step call sites. **Why it was taken without asking:** the alternative was
 shipping a recipe book that tells someone to run an air fryer at 780°F, and
 no reading of the spec asks for that — CLAUDE.md's own definition of done
 says the stepper "rescales **ingredient** quantities".
+
+## R60 — A second amount is disclosed, never guessed at
+
+**Provisional; the disclosure is one helper to delete.** Twenty-eight
+ingredient lines carry a second amount after the one that scales. Doubling
+rendered `2 lb (450g) chicken breast` — a line that now contradicts itself,
+because the metric is still the amount for four people.
+
+Scaling it too is right for some of them and wrong for others, and the
+difference is meaning, not syntax:
+
+| Line | The parenthetical is | Scale it? |
+|---|---|---|
+| `1 lb (450g) chicken breast` | the same amount, converted | yes |
+| `1 cup (2 sticks) butter` | the same amount, converted | yes |
+| `1 jar (16 ounces) Picante Sauce` | the size of one jar | **no** |
+| `2 pork cutlets (about 5 ounces each)` | the size of one cutlet | **no** |
+
+A rule could be written — outer unit is a measure, scale; outer unit is a
+container, don't — but `1 medium onion, chopped (about 1.5 cup/200g)` and
+`4 boneless 8 ounce pork chops` do not fit either side of it, and a rule that
+is right most of the time still invents a number the rest of the time.
+
+**So the app says what it left alone**: `— 450g not adjusted`, on the line, only
+while the recipe is rescaled, with a count in the sentence at the top. That is
+the same answer this app gives everywhere else it cannot be certain — the
+importer flags rather than guesses, OCR flags rather than invents — and it is
+the answer that costs a cook a glance instead of an ingredient.
+
+**What it costs if reversed:** delete `unscaledExtra()` and its three call
+sites. **Why it was taken without asking:** the alternative was leaving lines
+that contradict themselves on screen, and the only other alternative was
+guessing at meaning in a book of someone's recipes.
