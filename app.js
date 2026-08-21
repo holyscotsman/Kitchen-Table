@@ -533,9 +533,41 @@
     "stalks?", "eggs?"
   ].join("|") + ")\\b", "i");
 
+  /* A hyphen means two different things on a recipe card, and they are
+     opposites. "1-1/2 teaspoons" is one amount — the handwritten way to
+     write one and a half. "7-8 slices" is two ends of a range. Both open
+     with a number and a hyphen, and the scaler used to read every one of
+     them as "a number, then some text", which doubled the first and left
+     the rest: "14-8 slices", and — the dangerous one, because it still
+     looks like an amount — "2-1/2 teaspoons" where one and a half doubled
+     is three.
+     Told apart by what follows the hyphen: a fraction makes it one amount,
+     a whole number makes it a range. Six ingredient lines in the book. */
+  var MIXED_HYPHEN = /^(\d+)\s*[-–]\s*(\d+)\/(\d+)/;
+  var RANGE = /^(\d+(?:\.\d+)?)(\s*[-–]\s*)(\d+(?:\.\d+)?)(?!\s*\/)/;
+
   function scaleLine(text, mult, unitsOnly) {
     if (Math.abs(mult - 1) < 0.001) return text;
     var whole = String(text);
+
+    var mx = whole.match(MIXED_HYPHEN);
+    if (mx) {
+      var rest = whole.slice(mx[0].length);
+      if (unitsOnly && !STEP_UNIT.test(rest)) return whole;
+      return fmtQty((parseFloat(mx[1]) +
+        parseFloat(mx[2]) / parseFloat(mx[3])) * mult) + rest;
+    }
+    var rg = whole.match(RANGE);
+    if (rg) {
+      var tail = whole.slice(rg[0].length);
+      /* The step gate (R56) governs a range exactly as it governs a single
+         number — "390 - 3 mins" is an air-fryer setting read either way,
+         and treating it as a range would have made it 780 - 6. */
+      if (unitsOnly && !STEP_UNIT.test(tail)) return whole;
+      return fmtQty(parseFloat(rg[1]) * mult) + rg[2] +
+             fmtQty(parseFloat(rg[3]) * mult) + tail;
+    }
+
     return whole.replace(
       /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/,
       function (m) {
