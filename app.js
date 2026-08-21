@@ -2102,7 +2102,11 @@
     }) : [];
   }
 
-  function persistPlan() { save(K.plan, S.plan); }
+  /* Same rule as persistRecipes (R44): a week the phone could not keep must
+     not be drawn as kept. The plan is smaller than the overlay, so it fails
+     later — but "later" is not "never", and the sentence that follows a plan
+     is a promise. */
+  function persistPlan() { return save(K.plan, S.plan); }
 
   function isoDate(d) {
     return d.getFullYear() + "-" +
@@ -4353,7 +4357,13 @@
         titleThen: pr.title,
         servings: pr.servings
       });
-      persistPlan();
+      if (!persistPlan()) {
+        S.plan.pop();
+        S.pickOpen = false;
+        S.pickFor = null;
+        setNotice(RECIPES_FULL_MSG);
+        return;
+      }
       setNotice(pr.title + " planned for " + prettyDate(S.pickFor.date) + ".");
       S.pickFor = null;
       closeSheet("pickOpen");
