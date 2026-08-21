@@ -102,6 +102,16 @@ function send(res, status, body) {
  * polling, a wall against loops. Render terminates TLS in front of us, so
  * the caller is the first hop of x-forwarded-for. */
 const limiter = makeLimiter(120, 60000);
+
+/* `R91` — the same key, a longer window. The day cap in the database bounds
+ * what a day can COST; this bounds what one caller can take of it, so a
+ * stranger cannot spend the whole forty and leave the family locked out of
+ * their own importer. Counted in memory on purpose: a spin-down forgiving
+ * someone costs nothing here, because the money is still walled by the cap
+ * that is counted in the database. */
+const callerDay = makeLimiter(budget.CALLER_DAY_CAP, 24 * 60 * 60 * 1000);
+/* The comment above stale-guards itself: this must stay the trusted key
+ * from callerIp(), which R81 moved to the proxy-appended hop. */
 /* The RIGHTMOST entry, not the leftmost (`R81`). X-Forwarded-For is a list
  * the *client* can start and every proxy appends to, so what arrives here is
  * `<whatever the caller sent>, <what the proxy actually saw>`. The leftmost
@@ -200,6 +210,15 @@ async function postVideo(req, res) {
      where created_at > now() - interval '24 hours'`;
   const capped = budget.dayCapMessage(usedToday[0] && usedToday[0].n);
   if (capped) return send(res, 429, { error: capped });
+  /* And the caller's own share of that day (`R91`). Asked after the day cap
+   * so that when the kitchen really is closed, everybody hears the same
+   * sentence — being told "this phone is resting" while the whole importer
+   * is down would be a lie by omission. */
+  if (!callerDay.hit(callerIp(req), Date.now())) {
+    return send(res, 429, {
+      error: budget.callerDayMessage(budget.CALLER_DAY_CAP, budget.CALLER_DAY_CAP)
+    });
+  }
   const contributor = typeof body.contributor === "string"
     ? body.contributor.trim().slice(0, 60) : null;
   const rows = await sql`

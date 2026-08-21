@@ -36,4 +36,41 @@ function dayCapMessage(usedToday, cap) {
     "neither of them needs the server at all.";
 }
 
-module.exports = { DAY_CAP, dayCapMessage };
+/* `R91` — the cap above is a ceiling on the DAY. This one is a ceiling on
+ * a CALLER, and they are different promises.
+ *
+ * The day cap bounds the money, which is what it was written for. It does
+ * not stop one stranger spending the whole forty and leaving the family
+ * locked out of their own importer until tomorrow — at no cost to the
+ * stranger, since this API has no login by design and its address ships in
+ * the page.
+ *
+ * `R81` is what makes this worth building. Before it the caller key was the
+ * leftmost X-Forwarded-For entry, so anyone could rotate a header and be a
+ * new caller on every request; a per-caller count would have been theatre.
+ * Now the key is the hop the trusted proxy appended.
+ *
+ * This is a FAIRNESS valve, not a spending wall. The spending wall is the
+ * database-backed day cap and it is unchanged — so this one may be counted
+ * in memory, where a spin-down forgiving a stranger costs nothing, because
+ * the forty still holds either way.
+ *
+ * Deliberately generous: a household shares one address, so this has to sit
+ * well above what a family does in a day and only bite on abuse. */
+const ENV_CALLER = parseInt(process.env.KT_CALLER_DAY_CAP, 10);
+const CALLER_DAY_CAP = ENV_CALLER > 0 ? ENV_CALLER : 15;
+
+/* Same contract as dayCapMessage: null = go ahead, a string = the sentence.
+ * Fails open for the same reason. The wording differs on purpose — this
+ * wall is about THIS phone, not about the kitchen closing for everyone. */
+function callerDayMessage(usedByCaller, cap) {
+  const limit = cap === undefined ? CALLER_DAY_CAP : cap;
+  if (!(Number(usedByCaller) >= limit)) return null;
+  return "You’ve sent " + limit + " videos to the kitchen today, which is " +
+    "plenty for one day — so this phone is resting until tomorrow while the " +
+    "importer stays open for everyone else. Typing a recipe in by hand and " +
+    "importing from a photo both still work, and neither of them needs the " +
+    "server at all.";
+}
+
+module.exports = { DAY_CAP, dayCapMessage, CALLER_DAY_CAP, callerDayMessage };

@@ -267,6 +267,51 @@ const { runJob, computeFps } = lib('pipeline');
       /interval '24 hours'/.test(fn) && /count\(\*\)/.test(fn));
     chk('a refused import is a 429, the same language as the other walls',
       /send\(res, 429/.test(fn));
+
+    /* `R91` — the ceiling above is a ceiling on the DAY, not on a caller,
+       and those are different promises. It bounds the money, which is what
+       it was written for. It does not stop one stranger spending the whole
+       forty and leaving the family locked out of their own importer until
+       tomorrow — at no cost to the stranger, since the API has no login by
+       design and its address ships in the page.
+       `R81` is what makes a per-caller wall worth building: before it, the
+       caller key was the leftmost `X-Forwarded-For` entry, so anyone could
+       rotate a header and be a new caller on every request. Now the key is
+       the hop the trusted proxy appended, and a per-caller count means
+       something.
+       This one is a FAIRNESS valve, not a spending wall — the spending wall
+       is the database-backed day cap, which is unchanged. So it may live in
+       memory: a spin-down forgiving a stranger costs nothing, because the
+       forty still holds. */
+    chk('a caller\'s own day has a ceiling too',
+      typeof budget.CALLER_DAY_CAP === 'number' &&
+      budget.CALLER_DAY_CAP > 0 && budget.CALLER_DAY_CAP < budget.DAY_CAP,
+      String(budget.CALLER_DAY_CAP));
+    chk('and it leaves real room for everybody else',
+      budget.DAY_CAP - budget.CALLER_DAY_CAP >= 10,
+      budget.DAY_CAP + ' - ' + budget.CALLER_DAY_CAP);
+    chk('an ordinary caller never meets it',
+      budget.callerDayMessage(3, 15) === null &&
+      budget.callerDayMessage(14, 15) === null);
+    chk('the caller who takes too much is stopped',
+      typeof budget.callerDayMessage(15, 15) === 'string' &&
+      typeof budget.callerDayMessage(99, 15) === 'string');
+    {
+      const m = budget.callerDayMessage(15, 15);
+      chk('and that refusal, like the other, leaves them somewhere to go',
+        /photo/i.test(m) && /(typ|by hand)/i.test(m), m);
+      chk('it never blames the person', !/abuse|banned|blocked/i.test(m), m);
+      chk('and it says the wall is theirs alone, not the kitchen closing',
+        /you|your/i.test(m), m);
+    }
+    chk('a count it cannot read lets the caller through, like the other wall',
+      budget.callerDayMessage(NaN, 15) === null &&
+      budget.callerDayMessage(undefined, 15) === null);
+    chk('the route asks before it queues',
+      fn.indexOf('callerDayMessage') > -1 &&
+      fn.indexOf('callerDayMessage') < fn.indexOf('insert into kitchen.import_jobs'));
+    chk('and it counts the caller the trusted way R81 established',
+      /callerIp\(req\)/.test(fn));
   }
 
   console.log('\n== R27: the nightly sync cannot quietly empty the book ==');
