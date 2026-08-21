@@ -113,6 +113,54 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     [...document.querySelectorAll('.shoplist__items li')].some(li => /\d\.\d/.test(li.textContent)))));
   chk('the preview says what it is', (await p.locator('.shoplist__head').textContent()).toLowerCase().includes('preview'));
 
+  console.log('\n== A plan that could not be kept must not say it was (R45) ==');
+  {
+    /* R44's shape, one key over. The plan goes through the same save() that
+       swallows a quota error, and the same "it worked" sentence follows it —
+       so on a full phone the week says a meal is planned, draws it in the
+       day, and loses it on the next load. */
+    const ctxP = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pP = await ctxP.newPage();
+    const errsP = []; pP.on('pageerror', e => errsP.push(e.message));
+    await pP.goto(B + '/index.html#plan');
+    await pP.waitForSelector('.dayblock');
+    await pP.evaluate(() => {
+      let n = 0;
+      for (const size of [64, 8, 1]) {
+        const blob = 'x'.repeat(size * 1024);
+        try { for (let i = 0; i < 4000; i++, n++) localStorage.setItem('kt.fill.' + n, blob); }
+        catch (e) { /* next, smaller */ }
+      }
+    });
+    await pP.click('[data-act="plan-pick"]');
+    await pP.waitForSelector('[data-act="plan-assign"]');
+    await pP.locator('[data-act="plan-assign"]').first().click();
+    await pP.waitForTimeout(400);
+    const said = await pP.locator('#main-content').textContent();
+    chk('it does not claim the meal is planned',
+      !/planned for/i.test(said), said.slice(0, 80));
+    chk('and says the phone is full instead',
+      /full|no room/i.test(said), said.slice(0, 120));
+    chk('the day does not draw a meal it could not keep',
+      await pP.locator('.mealcard').count() === 0,
+      String(await pP.locator('.mealcard').count()));
+    chk('without throwing', errsP.length === 0, errsP.join(' | '));
+    /* With room again, planning works exactly as it always did. */
+    await pP.evaluate(() => Object.keys(localStorage)
+      .filter(k => k.indexOf('kt.fill.') === 0).forEach(k => localStorage.removeItem(k)));
+    await pP.click('[data-act="plan-pick"]');
+    await pP.waitForSelector('[data-act="plan-assign"]');
+    await pP.locator('[data-act="plan-assign"]').first().click();
+    await pP.waitForTimeout(400);
+    chk('with room again it plans and says so',
+      /planned for/i.test(await pP.locator('#main-content').textContent()));
+    await pP.reload();
+    await pP.waitForSelector('.dayblock');
+    chk('and the meal is really there after a reload',
+      await pP.locator('.mealcard').count() >= 1);
+    await ctxP.close();
+  }
+
   console.log('\n== Print view (129) ==');
   await p.emulateMedia({ media: 'print' });
   const printState = await p.evaluate(() => ({
