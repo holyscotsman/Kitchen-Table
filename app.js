@@ -535,55 +535,89 @@
 
   /* A hyphen means two different things on a recipe card, and they are
      opposites. "1-1/2 teaspoons" is one amount — the handwritten way to
-     write one and a half. "7-8 slices" is two ends of a range. Both open
-     with a number and a hyphen, and the scaler used to read every one of
-     them as "a number, then some text", which doubled the first and left
-     the rest: "14-8 slices", and — the dangerous one, because it still
+     write one and a half. "7-8 slices" is two ends of a range. Told apart
+     by what follows the hyphen: a fraction makes it one amount, a whole
+     number makes it a range and both ends scale. Before `R57` the scaler
+     read every one of them as "a number, then some text" and doubled only
+     the first: "14-8 slices", and — the dangerous one, because it still
      looks like an amount — "2-1/2 teaspoons" where one and a half doubled
-     is three.
-     Told apart by what follows the hyphen: a fraction makes it one amount,
-     a whole number makes it a range. Six ingredient lines in the book. */
-  var MIXED_HYPHEN = /^(\d+)\s*[-–]\s*(\d+)\/(\d+)/;
-  var RANGE = /^(\d+(?:\.\d+)?)(\s*[-–]\s*)(\d+(?:\.\d+)?)(?!\s*\/)/;
+     is three. */
+  var QTY = [
+    /* mixed, hyphenated: 1-1/2 */
+    [/^(\d+)\s*[-–]\s*(\d+)\/(\d+)/, function (m, mult) {
+      return fmtQty((parseFloat(m[1]) +
+        parseFloat(m[2]) / parseFloat(m[3])) * mult);
+    }],
+    /* a range: 7-8, 2 - 4. Must be tried after the mixed form, which it
+       would otherwise swallow — hence the lookahead for the slash. */
+    [/^(\d+(?:\.\d+)?)(\s*[-–]\s*)(\d+(?:\.\d+)?)(?!\s*\/)/, function (m, mult) {
+      return fmtQty(parseFloat(m[1]) * mult) + m[2] +
+             fmtQty(parseFloat(m[3]) * mult);
+    }],
+    /* one amount: 1 1/2, 3/4, 2, 0.5 */
+    [/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/, function (m, mult) {
+      var t = m[1], n;
+      if (t.indexOf("/") >= 0) {
+        var parts = t.trim().split(/\s+/);
+        var fr = parts[parts.length - 1].split("/");
+        n = (parts.length > 1 ? parseFloat(parts[0]) : 0) +
+            parseFloat(fr[0]) / parseFloat(fr[1]);
+      } else {
+        n = parseFloat(t);
+      }
+      return fmtQty(n * mult);
+    }]
+  ];
+
+  /* Reads one quantity at `at`, in whichever shape it is written.
+     Returns { len, scale } or null. */
+  function readQty(s, at) {
+    var rest = s.slice(at);
+    for (var i = 0; i < QTY.length; i++) {
+      var m = rest.match(QTY[i][0]);
+      if (m) {
+        var render = QTY[i][1];
+        return { len: m[0].length, scale: function (mult) { return render(m, mult); } };
+      }
+    }
+    return null;
+  }
 
   function scaleLine(text, mult, unitsOnly) {
     if (Math.abs(mult - 1) < 0.001) return text;
-    var whole = String(text);
+    var s = String(text);
 
-    var mx = whole.match(MIXED_HYPHEN);
-    if (mx) {
-      var rest = whole.slice(mx[0].length);
-      if (unitsOnly && !STEP_UNIT.test(rest)) return whole;
-      return fmtQty((parseFloat(mx[1]) +
-        parseFloat(mx[2]) / parseFloat(mx[3])) * mult) + rest;
-    }
-    var rg = whole.match(RANGE);
-    if (rg) {
-      var tail = whole.slice(rg[0].length);
-      /* The step gate (R56) governs a range exactly as it governs a single
-         number — "390 - 3 mins" is an air-fryer setting read either way,
-         and treating it as a range would have made it 780 - 6. */
-      if (unitsOnly && !STEP_UNIT.test(tail)) return whole;
-      return fmtQty(parseFloat(rg[1]) * mult) + rg[2] +
-             fmtQty(parseFloat(rg[3]) * mult) + tail;
+    var q = readQty(s, 0);
+    if (q) {
+      if (unitsOnly && !STEP_UNIT.test(s.slice(q.len))) return s;
+      return q.scale(mult) + s.slice(q.len);
     }
 
-    return whole.replace(
-      /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/,
-      function (m) {
-        if (unitsOnly && !STEP_UNIT.test(whole.slice(m.length))) return m;
-        var n;
-        if (m.indexOf("/") >= 0) {
-          var parts = m.trim().split(/\s+/);
-          var frac = parts[parts.length - 1].split("/");
-          n = (parts.length > 1 ? parseFloat(parts[0]) : 0) +
-              parseFloat(frac[0]) / parseFloat(frac[1]);
-        } else {
-          n = parseFloat(m);
-        }
-        return fmtQty(n * mult);
+    /* `R58` — a quantity behind a label is still a quantity. Cards label
+       their sections: "For the sauce: 6 tablespoons butter", "Brine: 3 cups
+       water", "Sauce: 1/8 teaspoon dill weed". Twelve lines across three
+       recipes, and not one of them used to scale, because only the start of
+       the line was ever read. Doubling Chicken Lasagne served eighteen
+       people from a sauce still made for nine, and said nothing about it.
+       So when a line opens with no quantity at all, the first number that
+       is followed by a measurement is taken as the amount — the same
+       allowlist the step gate uses, for the same reason: a miss costs a
+       line that doesn't scale, a wrong match costs an invented number.
+       Steps are deliberately not searched this way. `R56` settled what a
+       step's LEADING number means; hunting through the rest of a sentence
+       for something that looks like an amount is a much freer licence, and
+       this app does not take it. */
+    if (unitsOnly) return s;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (c < "0" || c > "9") continue;
+      if (i > 0 && /[\d.]/.test(s.charAt(i - 1))) continue;   // mid-number
+      var qq = readQty(s, i);
+      if (qq && STEP_UNIT.test(s.slice(i + qq.len))) {
+        return s.slice(0, i) + qq.scale(mult) + s.slice(i + qq.len);
       }
-    );
+    }
+    return s;
   }
 
   /* ======================================================================
