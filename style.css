@@ -2178,6 +2178,20 @@ input[type="file"].input {
   touch-action: pinch-zoom;
 }
 
+/* `R98` — what stands in for a photo the book names but nobody committed.
+   On the card surface rather than straight on the scrim: --card/--card-ink
+   is a known pairing in both themes, where text laid directly over a
+   translucent scrim would depend on whatever happens to be behind it. */
+.lightbox__gone {
+  max-width: 22em;
+  padding: 18px 20px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--card-ink);
+  text-align: center;
+  line-height: 1.5;
+}
+
 .lightbox__close {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));

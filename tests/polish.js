@@ -186,6 +186,130 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== A photo that was never committed (R98) ==');
+  {
+    /* The app already knows this happens — the capture-phase error handler
+       says so in its own comment: a recipe can reference images/<id>.jpg
+       that was downloaded but never actually committed, and "the
+       broken-image glyph must never be the fallback". Download updated
+       recipes.json and Download photos are two separate buttons, so the
+       file names a picture nobody committed the moment someone presses one
+       and not the other.
+
+       The handler keeps that promise for the hero and breaks it one tap
+       later. It removes the <img class="r-hero">, but that image lives
+       inside a <button class="herobtn"> — so what is left is a 358x44
+       button with nothing in it, sitting between the header and the title,
+       offered to a screen reader as "Show the photo full screen". Press it
+       and the lightbox opens: a full-screen modal dialog whose only content
+       is the broken image, which the handler does not cover at all. */
+    const ctxI = await br.newContext({ ...devices['iPhone 13'] });
+    const pI = await ctxI.newPage();
+    const iErrs = []; pI.on('pageerror', e => iErrs.push(e.message));
+    await pI.goto(B + '/index.html');
+    await pI.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.image = 'images/never-committed.jpg';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+    });
+    await pI.goto('about:blank');
+    await pI.goto(B + '/index.html#ninja-cookies');
+    await pI.waitForSelector('.r-title');
+    await pI.waitForTimeout(700);
+
+    chk('a photo that 404s leaves no broken image',
+        await pI.evaluate(() => !document.querySelector('.r-hero')));
+    const btn = await pI.evaluate(() => {
+      const b = document.querySelector('.herobtn');
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height),
+               empty: !b.innerHTML.trim() };
+    });
+    chk('and no empty button left behind where it was', btn === null,
+        JSON.stringify(btn));
+
+    /* Still reachable on a slow connection, and tested as such rather than
+       by hand-building the dialog: hold the 404 back so the hero paints and
+       the button is real, press it, then let the failure land while the
+       photo is open full screen. */
+    await ctxI.route('**/images/slow-404.jpg', async (route) => {
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.fulfill({ status: 404, body: '' });
+    });
+    await pI.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.image = 'images/slow-404.jpg';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+    });
+    await pI.goto('about:blank');
+    await pI.goto(B + '/index.html#ninja-cookies');
+    await pI.waitForSelector('.herobtn');
+    await pI.click('.herobtn');
+    await pI.waitForSelector('.lightbox');
+    chk('the photo really did open full screen before it failed',
+        await pI.evaluate(() => !!document.querySelector('.lightbox__img')));
+    await pI.waitForTimeout(3000);          // now the 404 lands
+    const lb = await pI.evaluate(() => ({
+      img: !!document.querySelector('.lightbox__img'),
+      stillOpen: !!document.querySelector('.lightbox'),
+      canClose: !!document.querySelector('[data-act="close-lb"]'),
+      said: (document.querySelector('.lightbox') || {}).innerText || ''
+    }));
+    chk('a photo missing inside the lightbox is not shown broken either', !lb.img,
+        JSON.stringify(lb));
+    chk('and the lightbox says what happened instead',
+        /photo/i.test(lb.said), JSON.stringify(lb.said));
+    chk('without yanking the dialog away', lb.stillOpen && lb.canClose,
+        JSON.stringify(lb));
+    await pI.evaluate(() => localStorage.removeItem('kt.recipes'));
+
+    /* The half that must not regress: a photo that IS there still works. */
+    await pI.evaluate(() => {
+      const px = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+      localStorage.removeItem('kt.recipes');
+      localStorage.setItem('kt.images', JSON.stringify({ 'ninja-cookies': px }));
+    });
+    await pI.goto('about:blank');
+    await pI.goto(B + '/index.html#ninja-cookies');
+    await pI.waitForSelector('.r-title');
+    await pI.waitForTimeout(500);
+    chk('a photo that loads still shows its hero',
+        await pI.evaluate(() => !!document.querySelector('.r-hero')));
+    chk('and its button still opens the photo full screen', await (async () => {
+      const b = await pI.locator('.herobtn').count();
+      if (!b) return false;
+      await pI.click('.herobtn');
+      await pI.waitForTimeout(300);
+      return pI.evaluate(() => !!document.querySelector('.lightbox__img'));
+    })());
+    /* The branch list is the part most likely to rot: five named classes
+       were five of the six kinds of <img> this app renders. An image added
+       later that nobody thought to list must still not show the glyph. */
+    const unlisted = await pI.evaluate(() => {
+      const img = document.createElement('img');
+      img.className = 'kt-not-a-real-class';
+      img.src = 'images/never-committed.jpg';
+      document.querySelector('#app').appendChild(img);
+      return new Promise((res) => setTimeout(
+        () => res(!!document.querySelector('.kt-not-a-real-class')), 800));
+    });
+    chk('an image class nobody listed still cannot show the glyph', !unlisted);
+
+    chk('nothing threw', iErrs.length === 0, iErrs.join(' | '));
+    await pI.evaluate(() => {
+      localStorage.removeItem('kt.images');
+      localStorage.removeItem('kt.recipes');
+    });
+    await ctxI.close();
+  }
+
   console.log('\n== A recipe that never said how many it serves (R97) ==');
   {
     /* normalizeRecipe DELETES a servings value it cannot read — the one

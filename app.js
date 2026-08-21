@@ -5493,13 +5493,33 @@
       span.innerHTML = catIcon(el.getAttribute("data-cat") || "", 24);
       el.replaceWith(span);
     } else if (el.classList.contains("r-hero")) {
-      el.remove();
+      /* `R98` — the hero is the entire content of a button. Removing just
+         the image left that button standing: 358×44 of nothing, between the
+         header and the title, offered to a screen reader as "Show the photo
+         full screen" — and it still worked, opening a lightbox onto the same
+         missing file. The control goes with the picture it was for. */
+      (el.closest(".herobtn") || el).remove();
     } else if (el.classList.contains("hero__img")) {
       var blank = document.createElement("div");
       blank.className = "hero__blank";
       blank.innerHTML = ART.steam();
       el.replaceWith(blank);
     } else if (el.classList.contains("photorow__img")) {
+      el.remove();
+    } else if (el.classList.contains("lightbox__img")) {
+      /* Still reachable on a slow connection: the button is painted before
+         the 404 comes back, so the photo can already be open full screen
+         when it fails. A dialog is not something to yank away underneath
+         someone — it says what happened and keeps its close button. */
+      var gone = document.createElement("p");
+      gone.className = "lightbox__gone";
+      gone.textContent = "That photo isn’t on this phone, and it isn’t in " +
+        "the book yet.";
+      el.replaceWith(gone);
+    } else {
+      /* The promise at the top of this handler is about every image, not
+         the five it happens to name. An image added later that nobody
+         thought to list here disappears rather than showing the glyph. */
       el.remove();
     }
   }, true);
