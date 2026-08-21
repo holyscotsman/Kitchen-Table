@@ -2,6 +2,8 @@ const { chromium, devices } = require('playwright');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0, fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
+const browserContextWithReduce = (br) =>
+  br.newContext({ ...devices['iPhone 13'], reducedMotion: 'reduce' });
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
@@ -148,6 +150,46 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await p.waitForSelector('.r-title');
     chk('and the control it describes is really there',
       await p.locator('button.servcard__value').count() === 1);
+  }
+
+  console.log('\n== Reduce Motion must not move the furniture (R51) ==');
+  {
+    /* tokens.css — the handoff palette, and the file that actually enforces
+       reduced motion — carries a blanket
+       `* { transition: none !important; animation: none !important;
+            transform: none !important; }`.
+       The first two are the point. The third is a hammer: `transform` is not
+       only motion, it is also how things get positioned, and anything centred
+       with translate simply falls out of place for a reader who has Reduce
+       Motion switched on in iOS Settings — which is exactly the reader this
+       app is built around. Measured before the fix: the search icon sat 14px
+       below the middle of its field. */
+    const ctxR = await browserContextWithReduce(br);
+    const pR = await ctxR.newPage();
+    await pR.goto(B + '/index.html');
+    await pR.waitForSelector('.searchwrap__icon');
+    const placed = await pR.evaluate(() => {
+      const out = [];
+      const pair = (a, b) => {
+        const x = document.querySelector(a), y = document.querySelector(b);
+        if (!x || !y) return;
+        const r1 = x.getBoundingClientRect(), r2 = y.getBoundingClientRect();
+        const off = Math.abs((r1.top + r1.height / 2) - (r2.top + r2.height / 2));
+        if (off > 2) out.push(a + ' is ' + Math.round(off) + 'px off centre');
+      };
+      pair('.searchwrap__icon', '.searchfield');
+      return out;
+    });
+    chk('nothing positioned by transform falls out of place under Reduce Motion',
+      placed.length === 0, placed.join(' | '));
+    /* And the reason it holds: nothing is centred with a transform any more,
+       so the blanket rule has nothing of ours to break. */
+    const cssR = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'style.css'), 'utf8');
+    chk('and no rule leans on translate for placement',
+      !/transform:\s*translate[XY]?\(-?50%/.test(cssR),
+      (cssR.match(/transform:\s*translate[^;]*/) || [''])[0]);
+    await ctxR.close();
   }
 
   console.log('\n== Two more lines of the definition of done (R49) ==');

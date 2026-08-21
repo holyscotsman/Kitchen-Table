@@ -70,6 +70,27 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   console.log('\n== Tap targets ==');
   const small=await p.evaluate(()=>{const bad=[];document.querySelectorAll('button,a[href],input,select,textarea').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0&&r.height<44)bad.push((el.id||el.className)+' h='+r.height.toFixed(1));});return bad;});
   chk('nothing under 44px', small.length===0, small.join(', '));
+  console.log('\n== Who actually turns the motion off (R51) ==');
+  {
+    /* Worth writing down, because it was a decoy for a whole arc: the
+       `@media (prefers-reduced-motion: reduce)` block in style.css can never
+       have any effect. tokens.css — the handoff file — carries a blanket
+       `* { transition: none !important; animation: none !important;
+            transform: none !important; }`
+       which wins over all of it. The style.css block is defence in depth for
+       the day that blanket is ever narrowed, and that is fine; what is not
+       fine is a check that reads the redundant list and reports on the
+       motion. The live proof lives in polish.js (R51); this only records
+       where the enforcement really is. */
+    const fsm = require('fs');
+    const pm = require('path');
+    const tk = fsm.readFileSync(pm.join(__dirname, '..', 'tokens.css'), 'utf8');
+    chk('tokens.css is what actually stops the motion',
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}animation:\s*none\s*!important/.test(tk));
+    chk('and it stops transforms with the same hammer — which is why nothing here centres with one',
+      /transform:\s*none\s*!important/.test(tk));
+  }
+
   console.log('\n== The palette rule, enforced (R48) ==');
   {
     /* CLAUDE.md opens with this and calls it "the one rule that keeps getting

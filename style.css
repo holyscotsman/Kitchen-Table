@@ -390,11 +390,19 @@ a.applogo:hover {
   margin-bottom: 32px;
 }
 
+/* Centred without a transform, deliberately. tokens.css enforces reduced
+   motion with a blanket `* { transform: none !important }`, and transform is
+   not only motion — it is also how things get placed. Anything centred with
+   translate falls out of position for a reader who has Reduce Motion switched
+   on in iOS Settings, which is precisely the reader this app is built around.
+   Measured before this: the icon sat 14px below the middle of its field. */
 .searchwrap__icon {
   position: absolute;
   left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
   color: var(--dim);
   pointer-events: none;
 }
