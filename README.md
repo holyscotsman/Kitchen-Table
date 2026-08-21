@@ -107,6 +107,11 @@ people from a sauce still made for nine, silently. When an ingredient line opens
 with no quantity, the first number followed by a measurement is now taken as the
 amount. Steps are deliberately not searched this way.
 
+A range is a range however it is written (`R59`). `7-8`, `2 - 4`, `1 to 2`,
+`1/4 - 1/2`, `1 1/2 - 2` — both ends are the same amount measured twice, so both
+ends scale. Four more lines were reading as `2 to 2` and `3 - 2` on a doubled
+recipe, which is not a range at all.
+
 **Tap any ingredient or step to check it off** while you cook. That state is
 deliberately per-visit and resets when you leave the recipe.
 

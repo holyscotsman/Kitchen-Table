@@ -542,30 +542,38 @@
      the first: "14-8 slices", and — the dangerous one, because it still
      looks like an amount — "2-1/2 teaspoons" where one and a half doubled
      is three. */
+  /* One amount as a card writes it: "1 1/2", "3/4", "2", "0.5". */
+  var QTY_ONE = "\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:\\.\\d+)?";
+
+  function qtyValue(t) {
+    if (t.indexOf("/") < 0) return parseFloat(t);
+    var parts = t.trim().split(/\s+/);
+    var fr = parts[parts.length - 1].split("/");
+    return (parts.length > 1 ? parseFloat(parts[0]) : 0) +
+           parseFloat(fr[0]) / parseFloat(fr[1]);
+  }
+
   var QTY = [
     /* mixed, hyphenated: 1-1/2 */
     [/^(\d+)\s*[-–]\s*(\d+)\/(\d+)/, function (m, mult) {
       return fmtQty((parseFloat(m[1]) +
         parseFloat(m[2]) / parseFloat(m[3])) * mult);
     }],
-    /* a range: 7-8, 2 - 4. Must be tried after the mixed form, which it
-       would otherwise swallow — hence the lookahead for the slash. */
-    [/^(\d+(?:\.\d+)?)(\s*[-–]\s*)(\d+(?:\.\d+)?)(?!\s*\/)/, function (m, mult) {
-      return fmtQty(parseFloat(m[1]) * mult) + m[2] +
-             fmtQty(parseFloat(m[3]) * mult);
-    }],
+    /* a range, in every shape the book writes one: "7-8", "2 - 4",
+       "1 to 2", "1/4 - 1/2", "1 1/2 - 2". Both ends are the same amount
+       measured twice, so both ends scale — before `R59` only the plainest
+       shape was understood and a doubled recipe read "2 to 2" or "3 - 2",
+       which is not a range at all.
+       ORDER IS LOAD-BEARING: this must be tried after the hyphenated mixed
+       number above, which it would otherwise read as one-to-a-half. */
+    [new RegExp("^(" + QTY_ONE + ")(\\s*[-–]\\s*|\\s+to\\s+)(" + QTY_ONE + ")"),
+      function (m, mult) {
+        return fmtQty(qtyValue(m[1]) * mult) + m[2] +
+               fmtQty(qtyValue(m[3]) * mult);
+      }],
     /* one amount: 1 1/2, 3/4, 2, 0.5 */
-    [/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/, function (m, mult) {
-      var t = m[1], n;
-      if (t.indexOf("/") >= 0) {
-        var parts = t.trim().split(/\s+/);
-        var fr = parts[parts.length - 1].split("/");
-        n = (parts.length > 1 ? parseFloat(parts[0]) : 0) +
-            parseFloat(fr[0]) / parseFloat(fr[1]);
-      } else {
-        n = parseFloat(t);
-      }
-      return fmtQty(n * mult);
+    [new RegExp("^(" + QTY_ONE + ")"), function (m, mult) {
+      return fmtQty(qtyValue(m[1]) * mult);
     }]
   ];
 

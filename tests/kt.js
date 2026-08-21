@@ -862,6 +862,56 @@ const browserContextWithReduce = (br) =>
     await pL.close();
   }
 
+  console.log('\n== Three more ways a card writes a range (R59) ==');
+  {
+    /* R57 taught the scaler that "7-8" is two ends of one amount. It only
+       ever learned the plainest shape of it. Four more lines in the book
+       are ranges the scaler still read as "a number, then some text":
+         "1 to 2 tablespoons milk"          — the word, not the hyphen
+         "1/4 - 1/2 teaspoon ancho chili"   — fractions on both sides
+         "1 1/2 - 2 lb. russet potatoes"    — a mixed number on the left
+       Same failure as before and the same cost: the first end doubles and
+       the second stands still, so a doubled recipe reads "2 to 2" or
+       "3 - 2", which is not a range at all. */
+    const pR = await ctx.newPage();
+    const doubled = async (id, servings) => {
+      await pR.goto(B + '/index.html#' + id);
+      await pR.waitForSelector('.checklist');
+      for (let i = 0; i < servings; i++) {
+        await pR.click('[data-act="serv+"]');
+        await pR.waitForTimeout(60);
+      }
+      await pR.waitForTimeout(250);
+      return pR.locator('.checklist:not(.checklist--steps) .checkrow__text').allTextContents();
+    };
+    const frosting = await doubled('vanilla-frosting', 8);
+    const milk = frosting.find(l => /milk/i.test(l)) || '';
+    chk('a range written with the word "to" doubles at both ends',
+      /^2 to 4 tablespoons/.test(milk), milk);
+
+    const schn = await doubled('pork-schnitzel', 2);
+    const oil = schn.find(l => /vegetable oil/i.test(l)) || '';
+    chk('and so does the other one', /^2 to 4 tablespoons/.test(oil), oil);
+
+    const soup = await doubled('potato-bacon-soup', 6);
+    const chili = soup.find(l => /ancho/i.test(l)) || '';
+    chk('a range of fractions doubles at both ends',
+      /^½\s*[-–]\s*1 teaspoon/.test(chili), chili);
+
+    const pie = await doubled('shepherds-pie', 6);
+    const spuds = pie.find(l => /russet/i.test(l)) || '';
+    chk('and a range that opens with a mixed number',
+      /^3\s*[-–]\s*4 lb\./.test(spuds), spuds);
+
+    /* Order is load-bearing and easy to break: "1-1/2" is ONE amount, and
+       a range reader that ran first would take it for one-to-a-half. */
+    const cake = await doubled('warm-chocolate-pudding-cake', 8);
+    const vanilla = cake.find(l => /vanilla/i.test(l)) || '';
+    chk('and a hyphenated mixed number is still not a range',
+      /^3 teaspoons/.test(vanilla), vanilla);
+    await pR.close();
+  }
+
   console.log('\n== Check off ==');
   await p.locator('.checkrow').first().click();
   await p.waitForTimeout(200);
