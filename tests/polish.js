@@ -249,6 +249,72 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== The font is really the font (R42) ==');
+  {
+    /* CLAUDE.md's second rule, and the one it calls a functional requirement
+       rather than a stylistic one: ONE font, Atkinson Hyperlegible, chosen
+       because the reader has low vision. The existing check reads
+       font-family and finds "Atkinson" — which is what the CSS *asks* for.
+       If every woff2 vanished tomorrow the string would still say Atkinson
+       while the browser quietly drew a system face, and nothing would fail. */
+    const fsf = require('fs');
+    const pathf = require('path');
+    const ROOTF = pathf.join(__dirname, '..');
+
+    /* Static first: every file the stylesheet promises must be on disk. */
+    const css = fsf.readFileSync(pathf.join(ROOTF, 'fonts', 'fonts.css'), 'utf8');
+    const srcs = [...new Set((css.match(/url\("([^"]+)"\)/g) || [])
+      .map(u => u.replace(/url\("|"\)/g, '')))];
+    const gone = srcs.filter(f => !fsf.existsSync(pathf.join(ROOTF, 'fonts', f)));
+    chk('every face the stylesheet promises is on disk',
+      srcs.length >= 4 && gone.length === 0, gone.join(', ') || srcs.length + ' faces');
+
+    /* …and everything else the page points at, which a 404 would otherwise
+       hide until someone tried to install it to a Home Screen. */
+    const man = JSON.parse(fsf.readFileSync(pathf.join(ROOTF, 'manifest.json'), 'utf8'));
+    const idx = fsf.readFileSync(pathf.join(ROOTF, 'index.html'), 'utf8');
+    const refs = man.icons.map(i => i.src)
+      .concat((idx.match(/(?:href|src)="([^"]+\.(?:png|svg|css|js|json))"/g) || [])
+        .map(m => m.replace(/^(?:href|src)="|"$/g, '')))
+      .filter(u => !/^https?:/.test(u));
+    const missingRefs = [...new Set(refs)].filter(u => !fsf.existsSync(pathf.join(ROOTF, u)));
+    chk('every file the page and the manifest point at exists',
+      missingRefs.length === 0, missingRefs.join(', '));
+
+    /* Then the live proof: loaded, and actually drawing the glyphs. */
+    const pFont = await br.newPage();
+    await pFont.goto(B + '/index.html');
+    await pFont.waitForSelector('.main__title');
+    await pFont.evaluate(() => document.fonts.ready);
+    const face = await pFont.evaluate(() => {
+      const measure = (family) => {
+        const s = document.createElement('span');
+        s.textContent = 'Chicken Cordon Bleu 1234';
+        s.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;' +
+          'font-size:64px;font-family:' + family;
+        document.body.appendChild(s);
+        const w = s.getBoundingClientRect().width;
+        s.remove();
+        return w;
+      };
+      return {
+        loaded400: document.fonts.check('400 24px "Atkinson Hyperlegible"'),
+        loaded700: document.fonts.check('700 24px "Atkinson Hyperlegible"'),
+        atkinson: measure('"Atkinson Hyperlegible"'),
+        fallback: measure('monospace'),
+        serif: measure('serif')
+      };
+    });
+    chk('both weights are loaded, not merely asked for',
+      face.loaded400 && face.loaded700, JSON.stringify(face));
+    chk('and the glyphs on screen are its glyphs, not a stand-in',
+      Math.abs(face.atkinson - face.fallback) > 1 &&
+      Math.abs(face.atkinson - face.serif) > 1,
+      'atkinson ' + Math.round(face.atkinson) + ' vs mono ' +
+      Math.round(face.fallback) + ' / serif ' + Math.round(face.serif));
+    await pFont.close();
+  }
+
   console.log('\n== Every key the app reads, filled with rubbish (R40) ==');
   {
     /* R12 closed the recipe overlay, R13 the draft snapshot, R21 the plan.
