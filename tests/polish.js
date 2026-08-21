@@ -1322,6 +1322,75 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxSW.close();
   }
 
+  console.log('\n== R80 — the sort menu keeps the app\'s own focus contract ==');
+  {
+    /* Every sheet in this app traps Tab, closes on Escape and hands focus
+       back to the control that opened it — that contract is written down in
+       CLAUDE.md and enforced by `openSheet`/`closeSheet`. The sort menu was
+       built as "a popup, not a sheet" (no scrim, dismisses on an outside
+       tap), and it took none of it: opening left focus on <body>, Tab
+       walked straight out of an open `role="menu"` into the page behind,
+       and closing dropped the caret at the top of the document because the
+       re-render destroyed the element focus was on.
+       For a VoiceOver reader that means activating "Sort" announces
+       nothing and leaves the cursor where it was. The popup styling is
+       fine; the focus contract is not optional. */
+    const state = () => p.evaluate(() => {
+      const menu = document.querySelector('.sortmenu');
+      const a = document.activeElement;
+      return {
+        open: !!menu,
+        inMenu: !!(menu && a && menu.contains(a)),
+        onTrigger: !!(a && a.getAttribute && a.getAttribute('data-act') === 'toggle-sort'),
+        checked: !!(a && a.getAttribute && a.getAttribute('aria-checked') === 'true'),
+        active: a ? (a.tagName + (a.getAttribute && a.getAttribute('data-act')
+          ? '[' + a.getAttribute('data-act') + ']' : '')) : 'none'
+      };
+    });
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html#menu');
+    await p.waitForSelector('.rcard');
+
+    await p.click('[data-act="toggle-sort"]');
+    await p.waitForTimeout(300);
+    let st = await state();
+    chk('opening the sort menu moves focus into it', st.open && st.inMenu, JSON.stringify(st));
+    chk('and onto the option that is currently chosen', st.checked, JSON.stringify(st));
+
+    for (let i = 0; i < 5; i++) await p.keyboard.press('Tab');
+    st = await state();
+    chk('Tab stays inside the open menu', st.open && st.inMenu, JSON.stringify(st));
+
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(300);
+    st = await state();
+    chk('Escape closes it and hands focus back to the Sort button',
+      !st.open && st.onTrigger, JSON.stringify(st));
+
+    /* And the path people actually take: choose a sort. */
+    await p.click('[data-act="toggle-sort"]');
+    await p.waitForTimeout(300);
+    await p.click('[data-act="sort"][data-key="az"]');
+    await p.waitForTimeout(350);
+    st = await state();
+    chk('choosing a sort closes it and hands focus back too',
+      !st.open && st.onTrigger, JSON.stringify(st));
+    chk('and the sort actually changed',
+      /A – Z|A - Z|A–Z/.test(await p.locator('[data-act="toggle-sort"]').textContent()),
+      await p.locator('[data-act="toggle-sort"]').textContent());
+
+    /* An outside tap stays a plain outside tap: it dismisses, and it does
+       NOT drag focus back to the Sort button, because the tap usually
+       landed on something the reader meant to use. */
+    await p.click('[data-act="toggle-sort"]');
+    await p.waitForTimeout(300);
+    await p.locator('.mhead__h1').click();
+    await p.waitForTimeout(300);
+    st = await state();
+    chk('an outside tap dismisses without stealing focus back',
+      !st.open && !st.onTrigger, JSON.stringify(st));
+  }
+
   console.log('\n== R78 — a number field can show its own number ==');
   {
     /* Found by looking at a screenshot of edit mode. The Serves box between
