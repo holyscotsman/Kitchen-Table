@@ -189,6 +189,74 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== The known-wrong-data ledger, checked against the data (R69) ==');
+  {
+    /* CONTENT.md is the ledger of what is known to be wrong in the book, and
+       `013` made it load-bearing: nothing on it may be resolved by inference,
+       only by asking Joan. That cuts both ways. The moment a recipe is fixed
+       and the ledger is not updated in the same breath, the ledger starts
+       lying about what is still outstanding — and the tasks that depend on
+       it (`072` recovering the missing ingredients, `074` confirming the
+       guessed servings) are working from a list that no longer describes the
+       book. Its counts and its named recipes are checkable, so they are. */
+    const fsx = require('fs');
+    const pathx = require('path');
+    const ROOT = pathx.join(__dirname, '..');
+    const md = fsx.readFileSync(pathx.join(ROOT, 'CONTENT.md'), 'utf8');
+    const book = JSON.parse(fsx.readFileSync(pathx.join(ROOT, 'recipes.json'), 'utf8'));
+    const ids = new Set(book.map(r => r.id));
+    /* Backticks in this file hold task numbers and commit hashes as well as
+       recipe ids; only the ones the book actually knows are ids. */
+    const idsIn = (chunk) => [...new Set((chunk.match(/`([a-z0-9-]+)`/g) || [])
+      .map(x => x.replace(/`/g, '')).filter(x => ids.has(x)))].sort();
+    const between = (a, b) => {
+      const i = md.indexOf(a);
+      if (i < 0) return '';
+      const j = b ? md.indexOf(b, i) : -1;
+      return md.slice(i, j < 0 ? undefined : j);
+    };
+
+    chk('the ledger and the book agree on how many recipes there are',
+      new RegExp('of ' + book.length + ' recipes').test(md), String(book.length));
+
+    /* §2 — the recipes with nothing to cook from. Named, and counted. */
+    const sec2 = between('## 2. Empty ingredient lists', '## 3.');
+    const claimedEmpty = idsIn(sec2);
+    const actuallyEmpty = book
+      .filter(r => !(r.ingredients || []).some(x => String(x).trim()))
+      .map(r => r.id).sort();
+    chk('the recipes with no ingredients are exactly the ones the ledger names',
+      JSON.stringify(claimedEmpty) === JSON.stringify(actuallyEmpty),
+      'ledger ' + JSON.stringify(claimedEmpty) + ' vs book ' + JSON.stringify(actuallyEmpty));
+    const head2 = sec2.match(/—\s*(\d+)\s*recipes?/);
+    chk('and its heading counts them right',
+      !!head2 && parseInt(head2[1], 10) === actuallyEmpty.length,
+      (head2 ? head2[1] : 'no count') + ' vs ' + actuallyEmpty.length);
+
+    /* §1 — the guessed servings. The claim is about provenance, which the
+       book cannot confirm; what it can confirm is that the list is the
+       length it says and names recipes that exist. */
+    const sec1 = between('## 1. Inferred servings', '## 2.');
+    const inferred = idsIn(sec1);
+    const head1 = sec1.match(/—\s*(\d+)\s*of\s*(\d+)/);
+    chk('the guessed-servings list is as long as its heading claims',
+      !!head1 && parseInt(head1[1], 10) === inferred.length,
+      (head1 ? head1[1] : 'no count') + ' claimed, ' + inferred.length + ' listed');
+    chk('and every recipe it names is still in the book',
+      inferred.length > 0 && inferred.every(i => ids.has(i)), String(inferred.length));
+
+    /* §6 — the two collection-wide claims, both of which stop being true the
+       day someone acts on them, which is exactly when they must be edited. */
+    const contributors = [...new Set(book.map(r => r.contributor))];
+    chk('"every recipe is Joan’s" is still true, or the ledger must say otherwise',
+      /Every recipe is Joan/.test(md) === (contributors.length === 1 && contributors[0] === 'Joan'),
+      JSON.stringify(contributors));
+    const withPhotos = book.filter(r => r.image).map(r => r.id);
+    chk('"no recipe has a photo" is still true, or the ledger must say otherwise',
+      /No recipe has a photo/.test(md) === (withPhotos.length === 0),
+      JSON.stringify(withPhotos.slice(0, 4)));
+  }
+
   console.log('\n== The book’s vocabulary, copied into a dozen files (R68) ==');
   {
     /* Ten courses and six contributors are the book's whole vocabulary, and

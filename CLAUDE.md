@@ -315,7 +315,10 @@ it, each with its task number in the log there:
   `tests/zoom.js` (`041`); scroll restoration is app-owned
   (`history.scrollRestoration = manual`).
 - **`CONTENT.md`** is the known-wrong-data ledger (`013`); nothing on it may
-  be resolved by inference.
+  be resolved by inference — and since `R69` its counts and its named
+  recipes are **checked against `recipes.json` on every run**, because a
+  ledger not updated the moment a recipe is fixed starts lying about what
+  is still outstanding.
 
 ### The completion push (Jason's "get the other 101 done")
 
@@ -393,8 +396,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **882 functional checks** across eleven
-suites (kt 231, feat 59, add 74, relay 16, quick 63, polish 117, sec 52,
+The suite after the video arc: **889 functional checks** across eleven
+suites (kt 231, feat 59, add 74, relay 16, quick 70, polish 117, sec 52,
 plan 41, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

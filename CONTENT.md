@@ -144,3 +144,17 @@ now matching the title-line pattern every other source follows.
 | Item | Resolved on | How |
 | --- | --- | --- |
 | — | | |
+
+---
+
+## Keeping this file honest
+
+Since `R69` the countable parts of this ledger are checked against
+`recipes.json` on every run (`tests/quick.js`): the recipe count, the recipes
+with no ingredient list — named **and** counted — the length of the
+guessed-servings list, and the two collection-wide claims in §6.
+
+That means **fixing a recipe and updating this file are one commit, not two**.
+When Joan supplies the parsnips ingredients, §2 loses a name and its heading
+loses a number in the same breath; when the first photo lands, §6's line has to
+change. CI will say which, by name.
