@@ -68,8 +68,20 @@ self.addEventListener("fetch", (ev) => {
     ev.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("index.html", copy));
+          /* Only a real page is worth keeping. A deploy that goes wrong
+           * answers 404 with the host's own apology page — a perfectly
+           * successful HTTP exchange carrying no app at all — and without
+           * this check that page is written straight over the offline copy.
+           * The reader would then have no book on the phone until a good
+           * load happened to land, which on a bad signal is exactly when it
+           * won't. Both other branches below already checked; this one, the
+           * one holding the app itself, never did. */
+          if (res && res.ok) {
+            const copy = res.clone();
+            /* The put outlives the response handed back, so keep the worker
+             * alive for it — same reason as the book's branch below. */
+            ev.waitUntil(caches.open(CACHE).then((c) => c.put("index.html", copy)));
+          }
           return res;
         })
         .catch(() => caches.match("index.html", { cacheName: CACHE }))

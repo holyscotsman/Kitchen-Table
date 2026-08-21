@@ -189,6 +189,34 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.evaluate(()=>{localStorage.removeItem('kt.easyRead');localStorage.removeItem('kt.fsIndex');});
   await p.reload(); await p.waitForSelector('.help');
 
+  console.log('\n== The record keeps its own arithmetic (R52) ==');
+  {
+    /* CLAUDE.md states a running total and then lists the suites it is made
+       of, and for several rounds the total sat one ahead of the sum of its
+       own parts — nobody adds eleven numbers by hand twice. It is a small
+       thing to be wrong about, but it is a number this file uses to tell
+       anyone reading it how much of the app is actually proven, and a
+       figure that drifts is worth less than no figure at all. Now it has to
+       add up, and the suite count has to match the word in front of it. */
+    const md = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'CLAUDE.md'), 'utf8');
+    const m = md.match(/\*\*(\d+) functional checks\*\*\s+across\s+(\w+)\s+suites\s*\(([^)]*)\)/);
+    chk('CLAUDE.md still states a battery total', !!m);
+    if (m) {
+      const stated = parseInt(m[1], 10);
+      const parts = [...m[3].matchAll(/([a-z]+)\s+(\d+)/g)].map(x => [x[1], parseInt(x[2], 10)]);
+      const sum = parts.reduce((a, x) => a + x[1], 0);
+      const WORDS = { eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+        thirteen: 13, fourteen: 14, fifteen: 15 };
+      chk('the stated total is the sum of the suites it lists',
+        sum === stated, stated + ' stated, ' + sum + ' listed (' +
+        parts.map(x => x.join(' ')).join(', ') + ')');
+      chk('and it names as many suites as it lists',
+        WORDS[m[2]] === parts.length,
+        m[2] + ' = ' + WORDS[m[2]] + ', listed ' + parts.length);
+    }
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
 
   await p.goto(B+'/index.html'); await p.waitForSelector('.main__title'); await p.waitForTimeout(300);

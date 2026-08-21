@@ -857,8 +857,27 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     /* Turned up for the R19 block: a weak signal, served by the same server
        that serves everything else, so only the book is slow. */
     let slowJsonMs = 0;
-    const srv = http.createServer((rq, rs) => {
+    /* Turned up for the R52 block: the deploy that goes wrong (docStatus),
+       and the deploy that goes right but ships a different page (docBody).
+       Both apply only to the document, which is the one thing the worker
+       fetches network-first. */
+    let docStatus = 0;
+    let docBody = null;
+    const MARKER = 'fresh-deploy-marker';
+    const handler = (rq, rs) => {
       const rel = decodeURIComponent(new URL(rq.url, 'http://x').pathname);
+      const isDoc = rel === '/' || rel.endsWith('/index.html');
+      if (isDoc && docStatus) {
+        /* Shaped like what a host actually sends: a complete, well-formed
+           HTML page that happens to contain no app. */
+        rs.writeHead(docStatus, { 'content-type': 'text/html' });
+        return rs.end('<!doctype html><html><body><h1>404</h1>' +
+          '<p>There isn\'t a GitHub Pages site here.</p></body></html>');
+      }
+      if (isDoc && docBody) {
+        rs.writeHead(200, { 'content-type': 'text/html' });
+        return rs.end(docBody);
+      }
       const file = pathx.join(ROOT, rel === '/' ? '/index.html' : rel);
       if (!file.startsWith(ROOT) || !fsx.existsSync(file) || fsx.statSync(file).isDirectory()) {
         rs.writeHead(404); return rs.end('no');
@@ -869,9 +888,11 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       };
       if (slowJsonMs && rel.endsWith('/recipes.json')) setTimeout(serve, slowJsonMs);
       else serve();
-    });
+    };
+    const srv = http.createServer(handler);
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
-    const OWN = 'http://127.0.0.1:' + srv.address().port;
+    const PORT = srv.address().port;
+    const OWN = 'http://127.0.0.1:' + PORT;
 
     const ctxSW = await br.newContext({ ...devices['iPhone 13'] });
     await ctxSW.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -946,6 +967,95 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await psw.waitForSelector('.r-title', { timeout: 8000 });
     chk('a recipe still opens with the server down',
       (await psw.locator('#main-content').textContent()).length > 60);
+
+    /* R52 — a deploy that goes wrong must not delete the book from the
+       phone. Everything above proves the worker keeps the app alive through
+       an outage; none of it asks what the worker WRITES when the network
+       answers, and the document branch was the one that never checked.
+       A failed deploy is not a network failure: the host answers, promptly
+       and successfully as far as fetch is concerned, with a well-formed
+       page carrying no app. That page went straight over the offline copy,
+       and from then on the phone's fallback WAS the apology page — the book
+       gone until a good load happened to land, which on a bad signal is
+       precisely when it doesn't. */
+    console.log('\n== A failed deploy must not delete the book (R52) ==');
+    {
+      const cachedDoc = () => psw.evaluate(async (marker) => {
+        const c = await caches.open('kt-shell-v2');
+        const r = await c.match('index.html');
+        const t = r ? await r.text() : '';
+        return { has: !!r, app: t.indexOf('id="app"') > -1,
+          err: /Pages site/.test(t), marker: t.indexOf(marker) > -1 };
+      }, MARKER);
+
+      const srv2 = http.createServer(handler);
+      await new Promise(r => srv2.listen(PORT, '127.0.0.1', r));
+
+      /* First the ordinary case, so nothing below can pass by the worker
+         simply never caching a page again — which is what a too-eager fix
+         would do, and it would look identical from the poisoning side. */
+      docBody = '<!doctype html><html><body><div id="app"></div><p>' +
+        MARKER + '</p></body></html>';
+      await psw.goto(OWN + '/index.html', { waitUntil: 'load' });
+      await psw.waitForTimeout(500);
+      chk('a good page is still written to the offline copy',
+        (await cachedDoc()).marker, JSON.stringify(await cachedDoc()));
+
+      /* Back to the real app, and cached again, so the outage below is
+         measured against the book rather than against that marker. */
+      docBody = null;
+      await psw.goto(OWN + '/index.html');
+      await psw.waitForSelector('.main__title');
+      await psw.waitForTimeout(500);
+      chk('and the real app is what the offline copy holds again',
+        (await cachedDoc()).app);
+
+      /* Now the deploy that goes wrong, with the reader opening the app in
+         the middle of it. */
+      docStatus = 404;
+      await psw.goto(OWN + '/index.html', { waitUntil: 'load' });
+      const shown = await psw.evaluate(() => document.body.textContent || '');
+      chk('during a bad deploy the reader sees what the server actually said',
+        /Pages site/.test(shown), shown.slice(0, 80));
+      const after = await cachedDoc();
+      chk('the offline copy survives it', after.has && !after.err, JSON.stringify(after));
+      chk('and it is still the app', after.app, JSON.stringify(after));
+
+      /* The proof that matters. The signal goes — the ordinary kitchen, not
+         a laboratory — and the book is still on the phone. */
+      await new Promise(r => srv2.close(r));
+      docStatus = 0;
+      await psw.reload();
+      /* Caught rather than awaited bare: when this regresses the phone shows
+         the apology page, and a suite that dies on the timeout hides every
+         check after it. The failure belongs on one line, like the rest. */
+      let opened = '';
+      try {
+        await psw.waitForSelector('.main__title', { timeout: 15000 });
+        opened = await psw.locator('#main-content').textContent();
+      } catch (e) {
+        opened = 'DID NOT OPEN :: ' + (await psw.evaluate(
+          () => (document.body.textContent || '').trim().slice(0, 60)));
+      }
+      chk('offline after a failed deploy, the book still opens',
+        opened.length > 40 && opened.indexOf('DID NOT OPEN') !== 0, opened.slice(0, 90));
+    }
+
+    /* And the rule, so the NEXT branch someone adds to sw.js inherits it
+       rather than repeating the same omission: no cache write without a
+       status check first. The count floor stops this passing vacuously if
+       the writes are ever renamed out from under it. */
+    {
+      const swSrc = fsx.readFileSync(pathx.join(ROOT, 'sw.js'), 'utf8');
+      const guarded = [];
+      let at = -1;
+      while ((at = swSrc.indexOf('.put(', at + 1)) > -1) {
+        guarded.push(/res\s*&&\s*res\.ok/.test(swSrc.slice(Math.max(0, at - 300), at)));
+      }
+      chk('every cache write in sw.js is guarded by a status check',
+        guarded.length >= 3 && guarded.every(Boolean),
+        JSON.stringify(guarded));
+    }
     await ctxSW.close();
   }
 
