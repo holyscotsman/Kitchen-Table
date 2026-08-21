@@ -637,6 +637,47 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pPr.close();
   }
 
+  console.log('\n== Paper carries the size the reader chose (R47) ==');
+  {
+    /* R24 checked what prints and in what colour, never at what size — and
+       the print stylesheet carried `.recipe { font-size: 12pt }`, a rule that
+       has never once applied. The renderer sets the reading size as an inline
+       style, and inline beats a stylesheet, so paper has always come out at
+       whatever the A−/A+ stepper was showing. That turns out to be the right
+       behaviour for this reader (DECISIONS §033: when preference and
+       legibility collide, legibility wins) — a recipe printed at 12pt for
+       someone who chose 40px on screen is a wasted sheet of paper. The rule
+       was removed rather than enforced, because a stylesheet that states an
+       intent it does not deliver misleads whoever reads it next. */
+    const pPaper = await br.newPage();
+    await pPaper.goto(B + '/index.html#chicken-cordon-bleu');
+    await pPaper.waitForSelector('.recipe');
+    const sizes = [];
+    for (const step of [0, 4]) {
+      await pPaper.evaluate((i) => localStorage.setItem('kt.fsIndex', String(i)), step);
+      await pPaper.reload();
+      await pPaper.waitForSelector('.recipe');
+      await pPaper.emulateMedia({ media: 'print' });
+      await pPaper.waitForTimeout(120);
+      sizes.push(await pPaper.evaluate(() =>
+        parseFloat(getComputedStyle(document.querySelector('.recipe')).fontSize)));
+      await pPaper.emulateMedia({ media: 'screen' });
+    }
+    chk('the smallest step prints small and the largest prints large',
+      sizes[0] === 20 && sizes[1] === 40, sizes.join(' → '));
+    chk('and nothing on paper is smaller than the screen floor',
+      Math.min.apply(null, sizes) >= 20, sizes.join(', '));
+    /* The dead rule must not come back, or the next reader believes it. */
+    const printCss = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'style.css'), 'utf8');
+    const printBlock = printCss.slice(printCss.indexOf('@media print'));
+    chk('the print stylesheet no longer claims a size it cannot set',
+      !/\.recipe\s*\{[^}]*font-size/.test(printBlock),
+      (printBlock.match(/\.recipe\s*\{[^}]*\}/) || [''])[0].slice(0, 60));
+    await pPaper.evaluate(() => localStorage.removeItem('kt.fsIndex'));
+    await pPaper.close();
+  }
+
   console.log('\n== The shell survives a real outage (R1/R9 — service worker) ==');
   {
     /* Playwright's offline emulation does NOT reach fetches made by a

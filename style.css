@@ -2347,10 +2347,18 @@ input[type="file"].input {
     color: var(--print-ink) !important;
   }
 
+  /* No font-size here. The renderer sets the reading size as an inline style
+     and inline beats a stylesheet, so the `12pt` that used to sit on this
+     rule never once applied — a line stating an intent it could not deliver,
+     which misleads whoever reads it next. The behaviour it was hiding is the
+     right one anyway: paper carries the size the reader chose (DECISIONS
+     §033 — when preference and legibility collide, legibility wins), and a
+     recipe printed at 12pt for someone who set 40px on screen is a wasted
+     sheet of paper. The stepper's own floor is 20px, so nothing prints
+     smaller than that either. */
   .recipe {
     max-width: none;
     padding: 0;
-    font-size: 12pt;
   }
 
   .checkrow,
