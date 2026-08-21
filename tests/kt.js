@@ -1496,7 +1496,7 @@ const browserContextWithReduce = (br) =>
   await p.goto(B+'/index.html#chops');
   await p.waitForSelector('.r-title');
   chk('flagged panel visible in viewer', await p.locator('.panel--flag').count()>=1);
-  chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients were captured'));
+  chk('missing ingredients explained (071)', (await p.locator('section.bodygrid__ing').textContent()).includes('No ingredients listed'));
 
   /* `R88` — the empty states, held to the same bar as the full ones.
      Two faults, both about telling a reader something that is not true.
@@ -1543,7 +1543,7 @@ const browserContextWithReduce = (br) =>
       });
     } catch (e) { /* one FAIL line below, not a dead suite */ }
     chk('a recipe with no instructions says so rather than showing a blank',
-      /No instructions were captured/i.test(steps), steps.slice(0, 100));
+      /No instructions listed/i.test(steps), steps.slice(0, 100));
     chk('and it does not tell you to tap steps that are not there',
       !/Tap to check off/.test(steps) || /ingredient/i.test(steps), steps.slice(0, 60));
     /* Clearing the key is not enough: `S.recipes` was read at boot, so the
