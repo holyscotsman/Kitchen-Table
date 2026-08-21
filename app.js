@@ -2607,7 +2607,22 @@
         "recipes.json</strong> and send that file to Jason. If you added " +
         "photos, press <strong>Download photos</strong> too.",
         "Changed your mind about everything? <strong>Undo all my changes on " +
-        "this phone</strong> puts it all back the way it was published."]]
+        "this phone</strong> puts it all back the way it was published.",
+        /* `R90` — Remove sits on the Menu next to Tag and appeared nowhere
+           in this page. It is the one destructive thing in the app, and
+           `R85` had just found the two modes drawn in the same colours, so
+           saying which is which is the least this page owes a reader. */
+        "<strong>Remove</strong>, at the top of the All recipes screen, " +
+        "takes a recipe off <em>this phone</em>. It asks first, and it takes " +
+        "the photo with it. Nothing is gone for everyone until a shorter " +
+        "file is published — and <strong>Undo all my changes on this " +
+        "phone</strong> brings it back until then.",
+        /* And the promise the machinery already keeps but nobody was told
+           about: a precached shell means the book opens with no signal. */
+        "The book lives on your phone once you have opened it, so it works " +
+        "with <strong>no signal at all</strong> — in a cellar, on a ferry, " +
+        "in a kitchen the wifi never reaches. Only the four ways of adding " +
+        "a recipe need the internet."]]
     ];
 
     h += sections.map(function (sec) {

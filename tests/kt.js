@@ -1446,6 +1446,37 @@ const browserContextWithReduce = (br) =>
     await p.goto('about:blank');
   }
 
+  console.log('\n== R90 — the tutorial owes the reader the whole app ==');
+  {
+    /* `R63` held the help page to being *accurate*. This holds it to being
+       *complete*, for the two things it is worst to leave out.
+       **Every mode the Menu can enter.** Tag and Remove sit side by side in
+       the same row; `R85` had just found them drawn in the same colours,
+       and the destructive one of the pair appeared nowhere in the tutorial.
+       Derived from the app rather than listed here, so a third mode
+       tomorrow asks for its own paragraph.
+       **And the fact that the book works with no signal.** There is a
+       service worker precaching a shell so that a kitchen with bad wifi
+       still opens the recipe — real machinery, making a real promise, that
+       a reader had no way to discover. */
+    await p.goto(B + '/index.html#menu');
+    await p.waitForSelector('.rcard');
+    const modes = await p.evaluate(() => [].slice.call(
+      document.querySelectorAll('.countrow__actions .textbtn'))
+      .map(b => b.textContent.trim())
+      .filter(t => t && t !== 'Clear'));
+    await p.goto(B + '/index.html#help');
+    await p.waitForSelector('h1');
+    const help = (await p.locator('#app').textContent()).replace(/\s+/g, ' ');
+    chk('the sweep found the Menu\'s modes to check for', modes.length >= 2, modes.join(', '));
+    const undocumented = modes.filter(m => help.toLowerCase().indexOf(m.toLowerCase()) === -1);
+    chk('every mode the Menu can enter is explained in the tutorial',
+      undocumented.length === 0, undocumented.join(', '));
+    chk('and the tutorial says the book works with no signal',
+      /no signal|without a signal|offline|no wifi|no internet/i.test(help),
+      help.slice(0, 60));
+  }
+
   console.log('\n== Back from a recipe returns the list you left (R22) ==');
   await p.goto(B+'/index.html#menu?cat=Desserts');
   await p.waitForSelector('.rcard');
