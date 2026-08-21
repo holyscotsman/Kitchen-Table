@@ -76,7 +76,8 @@ Dark is the default theme; the sun/moon button switches to light and remembers i
 
 **Easy Read** (the "Aa" button on the Menu) adds to the stepper rather than
 replacing it: a larger floor, one wide column at every width, thicker borders,
-and no faded grey text anywhere. A−/A+ keeps working inside it.
+no faded grey text anywhere, and **nothing set in italics** (`R67`). A−/A+ keeps
+working inside it.
 
 **Servings** rescales the recipe. Pick how many people you're feeding and every
 ingredient *and* instruction quantity adjusts with it — "Bake 2 cups of…" scales

@@ -227,6 +227,19 @@ img {
   font-weight: 700;
 }
 
+/* `R67` — Easy Read promised plainer and left the italics. All three of
+   them are explanatory notes — "matches ingredient" under a search result,
+   "— 450g not adjusted" on a rescaled line, one emphasis in the help — and
+   slanted small print is the exact shape of text this reader has the most
+   trouble with. Upright, and given the same weight Easy Read already gives
+   .hint above, so the note still reads as a note without the slant. */
+[data-easy="on"] em,
+[data-easy="on"] .matchnote,
+[data-easy="on"] .keptnote {
+  font-style: normal;
+  font-weight: 700;
+}
+
 /* Text-size sheet */
 .fsrow {
   display: flex;

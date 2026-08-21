@@ -822,6 +822,91 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await pPaper.close();
   }
 
+  console.log('\n== Easy Read promised plainer and left the italics (R67) ==');
+  {
+    /* Easy Read raises the ink, forces one column, thickens the borders and
+       bolds a few labels. It never touched font-style — and the app has
+       three italics, every one of them an explanatory note: "matches
+       ingredient" under a search result, "— 450g not adjusted" on a rescaled
+       line, and one emphasis in the help. Slanted small print is the exact
+       shape of text this reader has the most trouble with, and it is the
+       text carrying the explanation. Upright and bold under Easy Read now —
+       the same treatment Easy Read already gives .hint and .rcard__meta —
+       so the distinction survives without the slant. */
+    const SCREENS = [
+      ['Menu, searched', '#menu?q=chick', null, '.matchnote'],
+      ['Recipe, rescaled', '#chicken-stroganoff', '[data-act="serv+"]', '.keptnote'],
+      ['How to use it', '#help', null, 'em']
+    ];
+    const italicsOn = async (pg) => pg.evaluate(() => {
+      const bad = [];
+      document.querySelectorAll('#app *').forEach(el => {
+        if (getComputedStyle(el).fontStyle === 'italic' && (el.textContent || '').trim()) {
+          bad.push((el.className || el.tagName) + ' "' + el.textContent.trim().slice(0, 30) + '"');
+        }
+      });
+      return bad;
+    });
+
+    for (const easy of [true, false]) {
+      const ctxI = await br.newContext({ ...devices['iPhone 13'] });
+      const pI = await ctxI.newPage();
+      await pI.addInitScript((on) => {
+        if (on) { localStorage.setItem('kt.easyRead', 'true'); localStorage.setItem('kt.fsIndex', '4'); }
+      }, easy);
+      const found = [];
+      const slanted = [];
+      for (const [name, hash, extra, sel] of SCREENS) {
+        await pI.goto('about:blank');
+        await pI.goto(B + '/index.html' + hash);
+        await pI.waitForTimeout(600);
+        if (extra) { await pI.click(extra, { timeout: 4000 }).catch(() => {}); await pI.waitForTimeout(400); }
+        if (await pI.locator(sel).count()) found.push(name);
+        (await italicsOn(pI)).forEach(x => slanted.push(name + ': ' + x));
+      }
+      /* The floor first, and it matters in both directions: if the notes
+         never rendered, "no italics" is a pass on an empty page. */
+      chk('the three noted screens all drew their note, easy read ' + (easy ? 'on' : 'off'),
+        found.length === 3, found.join(', '));
+      if (easy) {
+        chk('nothing is set in italics under Easy Read',
+          slanted.length === 0, slanted.slice(0, 4).join(' | '));
+      } else {
+        /* The counterpart: without Easy Read the italics are still there, so
+           the check above is measuring the setting and not an app that
+           simply has no italics in it. */
+        chk('and with Easy Read off they are still italic, so the rule is real',
+          slanted.length >= 3, slanted.length + ' found');
+      }
+      await ctxI.close();
+    }
+
+    /* Upright is only half of it: the note still has to read as a note. */
+    {
+      const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+      const pW = await ctxW.newPage();
+      await pW.addInitScript(() => {
+        localStorage.setItem('kt.easyRead', 'true');
+        localStorage.setItem('kt.fsIndex', '4');
+      });
+      await pW.goto(B + '/index.html#chicken-stroganoff');
+      await pW.waitForSelector('.r-title');
+      await pW.click('[data-act="serv+"]');
+      await pW.waitForTimeout(400);
+      const w = await pW.evaluate(() => {
+        const n = document.querySelector('.keptnote');
+        const row = n.closest('.checkrow__text');
+        return { note: getComputedStyle(n).fontWeight,
+          around: getComputedStyle(row).fontWeight,
+          colour: getComputedStyle(n).color,
+          rowColour: getComputedStyle(row).color };
+      });
+      chk('and it still stands apart from the line it sits on',
+        w.note !== w.around || w.colour !== w.rowColour, JSON.stringify(w));
+      await ctxW.close();
+    }
+  }
+
   console.log('\n== The way out of a sheet must stay on screen (R55) ==');
   {
     /* Every sheet has a Done button in its head and a full-screen scrim
