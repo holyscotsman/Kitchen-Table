@@ -1322,6 +1322,61 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxSW.close();
   }
 
+  console.log('\n== R85 — the danger colour belongs to the destructive mode only ==');
+  {
+    /* The Menu has two modes behind two buttons sitting side by side in the
+       same row: **Tag**, which adds a word to a recipe, and **Remove**,
+       which deletes it. Tag mode was drawn in Remove mode's clothes — the
+       rows carry `.rrow`, whose own comment reads "Remove mode swaps every
+       card for a danger-outlined row", and the Done button carried
+       `.textbtn--removing`, a danger fill. So the harmless mode and the
+       irreversible one looked the same, and the only thing telling them
+       apart was one sentence of grey text.
+       Two things are wrong with that and the second is the serious one:
+       a danger colour that also means "you are adding tags" stops meaning
+       careful, and someone who believes they are tagging is one tap away
+       from removing. The check is that the two modes do not look alike, and
+       that the danger colour appears only in the destructive one. */
+    const modeLook = async (act) => {
+      await p.goto('about:blank');
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.rcard');
+      await p.click('[data-act="' + act + '"]');
+      await p.waitForTimeout(350);
+      return p.evaluate(() => {
+        const norm = (c) => { const d = document.createElement('span');
+          d.style.color = c; document.body.appendChild(d);
+          const v = getComputedStyle(d).color; d.remove(); return v; };
+        const danger = norm(getComputedStyle(document.documentElement)
+          .getPropertyValue('--danger').trim());
+        const uses = [];
+        [].slice.call(document.querySelectorAll('#app *')).forEach(el => {
+          const cs = getComputedStyle(el);
+          const hit = [];
+          if (cs.backgroundColor === danger) hit.push('fill');
+          if ([cs.borderTopColor, cs.borderLeftColor].indexOf(danger) > -1 &&
+              parseFloat(cs.borderTopWidth) > 0) hit.push('border');
+          if (cs.color === danger) hit.push('ink');
+          if (hit.length) uses.push((typeof el.className === 'string'
+            ? el.className.split(/\s+/)[0] : el.tagName) + ':' + hit.join('+'));
+        });
+        const row = document.querySelector('.rrow, .cardgrid > button');
+        const rs = row ? getComputedStyle(row) : null;
+        return { danger: uses.slice(0, 6), dangerCount: uses.length,
+                 rowBorder: rs ? rs.borderTopColor : '',
+                 rows: document.querySelectorAll('.cardgrid > button').length };
+      });
+    };
+    const tag = await modeLook('toggle-tagging');
+    const rem = await modeLook('toggle-remove');
+    chk('both modes drew their list', tag.rows > 5 && rem.rows > 5,
+      JSON.stringify([tag.rows, rem.rows]));
+    chk('remove mode still says danger', rem.dangerCount > 0, JSON.stringify(rem.danger));
+    chk('tag mode does not borrow it', tag.dangerCount === 0, JSON.stringify(tag.danger));
+    chk('and the two modes cannot be mistaken for each other',
+      tag.rowBorder !== rem.rowBorder, tag.rowBorder + ' vs ' + rem.rowBorder);
+  }
+
   console.log('\n== R83 — the accent fill marks the action you came for ==');
   {
     /* One colour carries one meaning in this app: an accent fill is the

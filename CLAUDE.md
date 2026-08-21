@@ -423,8 +423,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **968 functional checks** across eleven
-suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 140, sec 52,
+The suite after the video arc: **972 functional checks** across eleven
+suites (kt 240, feat 65, add 79, relay 16, quick 76, polish 144, sec 52,
 plan 60, video 54, backend 171, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
@@ -436,7 +436,10 @@ catch; and since `R46` a growth watcher that renders a synthetic 240-recipe
 book and reports the filter tap — 440–570 ms, so `089`'s unvirtualised
 ruling holds well past the 150 it worried about). WCAG AA contrast:
 zero failures across every screen × theme × Easy-Read combination, the
-video form included — **and since `R82` on paper too**, which the audit
+video form included — the Menu's tag and remove modes added in `R85`
+after the route list turned out never to have visited either of them,
+which was hiding a meta line at **1.00:1 on all 48 rows in light mode** —
+**and since `R82` on paper too**, which the audit
 had never looked at: printing under both themes found fourteen failures
 the dark palette was leaking onto white, including the shopping list's
 own title at 1.10:1 and all seven of `R60`'s "not adjusted" notes, the

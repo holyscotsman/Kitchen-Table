@@ -1407,7 +1407,7 @@
          (S.removing
            ? ""
            : '<button type="button" class="textbtn' +
-             (S.tagging ? " textbtn--removing" : "") + '" data-act="toggle-tagging">' +
+             (S.tagging ? " textbtn--on" : "") + '" data-act="toggle-tagging">' +
              (S.tagging ? "Done" : "Tag") + "</button>") +
          (S.tagging
            ? ""
@@ -1449,7 +1449,9 @@
     } else if (S.tagging) {
       h += '<div class="cardgrid">' + list.map(function (r) {
         var on = !!S.tagSel[r.id];
-        return '<button type="button" class="rrow press" data-act="tag-pick" ' +
+        /* `R85` — the picking row, not the removing one. Same shape, the
+           app's selected grammar instead of the danger outline. */
+        return '<button type="button" class="rrow rrow--pick press" data-act="tag-pick" ' +
                'aria-pressed="' + on + '" data-id="' + esc(r.id) + '">' +
                '<span class="checkbox">' + (on ? I.check(18) : "") + "</span>" +
                '<span class="rcard__body"><span class="rcard__title">' +
