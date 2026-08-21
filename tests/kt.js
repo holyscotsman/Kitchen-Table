@@ -968,6 +968,142 @@ const browserContextWithReduce = (br) =>
   await p.waitForSelector('.rcard');
   chk('one h1 per screen', await p.locator('h1').count()===1);
 
+  console.log('\n== Nobody had ever typed in this app (R53) ==');
+  {
+    /* Every state change here is a full re-render — app.innerHTML = html —
+       which throws away the very <input> the reader is typing into and
+       builds a new one. render() puts the focus and the caret back, and
+       that restore is the only reason searching works at all on a phone.
+       Nothing tested it. Every suite in this repo reaches a field with
+       fill(), which sets the whole value in one shot and never asks the
+       question; nobody had ever typed a second character.
+       Measured with the restore removed: typing "chicken" leaves "c",
+       focus on <body> — which on iOS means the keyboard drops away after
+       the first letter — and all 763 checks stayed green. */
+    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pT = await ctxT.newPage();
+    const errsT = []; pT.on('pageerror', e => errsT.push(e.message));
+    const field = (sel) => pT.evaluate((s) => {
+      const el = document.querySelector(s), a = document.activeElement;
+      return { value: el ? el.value : null, held: !!el && a === el,
+        active: a ? (a.id || a.tagName) : null,
+        caret: el && el.selectionStart !== undefined ? el.selectionStart : null };
+    }, sel);
+
+    await pT.goto(B + '/index.html#menu');
+    await pT.waitForSelector('.rcard');
+    const all = await pT.locator('.rcard').count();
+    await pT.click('[data-act="toggle-search"]');
+    await pT.waitForSelector('#menu-search');
+    await pT.click('#menu-search');
+    await pT.keyboard.type('chicken', { delay: 30 });
+    const menu = await field('#menu-search');
+    chk('typing a word into the Menu search leaves the word',
+      menu.value === 'chicken', JSON.stringify(menu));
+    chk('and the field still has the keyboard',
+      menu.held, 'focus went to ' + menu.active);
+    chk('and the caret is where the typing left it',
+      menu.caret === 7, String(menu.caret));
+    chk('and the list narrowed to match',
+      await pT.locator('.rcard').count() < all,
+      await pT.locator('.rcard').count() + ' of ' + all);
+
+    /* Correcting a typo is the harder half: the caret has to come back
+       where it WAS, not to the end, or every fix lands in the wrong place. */
+    await pT.evaluate(() => {
+      const e = document.querySelector('#menu-search');
+      e.focus(); e.setSelectionRange(3, 3);
+    });
+    await pT.keyboard.type('X', { delay: 30 });
+    const fixed = await field('#menu-search');
+    chk('a letter typed mid-word lands mid-word, caret and all',
+      fixed.value === 'chiXcken' && fixed.caret === 4, JSON.stringify(fixed));
+
+    await pT.goto(B + '/index.html');
+    await pT.waitForSelector('#main-search');
+    await pT.click('#main-search');
+    await pT.keyboard.type('soup', { delay: 30 });
+    const main = await field('#main-search');
+    chk('the front page search survives typing too',
+      main.value === 'soup' && main.held, JSON.stringify(main));
+
+    await pT.goto(B + '/index.html#plan');
+    await pT.waitForSelector('.slotadd');
+    await pT.locator('.slotadd').first().click();
+    await pT.waitForSelector('#pick-q');
+    await pT.click('#pick-q');
+    await pT.keyboard.type('chicken', { delay: 30 });
+    const pick = await field('#pick-q');
+    chk("and so does the planner's recipe picker",
+      pick.value === 'chicken' && pick.held, JSON.stringify(pick));
+
+    /* The rule, so a field added later inherits it rather than repeating
+       the omission: put one character into EVERY field on every screen and
+       you must still be in that field afterwards. It does not care how —
+       an id and render()'s restore is today's answer, and any other answer
+       that keeps the reader typing is fine too. */
+    const SWEEP = `(() => {
+      const bad = [];
+      const fields = [...document.querySelectorAll('input[data-act], textarea[data-act]')]
+        .filter(el => el.type !== 'file' && el.type !== 'checkbox' && el.type !== 'radio');
+      for (const el of fields) {
+        const act = el.getAttribute('data-act'), id = el.id, before = el.value;
+        el.focus();
+        el.value = before + 'x';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        const a = document.activeElement;
+        if (!(id ? (a && a.id === id) : a === el)) {
+          bad.push(act + ' (' + (id || 'no id') + ') -> ' + (a ? (a.id || a.tagName) : 'null'));
+        }
+        const now = (id && document.getElementById(id)) || el;
+        now.value = before;
+        now.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return { n: fields.length, bad };
+    })()`;
+    const freshAdd = async () => {
+      await pT.goto(B + '/index.html#add');
+      await pT.evaluate(() => sessionStorage.clear());
+      await pT.reload();
+      await pT.waitForSelector('.pathbtn');
+    };
+    const screens = [
+      ['Main', async () => { await pT.goto(B + '/index.html'); await pT.waitForSelector('#main-search'); }],
+      ['Menu + search', async () => {
+        await pT.goto(B + '/index.html#menu?q=chicken');
+        await pT.waitForSelector('#menu-search');
+      }],
+      ['Add — type it in', async () => {
+        await freshAdd(); await pT.click('[data-key="review"]'); await pT.waitForSelector('#a-title');
+      }],
+      ['Add — from a link', async () => {
+        await freshAdd(); await pT.click('[data-key="link"]'); await pT.waitForSelector('#a-paste');
+      }],
+      ['Add — from a video', async () => {
+        await freshAdd(); await pT.click('[data-key="video"]'); await pT.waitForSelector('#a-vurl');
+      }],
+      ['Plan — picker', async () => {
+        await pT.goto(B + '/index.html#plan'); await pT.waitForSelector('.slotadd');
+        await pT.locator('.slotadd').first().click(); await pT.waitForSelector('#pick-q');
+      }]
+    ];
+    let swept = 0;
+    const lost = [];
+    for (const [label, open] of screens) {
+      await open();
+      const r = await pT.evaluate(SWEEP);
+      swept += r.n;
+      r.bad.forEach(b => lost.push(label + ': ' + b));
+    }
+    chk('one character into any field on any screen and you are still in it',
+      lost.length === 0, lost.join(' | '));
+    /* A floor, so a selector that quietly stopped matching cannot read as
+       a clean pass — R21's lesson, and R52's. */
+    chk('and the sweep actually reached the fields', swept >= 12, String(swept));
+    chk('typing threw nothing', errsT.length === 0, errsT.join(' | '));
+    await ctxT.close();
+  }
+
   console.log('\n== JS errors ==');
   chk('no uncaught errors', errs.length===0, errs.join(' | '));
 
