@@ -1287,6 +1287,16 @@ a.applogo:hover {
   margin-top: 2px;
 }
 
+/* `R97` — "Not given" is the state of the book, not a serving count, so it
+   does not wear the number's weight. It is a paragraph, not a button: there
+   is nothing to tap, so the 44px floor below does not apply to it. Same
+   token as the label above it, which Easy Read already promotes to full
+   ink. */
+.servcard__value--none {
+  font-weight: 400;
+  color: var(--card-dim);
+}
+
 .servbtn {
   width: 56px;
   height: 56px;

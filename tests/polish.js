@@ -186,6 +186,146 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="fc"][data-key="Dinner"]'); await p.waitForTimeout(200);
   await p.click('.donebtn'); await p.waitForTimeout(200);
 
+  console.log('\n== A recipe that never said how many it serves (R97) ==');
+  {
+    /* normalizeRecipe DELETES a servings value it cannot read — the one
+       place in this app that discards rather than coerces. What the recipe
+       screen then does with the hole is the finding, and there are three
+       lies stacked on it:
+
+         "Amounts adjusted from the original undefined servings."
+
+       the literal word undefined, in a sentence a cook reads; a claim that
+       the amounts were rescaled when nothing moved; and a servings card
+       reading "4 people" for a recipe that never said four. Worst of all the
+       stepper still runs — tap + and the number goes to 5 while every
+       quantity stays exactly where it was, because the multiplier has no
+       base to work from. A cook could set eight and cook the amounts for
+       two dozen, told in writing that they had been adjusted.
+
+       Reachable by the workflow this project is built on: recipes.json is
+       hand-editable by design, db-sync rewrites it nightly, and CONTENT.md
+       §1 is 34 servings counts that are inferred rather than known — "makes
+       about 2 dozen" is the honest answer for a batch of cookies, and it is
+       exactly what someone will type. */
+    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    const pN = await ctxN.newPage();
+    const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
+    await pN.goto(B + '/index.html');
+    const orig = await pN.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.servings = 'makes about 2 dozen';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+      return one.ingredients;
+    });
+    await pN.goto('about:blank');
+    await pN.goto(B + '/index.html#ninja-cookies');
+    await pN.waitForSelector('.r-title');
+    await pN.waitForTimeout(200);
+
+    const read = () => pN.evaluate(() => ({
+      body: document.body.innerText,
+      note: (document.querySelector('.scalednote') || {}).textContent || '',
+      serv: (document.querySelector('.servcard__value') || {}).textContent || '',
+      ing: [...document.querySelectorAll('.bodygrid__ing li')].map(e => e.textContent.trim()),
+      plusOff: !!(document.querySelector('[data-act="serv+"]') || {}).disabled
+    }));
+
+    let v = await read();
+    chk('the word "undefined" never reaches the page', !/\bundefined\b/.test(v.body),
+        (v.body.match(/.{0,40}undefined.{0,40}/) || [''])[0]);
+    chk('the amounts really are untouched', JSON.stringify(v.ing) === JSON.stringify(orig),
+        v.ing[0] + ' vs ' + orig[0]);
+    chk('so nothing claims they were adjusted', !/adjusted/i.test(v.note), v.note);
+    chk('and the card does not invent a serving count', !/\d+\s+(people|person)/.test(v.serv),
+        v.serv);
+    chk('the page says instead that the book does not record one',
+        /(does|doesn|not say|no.*count)/i.test(v.note) && v.note.length > 20, v.note);
+
+    /* The control must not offer an adjustment it cannot make. */
+    chk('the stepper is off, because there is no count to scale from', v.plusOff);
+    if (!v.plusOff) {
+      await pN.click('[data-act="serv+"]');
+      await pN.waitForTimeout(200);
+      const after = await read();
+      chk('and tapping it changes no amount', JSON.stringify(after.ing) === JSON.stringify(v.ing),
+          after.ing[0]);
+    }
+
+    /* The half that must not regress: a recipe that DOES say, still does. */
+    await pN.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await pN.goto('about:blank');
+    await pN.goto(B + '/index.html#ninja-cookies');
+    await pN.waitForSelector('.servcard__value');
+    const good = await read();
+    chk('a recipe with a real count still shows it', /\d+\s+(people|person)/.test(good.serv),
+        good.serv);
+    chk('and its stepper still works', !good.plusOff);
+    await pN.click('[data-act="serv+"]');
+    await pN.waitForTimeout(200);
+    const scaled = await read();
+    chk('and stepping it really does rescale',
+        JSON.stringify(scaled.ing) !== JSON.stringify(good.ing), scaled.ing[0]);
+    chk('and says so', /adjusted/i.test(scaled.note), scaled.note);
+    /* And it must not gain a count merely by being opened and saved. The
+       old line was `parseInt(...) || r.servings` inside a clamp, which with
+       nothing on either side of the || is NaN — written out as
+       "servings": null, into the overlay and then into the recipes.json
+       somebody commits. */
+    await pN.evaluate(async () => {
+      const res = await fetch('recipes.json');
+      const j = await res.json();
+      const a = Array.isArray(j) ? j : j.recipes;
+      const one = JSON.parse(JSON.stringify(a.find(x => x.id === 'ninja-cookies')));
+      one.servings = 'makes about 2 dozen';
+      localStorage.setItem('kt.recipes', JSON.stringify([one]));
+    });
+    await pN.goto('about:blank');
+    await pN.goto(B + '/index.html#ninja-cookies');
+    await pN.waitForSelector('.r-title');
+    await pN.click('[data-act="toggle-edit"]');
+    await pN.waitForSelector('#e-title');
+    await pN.click('[data-act="save"]');
+    await pN.waitForTimeout(300);
+    const stored = await pN.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes'))[0]);
+    chk('saving an edit does not invent a count', !('servings' in stored),
+        JSON.stringify(stored.servings));
+    chk('and never writes null into the book', stored.servings !== null,
+        JSON.stringify(stored.servings));
+
+    /* The half that must not regress: an edited count is still kept. */
+    await pN.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await pN.goto('about:blank');
+    await pN.goto(B + '/index.html#ninja-cookies');
+    await pN.waitForSelector('.r-title');
+    await pN.click('[data-act="toggle-edit"]');
+    await pN.waitForSelector('#e-serves');
+    await pN.fill('#e-serves', '12');
+    await pN.click('[data-act="save"]');
+    await pN.waitForTimeout(300);
+    const kept = await pN.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes')).find(r => r.id === 'ninja-cookies'));
+    chk('a typed count is still saved', kept.servings === 12, JSON.stringify(kept.servings));
+
+    /* `R94`'s standard: the tutorial must not promise more than the app
+       does. This change creates a state where − and + are off, so the
+       bullet that promises they work has to admit it. */
+    await pN.goto(B + '/index.html#help');
+    await pN.waitForSelector('h1');
+    const help = await pN.evaluate(() => document.body.innerText);
+    chk('the help admits the case where the stepper cannot work',
+        /Not given/.test(help) && /switched off|are off/.test(help),
+        help.slice(0, 0) + (help.match(/.{0,80}Not given.{0,80}/) || ['(no mention)'])[0]);
+
+    chk('none of it threw', nErrs.length === 0, nErrs.join(' | '));
+    await pN.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxN.close();
+  }
+
   console.log('\n== The book survives bad data (R12) ==');
   {
     /* Both of these brick the app if unguarded — and the escape hatch
