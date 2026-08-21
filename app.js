@@ -3460,9 +3460,30 @@
     render();
     kitchenFetch("/api/import/video", { method: "POST", body: { url: url } })
       .then(function (r) {
+        /* `R92` — a 200 is not the same as an answer. `R87` coerced the job
+           lists at this boundary; the submit reply was trusted outright, so
+           a response without a usable id — a renamed field, a half-done
+           deploy, a proxy's own cheerful JSON — put the progress card on
+           screen for a job that does not exist. It stepped through
+           "Fetching the video", it cleared the link so there was nothing
+           left to retry, it invited the reader to close the page because
+           "the finished recipe will be waiting", and it polled
+           /api/import/jobs/undefined forever with every 404 swallowed as
+           transient. Reported as kept, silently dropped: the one thing this
+           app must never do. Nothing is claimed unless the server said what
+           it did with the link. */
+        var id = typeof r.job_id === "number" ? r.job_id : parseInt(r.job_id, 10);
+        if (!r || !isFinite(id)) {
+          S.addBusy = "";
+          S.addError = "The kitchen server took the link but didn’t say what " +
+            "it did with it, so nothing is running. Try again in a moment — " +
+            "the link is still here.";
+          render();
+          return;
+        }
         S.addBusy = "";
         S.videoUrl = "";
-        S.videoJob = { id: r.job_id, status: "queued", stage: "Waiting its turn", eta: null };
+        S.videoJob = { id: id, status: "queued", stage: "Waiting its turn", eta: null };
         scheduleAddPersist();
         startVideoPoll();
         render();

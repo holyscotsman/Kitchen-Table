@@ -288,8 +288,23 @@ const hostile = JSON.stringify({
       onePath(asked.filter(x => x.indexOf(' /api/import/jobs/') > -1)),
       JSON.stringify(asked));
 
-    /* The other way in has no parseInt anywhere near it: the id handed back
-       by a submission is polled straight from the server's own answer. */
+    /* The other way in used to have no parseInt anywhere near it: the id
+       handed back by a submission was polled straight from the server's own
+       answer, and this check proved that a hostile one stayed a single
+       encoded path rather than becoming two requests.
+       `R92` changed what should happen here, and the distinction is worth
+       stating because it is not the same as `R87`'s:
+         - **Showing** something the app does not recognise — a job in a
+           list with an odd id — passes through, escaped. The reader loses
+           nothing by seeing that it exists.
+         - **Claiming an operation succeeded** on something the app does not
+           recognise is a lie. A submission whose id cannot be used is not a
+           running job, and drawing the progress card for it told the family
+           to close the page and wait for a recipe that was never coming.
+       So the hostile id is now refused at the door, and what this proves is
+       that the refusal is honest and nothing is polled. The encoding
+       guarantee it used to cover is still covered above, by opening a
+       listed draft whose id carries the same payload. */
     asked.length = 0;
     await pK.goto(B + '/index.html#add');
     await pK.evaluate(() => sessionStorage.clear());
@@ -302,8 +317,17 @@ const hostile = JSON.stringify({
     /* The poll runs on a 3.5s tick, so one full turn plus a margin. */
     await pK.waitForTimeout(5000);
     const polls = asked.filter(x => x.indexOf('GET /api/import/jobs/') === 0);
-    chk('and the id a submission hands back is polled as one job, whatever it holds',
-      onePath(polls), JSON.stringify(asked));
+    const saidSo = await pK.evaluate(() => {
+      const t = ((document.querySelector('#app') || {}).textContent || '').replace(/\s+/g, ' ');
+      return { told: /didn.t say what it did with it/i.test(t),
+               noCard: !/you can close this page|Waiting its turn/i.test(t),
+               link: (document.querySelector('#a-vurl') || {}).value || null };
+    });
+    chk('a submission answered with an unusable id is refused, not drawn as progress',
+      saidSo.noCard && saidSo.told && polls.length === 0,
+      JSON.stringify(saidSo) + ' polls=' + JSON.stringify(polls));
+    chk('and the link is still there to send again',
+      saidSo.link === 'https://youtu.be/hostile', String(saidSo.link));
     await ctxK.close();
   }
 

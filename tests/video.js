@@ -379,6 +379,91 @@ async function freshPage(br, opts) {
     await ctx.close();
   }
 
+  console.log('\n== R92 — a submission is only sent if the server said what it did with it ==');
+  {
+    /* `R87` coerced the job LISTS at the boundary. The submit reply was
+       never checked at all: `S.videoJob = { id: r.job_id, ... }` trusts
+       that a 200 carries a job id.
+       A 200 that does not — a renamed field, a half-done deploy, a proxy's
+       own cheerful JSON — therefore produced the worst outcome this app is
+       capable of. The progress card appears and starts stepping through
+       "Waiting its turn… Fetching the video… Listening to it". The pasted
+       link is cleared, so there is nothing left to retry. The card says
+       **"you can close this page, the finished recipe will be waiting"** —
+       a promise that cannot be kept, because there is no job. And the poll
+       runs forever against `/api/import/jobs/undefined`, every 404
+       swallowed as transient.
+       CLAUDE.md's own line for this: a change reported as kept and
+       silently dropped is the worst thing this app could do. */
+    const SHAPES = [
+      ['a 200 with no job id at all', { ok: true }],
+      ['a job id that is null', { job_id: null }],
+      ['a job id that is an object', { job_id: { n: 7 } }],
+      ['an empty body', {}]
+    ];
+    for (const [what, body] of SHAPES) {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const polled = [];
+      await ctx.route(API + '/**', (route) => {
+        const u = new URL(route.request().url());
+        if (route.request().method() === 'POST' && u.pathname === '/api/import/video') {
+          return route.fulfill({ status: 200, contentType: 'application/json',
+            headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+        }
+        if (/^\/api\/import\/jobs\//.test(u.pathname)) polled.push(u.pathname);
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' }, body: '{"jobs":[]}' });
+      });
+      const p = await ctx.newPage();
+      const errs = [];
+      p.on('pageerror', e => errs.push(String(e.message)));
+      await p.addInitScript((api) => localStorage.setItem('kt.importApi', JSON.stringify(api)), API);
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      await p.click('.pathbtn[data-key="video"]');
+      await p.waitForSelector('#a-vurl');
+      await p.fill('#a-vurl', 'https://youtu.be/abc123');
+      await p.click('[data-act="video-submit"]');
+      await p.waitForTimeout(1200);
+
+      const r = await p.evaluate(() => {
+        const t = ((document.querySelector('#app') || {}).textContent || '').replace(/\s+/g, ' ');
+        const v = document.querySelector('#a-vurl');
+        return {
+          promised: /you can close this page|Waiting its turn/i.test(t),
+          said: /couldn|could not|didn|oddly|try again|again/i.test(t),
+          link: v ? v.value : null
+        };
+      });
+      chk('no progress is claimed for ' + what, !r.promised);
+      chk('and the reader is told, for ' + what, r.said);
+      chk('and the link survives so it can be sent again, for ' + what,
+        r.link === 'https://youtu.be/abc123', String(r.link));
+      chk('and nothing is polled for a job that does not exist, for ' + what,
+        polled.length === 0, polled.slice(0, 3).join(', '));
+      chk('and it threw nothing, for ' + what, errs.length === 0, errs.join(' | ').slice(0, 60));
+      await ctx.close();
+    }
+
+    /* The floor: a real 202 must still be accepted, or the fix is just a
+       wall across the feature. */
+    {
+      const { ctx, p } = await freshPage(br, { polls: [
+        { id: 7, status: 'queued', eta_seconds: 60, overrun: false }] });
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      await p.click('.pathbtn[data-key="video"]');
+      await p.waitForSelector('#a-vurl');
+      await p.fill('#a-vurl', 'https://youtu.be/abc123');
+      await p.click('[data-act="video-submit"]');
+      await p.waitForTimeout(1200);
+      const t = ((await p.locator('#app').textContent()) || '').replace(/\s+/g, ' ');
+      chk('a real job id is still accepted and still shows its progress',
+        /Waiting its turn|Fetching the video/i.test(t), t.slice(0, 80));
+      await ctx.close();
+    }
+  }
+
   console.log('\n== R87 — the server\'s answers are shapes, not promises ==');
   {
     /* `R62` established the rule for stored data: every key this app reads

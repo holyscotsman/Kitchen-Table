@@ -248,7 +248,15 @@ a string in `S.videoReady` and the next render called `.map` on it. Not the
 render that fetched it: that one throws inside a `.then` with a `.catch`
 behind it, so the failure is swallowed and the bad value simply waits, then
 takes down the Add screen on the reader's next tap. `normalizeJobs()`
-coerces both lists now. It deliberately does **not** discard an entry whose
+coerces both lists now, and since `R92` the **submit reply** is checked
+too — a 200 without a usable job id used to draw the progress card for a
+job that did not exist, clear the pasted link, and invite the reader to
+close the page because "the finished recipe will be waiting".
+**The two halves are not the same rule, and the difference is the point:**
+*showing* something the app does not recognise passes through, escaped —
+the reader loses nothing by seeing that it exists; *claiming an operation
+succeeded* on something it does not recognise is a lie, and is refused
+with a sentence. It deliberately does **not** discard an entry whose
 id it cannot parse: a boundary that silently drops what it does not
 recognise turns a schema change into an empty waiting list with no
 explanation, and `R54` renders exactly such an id, escaped, on purpose.
@@ -439,9 +447,9 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **1003 functional checks** across eleven
-suites (kt 247, feat 65, add 79, relay 16, quick 76, polish 148, sec 52,
-plan 60, video 64, backend 181, zoom 15), plus the perf budget (FCP ~900 ms
+The suite after the video arc: **1025 functional checks** across eleven
+suites (kt 247, feat 65, add 79, relay 16, quick 76, polish 148, sec 53,
+plan 60, video 85, backend 181, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —
