@@ -1090,7 +1090,16 @@
      rate-limit rapid downloads, hence the stagger. */
   function downloadPhotos() {
     var map = images();
-    var ids = Object.keys(map).filter(function (id) { return id !== "__new__"; });
+    /* `R71` — only pictures the book can actually reference. The written
+       file names a photo as images/<id>.jpg for recipes that exist, so a
+       photo whose recipe is gone would be saved, committed, and pointed at
+       by nothing. Removing a recipe takes its photo now, but a phone that
+       removed one before that still holds the orphan. */
+    var known = {};
+    S.recipes.forEach(function (r) { known[r.id] = true; });
+    var ids = Object.keys(map).filter(function (id) {
+      return id !== "__new__" && known[id];
+    });
     if (!ids.length) {
       setNotice("There are no photos on this phone yet.");
       return;
@@ -4760,8 +4769,22 @@
     if (act === "dl-photos") { downloadPhotos(); return; }
     if (act === "remove") {
       var victim = byId(el.getAttribute("data-id"));
-      if (victim && window.confirm('Remove "' + victim.title + '" from the collection?')) {
+      /* `R71` — the picture goes with it, and the question says so first.
+         Photos live outside the recipe records, so removing one used to
+         leave its photo in storage for good: it counted against the quota
+         that produces "this phone has no room left", and **Download photos
+         handed the family a file nothing referenced**, to be dropped into
+         images/ and committed with no recipe pointing at it. Nothing in
+         this app deletes what a person was not told about, so the sentence
+         changes when there is a photo to lose. */
+      if (!victim) return;
+      var hasPhoto = pagesOf(victim.id).length > 0;
+      var ask = hasPhoto
+        ? 'Remove "' + victim.title + '" and its photo from this phone?'
+        : 'Remove "' + victim.title + '" from the collection?';
+      if (window.confirm(ask)) {
         S.recipes = S.recipes.filter(function (x) { return x.id !== victim.id; });
+        if (hasPhoto) removeImage(victim.id);
         persistRecipes();
         render();
       }

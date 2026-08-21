@@ -210,7 +210,13 @@ would add hundreds of kilobytes per photo to it. Instead the download writes
 drop into `images/` alongside it.
 
 `imageFor()` prefers the local photo over the published path, so a picture
-shows the moment it is attached rather than after a commit. localStorage is
+shows the moment it is attached rather than after a commit. **Removing a
+recipe takes its photo with it** (`R71`), and the confirm says so when there
+is one to lose — before that the picture stayed for good, counting against
+the quota that produces the no-room message, and *Download photos* handed
+the family a file nothing referenced. That download now offers only photos
+the book can actually point at, which also covers the orphans a phone may
+already be holding. localStorage is
 only a few megabytes; a quota failure returns a plain message telling the user
 to download and commit what they have. Since `R44` the **recipe overlay** does
 the same, and since `R45` so does the **week plan**: a save that could not be
@@ -404,8 +410,8 @@ contributor names stay labels, never keys.
 
 ### Verified
 
-The suite after the video arc: **897 functional checks** across eleven
-suites (kt 239, feat 59, add 74, relay 16, quick 70, polish 117, sec 52,
+The suite after the video arc: **903 functional checks** across eleven
+suites (kt 239, feat 65, add 74, relay 16, quick 70, polish 117, sec 52,
 plan 41, video 54, backend 162, zoom 13), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
