@@ -249,6 +249,61 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxImg.close();
   }
 
+  console.log('\n== A save that did not happen must not say "Saved" (R44) ==');
+  {
+    /* The photo path has said "storage is full" out loud since task 011. The
+       recipe overlay — the family's own words, the thing Edit mode exists to
+       keep — went through save(), which swallows a quota error entirely. So
+       the button says Saved, the screen shows the change, and it is gone on
+       the next load: data loss wearing the face of success. Reachable on a
+       browser without IndexedDB, where photos fall back into the same
+       localStorage this overlay lives in. */
+    const ctxFull = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pFull = await ctxFull.newPage();
+    const fullErrs = []; pFull.on('pageerror', e => fullErrs.push(e.message));
+    await pFull.goto(B + '/index.html#chicken-cordon-bleu');
+    await pFull.waitForSelector('.r-title');
+    /* Fill the shelf, leaving the app's own keys alone. */
+    const filled = await pFull.evaluate(() => {
+      /* Coarse, then fine: a 64KB block failing still leaves room for the
+         ~60KB overlay, and a half-full shelf proves nothing. */
+      let n = 0;
+      for (const size of [64, 8, 1]) {
+        const blob = 'x'.repeat(size * 1024);
+        try { for (let i = 0; i < 4000; i++, n++) localStorage.setItem('kt.fill.' + n, blob); }
+        catch (e) { /* next, smaller */ }
+      }
+      return n;
+    });
+    chk('the shelf really is full', filled > 0, 'filled ' + filled + ' blocks');
+    await pFull.click('[data-act="toggle-edit"]');
+    await pFull.waitForTimeout(300);
+    await pFull.fill('#e-title', 'A Title That Cannot Be Kept');
+    await pFull.click('[data-act="save"]');
+    await pFull.waitForTimeout(400);
+    const label = await pFull.locator('[data-act="save"]').textContent();
+    const screen = await pFull.locator('#main-content').textContent();
+    chk('it does not claim to have saved', !/saved/i.test(label), label);
+    chk('and says plainly that the phone is full',
+      /full|no room|wouldn’t store|would not store/i.test(screen),
+      screen.slice(0, 120));
+    chk('without throwing', fullErrs.length === 0, fullErrs.join(' | '));
+    /* And with room again, Save behaves exactly as it always did. */
+    await pFull.evaluate(() => {
+      Object.keys(localStorage).filter(k => k.indexOf('kt.fill.') === 0)
+        .forEach(k => localStorage.removeItem(k));
+    });
+    await pFull.click('[data-act="save"]');
+    await pFull.waitForTimeout(400);
+    chk('with room again it saves and says so',
+      /saved/i.test(await pFull.locator('[data-act="save"]').textContent()));
+    await pFull.reload();
+    await pFull.waitForSelector('.r-title');
+    chk('and the change is really there after a reload',
+      (await pFull.locator('.r-title').textContent()).includes('Cannot Be Kept'));
+    await ctxFull.close();
+  }
+
   console.log('\n== The font is really the font (R42) ==');
   {
     /* CLAUDE.md's second rule, and the one it calls a functional requirement
