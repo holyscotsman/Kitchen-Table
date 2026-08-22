@@ -1025,10 +1025,51 @@ database error event, which is a task, so the sentence lands after the route
 change. The fallback path is where it was false, and the fallback path is
 the one with the smaller quota.
 
+### Three sweeps, one list, and a comment that said so before it was true
+
+`R131`. The app is walked screen by screen four times over: the contrast
+audit, and — in `tests/kt.js` — the 48×48 icon rule, the 44px floor, the
+accessible-name sweep and the focus-ring sweep. Each carried its own
+hand-typed route list, and they had drifted to **32, 5, 6, 16 and 6**
+screens respectively. The accessible-name list's comment said *"Same list
+the contrast audit walks"*, which was false by sixteen screens.
+
+The floor sweep's own comment is the argument, one level down:
+
+> Every screen, not just the Menu: the servings number shipped a hair under
+> the floor (`R16`) precisely because this sweep only ever visited one route.
+
+`R85` found **192** contrast failures the moment two unswept modes were
+added, so *which states are missing* is a question worth answering once, in
+one place, rather than five times.
+
+`tests/screens.js` is that place: the list, and the **opening procedure**
+with it. Several of these states need more than one tap to exist (the tag
+sheet wants Tag mode and a selected recipe first; the refused-link screen
+wants a URL typed and submitted), several need a seed planted before boot
+(`R101`), one needs the network held and then refused (`R110`), and each
+carries the selector that proves it opened rather than silently auditing
+the screen behind it (`R86` found four routes doing exactly that). A state
+one sweep can reach is now a state all of them can.
+
+Nothing was found: every icon button is 48×48, nothing interactive is under
+44px, every control has a name, every field a label, every tab stop a focus
+ring, and no decoration speaks — across every screen the app has. The
+coverage was fine; the guarantee was not, and it is the guarantee that has
+to survive the next screen somebody adds.
+
+One more thing fell out of it. Atkinson is self-hosted (`049`) and arrives
+after first paint: measured before it lands, a 44px control reads **43.98**
+and a 24px line reads **23.9** — one flips the tap-target floor, the other
+flips which AA ratio applies — and both do it at random. Reproduced while
+mutation-testing this round, on the Main header's two documented 44px
+controls. The shared opener waits for `document.fonts.ready` now, so neither
+audit is one sub-pixel from a false alarm.
+
 ### Verified
 
-The suite after the video arc: **1529 functional checks** across eleven
-suites (kt 308, feat 65, add 113, relay 16, quick 76, polish 297, sec 56,
+The suite after the video arc: **1531 functional checks** across eleven
+suites (kt 310, feat 65, add 113, relay 16, quick 76, polish 297, sec 56,
 plan 79, video 244, backend 260, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
