@@ -1092,6 +1092,35 @@
     return save(K.recipes, S.recipes);
   }
 
+  /* `R134` — every write to the book re-reads it first.
+   *
+   * `persistRecipes` writes `S.recipes`: the list this tab read at boot,
+   * with this tab's change applied. Two tabs of the same site share one
+   * `localStorage`, so the second save wrote a snapshot that had never
+   * heard of the first. Measured: tab A renamed Chops and was told
+   * "Saved"; tab B then saved a change to Crepes, and the book held the
+   * ORIGINAL Chops. Tab A's change was gone, silently, while tab A still
+   * showed it on screen — and on a sharing phone tab A's save had already
+   * reached the family, so the family and the phone that made the change
+   * now disagree.
+   *
+   * iOS Safari keeps tabs for months and a home-screen install beside an
+   * open tab is two instances of this app, so this is not an exotic state.
+   *
+   * The change is applied to what is actually stored, which also means the
+   * other tab's work arrives on this screen at the same moment. Two tabs
+   * editing THE SAME recipe is still last-write-wins — a different question,
+   * and an honest one; two tabs editing two different recipes must not lose
+   * either. */
+  function writeRecipes(change) {
+    var stored = load(K.recipes, null);
+    var base = Array.isArray(stored)
+      ? settleIds(stored.map(normalizeRecipe).filter(Boolean))
+      : S.recipes;
+    S.recipes = change(base);
+    return persistRecipes();
+  }
+
   /* ---- photos ----
 
      Photos live in IndexedDB (database "kt", store "images"), because
@@ -2066,7 +2095,7 @@
       next = target;
     }
     var moved = [];
-    S.recipes = S.recipes.map(function (r) {
+    writeRecipes(function (list) { return list.map(function (r) {
       var have = tagsOf(r);
       if (have.indexOf(oldTag) === -1) return r;
       var out = {};
@@ -2081,8 +2110,7 @@
         });
       moved.push(out);
       return out;
-    });
-    persistRecipes();
+    }); });
     /* An active filter on the old name follows the rename. */
     S.tags = S.tags.map(function (t) { return t === oldTag ? next : t; })
       .filter(function (t, i, a) { return a.indexOf(t) === i; });
@@ -3167,11 +3195,20 @@
       else delete updated.flagged;
     }
 
-    S.recipes = S.recipes.map(function (x) {
-      return x.id === r.id ? updated : x;
+    var kept = writeRecipes(function (list) {
+      var found = false;
+      var next = list.map(function (x) {
+        if (x.id !== r.id) return x;
+        found = true;
+        return updated;
+      });
+      /* Another tab removed it while this one was editing. The reader is
+         about to be told this was saved, so it has to be: an edit is
+         typing, and a removal is one tap that can be made again. */
+      return found ? next : next.concat([updated]);
     });
     if (hasCount(updated)) S.serves = updated.servings;
-    if (persistRecipes()) {
+    if (kept) {
       /* `R120` — the form now shows the recipe that was actually stored.
          `saveDraft` has always tidied on the way past: a title cleared to
          nothing falls back to the old one, blank lines are dropped, and
@@ -4293,8 +4330,7 @@
       moved = Promise.resolve("");
     }
 
-    S.recipes = S.recipes.concat([recipe]);
-    if (!persistRecipes()) {
+    if (!writeRecipes(function (list) { return list.concat([recipe]); })) {
       /* Keep the draft on screen rather than pretending it landed. */
       S.recipes = S.recipes.filter(function (x) { return x.id !== recipe.id; });
       S.addError = RECIPES_FULL_MSG;
@@ -6182,7 +6218,7 @@
       allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
       toAdd = toAdd.map(function (t) { return canon[t.toLowerCase()] || t; });
       var tagged = [];
-      S.recipes = S.recipes.map(function (r) {
+      writeRecipes(function (list) { return list.map(function (r) {
         if (!S.tagSel[r.id]) return r;
         var out = {};
         Object.keys(r).forEach(function (k) { out[k] = r[k]; });
@@ -6194,8 +6230,7 @@
         out.tags = have;
         tagged.push(out);
         return out;
-      });
-      persistRecipes();
+      }); });
       S.tagSheetOpen = false;
       S.tagging = false; S.tagSel = {}; S.bulkTags = "";
       render();
@@ -6238,13 +6273,14 @@
             "thing this phone keeps to itself."
           : "");
       if (window.confirm(ask)) {
-        S.recipes = S.recipes.filter(function (x) { return x.id !== victim.id; });
+        writeRecipes(function (list) {
+          return list.filter(function (x) { return x.id !== victim.id; });
+        });
         if (hasPhoto) removeImage(victim.id);
         /* `R127` — and the note saying where the family's book keeps this
            phone's copy of it, which stops being true the moment the copy
            does. */
         forgetSharedId(victim.id);
-        persistRecipes();
         render();
       }
       return;

@@ -1149,10 +1149,42 @@ have caught this by name, in the print pass, on a Sunday — and `seedInit`
 is held to the Monday anchor and to local date parts, so the formula cannot
 come back.
 
+### Two tabs of the same book, and one of them lost
+
+`R134`. `persistRecipes` wrote `S.recipes` — the list this tab read at boot,
+with this tab's change applied. Two tabs of the same site share one
+`localStorage`, so the second save wrote a snapshot that had never heard of
+the first.
+
+Measured: tab A renamed *Chops* and was told **Saved**; tab B then saved a
+change to *Crepes*, and the book held `chops = "Air Fryer Chops"` — the
+original. Tab A's change was gone, silently, while tab A still showed it on
+screen. A recipe **added** in one tab vanished the same way. CLAUDE.md's own
+words for that shape: *a change reported as kept and silently dropped is the
+worst thing this app could do to a book of someone's recipes.* And on a
+sharing phone it is worse — tab A's save had already reached the family, so
+the family's copy and the phone that made the change now disagree, with the
+phone's next edit pushing the old version back.
+
+iOS Safari keeps tabs for months, and a home-screen install beside an open
+tab is two instances of this app. It is not an exotic state.
+
+`writeRecipes(change)` re-reads the stored book, applies the change to
+**that**, and writes it back — so the other tab's work arrives on this
+screen in the same moment. All five writes go through it: an edit, an add, a
+removal, a tag rename or merge, and a bulk tagging.
+
+Two tabs editing **the same** recipe is still last-write-wins. That is a
+different question and an honest one; two tabs editing two different recipes
+must not lose either. One case needed a ruling: another tab removing a
+recipe while this one is editing it. The edit wins and puts it back —
+the reader is about to be told it was saved, so it has to be, and an edit is
+typing where a removal is one tap that can be made again.
+
 ### Verified
 
-The suite after the video arc: **1565 functional checks** across eleven
-suites (kt 323, feat 65, add 113, relay 16, quick 76, polish 307, sec 56,
+The suite after the video arc: **1571 functional checks** across eleven
+suites (kt 323, feat 71, add 113, relay 16, quick 76, polish 307, sec 56,
 plan 79, video 244, backend 271, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
