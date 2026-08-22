@@ -975,6 +975,41 @@ const { runJob, computeFps } = lib('pipeline');
       /api\/recipes"\) === 0/.test(src) || /indexOf\("\/api\/recipes"\)/.test(src));
   }
 
+  console.log('\n== A burst publishes once, after the last row is in (S11) ==');
+  {
+    /* `S11` sends a bulk tag change one recipe at a time. Without a way to
+       say "more coming", the FIRST write fires the republish and the other
+       47 race a GitHub runner starting up — and the publisher's own cooldown
+       guarantees no later write can fire a second one. That race is real,
+       and this proves it before asserting the cure. */
+    const { makePublisher } = require('../backend/lib/publish');
+    const burst = makePublisher({ token: 'ghp_x', cooldownMs: 90000,
+      fetchImpl: () => Promise.resolve({ status: 204, ok: true }) });
+    const first = await burst.poke(0);
+    const later = await burst.poke(1000);
+    chk('the first write of a burst would publish', first.sent === true, JSON.stringify(first));
+    chk('and no later one can, so the poke must be held back instead',
+      later.sent === false && later.why === 'debounced', JSON.stringify(later));
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const put = src.slice(src.indexOf('async function putRecipe'), src.indexOf('/* ---', src.indexOf('async function putRecipe')));
+    chk('the write endpoint can be told more is coming',
+      /async function putRecipe\(req, res, id, more\)/.test(put), 'no more parameter');
+    chk('and the route reads it off the address',
+      /putRecipe\(req, res, m\[1\], u\.searchParams\.get\("more"\) === "1"\)/.test(src),
+      'route does not pass more');
+    chk('a deferred write does not poke at all',
+      /more \? \{ sent: false[^}]*\} : await publisher\.poke\(\)/.test(put), 'poke not guarded');
+    chk('and still reports what actually happened, not what will',
+      /publishing: poked\.sent/.test(put), 'publishing must mirror the poke');
+    /* Deferring costs a caller nothing they did not already have: reaching
+       this line at all needs the family passphrase, and the only effect is
+       that the change waits for the nightly sync instead of a poke. */
+    chk('the flag is read only on the write route',
+      (src.match(/searchParams\.get\("more"\)/g) || []).length === 1,
+      'more must not steer anything else');
+  }
+
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('SUITE CRASH:', e); process.exit(1); });

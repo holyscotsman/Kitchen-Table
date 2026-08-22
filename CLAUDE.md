@@ -492,6 +492,17 @@ Save in Edit mode writes to `localStorage` exactly as before and says so —
   ("try Save again in a minute"). Saying "yet" about the first would be a
   promise nobody can keep.
 
+**One known mismatch, recorded rather than fixed.** The app treats a
+serving count as optional — `R97` made sure a recipe without one does not
+gain one by being edited — while `kitchen.recipes.servings` is `not null`
+and `validateRecipe` refuses anything else. So a recipe with no count could
+never be shared: a single edit would come back refused, and a bulk change
+would stop dead at it. Nothing in the book lacks a count (all 48 have one,
+and every import path defaults and flags rather than omitting), and no path
+in the app can remove one, so this is unreachable today. It is written down
+because the two models disagree, and the first countless recipe would find
+that out the hard way.
+
 Two variables for Jason, both in Render, neither in this repo or in chat:
 `KT_WRITE_KEY` (the passphrase) and `KT_GH_TOKEN` (optional — without it a
 change waits for the nightly sync instead of arriving in minutes).
@@ -503,17 +514,50 @@ not — and the video path had been telling the server all along. All three
 ways now behave the same; a video draft still goes through `acceptJob` only,
 never both.
 
-**And the sentences it falsified** (`S06`). The help page said *"your
-changes live on your phone only"*, which this arc made false for any phone
-holding the passphrase. It reads the phone now rather than describing phones
-in general, and is checked from both sides. Removal's sentence was
-deliberately left alone: removal is still local-only.
+**And the sentences it falsified.** The help page said *"your changes live
+on your phone only"* (`S06`), the family walkthrough `ADDING.md` said it
+again and then contradicted itself (`S07`), and *"Undo all my changes on
+this phone"* promised an undo it no longer fully delivers (`S08`) — all
+true for the whole life of this app until the round before them made them
+false. Each now reads the phone rather than describing phones in general,
+and is checked from both sides.
+
+Removal's sentence changed too, but the other way (`S10`): removal is
+still deliberately local, so both halves of its confirm say **"from this
+phone"**, and on a sharing phone one more line names the exception — *it
+stays in everyone else's book; removing is the one thing this phone keeps
+to itself*. The trap that fixed was the worst shape a wrong sentence can
+take here — someone removes a recipe believing the family lost it too, so
+it stays live for them **and** their own copy is gone.
+
+**And the changes made to many at once** (`S11`). `S04` wired sharing into
+the two places a recipe is written one at a time, and missed the two places
+this app writes to **many**: Tag mode's *Add tags*, and renaming or merging
+a tag. Both wrote the overlay and stopped, on phones where every single
+edit reached the family. That is the worst place for the gap to be — tag
+hygiene is the one part of this app built specifically to keep the *whole
+book* consistent (`067`–`069`), so a rename landing on one phone only is
+exactly how the near-duplicate tags that machinery exists to prevent get
+made, and the next ordinary edit from the other phone puts the old spelling
+back into the family's copy. `shareEdits` now sends every recipe a bulk
+change touched, **stops at the first failure** (one outage is one answer,
+not a wasted thirty-second wait per recipe), and reports how far it
+actually got.
+
+Every write of a burst but the last carries **`?more=1`**, which tells the
+server to hold the publish poke. Without it the *first* row of a
+48-recipe burst fires the republish, and the publisher's own 90-second
+cooldown guarantees no later row can fire a second one — so whether the
+rest reached the file was a race between Neon and a GitHub runner starting
+up. A phone that closes mid-burst simply never pokes and the nightly sync
+picks the change up: **late, never wrong**, which is the direction this app
+errs in.
 
 ### Verified
 
-The suite after the video arc: **1288 functional checks** across eleven
+The suite after the video arc: **1329 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 53,
-plan 79, video 152, backend 226, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 186, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

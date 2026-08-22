@@ -373,7 +373,15 @@ const publisher = makePublisher({
  * has never been through the database is the normal state of all 48 of
  * them, and editing one is not a reason to fail.
  */
-async function putRecipe(req, res, id) {
+/* `more` means "this write is one of a burst — do not publish yet". The
+   app sets it on every recipe of a bulk tag change except the last, so the
+   republish that follows reads a database holding the WHOLE change. Without
+   it the first write of a 48-recipe burst fires the poke, and whether the
+   other 47 made it into the file depends on a race between Neon and a
+   GitHub runner starting up. A phone that closes mid-burst simply never
+   pokes, and the nightly sync picks the change up — late, never wrong,
+   which is the direction this app errs in. */
+async function putRecipe(req, res, id, more) {
   const refusal = writeGate.refusalFor(req.headers, callerIp(req), Date.now());
   if (refusal) return send(res, refusal.status, { error: refusal.error });
 
@@ -424,7 +432,7 @@ async function putRecipe(req, res, id) {
   /* Deliberately not awaited into the response: the write is done and the
      family's copy is safe. Whether the publish fires now or the nightly run
      picks it up changes when they see it, not whether. */
-  const poked = await publisher.poke();
+  const poked = more ? { sent: false, why: "more-coming" } : await publisher.poke();
   send(res, 200, { ok: true, id: r.id, publishing: poked.sent });
 }
 
@@ -477,7 +485,7 @@ const server = http.createServer((req, res) => {
       return acceptJob(req, res, parseInt(m[1], 10));
     }
     if ((m = p.match(/^\/api\/recipes\/([a-z0-9-]{1,80})$/)) && req.method === "PUT") {
-      return putRecipe(req, res, m[1]);
+      return putRecipe(req, res, m[1], u.searchParams.get("more") === "1");
     }
     send(res, 404, { error: "not found" });
   })();

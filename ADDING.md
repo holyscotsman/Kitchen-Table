@@ -16,11 +16,13 @@ else sees it depends on one box.
   pages to Jason to put in everyone's copy.
 - **If the family's passphrase is in it**, pressing Save also sends the
   change to everyone, usually within a few minutes. You only put it in once,
-  on that phone. Ask Jason for it.
+  on that phone. Ask Jason for it. The same goes for tagging a batch of
+  recipes at once (**"Add tags"**) and for renaming or merging a tag — those
+  change lots of recipes in one go, and they go to everyone too.
 
 **The app tells you which happened, every single time.** If it says *saved on
-this phone*, it means only this phone — whatever the box says, whatever you
-expected. Believe the sentence, not the setting.
+this phone*, or *only on this phone*, it means only this phone — whatever the
+box says, whatever you expected. Believe the sentence, not the setting.
 
 Two things never go to everyone, no matter what: **removing** a recipe, and
 **photos**. Both stay on your phone until a file is published in the ordinary
