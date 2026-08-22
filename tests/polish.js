@@ -3065,6 +3065,45 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
+  console.log('\n== Every rule in the stylesheet is for something the app draws (R125) ==');
+  {
+    /* `tokens.css` is protected by `R48` — no colour may exist outside it.
+       Nothing protected the other direction: a rule for a class the app
+       stopped emitting stays forever, and the next person reading
+       `style.css` cannot tell a live rule from a fossil. Three had already
+       accumulated (`.form-grid`, `.main__marks`, `.sheetbtn--acc`), and a
+       stylesheet nobody can trust is one people work around rather than
+       edit.
+
+       `tokens.css` is deliberately exempt: it is copied in verbatim from the
+       handoff and is the one file this project does not get to tidy.
+
+       An exemption list is here and empty on purpose, with `R114`'s rule
+       attached: a class built by concatenation could trip this honestly, and
+       when the first one does it gets a name and a reason here rather than a
+       loosened check. */
+    const fs = require('fs'), path = require('path');
+    const root = (f) => path.join(__dirname, '..', f);
+    const css = fs.readFileSync(root('style.css'), 'utf8');
+    const emitted = fs.readFileSync(root('app.js'), 'utf8') +
+                    fs.readFileSync(root('index.html'), 'utf8');
+    const EXEMPT = new Set([]);
+
+    const body = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const classes = [...new Set([...body.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)]
+      .map((m) => m[1]))];
+    const dead = classes.filter((c) => !EXEMPT.has(c) && !emitted.includes(c));
+
+    chk('every class the stylesheet styles is one the app writes',
+      dead.length === 0, dead.join(' | '));
+    /* Floors: a scan that stopped finding classes, or an app that stopped
+       emitting them, would pass this silently. */
+    chk('and the scan actually read a stylesheet', classes.length > 150,
+      String(classes.length));
+    chk('against markup that actually emits classes',
+      /class="/.test(emitted), 'no class attributes found');
+  }
+
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);
 })();
