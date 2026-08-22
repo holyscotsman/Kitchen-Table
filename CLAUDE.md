@@ -927,10 +927,39 @@ with this name, so yours is in there as “shortbread-2” rather than over
 theirs"* — because they are the only person who can say whether those are
 two recipes or one.
 
+### The line under a recipe named one provenance for every provenance
+
+`R128`. All 48 recipes in the handoff carry a `source` that is the name of
+the note Joan's screenshot came from — *Chicken fritters*, *BBQ steak
+times* — and the recipe page printed **"From Joan's screenshots · <name>"**,
+which is true of those 48 and of nothing else.
+
+It printed it for every other recipe too, and three import paths write a
+`source` of their own: a link import and the video importer store the URL,
+the photo path stores *Read from a photo*, the paste box stores *Pasted
+text*. So a recipe pulled off a cooking site read **"From Joan's
+screenshots · https://cooking.example.com/…"** — Joan credited for somebody
+else's recipe, in the one book where whose recipe it is is the entire
+point. The contributor split was corrected once for exactly this reason.
+There was no field to fix it with either: `source` is written by the import
+paths and is not on the Edit form.
+
+The set of writers is **closed**, which is what makes reading the value
+safe rather than a guess: a URL, one of two phrases the app writes itself,
+or a note name out of the handoff. The phrases are named once
+(`SOURCE_SELF`) so the writer and the line that prints them cannot drift,
+and a check holds every writer to producing one of the three shapes.
+
+The address is shortened to its site on screen — *From cooking.example.com*
+— because a 120-character URL at this size is a wall and is not tappable by
+design. The whole address still goes out in Share and *Download as text*,
+which is checked rather than asserted: that is where somebody goes to find
+their way back to it.
+
 ### Verified
 
-The suite after the video arc: **1492 functional checks** across eleven
-suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 284, sec 56,
+The suite after the video arc: **1505 functional checks** across eleven
+suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 297, sec 56,
 plan 79, video 234, backend 260, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
