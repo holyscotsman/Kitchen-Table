@@ -92,7 +92,8 @@ const CONTRAST = `(() => {
          panels at once, a heading and a paragraph inside `.panel--flag`
          that the flagged route does not carry. */
       ['Week planner, a plan that outlived its recipe','#plan',null,{
-        'kt.plan': JSON.stringify([{ id:'pgone', date:new Date().toISOString().slice(0,10),
+        'kt.plan': JSON.stringify([{ id:'pgone', date:(()=>{const n=new Date();
+            return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})(),
           slot:'dinner', recipeId:'no-such-recipe', servings:4,
           titleThen:'Granny’s Clootie Dumpling' }])
       }],
@@ -161,8 +162,16 @@ const CONTRAST = `(() => {
       await p.addInitScript(a=>{
         localStorage.setItem('kt.theme',JSON.stringify(a.t));
         if(a.e)localStorage.setItem('kt.easyRead','true');
-        /* The planner's states only exist with meals in them. */
-        const iso=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+        /* The planner's states only exist with meals in them — and the
+           meals have to land in the week the planner is SHOWING. `R113`:
+           offsets from today walk off the end of a Monday-to-Sunday week at
+           the weekend, which silently audits one meal instead of two rather
+           than failing. Anchored to this week's Monday, in local date parts
+           like the app's own `isoDate`. */
+        const mon=(()=>{const n=new Date();
+          return new Date(n.getFullYear(),n.getMonth(),n.getDate()-((n.getDay()+6)%7));})();
+        const iso=n=>{const d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+n);
+          return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
         /* And the lightbox only exists with a photo. A 2x2 GIF is enough
            for a hero, a thumbnail and a full-screen view; the app migrates
            this legacy key into IndexedDB at boot. */
