@@ -28,6 +28,10 @@ const SCREENS = [
       ['Menu + filter sheet','#menu','[data-act="open-filter"]'],
       ['Recipe','#chicken-cordon-bleu',null],
       ['Recipe flagged','#chops',null],
+      /* `R133` — a recipe carrying a tag chip. It lived in the print list
+         and nowhere else, so the SCREEN passes had never seen one: found by
+         the floor below, which is the whole reason for having a floor. */
+      ['Recipe with a tag','#scottish-tablet',null],
       /* R60 — the kept-amount note only exists on a rescaled recipe, so it
          needs a route of its own. One tap on + is enough to be off the
          original count; this one carries seven of them. */
@@ -231,6 +235,17 @@ async function openScreen(p, base, entry) {
     await p.click('[data-act="video-submit"]').catch(() => {});
     await p.waitForTimeout(500);
   }
+  /* `R133` — the seed plants two meals in the week the planner is showing,
+     and a week that is showing one of them is a shopping list with half the
+     ingredients in it. That is exactly how the print pass's own copy of the
+     seed failed: `today + n days` puts the second meal in NEXT week every
+     Sunday, and the audit read it as clean. Any planner screen that leans on
+     the shared seed says so here rather than in one loop and not the other. */
+  if (/^Week planner/.test(name) && !entry[3]) {
+    const meals = await p.evaluate(() => document.querySelectorAll('.dayblock .mealcard').length);
+    if (meals < 2) return 'the week is showing ' + meals + ' of the 2 meals it was seeded with';
+  }
+
   const need = NEED[name];
   if (need) {
     /* Wait for the state rather than sampling once: a state that arrives off
@@ -241,4 +256,27 @@ async function openScreen(p, base, entry) {
   return '';
 }
 
-module.exports = { SCREENS, NEED, seedInit, openScreen };
+/* `R133` — which screens are worth putting on paper is a different question
+   from which screens exist, and it has a different answer: nobody prints a
+   sheet, a popup, or the Add screen. But it is still a question about the
+   list above, so it is answered beside it rather than in a second list in
+   another file — which is where it used to live, four names long, with its
+   own copy of the seed and its own copy of the opener.
+
+   That copy had drifted: it planned meals at `today + n days` in UTC, which
+   is the bug `R113` fixed here. On a Sunday the second meal lands in NEXT
+   week, so the printed shopping list carries one meal instead of two and
+   the audit says "AA clean" over half of what it thinks it is reading. */
+const PRINTS = new Set([
+  'Recipe',
+  'Recipe flagged',
+  'Recipe rescaled',
+  'Recipe with a tag',
+  'Recipe with no serving count',
+  'Recipe with nothing written down',
+  'Week planner',
+  'Week planner, planned',
+  'Week planner, a plan that outlived its recipe'
+]);
+
+module.exports = { SCREENS, NEED, PRINTS, seedInit, openScreen };

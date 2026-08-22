@@ -1112,10 +1112,47 @@ added without a word for it fails by name. Reading the code and not the
 comments, because `parseHash` quotes the old line to explain itself — a
 check a comment can trip is a check that cries wolf.
 
+### The print pass kept its own copy of everything, including a bug
+
+`R133`, and the completion of `R131`. That round unified five hand-typed
+screen lists into `tests/screens.js` and left a sixth: the **print** pass,
+in the same file, with four names of its own, its own copy of the seed and
+its own opener.
+
+The copy had drifted. It planted meals at `today + n days` in **UTC**,
+which is precisely what `R113` fixed in the other copy — offsets from today
+walk off the end of a Monday-to-Sunday week at the weekend. Measured across
+a week: **every Sunday**, the second meal lands in the *next* week, so the
+printed shopping list carries one meal instead of two and the audit reports
+*AA clean* over half of what it thinks it read. (`toISOString` is a UTC
+instant too, which moves the date again for anyone west of it — the reason
+`R113`'s note says "in local date parts like the app's own `isoDate`".)
+
+Its opener had drifted the other way: no proof that the state it wanted
+ever appeared, which is the fault `R86` found four times in the screen pass.
+
+So printing walks the shared list now, through the shared seed and the
+shared opener. **Which screens go on paper is a different question** — nobody
+prints a sheet, a popup, or the Add screen — so it is answered beside the
+list rather than in another file, as a named set with three floors: every
+printable name is a real screen, paper is a smaller question than the
+screen list, and nothing that only exists as a sheet is on it.
+
+The first floor earned its keep immediately: *Recipe with a tag* turned out
+to exist in the print list and **nowhere else**, so no screen pass had ever
+looked at a recipe carrying a tag chip. It is a screen now, audited in all
+four theme/Easy-Read combinations, and clean.
+
+And the drift itself is pinned twice: `openScreen` refuses any planner
+screen showing fewer meals than the seed planted — the check that would
+have caught this by name, in the print pass, on a Sunday — and `seedInit`
+is held to the Monday anchor and to local date parts, so the formula cannot
+come back.
+
 ### Verified
 
-The suite after the video arc: **1560 functional checks** across eleven
-suites (kt 323, feat 65, add 113, relay 16, quick 76, polish 302, sec 56,
+The suite after the video arc: **1565 functional checks** across eleven
+suites (kt 323, feat 65, add 113, relay 16, quick 76, polish 307, sec 56,
 plan 79, video 244, backend 271, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

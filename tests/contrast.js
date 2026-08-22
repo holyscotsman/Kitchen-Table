@@ -1,5 +1,5 @@
 const { chromium, devices } = require('playwright');
-const { SCREENS, seedInit, openScreen } = require('./screens');
+const { SCREENS, PRINTS, seedInit, openScreen } = require('./screens');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 const CONTRAST = `(() => {
   function lum(c){const [r,g,b]=c.map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});return 0.2126*r+0.7152*g+0.0722*b;}
@@ -60,7 +60,7 @@ const CONTRAST = `(() => {
       await p.addInitScript(seedInit,{t:theme,e:mode==='easyread',s:seed||null});
       /* `R131` — one opening procedure, shared with the two sweeps in
          kt.js, so a state one of them can reach is a state all of them can. */
-      const why=await openScreen(p,''+B,[name,hash,extra]);
+      const why=await openScreen(p,''+B,[name,hash,extra,seed,net]);
       if(why){ console.log('  ('+name+' — '+why+')'); total++; }
       const bad=await p.evaluate(CONTRAST);
       console.log('['+mode+'/'+theme+'] '+name+': '+(bad.length?bad.length+' FAILURES':'AA clean'));
@@ -81,30 +81,27 @@ const CONTRAST = `(() => {
      failure that appears in one theme and not the other is the dark palette
      leaking onto paper — which is precisely the bug. */
   for(const theme of ['dark','light']){
-    for(const [name,hash,extra] of [
-      ['Recipe','#chicken-cordon-bleu',null],
-      ['Recipe with a tag','#scottish-tablet',null],
-      ['Recipe rescaled','#potato-bacon-soup','[data-act="serv+"]'],
-      ['Week plan + shopping list','#plan','[data-act="toggle-list"]']
-    ]){
+    /* `R133` — the same list, the same seed and the same opener as the
+       screen pass. This kept four names, a seed of its own carrying the
+       bug `R113` fixed, and an opener with no proof that the state it
+       wanted ever appeared. */
+    for(const [name,hash,extra,seed,net] of SCREENS.filter(e=>PRINTS.has(e[0]))){
       const ctx=await br.newContext({viewport:{width:820,height:1160}});
       await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
+      if(net){
+        await ctx.route(net.url, async r => {
+          await new Promise(x=>setTimeout(x, net.holdMs||2500));
+          return r.abort('failed');
+        });
+      }
       const p=await ctx.newPage();
-      await p.addInitScript(t=>{
-        localStorage.setItem('kt.theme',JSON.stringify(t));
-        const iso=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
-        localStorage.setItem('kt.plan',JSON.stringify([
-          {id:'pseed1',date:iso(0),slot:'dinner',recipeId:'chicken-cordon-bleu',servings:8,titleThen:'Chicken Cordon Bleu'},
-          {id:'pseed2',date:iso(1),slot:'dinner',recipeId:'potato-bacon-soup',servings:6,titleThen:'Potato Bacon Soup'}
-        ]));
-      },theme);
+      await p.addInitScript(seedInit,{t:theme,e:false,s:seed||null});
       /* Set the state on screen, THEN switch to paper. Print hides the very
          controls some of these routes need — `.servbtn` is display:none
          there, so rescaling first and printing second is the only order
          that reaches a rescaled page at all. */
-      await p.goto(''+B+'/index.html'+hash);
-      await p.waitForTimeout(900);
-      if(extra){ try{ await p.click(extra,{timeout:4000}); }catch(e){ console.log("  (trigger missing: "+extra+")"); } await p.waitForTimeout(400); }
+      const whyP=await openScreen(p,''+B,[name,hash,extra,seed,net]);
+      if(whyP){ console.log('  ('+name+' — '+whyP+')'); total++; }
       await p.emulateMedia({media:'print'});
       await p.waitForTimeout(300);
       /* A floor: paper that rendered nothing would read as a clean pass. */

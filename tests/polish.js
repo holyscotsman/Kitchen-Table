@@ -2028,6 +2028,49 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       missing.length === 0, missing.join(', '));
   }
 
+  console.log('\n== Which screens go on paper is a question about the list (R133) ==');
+  {
+    /* The print pass kept four names of its own, in another file, with its
+       own copy of the seed and its own opener. The copy had drifted: it
+       planted meals at `today + n days` in UTC, which is the bug `R113`
+       fixed in the shared one — on a Sunday the second meal lands in NEXT
+       week, so the printed shopping list carries one meal instead of two
+       and the audit reports AA clean over half of what it thinks it read.
+
+       Naming the printable screens beside the screens themselves is only
+       safe with this floor. It earned its keep immediately: "Recipe with a
+       tag" turned out to exist in the print list and NOWHERE else, so no
+       screen pass had ever looked at a recipe carrying a tag chip. */
+    const { SCREENS: SC, PRINTS: PR } = require('./screens');
+    const names = SC.map((e) => e[0]);
+    const orphan = [...PR].filter((n) => names.indexOf(n) === -1);
+    chk('every screen named for paper is a screen the app has',
+      orphan.length === 0, orphan.join(' | '));
+    chk('and paper is a smaller question than the screen list, not the same one',
+      PR.size >= 6 && PR.size < SC.length, PR.size + ' of ' + SC.length);
+    /* Nobody prints a sheet or a popup, and a print pass that wandered into
+       one would be auditing a surface that has no printed form at all. */
+    chk('nothing that only exists as a sheet or a popup is on it',
+      ![...PR].some((n) => /sheet|menu$|picker|lightbox|Add/i.test(n)),
+      [...PR].filter((n) => /sheet|menu$|picker|lightbox|Add/i.test(n)).join(' | '));
+
+    /* And the drift itself, pinned where it now lives. `R113`'s fix is that
+       the planner seed is anchored to this week's Monday in LOCAL date
+       parts — the app's own `isoDate` — because offsets from today walk off
+       the end of a Monday-to-Sunday week at the weekend, and `toISOString`
+       is UTC, which moves the date again for anyone west of it. */
+    const seedSrc = require('fs').readFileSync(
+      require('path').join(__dirname, 'screens.js'), 'utf8');
+    const fn = seedSrc.slice(seedSrc.indexOf('function seedInit'),
+      seedSrc.indexOf('\n}', seedSrc.indexOf('function seedInit')));
+    chk('the planner seed is anchored to this week, not to today',
+      /getDate\(\) - \(\(n\.getDay\(\) \+ 6\) % 7\)/.test(fn),
+      'no Monday anchor in seedInit');
+    chk('and it writes local date parts, not a UTC instant',
+      !/toISOString/.test(fn) && !/Date\.now\(\) \+ /.test(fn),
+      (fn.match(/toISOString|Date\.now\(\) \+ [^;]*/) || [''])[0]);
+  }
+
   console.log('\n== The app answers to five words, and three places have to agree (R132) ==');
   {
     /* A recipe id is the whole address it is read at, so an id that IS one
