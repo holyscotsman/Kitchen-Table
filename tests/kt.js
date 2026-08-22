@@ -1721,6 +1721,94 @@ const browserContextWithReduce = (br) =>
       (await pN.inputValue('#e-title').catch(() => 'MISSING')) === '',
       JSON.stringify(await pN.inputValue('#e-title').catch(() => 'MISSING')));
 
+    /* `R138` — and the four sentences that never learned the word.
+     *
+     * `R116` gave the app one word for a nameless recipe and taught the
+     * Menu, the two sorts, the recipe page, the search and the browser tab
+     * to use it. Four places that NAME a recipe went on reading `.title`
+     * raw, and all four are places where the reader is being asked to
+     * decide something. */
+
+    /* The week planner's meal sheet, which is the worst of them: its heading
+       is also the dialog's `aria-labelledby`, so a nameless recipe planned
+       for a meal opened a `role="dialog"` with no accessible name at all.
+       `R131`'s name sweep cannot see it — every recipe it seeds has a name.
+
+       Anchored to this week's Monday in local date parts, `R113`/`R133`:
+       an offset from today walks off the end of a Monday-to-Sunday week at
+       the weekend, and the meal then simply is not on the screen. */
+    await pN.addInitScript(() => {
+      var n = new Date();
+      var mon = new Date(n.getFullYear(), n.getMonth(), n.getDate() - ((n.getDay() + 6) % 7));
+      var iso = mon.getFullYear() + '-' + String(mon.getMonth() + 1).padStart(2, '0') +
+        '-' + String(mon.getDate()).padStart(2, '0');
+      localStorage.setItem('kt.plan', JSON.stringify([{ id: 'pn1', date: iso,
+        slot: 'dinner', recipeId: 'no-name-here', servings: 4,
+        titleThen: 'Untitled recipe' }]));
+    });
+    await pN.goto(B + '/index.html#plan');
+    /* A `goto` that changes only the hash is a SAME-DOCUMENT navigation, so
+       `addInitScript` never runs and the plan above is never seeded — the
+       first version of this measured a sheet that had not opened, which is
+       the `R86` fault. One real reload, and every wait below is strict so a
+       sheet that does not open fails here rather than further down. */
+    await pN.reload();
+    await pN.waitForSelector('[data-act="plan-meal"]', { timeout: 8000 });
+    await pN.click('[data-act="plan-meal"]', { timeout: 5000 });
+    /* The sheet, not its heading: an empty `<h2>` has no box, so waiting for
+       the heading to be VISIBLE times out on the very bug being measured.
+       Waiting for the dialog is also what proves the sheet opened. */
+    await pN.waitForSelector('[role="dialog"]', { timeout: 5000 });
+    const mealName = await pN.locator('#meal-title').first()
+      .textContent({ timeout: 2000 });
+    chk('a nameless recipe planned for a meal still names its sheet',
+      /untitled recipe/i.test(mealName || ''), JSON.stringify(mealName));
+    chk('so the dialog is never opened with no accessible name at all',
+      (await pN.locator('[role="dialog"]').first()
+        .evaluate((el) => {
+          var by = el.getAttribute('aria-labelledby');
+          var n = by && document.getElementById(by);
+          return (n && n.textContent || el.getAttribute('aria-label') || '').trim();
+        }).catch(() => '')).length > 0);
+
+    /* The Remove confirm — the app's one irreversible dialog, and it read
+       `'Remove "' + victim.title + '"'`. */
+    let removeAsk = '';
+    const grabDialog = (d) => { removeAsk = d.message(); d.dismiss(); };
+    pN.on('dialog', grabDialog);
+    await pN.goto(B + '/index.html#menu');
+    await pN.waitForSelector('[data-act="toggle-remove"]', { timeout: 5000 });
+    await pN.click('[data-act="toggle-remove"]');
+    await pN.waitForSelector('[data-act="remove"][data-id="no-name-here"]', { timeout: 5000 });
+    await pN.click('[data-act="remove"][data-id="no-name-here"]');
+    await pN.waitForTimeout(400);
+    chk('and asking to remove it never says Remove "undefined"',
+      !/undefined/i.test(removeAsk) && /untitled recipe/i.test(removeAsk), removeAsk);
+    pN.off('dialog', grabDialog);
+
+    /* The Add screen's duplicate warning names the existing recipe twice —
+       once in bold and once as the whole of a link's text, which degraded to
+       "Open " with nothing after it. Typing the placeholder is the only way
+       a nameless recipe can be matched, which is the point: it is exactly
+       the reader who cannot tell what they are about to duplicate. */
+    await pN.goto(B + '/index.html#add');
+    await pN.waitForSelector('[data-act="add-path"][data-key="review"]', { timeout: 5000 });
+    await pN.click('[data-act="add-path"][data-key="review"]');
+    await pN.waitForSelector('#a-title', { timeout: 5000 });
+    await pN.fill('#a-title', 'Untitled recipe');
+    await pN.click('[data-act="add-save"]');
+    await pN.waitForSelector('.panel--flag', { timeout: 5000 }).catch(() => {});
+    const dupePanel = await pN.locator('.panel--flag').first()
+      .innerText({ timeout: 2000 }).catch(() => 'MISSING');
+    chk('the duplicate warning names what it thinks this duplicates',
+      /looks a lot like\s+untitled recipe/i.test(dupePanel.replace(/\s+/g, ' ')),
+      JSON.stringify(dupePanel));
+    const openLink = await pN.locator('.panel--flag a').first()
+      .innerText({ timeout: 2000 }).catch(() => 'MISSING');
+    chk('and its link says what it opens, not just "Open"',
+      /open\s+untitled recipe/i.test(openLink.replace(/\s+/g, ' ')),
+      JSON.stringify(openLink));
+
     chk('and nothing threw across any of it', nErrs.length === 0, nErrs.join(' | '));
     await ctxN.close();
   }

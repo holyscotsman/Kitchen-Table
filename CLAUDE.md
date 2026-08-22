@@ -1305,10 +1305,51 @@ not, so a token that expires is discoverable instead of silent. The reason
 carries a status code and never the token, which is checked — health is a
 public page.
 
+### Four sentences that never learned the app's word for a nameless recipe
+
+`R138`, and the completion of `R116`. That round gave the app one word —
+*"Untitled recipe"* — and taught the Menu, both sorts, the recipe page, the
+search and the browser tab to use it. Four places that **name** a recipe went
+on reading `.title` raw, and all four are places where the reader is being
+asked to decide something.
+
+- **The week planner's meal sheet**, and this is the worst of them: the
+  heading is also the dialog's `aria-labelledby`, so a nameless recipe
+  planned for a meal opened a `role="dialog"` with **no accessible name at
+  all**. An empty `<h2>` has no box either, so there was nothing on screen
+  to notice — Playwright reported it as *"14 × locator resolved to hidden
+  `<h2 id="meal-title" class="sheet__title"></h2>`"*, which is why the first
+  version of the test timed out waiting for a heading to be visible and
+  measured the bug instead of the fix. `R131`'s accessible-name sweep cannot
+  see this: every recipe it seeds has a name.
+- **The Remove confirm**, the app's one irreversible dialog, asked
+  `Remove "undefined" from this phone?`.
+- **The duplicate warning** read *"It looks a lot like ."* — a bold nothing
+  and a full stop — and **its link**, whose whole text is the recipe's name,
+  read *"Open "*.
+
+Fixing four call sites is one word each. The part that makes it stick is the
+rule, in `R114`'s shape: **a recipe from the book is named through
+`titleOf`**, and every other `.title` in `app.js` names something that is not
+a recipe yet and says which — the draft `R116` deliberately keeps raw so Save
+cannot bake the placeholder into the family's file, a parser's own input, a
+video job with its own fallback, the import size caps, the browser tab. Three
+functions may read a book recipe's title raw and are named with why. A fifth
+site fails by name.
+
+The scan's own stripper needed the same discipline. Blanking comments so the
+prose above a fix cannot trip it is right — the `R116` comment quotes
+`a.title.localeCompare(b.title)` — but the file also contains
+`accept="image/*"`, and that `/*` opened a comment that ran on and swallowed
+`function startDraft(`, silently mis-attributing every line after it. Found
+because a floor said an excused name no longer appeared. Both directions are
+pinned now: the stripper must keep `image/*`, must drop the quoted comment,
+and `startDraft`'s declaration must survive.
+
 ### Verified
 
-The suite after the video arc: **1611 functional checks** across eleven
-suites (kt 323, feat 75, add 113, relay 16, quick 76, polish 319, sec 56,
+The suite after the video arc: **1622 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 325, sec 56,
 plan 79, video 252, backend 287, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

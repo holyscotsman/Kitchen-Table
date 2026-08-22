@@ -3857,7 +3857,11 @@
     S.plan.forEach(function (e) { if (e.id === S.mealFor) entry = e; });
     if (!entry) return "";
     var r = byId(entry.recipeId);
-    var title = r ? r.title : entry.titleThen;
+    /* `R138` — through `titleOf`, because this heading is also the dialog's
+       `aria-labelledby`. A recipe in the book with no name left it empty,
+       which is a `role="dialog"` with no accessible name at all — and an
+       empty `<h2>` has no box, so there was nothing on screen either. */
+    var title = r ? titleOf(r) : entry.titleThen;
     return (
       '<button type="button" class="scrim" data-act="close-meal" aria-label="Close"></button>' +
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="meal-title">' +
@@ -4201,11 +4205,14 @@
       h += '<div class="panel panel--flag" role="alert" style="margin-top:18px">' +
            "<h2>This might already be in the book</h2>" +
            "<p>It looks a lot like <strong>" +
-           esc(existing ? existing.title : S.addDupe) + "</strong>. " +
+           esc(existing ? titleOf(existing) : S.addDupe) + "</strong>. " +
            "Open it to compare, or save this one anyway — two versions is " +
            "allowed, it just shouldn’t be an accident.</p>" +
            '<a class="outlinebtn press" style="text-align:center; line-height:60px" href="#' +
-           esc(S.addDupe) + '">Open ' + esc(existing ? existing.title : "the existing recipe") + "</a>" +
+           esc(S.addDupe) + '">Open ' +
+           /* `R138` — this is the whole of the link's text, so a nameless
+              recipe left it reading "Open " with nothing after it. */
+           esc(existing ? titleOf(existing) : "the existing recipe") + "</a>" +
            '<button type="button" class="savebtn press" data-act="add-save-anyway">' +
            "Save anyway</button></div>";
     }
@@ -6330,7 +6337,10 @@
          them AND loses their own copy of it, so they cannot even open it
          to put it right. That is the worst shape a wrong sentence can
          take in this app. */
-      var ask = 'Remove "' + victim.title + '"' +
+      /* `R138` — `titleOf`, not `victim.title`: this is the app's one
+         irreversible dialog, and a recipe with no name asked
+         `Remove "undefined" from this phone?`. */
+      var ask = 'Remove "' + titleOf(victim) + '"' +
         (hasPhoto ? " and its photo" : "") + " from this phone?" +
         (kitchenKey()
           ? "\n\nIt stays in everyone else’s book: removing is the one " +
