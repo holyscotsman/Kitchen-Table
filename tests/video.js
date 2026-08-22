@@ -1658,6 +1658,142 @@ async function freshPage(br, opts) {
       [].concat(waiting.errs, quiet2.errs, many.errs).join(' | '));
   }
 
+  console.log('\n== Two taps on Save must not be two writes (R142) ==');
+  {
+    /* Render's free tier sleeps, so a write can hang for the best part of
+       half a minute — `S12` built the "Sending to the family's book…" line
+       for exactly that window. Nothing stopped a reader tapping Save again
+       inside it, and `shareEdit` set `S.sharing` and fired without ever
+       asking whether one was already in the air.
+
+       Measured, with the write held open for three seconds:
+
+         an EDIT   two taps → two writes. The first reply cleared `S.sharing`
+                   and the notice changed to "Saved, and sent to the family's
+                   book" while the second request was still running — `S12`'s
+                   fault back through a door nobody was watching.
+
+         a CREATE  two taps → two writes, both carrying `?new=1`. The server
+                   does what `R127` tells it to and suffixes rather than
+                   overwrites, so the family's book ends up holding TWO
+                   copies of one recipe because one person tapped twice —
+                   and `kt.shared` records the second, so this phone's next
+                   edit addresses the duplicate and the original is orphaned
+                   in everyone's book, edited by nobody. The reader is even
+                   shown `R127`'s disclosure, which blames a stranger for a
+                   collision this phone made with itself.
+
+       One send at a time, and the change that could not go now rides the
+       queue `S13` built for exactly "this did not get through". */
+    const MINE = [{ id: 'my-own-shortbread', title: 'My Own Shortbread',
+      category: 'Baking', contributor: 'Jason', servings: 6,
+      ingredients: ['200g butter'], steps: ['Bake it.'] }];
+    let midNotice = '';
+    const tapTwice = (firstNote, secondNote) => async (p) => {
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-notes');
+      await p.fill('#e-notes', firstNote);
+      await p.click('[data-act="save"]');
+      await p.waitForTimeout(300);
+      /* A second, genuinely different change, saved while the first write
+         is still in the air — so "was it lost?" is a real question. */
+      await p.fill('#e-notes', secondNote);
+      await p.click('[data-act="save"]');
+      await p.waitForTimeout(300);
+      midNotice = await p.evaluate(() => {
+        const n = document.querySelector('.notice');
+        return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+      });
+      await p.waitForTimeout(3400);
+    };
+    /* `shareOne` lives inside `R127`'s block, so this keeps its own. */
+    const oneShare = async (opts, seed, hash, act) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      if (seed) await p.addInitScript(v =>
+        localStorage.setItem('kt.recipes', v), JSON.stringify(seed));
+      await p.goto(B + '/index.html' + hash);
+      await act(p);
+      const out = {
+        puts: stub.puts,
+        shared: await p.evaluate(() => {
+          const raw = localStorage.getItem('kt.shared');
+          return raw ? JSON.parse(raw) : null;
+        }),
+        unsent: await p.evaluate(() => {
+          try { return JSON.parse(localStorage.getItem('kt.unsent') || '[]'); }
+          catch (e) { return 'UNPARSEABLE'; }
+        }),
+        notes: await p.evaluate(() => {
+          const f = document.querySelector('#e-notes');
+          return f ? f.value : (document.querySelector('.r-notes') || {}).textContent || '';
+        }),
+        errs: p.errs.slice()
+      };
+      await ctx.close();
+      return out;
+    };
+
+    const dblEdit = await oneShare({ putDelayMs: 3000 }, null,
+      '#bacon-ranch-chicken-casserole', tapTwice('One.', 'Two.'));
+    chk('a second tap while the first write is in the air is not a second write',
+      dblEdit.puts.length === 1, JSON.stringify(dblEdit.puts.map(x => x.path)));
+    chk('and the reader is told the change is waiting rather than sent',
+      /still|waiting|already sending|when the current/i.test(midNotice), JSON.stringify(midNotice));
+    /* The second change was a different one. Skipping its send must not lose
+       it — `S13`'s queue is exactly where "this did not get through" goes. */
+    chk('and the change that could not go is queued rather than dropped',
+      Array.isArray(dblEdit.unsent) &&
+      dblEdit.unsent.indexOf('bacon-ranch-chicken-casserole') > -1,
+      JSON.stringify(dblEdit.unsent));
+
+    const dblNew = await oneShare({ putDelayMs: 3000 }, MINE,
+      '#my-own-shortbread', tapTwice('One.', 'Two.'));
+    chk('a recipe this phone made is created once, not twice',
+      dblNew.puts.length === 1 && dblNew.puts[0].isNew === true,
+      JSON.stringify(dblNew.puts.map(x => ({ p: x.path, n: x.isNew }))));
+    /* And the bulk path, which is the one `S13` says matters most: redoing a
+       bulk tag means re-picking every recipe, and a rename cannot be redone
+       at all. Saving a recipe and then going off to tag things while the
+       write is still in the air is an ordinary thing to do on a phone. */
+    const TWO = [
+      { id: 'mine-one', title: 'Mine One', category: 'Baking', contributor: 'Jason',
+        servings: 4, ingredients: ['a'], steps: ['b'] },
+      { id: 'mine-two', title: 'Mine Two', category: 'Baking', contributor: 'Jason',
+        servings: 4, ingredients: ['c'], steps: ['d'] }
+    ];
+    const bulkMid = await oneShare({ putDelayMs: 3000 }, TWO, '#mine-one',
+      async (p) => {
+        await p.waitForSelector('.r-title');
+        await p.click('[data-act="toggle-edit"]');
+        await p.waitForSelector('#e-notes');
+        await p.fill('#e-notes', 'A note.');
+        await p.click('[data-act="save"]');
+        await p.waitForTimeout(300);
+        await p.evaluate(() => { location.hash = '#menu'; });
+        await p.waitForSelector('.rcard');
+        await p.click('[data-act="toggle-tagging"]');
+        await p.waitForSelector('[data-act="tag-pick"][data-id="mine-two"]');
+        await p.click('[data-act="tag-pick"][data-id="mine-two"]');
+        await p.click('[data-act="open-bulk"]');
+        await p.waitForSelector('#bulk-tags');
+        await p.fill('#bulk-tags', 'Scottish');
+        await p.click('[data-act="bulk-apply"]');
+        await p.waitForTimeout(3400);
+      });
+    chk('a bulk change started mid-send is not interleaved with it',
+      bulkMid.puts.length === 1, JSON.stringify(bulkMid.puts.map(x => x.path)));
+    chk('and every recipe it touched is waiting rather than lost',
+      Array.isArray(bulkMid.unsent) && bulkMid.unsent.indexOf('mine-two') > -1,
+      JSON.stringify(bulkMid.unsent));
+
+    chk('and nothing threw across any of it',
+      [].concat(dblEdit.errs, dblNew.errs, bulkMid.errs).length === 0,
+      [].concat(dblEdit.errs, dblNew.errs, bulkMid.errs).join(' | '));
+  }
+
   console.log('\n== A change the kitchen could not take can be sent again (S13) ==');
   {
     /* `DECISIONS.md S` left this open on purpose. A single edit that failed

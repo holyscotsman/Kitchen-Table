@@ -1467,11 +1467,52 @@ the arrival sentence to still be there. That is the second time this session
 a mutation has found my own check hollow, and both are recorded rather than
 quietly fixed.
 
+### Two taps on Save were two writes, and one of them made a duplicate
+
+`R142`. Render's free tier sleeps, so a write can hang for the best part of
+half a minute — `S12` built the *"Sending to the family's book…"* line for
+exactly that window. Nothing stopped a reader tapping Save again inside it,
+and `shareEdit` set `S.sharing` and fired without ever asking whether one was
+already in the air.
+
+Measured, with the write held open for three seconds.
+
+**An edit** sent twice. The first reply cleared `S.sharing`, so the screen
+changed to *"Saved, and sent to the family's book"* **while the second
+request was still running** — `S12`'s own fault, back through a door nobody
+was watching.
+
+**A create was worse.** Two writes, both carrying `?new=1`. The server does
+what `R127` tells it to and suffixes rather than overwrites, so the family's
+book ends up holding **two copies of one recipe because one person tapped
+twice** — and `kt.shared` records the second, which leaves the first orphaned
+in everyone's book, edited by nobody. The reader is even shown `R127`'s
+disclosure — *"someone had already added a recipe with this name"* — blaming
+a stranger for a collision this phone made with itself.
+
+One send at a time now, in `shareEdit` and `shareEdits` both, because a bulk
+change started on top of a running one interleaves its writes and clears
+`S.sharing` when the **first** of the two finishes. Saving a recipe and then
+going off to tag things while the write is still in the air is an ordinary
+thing to do on a phone, and it is checked.
+
+The refused change is not dropped: it goes on `S13`'s queue, which exists for
+exactly *"this one did not get through"*, and the Menu offers it. Late, never
+wrong.
+
+**And the part that needed a second look.** `clearUnsent` at the end of a send
+means *what I sent has landed* — which is not true of anything queued **after**
+it started. Without that distinction the in-flight send's success cleared the
+very id the second tap had just queued, and the change was dropped after all,
+silently. `S.reshare` records what was re-queued mid-flight and `clearSent`
+skips it. The first version of this fix did not have it, and the queue check
+failed by name.
+
 ### Verified
 
-The suite after the video arc: **1642 functional checks** across eleven
+The suite after the video arc: **1649 functional checks** across eleven
 suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 336, sec 56,
-plan 79, video 252, backend 296, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 259, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
