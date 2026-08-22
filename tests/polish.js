@@ -3064,7 +3064,98 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   }
 
   chk('no JS errors', errs.length===0, errs.join(' | '));
-  await br.close();
+  console.log('\n== The help explains tags, which it had only ever assumed (R126) ==');
+  {
+    /* The help page tells a reader how to browse by person and by course,
+       and mentions tags exactly once — as something the search box reads.
+       It never says what a tag is, that tapping one on a recipe shows
+       everything else wearing it, or that the Filter sheet lists them.
+
+       `S11` then made the omission worse rather than better. To keep the
+       sharing rule honest it added *"Tagging several recipes at once, and
+       renaming or merging a tag, go to everyone the same way"* — a sentence
+       that names two controls the page has never introduced. A reader who
+       has never met Tag mode is told what it does to the family's book
+       before being told it exists.
+
+       `R90` set the precedent when Remove was in the same position: the one
+       destructive control in the app, on the Menu, explained nowhere. The
+       fix then and now is the same — the page names the control, says where
+       it is, and says what it is for.
+
+       The bold-quote rule further up this file covers `ADDING.md` and
+       `README.md`, NOT the in-app help — so the labels this section names
+       are checked here instead, against the buttons the app actually
+       draws. A help page describing controls that are not there would be
+       worse than one that said nothing. */
+    const ctxH = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pH = await ctxH.newPage();
+    const hErrs = []; pH.on('pageerror', e => hErrs.push(e.message));
+    await pH.goto(B + '/index.html#help');
+    await pH.waitForSelector('.help__h1', { timeout: 8000 }).catch(() => {});
+    const help = await pH.evaluate(() => document.querySelector('#app').innerText);
+
+    chk('the page says what a tag is for', /\btags?\b/i.test(help) &&
+      /where a dish is from|what kind of dish|anything else true/i.test(help),
+      (help.match(/[^.]*\btag\b[^.]*\./i) || [''])[0].slice(0, 110));
+    /* Written against the claim rather than a guessed phrasing: the page
+       must say somewhere that tapping one leads to the others. The first
+       version of this check demanded a sentence shape the prose did not
+       take, which tests the wording instead of the promise. */
+    chk('and that tapping one on a recipe finds the others like it',
+      /tap[^.]{0,90}(shows?|finds?)[^.]{0,50}(every other|the others|the rest)/i.test(help),
+      (help.match(/[^.]*tapping[^.]*\./i) || [''])[0].slice(0, 120));
+    chk('it names where the tags are listed to filter by',
+      /Filter/.test(help), 'no Filter mentioned');
+    chk('and it introduces tagging several at once before relying on it',
+      /Tag/.test(help) && /All recipes/.test(help),
+      (help.match(/[^.]*Tag[^.]*\./) || [''])[0].slice(0, 110));
+    chk('including renaming, which the sharing sentence already assumed',
+      /Rename or merge/i.test(help),
+      (help.match(/[^.]*[Rr]ename[^.]*\./) || [''])[0].slice(0, 110));
+
+    /* Every control this section names, against what the app draws. */
+    await pH.goto(B + '/index.html#menu');
+    await pH.waitForSelector('.rcard, .rrow', { timeout: 8000 }).catch(() => {});
+    const menuLabels = await pH.evaluate(() =>
+      [...document.querySelectorAll('#app button, #app a, header button')]
+        .map((e) => (e.innerText || e.getAttribute('aria-label') || '')
+          .replace(/\s+/g, ' ').trim()));
+    await pH.click('[data-act="open-filter"]', { timeout: 5000 }).catch(() => {});
+    await pH.waitForTimeout(400);
+    const filterLabels = await pH.evaluate(() =>
+      [...document.querySelectorAll('button')]
+        .map((e) => (e.innerText || '').replace(/\s+/g, ' ').trim()));
+    /* Taken FROM the section, not from a list beside it: a hardcoded list
+       would not follow the prose if someone renamed a control in it, which
+       is the drift `R114` exists to stop — and the mutation that renamed
+       "Rename or merge" to a button that does not exist proved a fixed list
+       could not catch it.
+
+       CONCEPTS is the named exemption, in `R114`'s shape: a bold word that
+       is an idea rather than a button. It is short on purpose, and a new
+       entry is a decision someone makes deliberately. */
+    const CONCEPTS = new Set(['Tags']);
+    const hfs = require('fs'), hpath = require('path');
+    const src = hfs.readFileSync(hpath.join(__dirname, '..', 'app.js'), 'utf8');
+    const section = src.slice(src.indexOf('`R126`'), src.indexOf('Making the writing bigger'));
+    const bolded = [...new Set([...section.matchAll(/<strong>([^<]+)<\/strong>/g)]
+      .map((m) => m[1].trim()))];
+    const drawn = menuLabels.concat(filterLabels);
+    const missing = bolded.filter((n) => !CONCEPTS.has(n) &&
+      !drawn.some((l) => l === n || l.startsWith(n)));
+    chk('every control the tags section names is one the app draws',
+      missing.length === 0, missing.join(' | '));
+    chk('and the section really named some', bolded.length >= 3,
+      JSON.stringify(bolded));
+
+    /* And the section it belongs beside is untouched. */
+    chk('browsing by person and course still reads as it did',
+      /tap a person/i.test(help) && /View all/.test(help), 'browsing text changed');
+    chk('nothing threw', hErrs.length === 0, hErrs.join(' | '));
+    await ctxH.close();
+  }
+
   console.log('\n== Every rule in the stylesheet is for something the app draws (R125) ==');
   {
     /* `tokens.css` is protected by `R48` — no colour may exist outside it.
@@ -3104,6 +3195,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       /class="/.test(emitted), 'no class attributes found');
   }
 
+  await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);
 })();
