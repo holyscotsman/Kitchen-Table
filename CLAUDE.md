@@ -353,6 +353,29 @@ needs telling now. That needed `S.carry` — a sentence that outlives one
 navigation, since this screen saves and then goes straight to the new recipe
 and `onRoute` clears the notice on the way.
 
+### A flag that has been dealt with stops saying it has not
+
+`R122`. `082` gave every flag the name of its field — *"Servings — …"*,
+*"Title — …"* — and put a Double-check chip beside that field. **Nothing
+ever took one down.** `saveDraft` never mentioned `flagged`, and there is no
+dismiss anywhere in the app.
+
+So an import that could not read a count flagged *"Servings — no count was
+found; 4 was assumed."*, the reader opened Edit and typed the real number,
+and the recipe went on carrying that flag for good — beside a count the
+reader had set themselves. A *worth double-checking* list that never empties
+is a list nobody reads, which costs the reader the one mechanism built to
+tell them what still needs attention. The same fault this project keeps
+finding — a sentence that has stopped being true — on the feature whose
+whole job is to be true.
+
+The rule is the naming convention itself: **a flag naming a field is
+answered when that field changes.** A flag that names no field is left
+alone, because nothing can tell whether it was dealt with — inventing a
+dismissal for those is a different feature, not a corollary of this one.
+Both directions are mutation-tested: never clearing, and clearing
+everything, each fail by name.
+
 ### After Save, the fields show what was kept
 
 `R120`. `saveDraft` has always tidied on the way past — a title cleared to
@@ -756,8 +779,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1421 functional checks** across eleven
-suites (kt 292, feat 65, add 89, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1430 functional checks** across eleven
+suites (kt 301, feat 65, add 89, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

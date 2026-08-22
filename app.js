@@ -2912,6 +2912,37 @@
     if (ingMoved) S.checkedIng = {};
     if (stepMoved) S.checkedStep = {};
 
+    /* `R122` — a flag that has been dealt with must stop saying it has not.
+       `082` gave every flag the name of its field ("Servings — …") and put a
+       Double-check chip beside that field; nothing ever took one down.
+       `saveDraft` never mentioned `flagged` and there is no dismiss in the
+       app, so an import that guessed a count kept saying *no count was
+       found; 4 was assumed* after the reader had typed the real one — for
+       good. A "worth double-checking" list that never empties is a list
+       nobody reads, which costs the reader the one mechanism built to tell
+       them what still needs attention.
+
+       The rule is the naming convention itself: a flag naming a field is
+       answered when that field changes. A flag that names no field is left
+       alone — nothing can tell whether it was dealt with, and inventing a
+       dismissal for those is a different feature, not a corollary of this
+       one. */
+    if (updated.flagged && updated.flagged.length) {
+      var answered = {
+        Title: updated.title !== r.title,
+        Servings: updated.servings !== r.servings,
+        Ingredients: ingMoved,
+        Steps: stepMoved,
+        Course: updated.category !== r.category
+      };
+      var keptFlags = updated.flagged.filter(function (f) {
+        var m = /^([A-Za-z]+)\s+—/.exec(String(f));
+        return !(m && answered[m[1]]);
+      });
+      if (keptFlags.length) updated.flagged = keptFlags;
+      else delete updated.flagged;
+    }
+
     S.recipes = S.recipes.map(function (x) {
       return x.id === r.id ? updated : x;
     });
