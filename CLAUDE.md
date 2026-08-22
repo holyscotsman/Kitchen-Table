@@ -86,12 +86,19 @@ this section only records decisions and gaps.
 
 ### Decisions taken
 
-- **Persistence: Option 1, as specified.** Edit mode writes to `localStorage`
-  only and nothing is ever written to the repo by the app. An earlier version of
-  this project committed edits straight to GitHub through the REST API with a
-  personal access token; that was removed in favour of this handoff. The
-  trade-off is deliberate and worth restating: an edit made on one phone stays
-  on that phone until someone downloads `recipes.json` and commits it by hand.
+- **Persistence: Option 1, as specified — and since the `S` arc, Option 1
+  *plus a way out*.** Edit mode writes to `localStorage` and nothing is ever
+  written to the repo by the app. That was the whole story for a long time,
+  and its trade-off was that an edit made on one phone stayed on that phone
+  until someone downloaded `recipes.json` and committed it by hand.
+  Jason asked for the other half: *"If someone edits a recipe, can we have
+  that change happen on the server, so it is automatically adjusted for
+  everyone?"* It now can — see **Sharing an edit** below. The local write is
+  still first, still unconditional, and still the thing the reader is told
+  about; the server is an addition to it, never a replacement for it. An
+  earlier version of this project committed edits straight to GitHub through
+  the REST API with a personal access token; that is still not what this
+  does, and the token is still not in the app.
 - **`recipes.json` and `tokens.css` are shipped verbatim** from the handoff.
   `tokens.css` is loaded before `style.css`; `style.css` contains no hardcoded
   colours, with one exception noted below.
@@ -445,11 +452,56 @@ holds `KT_DB` server-side — which is what retired the Data-API question
 trusts: no logins, narrow operations, migration-grade validation —
 contributor names stay labels, never keys.
 
+### Sharing an edit (the `S` arc — Jason's ask, 2026-08-22)
+
+*"If someone edits a recipe, can we have that change happen on the server?
+This way it is automatically adjusted for everyone."*
+
+The pipe already existed: the database is the canonical shared copy, the
+video importer already writes recipes into it, and `db-sync` already turns
+it back into `recipes.json` and commits. What was missing was a way for an
+**edit** to use any of that. Now:
+
+Save in Edit mode writes to `localStorage` exactly as before and says so —
+**then**, if the phone holds the family passphrase, it sends the recipe to
+`PUT /api/recipes/:id`, which upserts it and asks `db-sync` to republish.
+
+- **Local first, always.** The phone's copy is saved and reported saved
+  before a byte goes anywhere. Render's free tier sleeps; that must cost the
+  reader nothing they typed.
+- **A shared passphrase, `KT_WRITE_KEY`, entered once per phone.** Reading
+  needs nothing and must keep needing nothing; changing the book for
+  everybody needs the one secret the family shares, because the alternative
+  is that anyone who finds the address can rewrite Joan's recipes and nobody
+  could say who did. It **fails closed**: unset means nobody writes.
+  `contributor` is still a byline and is never consulted — the passphrase
+  says *someone in this family is holding the phone*, not *this is Jennifer*.
+- **An edit overwrites; an import still suffixes.** `acceptJob` refuses to
+  clobber because two people accepting one draft must not replace each
+  other. An edit is the opposite instruction — someone opened *this* recipe
+  and changed it — so `putRecipe` writes over that row, and takes the id
+  from the **path** so a body cannot redirect the write onto another recipe.
+  `position` is deliberately never updated: fixing a typo must not jump a
+  recipe to the top of "recently added".
+- **Tags are replaced, not merged**, or removing one would never stick.
+- **The publish poke never fails the write** (`lib/publish.js`). The recipe
+  is already in the database; the nightly run would publish it regardless.
+  It is debounced, so four typos fixed in a row cause one publish.
+- **`R107`'s rule governs what is said.** A 4xx is a refusal that will never
+  clear ("It stays here until that is sorted"); a 503 is Render waking
+  ("try Save again in a minute"). Saying "yet" about the first would be a
+  promise nobody can keep.
+
+Two variables for Jason, both in Render, neither in this repo or in chat:
+`KT_WRITE_KEY` (the passphrase) and `KT_GH_TOKEN` (optional — without it a
+change waits for the nightly sync instead of arriving in minutes).
+`backend/README.md` has the checklist.
+
 ### Verified
 
-The suite after the video arc: **1185 functional checks** across eleven
+The suite after the video arc: **1236 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 267, sec 53,
-plan 79, video 99, backend 181, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 116, backend 215, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

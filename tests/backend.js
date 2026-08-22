@@ -423,9 +423,24 @@ const { runJob, computeFps } = lib('pipeline');
     chk('a body that is not JSON is the caller\'s fault, not a server error',
       /function bodyOr400/.test(src) && /send\(res, 400/.test(
         src.slice(src.indexOf('function bodyOr400'), src.indexOf('async function postVideo'))));
-    chk('and both writing routes read their body that way',
-      (src.match(/await bodyOr400\(req, res\)/g) || []).length === 2 &&
-      !/const body = await readJson\(req\)/.test(src));
+    /* Every route that reads a body reads it that way. Pinned to the COUNT
+       of writing routes at first, which made adding one (`S02`'s edit
+       endpoint) look like a regression: the rule is "nobody bypasses the
+       helper", not "there are exactly two of them". Stated as the rule, it
+       survives the next route and still catches the bypass. */
+    /* Call sites only — `function readJson(req)` is the declaration, and
+       counting that as a caller made this fail against correct code. */
+    const callSites = [...src.matchAll(/(^|[^\w])readJson\(req\)/g)]
+      .filter(m => !/function\s*$/.test(src.slice(Math.max(0, m.index - 10), m.index + 1)))
+      .map(m => m.index);
+    const helperFrom = src.indexOf('function bodyOr400');
+    const helperTo = src.indexOf('\n}', helperFrom);
+    chk('every route that reads a body goes through the one helper',
+      callSites.length === 1 && callSites[0] > helperFrom && callSites[0] < helperTo,
+      callSites.length + ' call site(s); only bodyOr400 may make one');
+    chk('and more than one route actually uses it',
+      (src.match(/await bodyOr400\(req, res\)/g) || []).length >= 2,
+      String((src.match(/await bodyOr400\(req, res\)/g) || []).length));
   }
 
   console.log('\n== The server answered, over real HTTP (R41) ==');
@@ -779,6 +794,139 @@ const { runJob, computeFps } = lib('pipeline');
     chk('the commit step is gated on the drifted branch alone',
       commitAt > -1 && gate > -1 && gate < commitAt,
       'commit at ' + commitAt + ', gate at ' + gate);
+  }
+
+  console.log('\n== Who may change the book for everybody (S01) ==');
+  {
+    /* The single most dangerous thing in this arc. Until now a stranger who
+       found the Render address could spend money on imports; the wall for
+       that was the rate limiter and the day cap. A write endpoint changes
+       the worst case from a bill to Joan's recipes, so it gets a gate, and
+       the gate gets proved rather than trusted. */
+    const { makeWriteGate } = require('../backend/lib/writegate');
+    const { makeLimiter } = require('../backend/lib/ratelimit');
+    const KEY = 'a-family-passphrase';
+
+    const open = makeWriteGate('', makeLimiter(10, 3600000));
+    chk('with no key configured, the gate reports itself unconfigured', open.configured === false);
+    const unset = open.refusalFor({ 'x-kitchen-key': KEY }, '1.1.1.1', 0);
+    chk('and refuses even the right passphrase — unset fails CLOSED',
+      unset && unset.status === 503, JSON.stringify(unset));
+
+    const g = makeWriteGate(KEY, makeLimiter(10, 3600000));
+    chk('the right passphrase is let through',
+      g.refusalFor({ 'x-kitchen-key': KEY }, '1.1.1.1', 0) === null);
+    chk('a wrong one is not',
+      (g.refusalFor({ 'x-kitchen-key': 'nope' }, '1.1.1.1', 0) || {}).status === 401);
+    chk('and no passphrase at all is not',
+      (g.refusalFor({}, '1.1.1.1', 0) || {}).status === 401);
+
+    /* A refusal that describes the key is a refusal that helps guess it. */
+    const wrong = g.refusalFor({ 'x-kitchen-key': 'a-family-passphras' }, '1.1.1.1', 0);
+    const missing = g.refusalFor({}, '1.1.1.1', 0);
+    chk('a near-miss reads exactly like no attempt at all',
+      wrong.error === missing.error, wrong.error + ' | ' + missing.error);
+    chk('and the refusal never contains the key, or any part of it',
+      wrong.error.indexOf(KEY) === -1 && !/passphras[^e]/.test(wrong.error), wrong.error);
+
+    /* Length is the first thing a stranger would like to learn. */
+    chk('a key of a different length is refused, not crashed on',
+      (g.refusalFor({ 'x-kitchen-key': 'x' }, '1.1.1.1', 0) || {}).status === 401);
+    chk('and a very long one is too',
+      (g.refusalFor({ 'x-kitchen-key': 'x'.repeat(5000) }, '1.1.1.1', 0) || {}).status === 401);
+
+    /* Patience, not flooding, is the shape of an attack on a family
+       passphrase — so the wall is per hour, and only wrong answers walk
+       toward it. */
+    const g2 = makeWriteGate(KEY, makeLimiter(10, 3600000));
+    let last = null;
+    for (let i = 0; i < 12; i++) last = g2.refusalFor({ 'x-kitchen-key': 'guess' + i }, '9.9.9.9', 1000);
+    chk('a patient guesser is walled after ten wrong answers',
+      last && last.status === 429, JSON.stringify(last));
+    chk('and the wall is per caller, not for everyone',
+      (g2.refusalFor({ 'x-kitchen-key': 'nope' }, '8.8.8.8', 1000) || {}).status === 401);
+    chk('while the family, who know it, are never counted toward that wall',
+      g2.refusalFor({ 'x-kitchen-key': KEY }, '9.9.9.9', 1000) === null);
+  }
+
+  console.log('\n== A change reaches the family without waiting for morning (S03) ==');
+  {
+    /* The database is the canonical copy and db-sync is what turns it back
+       into recipes.json. This asks for that run. Every rule here is about
+       not making a write worse than it was. */
+    const { makePublisher } = require('../backend/lib/publish');
+    const calls = [];
+    const okFetch = (url, opts) => { calls.push({ url, opts }); return Promise.resolve({ status: 204, ok: true }); };
+
+    const none = makePublisher({ token: '', fetchImpl: okFetch });
+    chk('with no token it reports itself unconfigured', none.configured === false);
+    chk('and pokes nothing', (await none.poke(0)).sent === false && calls.length === 0);
+
+    const pub = makePublisher({ token: 'ghp_secret', fetchImpl: okFetch, cooldownMs: 90000 });
+    const first = await pub.poke(0);
+    chk('a write asks db-sync to run', first.sent === true, JSON.stringify(first));
+    chk('at the workflow this repo actually has',
+      /actions\/workflows\/db-sync\.yml\/dispatches$/.test(calls[0].url), calls[0].url);
+    chk('naming the branch Pages publishes from',
+      JSON.parse(calls[0].opts.body).ref === 'main', calls[0].opts.body);
+
+    /* Four typos fixed in a row is one publish, not four: the sync rebuilds
+       the whole file, so one run covers everything that landed before it. */
+    const second = await pub.poke(1000);
+    chk('a second change moments later does not start a second run',
+      second.sent === false && second.why === 'debounced', JSON.stringify(second));
+    chk('and nothing else was sent', calls.length === 1, String(calls.length));
+    chk('but once the cooldown passes it runs again',
+      (await pub.poke(200000)).sent === true);
+
+    /* The rule that matters most: this must never turn a saved recipe into
+       a failed one. */
+    const bad = makePublisher({ token: 'ghp_secret', cooldownMs: 0,
+      fetchImpl: () => Promise.reject(new Error('getaddrinfo ENOTFOUND api.github.com')) });
+    const r1 = await bad.poke(0);
+    chk('an unreachable GitHub is reported, not thrown',
+      r1.sent === false && r1.why === 'unreachable', JSON.stringify(r1));
+    const refused = makePublisher({ token: 'ghp_secret', cooldownMs: 0,
+      fetchImpl: () => Promise.resolve({ status: 403, ok: false }) });
+    const r2 = await refused.poke(0);
+    chk('and so is a token GitHub will not accept',
+      r2.sent === false && /403/.test(r2.why), JSON.stringify(r2));
+
+    /* A token in a log line is a token in a support screenshot. */
+    const logged = [];
+    const noisy = makePublisher({ token: 'ghp_SUPERSECRET', cooldownMs: 0,
+      log: (m) => logged.push(m),
+      fetchImpl: () => Promise.resolve({ status: 401, ok: false }) });
+    await noisy.poke(0);
+    chk('and the token never reaches a log line',
+      logged.length > 0 && !logged.join(' ').includes('SUPERSECRET'), logged.join(' '));
+  }
+
+  console.log('\n== The edit endpoint is wired the way the gate expects (S02) ==');
+  {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const put = src.slice(src.indexOf('async function putRecipe'), src.indexOf('/* ---', src.indexOf('async function putRecipe')));
+    chk('the edit route exists', /\/api\\\/recipes\\\/|api\/recipes/.test(src));
+    chk('and the very first thing it does is ask the gate',
+      put.indexOf('refusalFor') < put.indexOf('bodyOr400'), 'gate must precede reading the body');
+    chk('it validates before it writes',
+      put.indexOf('validateRecipe') < put.indexOf('insert into kitchen.recipes'));
+    /* The body must not be able to redirect the write onto another recipe. */
+    chk('the id comes from the address, and a body that disagrees is refused',
+      /r\.id !== id/.test(put), 'no path/body id check');
+    /* Editing is not adding: "recently added" must not reshuffle on a typo. */
+    chk('an edit overwrites its own row', /on conflict \(id\) do update/.test(put));
+    chk('and does not touch position, so fixing a typo does not jump the queue',
+      !/position\s*=\s*excluded\.position/.test(put));
+    /* A tag someone removed has to actually come off. */
+    chk('tags are replaced, not merely added to',
+      /delete from kitchen\.recipe_tags where recipe_id/.test(put));
+    chk('the browser is allowed to send the header the gate reads',
+      /access-control-allow-headers[^\n]*x-kitchen-key/.test(src));
+    chk('and to use the method the route answers',
+      /access-control-allow-methods[^\n]*PUT/.test(src));
+    chk('a write with no database is refused before it is attempted',
+      /api\/recipes"\) === 0/.test(src) || /indexOf\("\/api\/recipes"\)/.test(src));
   }
 
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');

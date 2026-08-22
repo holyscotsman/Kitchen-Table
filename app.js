@@ -97,7 +97,14 @@
        tests point it at a stub. */
     importApi: "kt.importApi",
     /* Failed imports this device has been told about and waved away. */
-    dismissed: "kt.dismissedImports"
+    dismissed: "kt.dismissedImports",
+    /* `S04` — the family's shared passphrase, entered once per phone. It is
+       what lets this device change the book for everybody; without it an
+       edit stays here, exactly as it always did. Kept beside the other
+       preferences on purpose: it is not an identity and it names nobody,
+       so there is nothing here to keep secret from the person holding the
+       phone — only from the internet. */
+    kitchenKey: "kt.kitchenKey"
   };
 
   /* The week planner's slots. All three exist on every day; the UI shows
@@ -364,6 +371,11 @@
 
     menuQ: "",
     searchOpen: false,
+    /* `S04` — which recipe is being sent to the family's book right now, and
+       which ones this session has seen land. Session-only on purpose: it
+       describes what just happened, not what is true of the book. */
+    sharing: "",
+    shared: {},
     filterOpen: false,
     sortOpen: false,
     who: [],
@@ -2326,6 +2338,24 @@
 
     h += '<button type="button" class="savebtn press" data-act="save">' +
          (S.saved ? "Saved ✓" : "Save changes") + "</button>";
+    /* `S04` — the shorter path to everyone. The download below it is still
+       here and still works; this is what makes it optional.
+
+       Plain text, not a password field, and that is deliberate: the reader
+       this app was built for cannot check a row of dots. The thing being
+       kept out is the internet, not somebody standing in Joan's kitchen. */
+    h += '<div class="field" style="margin-top:22px">' +
+         '<label class="field__label" for="e-key">Family passphrase</label>' +
+         '<input class="input" id="e-key" type="text" autocomplete="off" ' +
+         'autocapitalize="none" spellcheck="false" data-act="kitchen-key" value="' +
+         esc(kitchenKey()) + '" />' +
+         '<p class="hint">' + (kitchenKey()
+           ? "Saving also sends the change to the family’s book, so everyone " +
+             "sees it. Clear this box to go back to saving on this phone only."
+           : "Leave this empty and your changes stay on this phone. Put the " +
+             "family’s passphrase in, and Save sends them to everyone.") +
+         "</p></div>";
+
     h += '<button type="button" class="outlinebtn press" data-act="dl-json">' +
          "Download updated recipes.json</button>";
     if (Object.keys(images()).length) {
@@ -2465,6 +2495,53 @@
     S.saved = false;
   }
 
+  /* ------------------------------------------------------ sharing an edit
+   *
+   * `S04`. Until now every edit stopped at the phone that made it, and the
+   * only way to the family was to download recipes.json and hand it over.
+   * That is still true when no passphrase is set, and it is still the path
+   * that can never break.
+   *
+   * With one set, Save also tells the kitchen server, which writes the
+   * recipe into the database and asks db-sync to republish. Local first and
+   * always: the phone's copy is saved and reported saved before this runs,
+   * so a server that is asleep, refusing or simply not there costs the
+   * reader nothing they typed.
+   *
+   * `R107`'s rule governs what is said afterwards. A refusal and an outage
+   * are different things — one never clears by itself — and saying "yet"
+   * about the first is a promise nobody can keep.
+   */
+  function kitchenKey() {
+    try { return String(load(K.kitchenKey, "") || "").trim(); } catch (e) { return ""; }
+  }
+
+  function shareEdit(recipe) {
+    var key = kitchenKey();
+    if (!key) return;                       // local-only, exactly as before
+    S.sharing = recipe.id;
+    render();
+    kitchenFetch("/api/recipes/" + encodeURIComponent(recipe.id),
+      { method: "PUT", body: { recipe: orderFields(recipe) }, key: key, timeout: 30000 }, true)
+      .then(function (data) {
+        S.sharing = "";
+        S.shared[recipe.id] = true;
+        setNotice(data && data.publishing
+          ? "Saved, and sent to the family’s book — everyone will see it in a few minutes."
+          : "Saved, and sent to the family’s book. It appears for everyone at the next nightly update.");
+      })
+      .catch(function (err) {
+        S.sharing = "";
+        var st = (err && err.status) || 0;
+        var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
+        setNotice(refused
+          ? "Saved on this phone. The family’s book would not take it: " +
+            err.message + " It stays here until that is sorted."
+          : "Saved on this phone. The family’s book couldn’t be reached just " +
+            "now, so this change is still only here — try Save again in a minute.");
+      });
+  }
+
   function saveDraft(r) {
     /* Each save speaks for itself. `S.notice` lives until the route
        changes, so without this the sentence from the LAST save is still on
@@ -2531,6 +2608,8 @@
     if (hasCount(updated)) S.serves = updated.servings;
     if (persistRecipes()) {
       S.saved = true;
+      /* The phone's copy is safe before a byte goes anywhere. */
+      shareEdit(updated);
       /* Said, not done quietly: someone who ticked their way down the
          ingredients and finds the ticks gone should know why, rather than
          think the app lost their place. Only when something was actually
@@ -3645,9 +3724,13 @@
           if (!S.videoWaking) { S.videoWaking = true; render(); }
         }, 4000);
       }
+      var headers = opts.body ? { "content-type": "application/json" } : {};
+      /* `S04` — the write gate reads this. Sent only when a caller asks for
+         it, so a read never carries the family's passphrase anywhere. */
+      if (opts.key) headers["x-kitchen-key"] = opts.key;
       return fetch(IMPORT_API + path, {
         method: opts.method || "GET",
-        headers: opts.body ? { "content-type": "application/json" } : undefined,
+        headers: Object.keys(headers).length ? headers : undefined,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         signal: ctl ? ctl.signal : undefined
       }).then(function (res) {
@@ -5535,6 +5618,12 @@
          is committed, on Enter or on leaving the field. */
       var typed = parseInt(el.value, 10);
       if (typed >= 1 && typed <= 40) S.serves = typed;
+      return;
+    }
+    if (act === "kitchen-key") {
+      /* Not re-rendered on every keystroke: the caret is in this field and
+         the only thing that changes is a hint under it. */
+      save(K.kitchenKey, el.value.trim());
       return;
     }
     if (act === "main-q") { S.mainQ = el.value; render(); return; }

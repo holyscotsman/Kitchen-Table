@@ -358,3 +358,70 @@ the answer that costs a cook a glance instead of an ingredient.
 sites. **Why it was taken without asking:** the alternative was leaving lines
 that contradict themselves on screen, and the only other alternative was
 guessing at meaning in a book of someone's recipes.
+
+---
+
+## S — Edits reach everyone, and what stands between them and a stranger
+
+**Asked for directly**, 2026-08-22: *"If someone edits a recipe, can we have
+that change happen on the server? This way it is automatically adjusted for
+everyone."* That reverses the part of ruling 026 that kept edits local, and
+it reverses it on request rather than by default — which is the difference
+between a decision and a drift.
+
+### What was already true
+
+Most of this was built. The database is the canonical shared copy, the video
+importer already writes recipes into it, and `db-sync` already regenerates
+`recipes.json` and commits, which is what makes Pages republish. The missing
+piece was small: nothing let an **edit** use any of it.
+
+### The two questions that were not mine to answer
+
+Both were put to Jason with a recommendation, and both recommendations were
+taken.
+
+**1. What stands between an edit and a stranger?** This is the question the
+feature turns on. Today the blast radius of someone who finds the Render
+address is a bill: they can spend imports, and the rate limiter, the caller
+day cap and the URL allowlist bound that. A write endpoint changes the worst
+case from *money* to *Joan's recipes* — silently, with no way to tell who
+did it and nothing to roll back to but a nightly commit.
+
+Chosen: **one shared family passphrase**, `KT_WRITE_KEY`, held in Render's
+environment and entered once per phone. No accounts, no logins, no identity —
+which keeps faith with the rule that has governed this app from the start:
+**`contributor` is a byline, never a credential.** The passphrase says
+*someone in this family is holding the phone*. It does not say who, and
+nothing in the app may ever start deciding anything from the name.
+
+It **fails closed**. With no key set, every write is refused — the
+unconfigured state is the dangerous one, so it is the locked one. Wrong
+answers are walled at ten an hour per caller, because a family passphrase is
+not attacked by flooding but by patience; correct ones are never counted, so
+ordinary saving never walks toward the wall. The refusal for a near-miss is
+byte-identical to the refusal for no attempt at all.
+
+**2. How fast should a change reach everyone?** Chosen: **poke `db-sync` on
+write** — minutes, not overnight. The rejected option was letting the app
+read from the server, which would have put a sleeping Render service between
+the family and their recipes, and ruling V is explicit that no request to
+that server is ever on the path to *reading* a recipe. That still holds:
+this arc adds a server on the **write** path only.
+
+### What is deliberately not built
+
+- **Removal.** Deleting a recipe for everyone is a bigger, sharper action
+  than changing one, and `db/migrate.js --prune` exists precisely because
+  pruning is never automatic. Remove is still local-only. If that should
+  change it is its own decision, not a corollary of this one.
+- **Conflict resolution.** `ADDING.md` says that when two people change the
+  same recipe Jason asks which is right rather than picking silently. Server
+  writes make last-write-wins the default for anyone holding the passphrase,
+  and this arc does not solve that — it narrows it (both edits land in the
+  database, and the file is regenerated from it) without pretending to.
+  Worth revisiting if two people ever actually collide.
+
+**What it costs if reversed:** unset `KT_WRITE_KEY` and every write is
+refused again, with no code change and no redeploy — the app falls back to
+saving locally and saying so, which is exactly what it did before.

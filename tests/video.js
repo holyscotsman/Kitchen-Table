@@ -21,7 +21,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, postDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, publishing: true, postDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -43,6 +43,13 @@ function stubKitchen(ctx, opts) {
     if (req.method() === 'GET' && /^\/api\/import\/jobs\/\d+$/.test(u.pathname)) {
       pollN = Math.min(pollN + 1, o.polls.length - 1);
       return json(200, o.polls[pollN] || { id: 7, status: 'queued', eta_seconds: 60, overrun: false });
+    }
+    if (req.method() === 'PUT' && /^\/api\/recipes\//.test(u.pathname)) {
+      o.puts.push({ path: u.pathname, key: req.headers()['x-kitchen-key'] || null,
+                    body: req.postDataJSON() });
+      if (o.failPut) return json(o.failPut.status, { error: o.failPut.error || '' });
+      return json(200, { ok: true, id: u.pathname.split('/').pop(),
+                         publishing: o.publishing !== false });
     }
     if (req.method() === 'POST' && /\/accept$/.test(u.pathname)) {
       o.accepted.push({ path: u.pathname, body: req.postDataJSON() });
@@ -682,6 +689,100 @@ async function freshPage(br, opts) {
     chk('nothing threw across all three', refused.errs.length === 0 &&
       unreachable.errs.length === 0 && fine.errs.length === 0,
       refused.errs.concat(unreachable.errs, fine.errs).join(' | '));
+  }
+
+  console.log('\n== An edit can reach the whole family now (S04) ==');
+  {
+    /* Until this arc an edit stopped at the phone that made it, and the only
+       way to everyone was to download recipes.json and hand it over. That
+       path still exists and still cannot break — this is what makes it
+       optional.
+
+       The ORDER is the point. The phone's copy is saved, and reported saved,
+       before a byte goes anywhere: a server asleep on Render's free tier
+       must cost the reader nothing they typed. */
+    const edit = async (opts, key, title) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      await p.goto(B + '/index.html#ninja-cookies');
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.fill('#e-title', title);
+      await p.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await p.waitForTimeout(1300);
+      const out = {
+        puts: stub.puts,
+        notice: await p.evaluate(() => {
+          const n = document.querySelector('.notice');
+          return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+        }),
+        stored: await p.evaluate(() => {
+          const raw = localStorage.getItem('kt.recipes');
+          return raw ? (JSON.parse(raw).find(r => r.id === 'ninja-cookies') || {}).title : null;
+        }),
+        errs: p.errs.slice()
+      };
+      await ctx.close();
+      return out;
+    };
+
+    /* No passphrase is the behaviour the app has always had, and it has to
+       survive untouched: nothing sent, nothing claimed, saved here. */
+    const quiet = await edit({}, '', 'Ninja Cookies Local');
+    chk('with no passphrase nothing is sent anywhere', quiet.puts.length === 0);
+    chk('and the edit is still saved on the phone',
+      quiet.stored === 'Ninja Cookies Local', String(quiet.stored));
+    chk('and nothing is claimed about the family seeing it',
+      !/famil/i.test(quiet.notice), quiet.notice);
+
+    const sent = await edit({}, 'family-secret', 'Ninja Cookies Shared');
+    chk('with one, the edit is sent to the kitchen', sent.puts.length === 1,
+      String(sent.puts.length));
+    chk('to that recipe\'s own address',
+      /\/api\/recipes\/ninja-cookies$/.test(sent.puts[0].path), sent.puts[0].path);
+    chk('carrying the passphrase in the header the gate reads',
+      sent.puts[0].key === 'family-secret', String(sent.puts[0].key));
+    chk('and the edited recipe, not the old one',
+      sent.puts[0].body.recipe.title === 'Ninja Cookies Shared',
+      sent.puts[0].body.recipe.title);
+    chk('the passphrase never travels inside the recipe itself',
+      !JSON.stringify(sent.puts[0].body.recipe).includes('family-secret'));
+    chk('it is saved here too, not only there', sent.stored === 'Ninja Cookies Shared');
+    chk('and the reader is told everyone will see it',
+      /famil/i.test(sent.notice) && /few minutes/i.test(sent.notice), sent.notice);
+
+    /* A kitchen that took the recipe but cannot republish is a different
+       sentence from one that can — "in a few minutes" would be a promise
+       nobody kept. */
+    const slow = await edit({ publishing: false }, 'family-secret', 'Ninja Cookies Nightly');
+    chk('a kitchen that cannot republish says when it will instead',
+      /nightly/i.test(slow.notice) && !/few minutes/i.test(slow.notice), slow.notice);
+
+    /* `R107`'s rule, on the path it was written for. */
+    const refused = await edit(
+      { failPut: { status: 401, error: 'That passphrase is not the family’s one.' } },
+      'wrong-one', 'Ninja Cookies Refused');
+    chk('a refused passphrase still saves on the phone',
+      refused.stored === 'Ninja Cookies Refused' && /saved on this phone/i.test(refused.notice),
+      refused.notice);
+    chk('and repeats what the kitchen actually said',
+      /not the family/i.test(refused.notice), refused.notice);
+    chk('and does not promise it will go through later',
+      !/try save again/i.test(refused.notice), refused.notice);
+
+    const asleep = await edit({ failPut: { status: 503 } }, 'family-secret', 'Ninja Cookies Asleep');
+    chk('a sleeping kitchen saves on the phone too',
+      asleep.stored === 'Ninja Cookies Asleep', String(asleep.stored));
+    chk('and says it is worth trying again, because it is',
+      /again/i.test(asleep.notice) && !/would not take/i.test(asleep.notice), asleep.notice);
+    chk('nothing threw across any of it',
+      [].concat(quiet.errs, sent.errs, slow.errs, refused.errs, asleep.errs).length === 0,
+      [].concat(quiet.errs, sent.errs, slow.errs, refused.errs, asleep.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');

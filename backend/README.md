@@ -36,6 +36,18 @@ because this folder didn't exist yet. With this code on the deployed branch:
      **Create credentials → API key** → copy it here. No billing account
      needed; the free quota (10,000 lookups/day) is thousands of times
      family scale.
+   - `KT_WRITE_KEY` — **the family passphrase.** Set this and an edit made
+     on any phone can be saved for everyone; leave it unset and nobody can,
+     which is the safe direction for an unset value. Pick something a person
+     can type on a phone — three or four words is plenty — and give it to
+     the family, not to this chat. Anyone who has it can change any recipe;
+     it is a house key, not a login, and it names nobody (`contributor`
+     stays a byline, never a credential).
+   - `KT_GH_TOKEN` — optional. A GitHub token with **Actions: write** on
+     this repo. With it, a saved edit asks `db-sync` to run and the family
+     sees the change in a few minutes; without it the change still lands in
+     the database and appears at the nightly sync instead. A fine-grained
+     token scoped to this one repository is enough.
 2. **Settings → Build & Deploy** → confirm **Build Command** is `yarn` and
    **Start Command** is `yarn start`. Leave **Root Directory** empty.
 3. **Manual Deploy → Deploy latest commit.** The build fetches yt-dlp and
