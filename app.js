@@ -4849,12 +4849,26 @@
   function recipeText(r) {
     var mult = S.serves && r.servings ? S.serves / r.servings : 1;
     var lines = [titleOf(r), ""];
-    lines.push("From: " + r.contributor);
-    lines.push(
-      S.serves === r.servings
+    /* `R117` — this is not a screen. It is the copy that GOES TO ANOTHER
+       PERSON, through Share and through "Download as text", and it was
+       still assuming what `R97` and `R116` taught every screen not to: that
+       a recipe has a contributor and a serving count. On a recipe with
+       neither it read "From: undefined" and "Serves 4 (adjusted from
+       undefined)" while the screen beside it correctly said "Not given" —
+       the gap handed to somebody else, in the reader's name.
+
+       The servings guard is `hasCount(r)`, not `S.serves === r.servings`: a
+       countless recipe still has a working stepper, so `S.serves` is a real
+       number while `r.servings` is absent, which is exactly how "adjusted
+       from undefined" was produced. */
+    var from = String(r.contributor === undefined || r.contributor === null
+      ? "" : r.contributor).trim();
+    if (from) lines.push("From: " + from);
+    lines.push(!hasCount(r)
+      ? "Serves: not given"
+      : S.serves === r.servings
         ? "Serves " + r.servings
-        : "Serves " + S.serves + " (adjusted from " + r.servings + ")"
-    );
+        : "Serves " + S.serves + " (adjusted from " + r.servings + ")");
     if (r.prepTime) lines.push("Prep: " + r.prepTime);
     if (r.cookTime) lines.push("Cook: " + r.cookTime);
     lines.push("", "INGREDIENTS");

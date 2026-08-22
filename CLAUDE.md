@@ -274,6 +274,29 @@ It composes with `R115` the way it should: a nameless recipe on a sharing
 phone is refused by the server ("bad title"), queued by `S13`, and the reader
 is told — because the recipe genuinely has no name, and refusing is right.
 
+### The copy that leaves the phone must be as honest as the screen
+
+`R117`, found by asking `R116`'s question of the field beside `title`.
+`R97` taught every screen to ask whether the book actually says how many a
+recipe makes and to print *Not given* when it does not; `R116` did the same
+for a missing name. Neither reached `recipeText`, which is **not a screen**:
+it is the copy that goes to another person, through Share and through
+*Download as text*. On a recipe with no contributor and no count it read
+
+    From: undefined
+    Serves 4 (adjusted from undefined)
+
+while the screen beside it correctly said *Not given*. That is the worst
+place in the app for it — everywhere else the reader sees the gap and can
+judge it; here they hand it to somebody else, in their own name, with the
+word *undefined* in it.
+
+The servings guard has to be `hasCount(r)` and not `S.serves ===
+r.servings`: a countless recipe still has a working stepper, so `S.serves`
+is a real number while `r.servings` is absent, which is precisely how
+*adjusted from undefined* was produced. Print was already honest — `dl-pdf`
+and `plan-print` render the DOM, so only the two text paths were wrong.
+
 ### A validator must judge what it stores, not what it was handed
 
 `R115`. `validateRecipe` read the **raw** string for every check and then
@@ -658,8 +681,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1382 functional checks** across eleven
-suites (kt 263, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1389 functional checks** across eleven
+suites (kt 270, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

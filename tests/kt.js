@@ -1100,6 +1100,83 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== The copy that leaves the phone must be as honest as the screen (R117) ==');
+  {
+    /* `R97` taught every screen to ask whether the book actually says how
+       many a recipe makes, and to print *Not given* when it does not.
+       `R116` did the same for a missing name. Neither reached `recipeText`,
+       which is not a screen — it is the text that **goes to another
+       person**, through Share and through "Download as text".
+
+       Measured on a recipe with no contributor and no servings, while the
+       screen beside it correctly read "Not given":
+
+           From: undefined
+           Serves 4 (adjusted from undefined)
+
+       That is the worst place in the app for it. Everywhere else the reader
+       can see the gap and judge it; here they hand the gap to somebody else
+       with the word "undefined" in it, over their own name.
+
+       The servings guard has to be `hasCount(r)`, not `S.serves ===
+       r.servings`: a countless recipe still has a working stepper, so
+       `S.serves` is a real number while `r.servings` is absent — which is
+       exactly how "adjusted from undefined" was produced. */
+    const BARE = { id: 'bare-r117', title: 'Bare Recipe', category: 'Dinner',
+      ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+    /* The control, seeded rather than borrowed: the overlay is authoritative
+       by design, so a shipped recipe is not in the book once this seed is. */
+    const WHOLE = { id: 'whole-r117', title: 'Whole Recipe', category: 'Dinner',
+      contributor: 'Joan', servings: 4, ingredients: ['2 eggs'], steps: ['Whisk.'] };
+    const ctxR = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pR = await ctxR.newPage();
+    const rErrs = []; pR.on('pageerror', e => rErrs.push(e.message));
+    await pR.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
+      [BARE, WHOLE]);
+    await pR.goto(B + '/index.html#bare-r117');
+    await pR.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pR.evaluate(() => {
+      window.__copied = null;
+      navigator.share = () => Promise.reject(
+        Object.assign(new Error('nope'), { name: 'NotAllowedError' }));
+      Object.defineProperty(navigator, 'clipboard', { configurable: true,
+        value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+    });
+    await pR.click('[data-act="share"]', { timeout: 5000 }).catch(() => {});
+    await pR.waitForTimeout(500);
+    const shared = (await pR.evaluate(() => window.__copied)) || '';
+
+    chk('the shared copy never contains the word "undefined"',
+      shared.length > 0 && !/undefined/i.test(shared),
+      shared.split('\n').slice(0, 5).join(' / ') || 'NOTHING COPIED');
+    chk('a recipe with nobody named simply does not claim one',
+      !/^From:/m.test(shared), (shared.match(/^From:.*/m) || [''])[0]);
+    chk('and a recipe with no count says so in words',
+      /not given/i.test(shared), (shared.match(/^Serves.*/mi) || [''])[0]);
+    chk('while the recipe itself still travels',
+      /Bare Recipe/.test(shared) && /1 cup flour/.test(shared) && /Bake it\./.test(shared));
+
+    /* And the ordinary recipe must be untouched by all of that. */
+    await pR.goto(B + '/index.html#whole-r117');
+    await pR.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pR.evaluate(() => {
+      window.__copied = null;
+      navigator.share = () => Promise.reject(
+        Object.assign(new Error('nope'), { name: 'NotAllowedError' }));
+      Object.defineProperty(navigator, 'clipboard', { configurable: true,
+        value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+    });
+    await pR.click('[data-act="share"]', { timeout: 5000 }).catch(() => {});
+    await pR.waitForTimeout(500);
+    const full = (await pR.evaluate(() => window.__copied)) || '';
+    chk('a complete recipe still names who it came from',
+      /^From: \w/m.test(full), (full.match(/^From:.*/m) || [''])[0]);
+    chk('and still says how many it serves',
+      /^Serves \d/m.test(full), (full.match(/^Serves.*/m) || [''])[0]);
+    chk('nothing threw', rErrs.length === 0, rErrs.join(' | '));
+    await ctxR.close();
+  }
+
   console.log('\n== A recipe with no name must not take two screens with it (R116) ==');
   {
     /* `R62` coerced `ingredients`, `steps`, `flagged`, `tags` and `servings`
