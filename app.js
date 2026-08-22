@@ -1753,7 +1753,21 @@
            "</div>";
     } else if (S.removing) {
       h += '<div class="cardgrid">' + list.map(function (r) {
+        /* `R140` — the name says what pressing it does. `R85` settled that
+           this mode cannot be mistaken for Tag mode BY EYE; by ear this row
+           was "Bacon Ranch Chicken Casserole Joan", the same words as the
+           row that OPENS the recipe, on the one action that cannot be
+           undone. Tag mode was already fine — its rows carry `aria-pressed`
+           and announce as toggles.
+
+           The sentence is the app's own, twice over: the planner's delete
+           button has always read "Remove <name> from the plan", and `S10`
+           settled that Menu removal says "from this phone" because that is
+           the truth about its scope. The contributor drops out of the name
+           and stays on the screen; in this mode it is decoration, and the
+           action and the recipe are what a reader needs. */
         return '<button type="button" class="rrow press" data-act="remove" ' +
+               'aria-label="Remove ' + esc(titleOf(r)) + ' from this phone" ' +
                'data-id="' + esc(r.id) + '">' +
                '<span class="rcard__body"><span class="rcard__title">' +
                esc(titleOf(r)) + "</span>" +
