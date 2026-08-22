@@ -2561,6 +2561,84 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await p.waitForSelector('.rcard');
   }
 
+  console.log('\n== R141 — the rescale the app knows is easy to miss ==');
+  {
+    /* The ingredient list carries this comment, in the app's own words:
+
+         "A rescale changes the numbers in place, which is easy to miss at
+          any font size and very easy to miss at 40px. The list flashes once
+          so the change is seen rather than merely made."
+
+       So the app knows, and solved it — FOR THE EYE. `S12`'s rule is *the
+       eye gets progress, the ear gets one sentence*; here the eye got the
+       flash and the ear got nothing. `liveMessage()` covers sharing, a
+       notice, the Add screen's busy line, the kitchen waking and a video's
+       stage, and says nothing about the recipe screen at all — the screen
+       someone is standing at a hob reading.
+
+       Focus is the reason it has to be the live region: `R106` restores the
+       caret to the control that was pressed, so after "More servings" the
+       reader stays on that button and the new count is never spoken.
+
+       And the app already announces the smaller thing: planning a meal says
+       "… planned for Monday 17" out loud. Changing what a recipe makes,
+       which moves every quantity on the screen, said nothing. */
+    await p.goto(B + '/index.html#bacon-ranch-chicken-casserole');
+    await p.reload();
+    await p.waitForSelector('[data-act="serv+"]');
+    const serves = () => p.locator('.servcard__value').first().innerText();
+    const firstQty = () => p.locator('.checkrow__text').first().innerText();
+    const heard = () => p.locator('#route-live').innerText();
+    const focused = () => p.evaluate(() => {
+      const a = document.activeElement;
+      return a ? (a.getAttribute('aria-label') || a.tagName) : 'none';
+    });
+
+    /* Before anything is rescaled: the region holds the sentence this screen
+       announced on arrival, and ticking a line off must not disturb it. Done
+       FIRST and on an untouched recipe, because that is what proves the
+       sentence is armed by the rescale rather than said on every paint —
+       a version that announced unconditionally passed every other check
+       here, measured. */
+    const arrival = (await heard()).trim();
+    await p.click('[data-act="chk-i"]');
+    await p.waitForTimeout(400);
+    chk('an untouched recipe says nothing new when a line is ticked off',
+      (await heard()).trim() === arrival && /kitchen table/i.test(arrival),
+      JSON.stringify([arrival, (await heard()).trim()]));
+
+    const s0 = await serves(), q0 = await firstQty();
+    await p.click('[data-act="serv+"]');
+    await p.waitForTimeout(400);
+    const s1 = await serves(), q1 = await firstQty(), said1 = (await heard()).trim();
+
+    chk('pressing + really rescales the recipe', s0 !== s1 && q0 !== q1,
+      JSON.stringify([s0, s1, q0, q1]));
+    chk('and the caret stays on the button that was pressed',
+      /more servings/i.test(await focused()), await focused());
+    /* A sentence, not a bare number: this is read out loud in a kitchen, and
+       "7" on its own tells a reader nothing about what changed. */
+    chk('so the live region is what has to say the new count',
+      said1.indexOf(s1.split(' ')[0]) > -1 && /[a-z]{4}/i.test(said1),
+      JSON.stringify([said1, s1]));
+
+    /* A second press is a different count, so it must be heard again —
+       `announceOnce` drops a REPEAT, and two different numbers are not one. */
+    await p.click('[data-act="serv+"]');
+    await p.waitForTimeout(400);
+    const s2 = await serves(), said2 = (await heard()).trim();
+    chk('and again on the next press, because the count is different',
+      said2 !== said1 && said2.indexOf(s2.split(' ')[0]) > -1,
+      JSON.stringify([said1, said2, s2]));
+
+    /* And after one too: the tick is carried by the row's own `aria-pressed`,
+       and a live sentence for every tap would be noise in a kitchen. */
+    await p.click('[data-act="chk-i"]');
+    await p.waitForTimeout(400);
+    chk('and still says nothing new when a line is ticked off after one',
+      (await heard()).trim() === said2, JSON.stringify([said2, (await heard()).trim()]));
+  }
+
   console.log('\n== R83 — the accent fill marks the action you came for ==');
   {
     /* One colour carries one meaning in this app: an accent fill is the

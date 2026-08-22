@@ -1426,10 +1426,51 @@ screen says, which is a design question and Jason's call, not a bug fix.
 With the rows now naming the action, the mode's meaning is carried where the
 reader actually is.
 
+### The app knew the rescale was easy to miss, and told only the eye
+
+`R141`, and `R140`'s question asked one screen over. The ingredient list has
+carried this comment since it was written:
+
+> A rescale changes the numbers in place, which is easy to miss at any font
+> size and very easy to miss at 40px. The list flashes once so the change is
+> seen rather than merely made.
+
+So the app knows, and solved it — **for the eye**. `S12`'s rule is *the eye
+gets progress, the ear gets one sentence*, and `liveMessage()` covers
+sharing, a notice, the Add screen's busy line, the kitchen waking and a
+video's stage. It said nothing about the recipe screen at all: the screen
+someone is standing at a hob reading.
+
+Measured, on a recipe that serves 6. Press **+** twice — the count goes to 8,
+every quantity in the list moves — and the live region still reads *"Bacon
+Ranch Chicken Casserole — Kitchen Table"*, the sentence it announced on
+arrival. Not silence: **a stale sentence**, unchanged through two rescales.
+
+It has to be the live region rather than the control. `R106` restores the
+caret to the button that was pressed, so a reader stays on *"More servings"*
+and the new count is never spoken from anywhere. And the app already
+announces the smaller thing — planning a meal says *"… planned for Monday
+17"* out loud.
+
+The sentence is armed and consumed exactly like the flash: `S.pulseScale` is
+set only when the count actually moved (`S.serves !== before`) and cleared by
+the paint that reads it. Two different counts are not a repeat, so
+`announceOnce` lets each through; ticking a line off stays silent, because
+the row's own `aria-pressed` carries that and a sentence per tap would be
+noise in a kitchen.
+
+**And a check that could not fail, again.** The first version of this round
+tested the tick only *after* a rescale — so a version that announced on every
+recipe paint, regardless of whether anything changed, passed everything.
+The check that kills it ticks a line on an **untouched** recipe and requires
+the arrival sentence to still be there. That is the second time this session
+a mutation has found my own check hollow, and both are recorded rather than
+quietly fixed.
+
 ### Verified
 
-The suite after the video arc: **1636 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 330, sec 56,
+The suite after the video arc: **1642 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 336, sec 56,
 plan 79, video 252, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

@@ -5717,6 +5717,22 @@
        without the live region speaking again. */
     if (S.sharing) return "Sending to the family’s book.";
     if (S.notice) return S.notice;
+    /* `R141` — the rescale the app already knows is easy to miss. The
+       ingredient list flashes once so the change is SEEN rather than merely
+       made; this is the same thing for the ear, and it is armed and consumed
+       the same way — `S.pulseScale` is set only when the count actually
+       moved, and cleared by the paint that reads it here.
+
+       It has to be the live region rather than the control: `R106` restores
+       the caret to the button that was pressed, so a reader stays on "More
+       servings" and never hears the new count. Without this the region went
+       on holding the sentence it announced on arrival — the recipe's name —
+       through every press, which is a stale sentence rather than a silent
+       one. Two different counts are not a repeat, so `announceOnce` lets
+       each one through; ticking a line off stays silent, because the row's
+       own `aria-pressed` carries that and a sentence per tap would be noise
+       in a kitchen. */
+    if (S.pulseScale) return "Serves " + S.serves + ". Amounts adjusted.";
     if (S.addBusy) return S.addBusy;
     if (S.videoWaking) return "Waking up the kitchen server.";
     if (S.videoJob && S.videoJob.stage) return S.videoJob.stage;
