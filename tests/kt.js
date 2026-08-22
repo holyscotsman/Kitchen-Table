@@ -1100,6 +1100,137 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== One reader for a flag\'s field, and a tolerant one (R124) ==');
+  {
+    /* `R122` and `R123` both learned to answer a flag by the field it names,
+       and both did it with their own copy of `/^([A-Za-z]+)\s+—/`. Two copies
+       of one rule is the drift `R114` exists to stop, and this pair is worse
+       than most: the shape they parse is written by a **language model**.
+       `backend/lib/extract.js` asks for 'Field — what needs checking' and
+       then stores whatever comes back verbatim — every other field in that
+       function is coerced, flags alone are taken as typed.
+
+       So a model that writes "Servings: no count was found" produces a flag
+       that neither `R122` nor `R123` can ever answer, and `R122`'s permanent
+       stale warning is back through the door nobody was watching.
+
+       Fixed on the reading side rather than the writing one, deliberately.
+       Flags come from four writers — the extraction model, the link parser,
+       the photo parser, and a hand-edited recipes.json — and a list of field
+       names kept on the server would be a fifth thing to keep in step with
+       the app. One tolerant reader covers all of them and cannot drift from
+       itself. */
+    const COLON = { id: 'colon-124', title: 'Colon Flags', category: 'Dinner',
+      contributor: 'Joan', servings: 4,
+      ingredients: ['1 cup flour'], steps: ['Bake it.'],
+      flagged: ['Servings: no count was found; 4 was assumed.',
+                'Title - none was obvious; add one.',
+                'Steps – none were picked up.'] };
+    const ctxC = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pC = await ctxC.newPage();
+    const cErrs = []; pC.on('pageerror', e => cErrs.push(e.message));
+    await pC.addInitScript((r) =>
+      localStorage.setItem('kt.recipes', JSON.stringify([r])), COLON);
+    await pC.goto(B + '/index.html#colon-124');
+    await pC.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pC.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pC.waitForSelector('#e-serves', { timeout: 5000 });
+    await pC.fill('#e-serves', '6');
+    await pC.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pC.waitForTimeout(700);
+    const left = await pC.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+
+    chk('a flag written with a colon is still answerable',
+      !left.some(f => /^Servings/.test(f)), JSON.stringify(left));
+    chk('and the ones about other fields still stand',
+      left.some(f => /^Title/.test(f)) && left.some(f => /^Steps/.test(f)),
+      JSON.stringify(left));
+
+    /* The hyphen and en-dash forms answer too, on their own fields. */
+    await pC.fill('#e-title', 'A Real Name');
+    await pC.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pC.waitForTimeout(700);
+    const left2 = await pC.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+    chk('a hyphen reads the same way',
+      !left2.some(f => /^Title/.test(f)), JSON.stringify(left2));
+    chk('while an en-dash flag about an untouched field is left where it is',
+      left2.some(f => /^Steps/.test(f)), JSON.stringify(left2));
+
+    /* Prose that names no field is not a field claim, whatever punctuation
+       it happens to contain — checked through behaviour, since the reader
+       itself is private to the app. */
+    /* Its own context: the page above has a book in memory that a render
+       writes back over any seed poked into storage underneath it — the same
+       cross-contamination `R122`'s and `R123`'s harnesses each hit. */
+    const ctxP = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pP = await ctxP.newPage();
+    pP.on('pageerror', e => cErrs.push(e.message));
+    await pP.addInitScript((r) => localStorage.setItem('kt.recipes', JSON.stringify([r])),
+      Object.assign({}, COLON, { flagged: [
+        'The photos couldn’t be kept on this phone (quota)',
+        'Servings: no count was found; 4 was assumed.'] }));
+    await pP.goto(B + '/index.html#colon-124');
+    await pP.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pP.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pP.waitForSelector('#e-serves', { timeout: 5000 });
+    await pP.fill('#e-serves', '9');
+    await pP.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pP.waitForTimeout(700);
+    const left3 = await pP.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+    chk('a sentence that names no field survives a save that answered one',
+      left3.length === 1 && /photos/.test(left3[0]), JSON.stringify(left3));
+
+    /* And the case that makes the separator load-bearing rather than
+       decorative: a sentence whose FIRST WORD is a field name but which is
+       not a claim about that field. Without the separator this reads as
+       "Steps, answered" and a real warning disappears — the mutation that
+       dropped the separator passed every other check here, which is how
+       this gap was found. */
+    const ctxW = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pW = await ctxW.newPage();
+    pW.on('pageerror', e => cErrs.push(e.message));
+    await pW.addInitScript((r) => localStorage.setItem('kt.recipes', JSON.stringify([r])),
+      Object.assign({}, COLON, { flagged: [
+        'Steps taken after the oven were never shown',
+        'Servings: no count was found; 4 was assumed.'] }));
+    await pW.goto(B + '/index.html#colon-124');
+    await pW.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pW.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pW.waitForSelector('#e-serves', { timeout: 5000 });
+    await pW.fill('#e-serves', '9');
+    await pW.fill('#e-step-0', 'Bake it well.').catch(() => {});
+    await pW.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pW.waitForTimeout(700);
+    const left4 = await pW.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+    chk('a sentence merely starting with a field name is not a claim about it',
+      left4.length === 1 && /^Steps taken/.test(left4[0]), JSON.stringify(left4));
+    await ctxW.close();
+    await ctxP.close();
+
+    chk('nothing threw', cErrs.length === 0, cErrs.join(' | '));
+    await ctxC.close();
+  }
+
   console.log('\n== A flag that has been dealt with must stop saying it has not (R122) ==');
   {
     /* `082` gave every flag the name of its field — "Servings — …",

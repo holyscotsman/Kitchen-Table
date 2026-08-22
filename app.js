@@ -760,6 +760,32 @@
    * Joins, and deliberately does NOT escape: every caller assembles parts
    * that are already escaped, and one of them carries a `<span>` for the
    * search match-note. */
+  /* `R124` — the one reader of a flag's field, and a tolerant one.
+   *
+   * `R122` and `R123` each learned to answer a flag by the field it names,
+   * and each did it with its own copy of the same expression. Two copies of
+   * one rule is the drift `R114` exists to stop — and this pair is worse
+   * than most, because the shape being parsed is written by a **language
+   * model**: `backend/lib/extract.js` asks for "Field — what needs checking"
+   * and then stores whatever comes back verbatim. Every other field in that
+   * function is coerced; flags alone are taken as typed. A model that writes
+   * "Servings: no count was found" would produce a flag neither round could
+   * ever answer, which is `R122`'s permanent stale warning coming back
+   * through a door nobody was watching.
+   *
+   * Fixed on the reading side rather than the writing one, deliberately.
+   * Flags come from four writers — the extraction model, the link parser,
+   * the photo parser, and a hand-edited recipes.json — so a list of field
+   * names kept on the server would be a fifth thing to hold in step with the
+   * app. One tolerant reader covers every writer and cannot drift from
+   * itself. A word followed by a separator and a space is a field claim;
+   * anything else is prose, and prose is never treated as an answerable
+   * claim about a field. */
+  function flagField(f) {
+    var m = /^([A-Za-z]+)\s*[—–:-]\s+/.exec(String(f || ""));
+    return m ? m[1] : "";
+  }
+
   function metaLine(parts) {
     return parts.filter(function (x) {
       return x !== undefined && x !== null && String(x).trim() !== "";
@@ -2936,8 +2962,7 @@
         Course: updated.category !== r.category
       };
       var keptFlags = updated.flagged.filter(function (f) {
-        var m = /^([A-Za-z]+)\s+—/.exec(String(f));
-        return !(m && answered[m[1]]);
+        return !answered[flagField(f)];
       });
       if (keptFlags.length) updated.flagged = keptFlags;
       else delete updated.flagged;
@@ -3980,8 +4005,7 @@
       Course: (CATS.indexOf(d.category) > -1 ? d.category : "Dinner") !== "Dinner"
     };
     var addFlags = (d.flagged || []).filter(function (f) {
-      var m = /^([A-Za-z]+)\s+—/.exec(String(f));
-      return !(m && addAnswered[m[1]]);
+      return !addAnswered[flagField(f)];
     });
     var addClamped = 0;
     var servings;
