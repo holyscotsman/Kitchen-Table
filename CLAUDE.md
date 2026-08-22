@@ -332,6 +332,25 @@ did not touch survives untouched, and one they **did** type past the limit is
 clamped *and said*. This app does not change someone's words behind their
 back.
 
+### After Save, the fields show what was kept
+
+`R120`. `saveDraft` has always tidied on the way past — a title cleared to
+nothing falls back to the old one, blank lines are dropped, and since `R119`
+a count typed past the limit comes back to 40. Every one of those is right.
+**None of them was ever shown back.**
+
+Measured: type 300 into Serves and press Save. The notice correctly says
+*"300 was saved as 40"* — and the field goes on reading **300**. The reader
+is told the right thing and shown the wrong thing in the same moment, and
+the one they will believe is the box in front of them. Clearing a title was
+worse: the field read empty, the book had quietly kept the old name, and
+nothing said so at all.
+
+Structural rather than a patch per field: the form is re-seeded from the
+recipe that was actually stored, so what is on screen and what is in the
+book cannot disagree. It also covers the tidying nobody had thought about —
+blank ingredient lines dropped on save now leave the fields too.
+
 ### A validator must judge what it stores, not what it was handed
 
 `R115`. `validateRecipe` read the **raw** string for every check and then
@@ -716,8 +735,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1404 functional checks** across eleven
-suites (kt 285, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1411 functional checks** across eleven
+suites (kt 292, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

@@ -2910,6 +2910,17 @@
     });
     if (hasCount(updated)) S.serves = updated.servings;
     if (persistRecipes()) {
+      /* `R120` — the form now shows the recipe that was actually stored.
+         `saveDraft` has always tidied on the way past: a title cleared to
+         nothing falls back to the old one, blank lines are dropped, and
+         since `R119` a count typed past the limit comes back to 40. Every
+         one of those is right, and none of them was ever shown back — type
+         300 into Serves and the notice correctly said "300 was saved as 40"
+         while the field went on reading 300. Told the right thing, shown
+         the wrong thing, and the box in front of them is the one a person
+         believes. Structural rather than a patch per field: re-seed from
+         what was kept, so the screen and the book cannot disagree. */
+      startDraft(updated);
       S.saved = true;
       /* The phone's copy is safe before a byte goes anywhere. */
       shareEdit(updated);

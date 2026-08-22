@@ -1100,6 +1100,89 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== After Save, the fields must show what was kept (R120) ==');
+  {
+    /* `saveDraft` has always tidied on the way past — a title cleared to
+       nothing falls back to the old one, blank ingredient lines are dropped,
+       and since `R119` a count typed past the limit is brought back to 40.
+       Every one of those is right. None of them was ever shown back.
+
+       Measured: type 300 into Serves, press Save. The notice says *"300 was
+       saved as 40"* — correct, `R119` — and the field goes on reading
+       **300**. The reader is told the right thing and shown the wrong thing
+       at the same moment, and the one they will believe is the box in front
+       of them. Clear a title and it is worse: the field reads empty, the
+       book has quietly kept the old name, and nothing says so at all.
+
+       The fix is structural rather than one patch per field: a save that
+       tidied anything must leave the form showing the recipe that was
+       actually stored, so what is on screen and what is in the book cannot
+       disagree. `startDraft` already builds exactly that form. */
+    const TIDY = { id: 'tidy-120', title: 'Real Title', category: 'Dinner',
+      contributor: 'Joan', servings: 4,
+      ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pT = await ctxT.newPage();
+    const tErrs = []; pT.on('pageerror', e => tErrs.push(e.message));
+    await pT.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), [TIDY]);
+
+    const save = async () => {
+      await pT.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pT.waitForTimeout(700);
+    };
+    const stored = () => pT.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0] || {});
+
+    await pT.goto(B + '/index.html#tidy-120');
+    await pT.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    await pT.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pT.waitForSelector('#e-title', { timeout: 5000 }).catch(() => {});
+
+    /* A count brought back to the limit. */
+    await pT.fill('#e-serves', '300');
+    await save();
+    chk('the serving field shows the count that was kept, not the one refused',
+      (await pT.inputValue('#e-serves')) === '40',
+      JSON.stringify(await pT.inputValue('#e-serves')));
+    chk('and the book agrees with it', (await stored()).servings === 40,
+      String((await stored()).servings));
+    chk('the button still reads as saved, because it was',
+      /saved/i.test(await pT.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        return b ? b.innerText.trim() : '';
+      })), await pT.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        return b ? b.innerText.trim() : 'NO BUTTON';
+      }));
+
+    /* A name cleared to nothing: the book keeps the old one, so the form has
+       to admit that rather than showing an empty box. */
+    await pT.fill('#e-title', '');
+    await save();
+    chk('a name cleared away comes back in the field, because it came back in the book',
+      (await pT.inputValue('#e-title')) === 'Real Title',
+      JSON.stringify(await pT.inputValue('#e-title')));
+    chk('and the book still holds it', (await stored()).title === 'Real Title',
+      JSON.stringify((await stored()).title));
+
+    /* And an ordinary edit is untouched by any of it. */
+    await pT.fill('#e-title', 'A Better Title');
+    await save();
+    chk('an ordinary change still saves and still shows what it saved',
+      (await stored()).title === 'A Better Title' &&
+      (await pT.inputValue('#e-title')) === 'A Better Title',
+      JSON.stringify([(await stored()).title, await pT.inputValue('#e-title')]));
+
+    chk('nothing threw', tErrs.length === 0, tErrs.join(' | '));
+    await ctxT.close();
+  }
+
   console.log('\n== Editing a recipe must not quietly rewrite a count nobody touched (R119) ==');
   {
     /* `R97` settled that a recipe with NO count must not gain one by being
