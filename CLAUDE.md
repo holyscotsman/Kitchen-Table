@@ -514,7 +514,13 @@ And `tests/sec.js` caught the new helper writing a raw `style=` within
 minutes of it existing: every caller passes a literal, but the rule is that
 an attribute built by concatenation is escaped, so nobody has to re-derive
 per call site whether that particular value can be reached by anything a
-person typed.
+person typed. `R114` then closed the older half of the same gap: `R54`'s
+exemption list calls `id`, `act` and `cls` "literals passed by the caller",
+which is an assertion about **call sites** that nothing verified — one
+`tagsFieldHtml(r.id, …)` written later would leave the suite green while a
+hand-edited id went unescaped into an `id=` and a `for=`. Every such call
+site is now checked to pass a real literal, and a local `var cls = …` is
+checked to read no property. An exemption allowed to drift is a hole.
 
 **One known mismatch, recorded rather than fixed.** The app treats a
 serving count as optional — `R97` made sure a recipe without one does not
@@ -579,8 +585,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1344 functional checks** across eleven
-suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 53,
+The suite after the video arc: **1347 functional checks** across eleven
+suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 201, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
