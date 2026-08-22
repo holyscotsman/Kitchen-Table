@@ -3195,6 +3195,127 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       /class="/.test(emitted), 'no class attributes found');
   }
 
+  console.log('\n== The provenance line says where a recipe actually came from (R128) ==');
+  {
+    /* Every recipe in the handoff carries a `source` that is the name of
+       the note Joan's screenshot came from — "Chicken fritters", "BBQ steak
+       times" — and the recipe page prints it as "From Joan's screenshots ·
+       <name>", which is true of all 48 of them.
+
+       It prints exactly that for every OTHER recipe too, and the app has
+       three import paths that write a `source` of their own: a link import
+       and a video import store the URL, the photo path stores "Read from a
+       photo", the paste box stores "Pasted text". So a recipe imported from
+       a cooking site reads "From Joan's screenshots ·
+       https://cooking.example.com/…" — Joan credited for somebody else's
+       recipe, in the one book where whose recipe it is IS the point. The
+       contributor split was corrected once for exactly this reason.
+
+       There is no field for the reader to fix it with either: `source` is
+       written by the import paths and is not on the Edit form. */
+    const sourceFor = async (source) => {
+      const ctx2 = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
+      await ctx2.addInitScript((src) => {
+        localStorage.setItem('kt.recipes', JSON.stringify([{
+          id: 'probe', title: 'Probe', category: 'Dinner', contributor: 'Joan',
+          servings: 4, ingredients: ['1 cup flour'], steps: ['Mix.'], source: src }]));
+      }, source);
+      const p2 = await ctx2.newPage();
+      await p2.goto(B + '/index.html#probe');
+      await p2.waitForSelector('.r-title');
+      const line = await p2.evaluate(() => {
+        const e = document.querySelector('.sourceline');
+        return e ? e.textContent.replace(/\s+/g, ' ').trim() : '';
+      });
+      await ctx2.close();
+      return line;
+    };
+
+    const note = await sourceFor('Chicken fritters');
+    chk('a note out of the handoff still says where it came from',
+      /Joan’s screenshots/.test(note) && /Chicken fritters/.test(note), note);
+
+    const link = await sourceFor('https://cooking.example.com/recipes/soup?x=1');
+    chk('a recipe imported from a website is not credited to Joan’s screenshots',
+      !/Joan’s screenshots/.test(link), link);
+    chk('and it names the site it did come from, not the whole address',
+      /cooking\.example\.com/.test(link) && !/\/recipes\/soup/.test(link), link);
+
+    const vid = await sourceFor('https://www.youtube.com/watch?v=abc123');
+    chk('nor is one imported from a video',
+      !/Joan’s screenshots/.test(vid), vid);
+    chk('and the www. is not read out to somebody using a screen reader',
+      /youtube\.com/.test(vid) && !/www\./.test(vid), vid);
+
+    const photo = await sourceFor('Read from a photo');
+    chk('a photo import says it was read from a photo, and nothing more',
+      /Read from a photo/.test(photo) && !/Joan’s screenshots/.test(photo), photo);
+
+    const pasted = await sourceFor('Pasted text');
+    chk('and pasted text says that',
+      /[Pp]asted text/.test(pasted) && !/Joan’s screenshots/.test(pasted), pasted);
+
+    chk('a recipe with no source line at all shows none',
+      (await sourceFor('')) === '', await sourceFor(''));
+
+    /* Shortening to the site is only defensible if the whole address is
+       still somewhere the reader can reach. It is: the copy that leaves the
+       phone carries it in full. Checked, rather than asserted in a comment. */
+    {
+      const ctx3 = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx3.route('**/*.onrender.com/**', r => r.abort('failed'));
+      await ctx3.addInitScript(() => {
+        localStorage.setItem('kt.recipes', JSON.stringify([{
+          id: 'probe', title: 'Probe', category: 'Dinner', contributor: 'Joan',
+          servings: 4, ingredients: ['1 cup flour'], steps: ['Mix.'],
+          source: 'https://cooking.example.com/recipes/soup?x=1' }]));
+      });
+      const p3 = await ctx3.newPage();
+      await p3.goto(B + '/index.html#probe');
+      await p3.waitForSelector('.r-title');
+      await p3.evaluate(() => {
+        window.__copied = null;
+        navigator.share = () => Promise.reject(
+          Object.assign(new Error('nope'), { name: 'NotAllowedError' }));
+        Object.defineProperty(navigator, 'clipboard', { configurable: true,
+          value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+      });
+      await p3.click('[data-act="share"]').catch(() => {});
+      await p3.waitForTimeout(500);
+      const copied = await p3.evaluate(() => window.__copied || '');
+      await ctx3.close();
+      chk('the whole address still goes out with the recipe, so the way back is not lost',
+        copied.includes('https://cooking.example.com/recipes/soup?x=1'),
+        copied.split('\n').filter((l) => /Source/i.test(l)).join(' | ') || copied.slice(0, 80));
+    }
+
+    /* The line is one of two shapes, and which one is decided by the value.
+       Every writer of `source` in the app has to produce a value this can
+       tell apart, or the "it came out of the handoff" branch starts
+       swallowing new kinds of import. */
+    const fs2 = require('fs');
+    const path2 = require('path');
+    const appSrc2 = fs2.readFileSync(path2.join(__dirname, '..', 'app.js'), 'utf8');
+    const writers = [...appSrc2.matchAll(/(?:^|[^\w.])(?:d|draft|recipe)\.source\s*=\s*([^;]+);/g)]
+      .map((m) => m[1].trim());
+    chk('the scan found the places that write a source', writers.length >= 3,
+      writers.join(' | '));
+    chk('and every one of them writes a URL or a phrase the page knows',
+      writers.every((w) => /S\.addUrl|url|SOURCE_SELF\.|asText\(s\.source\)|d\.source\.trim/.test(w)),
+      writers.join(' | '));
+    /* The phrases are named in one place so the writer and the line that
+       prints them cannot drift — a literal on either side would leave this
+       suite green while the page fell back to crediting Joan. */
+    chk('the two phrases the app writes itself are named once, not typed twice',
+      (appSrc2.match(/"Read from a photo"/g) || []).length === 1 &&
+      (appSrc2.match(/"Pasted text"/g) || []).length === 1,
+      'photo=' + (appSrc2.match(/"Read from a photo"/g) || []).length +
+      ' pasted=' + (appSrc2.match(/"Pasted text"/g) || []).length);
+    chk('and the line that prints them reads those names',
+      /v === SOURCE_SELF\.photo \|\| v === SOURCE_SELF\.pasted/.test(appSrc2));
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);

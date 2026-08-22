@@ -24,6 +24,12 @@ jobs:
     # can be written over by another's of the same name, and no amount of
     # reading its source answers that. A throwaway Postgres lets the shipped
     # statement be run for real on every pull request.
+    #
+    # The health check names the database on purpose: `pg_isready -U kt`
+    # alone asks for a database called `kt`, which does not exist here, so
+    # it still reported ready while writing a FATAL line every five seconds
+    # — about 130 of them into the run's log, on top of whatever a real
+    # failure would have had to say (`R128`).
     services:
       postgres:
         image: postgres:16
@@ -33,7 +39,7 @@ jobs:
           POSTGRES_DB: kt_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U kt"
+          --health-cmd "pg_isready -U kt -d kt_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

@@ -1257,6 +1257,43 @@
     return out;
   }
 
+  /* ------------------------------------------------- where a recipe is from
+   *
+   * `R128`. Every recipe in the handoff carries a `source` that is the name
+   * of the note Joan's screenshot came from — "Chicken fritters", "BBQ steak
+   * times" — and the recipe page printed "From Joan's screenshots · <name>",
+   * which is true of all 48 of them and of nothing else. It printed it for
+   * every OTHER recipe too, and three import paths write a source of their
+   * own, so a recipe pulled off a cooking site read *"From Joan's
+   * screenshots · https://cooking.example.com/…"*: Joan credited for
+   * somebody else's recipe, in the one book where whose recipe it is is the
+   * whole point. There is no field to fix it with either — `source` is
+   * written by the import paths and is not on the Edit form.
+   *
+   * The set of writers is closed, which is what makes reading the value
+   * safe: a URL (link import, video import, or a pasted address), one of
+   * the two phrases below, or a note name out of the handoff. The phrases
+   * are named here so the writer and the line that prints them cannot
+   * drift, and a check holds every writer to producing one of the three.
+   *
+   * The address is shortened to its site on screen — a 120-character URL at
+   * this size is a wall, and it is not tappable by design. The whole thing
+   * survives in Share and in "Download as text", which is where somebody
+   * goes to find their way back to it. */
+  var SOURCE_SELF = { photo: "Read from a photo", pasted: "Pasted text" };
+
+  function sourceLine(raw) {
+    var v = String(raw === undefined || raw === null ? "" : raw).trim();
+    if (!v) return "";
+    if (/^https?:\/\//i.test(v)) {
+      var host = "";
+      try { host = new URL(v).hostname.replace(/^www\./i, ""); } catch (e) {}
+      return "From " + (host || v);
+    }
+    if (v === SOURCE_SELF.photo || v === SOURCE_SELF.pasted) return v;
+    return "From Joan’s screenshots · " + v;
+  }
+
   function orderFields(recipe) {
     var out = {};
     FIELD_ORDER.forEach(function (k) {
@@ -2340,8 +2377,9 @@
 
     h += noticeHtml("notice", "margin-top:16px");
 
-    if (r.source) {
-      h += '<p class="sourceline">From Joan’s screenshots · ' + esc(r.source) + "</p>";
+    var from = sourceLine(r.source);
+    if (from) {
+      h += '<p class="sourceline">' + esc(from) + "</p>";
     }
 
     h += "</div>";
@@ -5192,7 +5230,7 @@
     if (!d.ingredients.length) { d.ingredients = [""]; d.flagged.push("Ingredients — none were picked up."); }
     if (!d.steps.length) { d.steps = [""]; d.flagged.push("Steps — none were picked up."); }
     d.notes = notes.join(" ");
-    d.source = "Read from a photo";
+    d.source = SOURCE_SELF.photo;
     return capDraft(d);
   }
 
@@ -6187,7 +6225,7 @@
       var text = (S.addPaste || "").trim();
       if (!text) return;
       var draft = draftFromText(text);
-      draft.source = (S.addUrl || "").trim() || "Pasted text";
+      draft.source = (S.addUrl || "").trim() || SOURCE_SELF.pasted;
       S.addDraft = draft;
       S.addStep = "review";
       S.addError = "";
