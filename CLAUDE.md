@@ -1263,11 +1263,53 @@ so, the week, the passphrase — in `R114`'s shape, so a sixth store added later
 fails by name instead of quietly inheriting whichever answer its author
 assumed. That is the check that would have caught this one.
 
+### A poke that never happened still spent the ninety seconds
+
+`R137`, and the first thing this loop has found on the path that publishes
+to everyone.
+
+An edit lands in the database and then asks `db-sync` to run, so the family
+sees it in minutes rather than overnight. That ask is **debounced** — and
+the debounce is not a rate limit. Its whole justification, written at the
+top of `backend/lib/publish.js`, is that *"the sync regenerates the whole
+file, so a single run covers everything that landed before it"*: it is a
+**promise that a run is already covering this**.
+
+`lastAt = now` was set before the request and never given back, so a poke
+GitHub refused — an expired token, a 5xx, a name that would not resolve —
+held the window for ninety seconds exactly as though it had succeeded.
+Measured: two edits twenty seconds apart with GitHub unreachable make
+**one** API call, and the second writer is told **"debounced"** — *a run is
+already on its way for you* — when there is none. Both changes then wait
+for the nightly sync.
+
+Late-never-wrong is the direction this app errs in, and that is the point:
+it is meant to be the cost of a phone closing mid-burst, not the cost of one
+unlucky request. The claim stays **before** the request, because that is
+what stops two writes landing together from both calling GitHub; it is
+**given back** when the request did not land. A failure after a success
+restores the success rather than clearing it, so the window a real publish
+earned is not reopened.
+
+Every existing failure test passed `cooldownMs: 0`, which is exactly why the
+seam between *failing* and *debouncing* had never been looked at.
+
+**And the accessor that named a lie nothing read.** `lastSentAt()` was set
+for pokes that were never sent, its comment said *"for the tests and the
+health endpoint"*, and neither used it — so there was nowhere for the fault
+above to show. Health reported `publishes_on_change`, which only ever meant
+*a token is set*: a `KT_GH_TOKEN` that has stopped working reads exactly
+like one that works, while every change quietly waits for morning. It now
+also says when a publish last **landed** and why the most recent one did
+not, so a token that expires is discoverable instead of silent. The reason
+carries a status code and never the token, which is checked — health is a
+public page.
+
 ### Verified
 
-The suite after the video arc: **1595 functional checks** across eleven
+The suite after the video arc: **1611 functional checks** across eleven
 suites (kt 323, feat 75, add 113, relay 16, quick 76, polish 319, sec 56,
-plan 79, video 252, backend 271, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 252, backend 287, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
