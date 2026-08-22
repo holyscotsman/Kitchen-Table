@@ -376,6 +376,31 @@ dismissal for those is a different feature, not a corollary of this one.
 Both directions are mutation-tested: never clearing, and clearing
 everything, each fail by name.
 
+### One reader for a flag's field, and a tolerant one
+
+`R124`. `R122` and `R123` each learned to answer a flag by the field it
+names, and each did it with **its own copy** of the same expression. Two
+copies of one rule is the drift `R114` exists to stop — and this pair is
+worse than most, because the shape being parsed is written by a **language
+model**: `backend/lib/extract.js` asks for *"Field — what needs checking"*
+and then stores whatever comes back verbatim. Every other field in that
+function is coerced; flags alone are taken as typed. A model writing
+*"Servings: no count was found"* would produce a flag neither round could
+ever answer — `R122`'s permanent stale warning, back through a door nobody
+was watching.
+
+Fixed on the **reading** side rather than the writing one, deliberately.
+Flags come from four writers — the extraction model, the link parser, the
+photo parser, and a hand-edited `recipes.json` — so a list of field names
+kept on the server would be a fifth thing to hold in step with the app. One
+tolerant reader covers every writer and cannot drift from itself.
+
+The mutation testing earned its place here: dropping the separator entirely
+passed every check, because the prose case started with *"The"* and no field
+is named that. The gap was real — *"Steps taken after the oven were never
+shown"* would have read as an answered `Steps` flag and vanished. That case
+is pinned now, and the separator is load-bearing rather than decorative.
+
 ### Fixing a flagged field on the review screen kept the flag anyway
 
 `R123`, the sibling of `R122` on the screen built for exactly this job. The
@@ -800,8 +825,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1440 functional checks** across eleven
-suites (kt 301, feat 65, add 99, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1447 functional checks** across eleven
+suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
