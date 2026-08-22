@@ -840,6 +840,66 @@ async function freshPage(br, opts) {
     chk('nothing threw', off.errs.length === 0 && on.errs.length === 0);
   }
 
+  console.log('\n== The panic button had to stop over-promising (S08) ==');
+  {
+    /* "Undo all my changes on this phone" is what somebody presses when they
+       are worried, so its sentence has to be the most honest in the app.
+
+       It drops the local overlay and falls back to the published book. That
+       was the whole story until `S04`: a change sent to everyone IS the
+       published book now, so pressing this RESTORES it rather than removing
+       it. Someone could press the panic button believing a shared mistake
+       was gone while it sat on the website and on everyone else's phone.
+
+       Read from the dialog itself rather than from the source, because what
+       matters is the sentence a person is actually shown. */
+    const askedWith = async (key) => {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', r => r.abort('failed'));
+      await ctx.addInitScript((k) => {
+        /* The undo only appears once this phone has local changes. */
+        localStorage.setItem('kt.recipes', JSON.stringify([{
+          id: 'ninja-cookies', title: 'Ninja Cookies', category: 'Desserts',
+          contributor: 'Joan', servings: 12, ingredients: ['1 cup butter'],
+          steps: ['Bake.'] }]));
+        if (k) localStorage.setItem('kt.kitchenKey', JSON.stringify(k));
+      }, key);
+      const p = await ctx.newPage();
+      let asked = '';
+      p.on('dialog', d => { asked = d.message(); d.dismiss(); });
+      await p.goto(B + '/index.html#ninja-cookies');
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.evaluate(() => {
+        const b = document.querySelector('[data-act="reset-local"]');
+        if (b) b.click();
+      });
+      await p.waitForTimeout(500);
+      const stillThere = await p.evaluate(() => !!localStorage.getItem('kt.recipes'));
+      await ctx.close();
+      return { asked, stillThere };
+    };
+
+    const alone = await askedWith('');
+    chk('the undo still asks before doing anything', alone.asked.length > 40, alone.asked.slice(0, 60));
+    chk('and dismissing it changes nothing', alone.stillThere === true);
+    chk('on a phone that shares nothing, it promises what it always did',
+      /undoes everything changed, added, or removed on this phone/i.test(alone.asked));
+    chk('and says nothing about everyone, because there is no everyone',
+      !/sent to everyone/i.test(alone.asked), alone.asked.slice(-90));
+
+    const shares = await askedWith('family-secret');
+    chk('on a phone that shares, it warns what it cannot take back',
+      /will NOT take those back/i.test(shares.asked), shares.asked.slice(-160));
+    chk('and says what to do about those instead',
+      /Save again/i.test(shares.asked), shares.asked.slice(-90));
+    chk('while still saying what it DOES undo',
+      /undoes everything changed, added, or removed on this phone/i.test(shares.asked));
+    chk('and it never prints the passphrase into a dialog',
+      !shares.asked.includes('family-secret'));
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);

@@ -2377,11 +2377,34 @@
      other undo — a removed recipe is otherwise gone from this device for good.
      This puts it all back to the published file. */
   function resetLocal() {
+    /* `S08` — the panic button's promise, and what the `S` arc did to it.
+       This is the control somebody reaches for when they are worried, so
+       its sentence has to be the most honest one in the app.
+
+       It undoes what is on THIS PHONE by dropping the overlay and falling
+       back to the published book. That was the whole story until `S04`: a
+       change sent to everyone IS the published book now, so pressing this
+       restores it rather than removing it. The old wording — "undoes
+       everything changed, added, or removed on this phone" — would have
+       someone press it believing a shared mistake was gone, when it is
+       still on the website and on everyone else's phone.
+
+       "Anything already downloaded and committed is unaffected" gestured at
+       this and does not cover it: a person who shared with the passphrase
+       never downloaded or committed anything. So the sentence says which
+       kind of change this can reach, and what to do about the other kind. */
+    var shares = !!kitchenKey();
     if (!window.confirm(
       "Put every recipe back the way it is on the website?\n\n" +
       "This undoes everything changed, added, or removed on this phone. " +
       "Photos you have added are kept. Anything already downloaded and " +
-      "committed is unaffected."
+      "committed is unaffected." +
+      (shares
+        ? "\n\nChanges you already sent to everyone are part of the website " +
+          "now, so this will NOT take those back — it puts this phone back to " +
+          "match them. To undo one of those, open the recipe, put it right, " +
+          "and Save again."
+        : "")
     )) return;
     try { localStorage.removeItem(K.recipes); } catch (e) {}
     applyOverlay();
