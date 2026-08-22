@@ -197,8 +197,7 @@ img {
 [data-easy="on"] .cat-grid,
 [data-easy="on"] .cardgrid,
 [data-easy="on"] .topgrid,
-[data-easy="on"] .bodygrid,
-[data-easy="on"] .form-grid {
+[data-easy="on"] .bodygrid {
   grid-template-columns: 1fr !important;
 }
 
@@ -341,13 +340,6 @@ img {
   color: var(--dim);
   font-size: 19px;
   line-height: 1.35;
-}
-
-.main__marks {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
 }
 
 /* The logo lockup: mark + name on the left, per Jason. The mark is the steam
@@ -2067,13 +2059,6 @@ input[type="file"].input {
   margin-bottom: 10px;
 }
 
-.sheetbtn--acc {
-  min-height: 58px;
-  background: var(--acc);
-  border-color: var(--acc);
-  color: var(--acc-ink);
-}
-
 /* Sort menu — anchored under the tool row, not a bottom sheet. */
 .sortmenu {
   position: absolute;
@@ -2588,7 +2573,6 @@ input[type="file"].input {
 .actbtn--primary:focus-visible,
 .iconbtn[aria-pressed="true"]:focus-visible,
 .iconbtn.is-on:focus-visible,
-.sheetbtn--acc:focus-visible,
 .donebtn:focus-visible,
 .switch[aria-checked="true"]:focus-visible,
 .skip-link:focus-visible {

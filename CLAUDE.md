@@ -376,6 +376,24 @@ dismissal for those is a different feature, not a corollary of this one.
 Both directions are mutation-tested: never clearing, and clearing
 everything, each fail by name.
 
+### Every rule in the stylesheet is for something the app draws
+
+`R125`. `tokens.css` has been protected since `R48` — no colour may exist
+outside it. **Nothing protected the other direction**: a rule for a class the
+app stopped emitting stays forever, and the next person reading `style.css`
+cannot tell a live rule from a fossil. Three had accumulated — `.form-grid`
+(the app draws `.topgrid`/`.bodygrid`), `.main__marks` (never rendered), and
+`.sheetbtn--acc` with its entry in the shared focus-ring list. A stylesheet
+nobody can trust is one people work around rather than edit.
+
+Removed, and the gap closed the way `R48` closed its own: **enforced rather
+than remembered**. The exemption list is present and empty on purpose, with
+`R114`'s rule attached — a class built by concatenation could trip this
+honestly, and when the first one does it gets a name and a reason there
+rather than a loosened check. `tokens.css` is deliberately outside the scan:
+it is copied in verbatim from the handoff and is the one file this project
+does not get to tidy.
+
 ### One reader for a flag's field, and a tolerant one
 
 `R124`. `R122` and `R123` each learned to answer a flag by the field it
@@ -825,8 +843,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1447 functional checks** across eleven
-suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1450 functional checks** across eleven
+suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 275, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
