@@ -78,10 +78,17 @@ Press **Save**. The recipe is now in your phone's copy of the book.
 
 ## 4. Make it real for everyone
 
-Two ways, easiest first:
+Three ways, easiest first:
 
-**The easy way:** open any recipe, turn on **Edit** (the switch at the top),
-and press **"Download updated recipes.json"**. Your phone saves a file —
+**The easiest way, if the passphrase is set up:** in Edit mode there's a
+**Family passphrase** box. Put the family's passphrase in it once — just
+once, on that phone — and from then on pressing **Save** puts the change in
+everyone's copy as well as your own. The app tells you which happened, every
+time: if it says *saved on this phone*, it means only this phone, and the
+other two ways below still work.
+
+**The reliable way:** open any recipe, turn on **Edit** (the switch at the
+top), and press **"Download updated recipes.json"**. Your phone saves a file —
 send that file to Jason (text, email, AirDrop, anything). If you added
 photos, press **"Download photos"** too and send those along. Jason puts
 them in the book, and within a couple of minutes the site shows your recipe

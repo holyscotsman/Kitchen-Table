@@ -14,6 +14,7 @@
 "use strict";
 
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -24,6 +25,8 @@ const { serialQueue } = require("./lib/queue");
 const { makeLimiter } = require("./lib/ratelimit");
 const budget = require("./lib/budget");
 const db = require("./lib/db");
+const { makePublisher } = require("./lib/publish");
+const { makeWriteGate } = require("./lib/writegate");
 const { runJob } = require("./lib/pipeline");
 
 const PORT = parseInt(process.env.PORT, 10) || 8787;
@@ -338,6 +341,93 @@ async function acceptJob(req, res, id) {
   }
 }
 
+/* The write gate lives in lib/writegate.js so it can be proved rather than
+ * trusted. Ten wrong answers an hour per caller; no key configured means no
+ * writes from anybody, which is the safe direction for the unset state. */
+const writeGate = makeWriteGate(process.env.KT_WRITE_KEY || "",
+  makeLimiter(10, 60 * 60 * 1000));
+
+/* What turns a write into something everyone can see. See lib/publish.js:
+ * a failed poke never fails the write, because the recipe is already in the
+ * database and the nightly run will publish it either way. */
+const publisher = makePublisher({
+  token: process.env.KT_GH_TOKEN || "",
+  repo: process.env.KT_REPO || "holyscotsman/Kitchen-Table",
+  log: (m) => console.log(m)
+});
+
+/* --------------------------------------------------------------- an edit
+ *
+ * The one thing the import path deliberately will not do. `acceptJob`
+ * suffixes on an id collision because two people accepting the same draft
+ * must not silently replace each other's work — there, a duplicate the
+ * family can see beats a recipe quietly gone.
+ *
+ * An edit is the opposite instruction. Someone opened THIS recipe, changed
+ * it and pressed Save; writing it anywhere but over that row would be the
+ * bug. So this overwrites by id, and the id is taken from the PATH — the
+ * body may not redirect the write somewhere else, which is how an edit to
+ * one recipe would land on another.
+ *
+ * Upsert rather than update: a recipe that only lives in recipes.json and
+ * has never been through the database is the normal state of all 48 of
+ * them, and editing one is not a reason to fail.
+ */
+async function putRecipe(req, res, id) {
+  const refusal = writeGate.refusalFor(req.headers, callerIp(req), Date.now());
+  if (refusal) return send(res, refusal.status, { error: refusal.error });
+
+  const body = await bodyOr400(req, res);
+  if (!body) return;
+  const v = validateRecipe(body.recipe);
+  if (v.error) return send(res, 400, { error: v.error });
+  const r = v.recipe;
+  if (r.id !== id) {
+    return send(res, 400, { error: "that recipe says it is " + r.id + ", but the address says " + id });
+  }
+
+  await sql`insert into kitchen.contributors (name) values (${r.contributor})
+            on conflict (name) do nothing`;
+  await sql`
+    insert into kitchen.recipes
+      (id, title, category, contributor_id, servings, prep_time, cook_time,
+       ingredients, steps, notes, flagged, source, image, position)
+    values
+      (${r.id}, ${r.title}, ${r.category},
+       (select id from kitchen.contributors where name = ${r.contributor}),
+       ${r.servings}, ${r.prepTime || null}, ${r.cookTime || null},
+       ${JSON.stringify(r.ingredients)}, ${JSON.stringify(r.steps)},
+       ${r.notes || null}, ${JSON.stringify(r.flagged)},
+       ${r.source || null}, ${r.image || null},
+       (select coalesce(max(position), -1) + 1 from kitchen.recipes))
+    on conflict (id) do update set
+      title = excluded.title, category = excluded.category,
+      contributor_id = excluded.contributor_id, servings = excluded.servings,
+      prep_time = excluded.prep_time, cook_time = excluded.cook_time,
+      ingredients = excluded.ingredients, steps = excluded.steps,
+      notes = excluded.notes, flagged = excluded.flagged,
+      source = excluded.source, image = excluded.image,
+      updated_at = now()`;
+  /* position is deliberately NOT in the update list: it is what "recently
+     added" sorts on, and editing a recipe is not adding it. Fixing a typo
+     must not jump a recipe to the top of the family's list. */
+
+  /* Tags are a join table, so the edit is a replace: a tag someone took off
+     has to come off here too, or removing one would never stick. */
+  await sql`delete from kitchen.recipe_tags where recipe_id = ${r.id}`;
+  for (const t of r.tags) {
+    await sql`insert into kitchen.tags (name) values (${t}) on conflict (name) do nothing`;
+    await sql`insert into kitchen.recipe_tags (recipe_id, tag_id)
+              values (${r.id}, (select id from kitchen.tags where name = ${t}))
+              on conflict do nothing`;
+  }
+  /* Deliberately not awaited into the response: the write is done and the
+     family's copy is safe. Whether the publish fires now or the nightly run
+     picks it up changes when they see it, not whether. */
+  const poked = await publisher.poke();
+  send(res, 200, { ok: true, id: r.id, publishing: poked.sent });
+}
+
 /* ----------------------------------------------------------------- server */
 
 const server = http.createServer((req, res) => {
@@ -347,8 +437,8 @@ const server = http.createServer((req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "content-type",
+      "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+      "access-control-allow-headers": "content-type, x-kitchen-key",
       "access-control-max-age": "86400"
     });
     return res.end();
@@ -365,12 +455,16 @@ const server = http.createServer((req, res) => {
         uptime_s: Math.round(process.uptime()),
         queue_pending: queue.size(),
         pot_provider: potUp,
+        accepts_changes: writeGate.configured,
+        publishes_on_change: publisher.configured,
         missing: [!sql && "KT_DB", !anthropic && "ANTHROPIC_API_KEY",
           !ctx.groqKey && "GROQ_API_KEY (optional)",
-          !ctx.ytKey && "YT_API_KEY (optional — rescues robot-blocked YouTube imports)"].filter(Boolean)
+          !ctx.ytKey && "YT_API_KEY (optional — rescues robot-blocked YouTube imports)",
+          !writeGate.configured && "KT_WRITE_KEY (optional — until it is set, nobody can change a recipe for everyone)",
+          !publisher.configured && "KT_GH_TOKEN (optional — without it a change waits for the nightly sync)"].filter(Boolean)
       });
     }
-    if (!sql && p.indexOf("/api/import") === 0) {
+    if (!sql && (p.indexOf("/api/import") === 0 || p.indexOf("/api/recipes") === 0)) {
       return send(res, 503, { error: "The kitchen server isn’t fully set up yet — its database connection (KT_DB) is missing." });
     }
     let m;
@@ -381,6 +475,9 @@ const server = http.createServer((req, res) => {
     }
     if ((m = p.match(/^\/api\/import\/jobs\/(\d+)\/accept$/)) && req.method === "POST") {
       return acceptJob(req, res, parseInt(m[1], 10));
+    }
+    if ((m = p.match(/^\/api\/recipes\/([a-z0-9-]{1,80})$/)) && req.method === "PUT") {
+      return putRecipe(req, res, m[1]);
     }
     send(res, 404, { error: "not found" });
   })();
