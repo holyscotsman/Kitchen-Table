@@ -20,6 +20,23 @@ jobs:
   suites:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # `R127` — the write endpoint's SQL decides whether one person's recipe
+    # can be written over by another's of the same name, and no amount of
+    # reading its source answers that. A throwaway Postgres lets the shipped
+    # statement be run for real on every pull request.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kt
+          POSTGRES_PASSWORD: kt
+          POSTGRES_DB: kt_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U kt"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -65,3 +82,12 @@ jobs:
       - name: Run all suites
         working-directory: tests
         run: bash run.sh
+
+      # Kept out of run.sh because it needs something a laptop may not have.
+      # KT_SQL_REQUIRED turns a skip into a failure here, where the database
+      # is guaranteed — a gate that silently does nothing is worse than none.
+      - name: Run the SQL gate against a real Postgres
+        env:
+          KT_TEST_DB: postgres://kt:kt@127.0.0.1:5432/kt_test
+          KT_SQL_REQUIRED: '1'
+        run: node tests/sql-live.js

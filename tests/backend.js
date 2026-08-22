@@ -1046,6 +1046,79 @@ const { runJob, computeFps } = lib('pipeline');
       /api\/recipes"\) === 0/.test(src) || /indexOf\("\/api\/recipes"\)/.test(src));
   }
 
+  console.log('\n== A create must not overwrite; an edit must (R127) ==');
+  {
+    /* `S09` sent a newly typed recipe through the same call as an edit, and
+       `putRecipe` overwrites by design. The two are opposite instructions:
+       an edit says "someone opened THIS recipe and changed it", while a
+       create's id was minted by `slugify(title)` against the phone's own
+       copy of the book — so an id already in use belongs to somebody else's
+       recipe, and writing over it destroys one.
+
+       `acceptJob` had answered this from the day it was built. The rule now
+       lives in one place so the two cannot drift. */
+    const { freeRecipeId } = require('../backend/lib/ids');
+    const fakeSql = (taken) => {
+      const seen = new Set(taken);
+      const f = (strings, ...vals) => Promise.resolve(seen.has(vals[0]) ? [{ one: 1 }] : []);
+      f.asked = [];
+      return (strings, ...vals) => { f.asked.push(vals[0]); return f(strings, ...vals); };
+    };
+
+    chk('a free name is used as it is', await freeRecipeId(fakeSql([]), 'shortbread') === 'shortbread');
+    chk('a taken one is suffixed rather than overwritten',
+      await freeRecipeId(fakeSql(['shortbread']), 'shortbread') === 'shortbread-2');
+    chk('and keeps counting past the second',
+      await freeRecipeId(fakeSql(['shortbread', 'shortbread-2']), 'shortbread') === 'shortbread-3');
+    chk('it suffixes the ORIGINAL, so nothing turns into name-2-2',
+      await freeRecipeId(fakeSql(['shortbread', 'shortbread-2', 'shortbread-3']), 'shortbread')
+        === 'shortbread-4');
+    {
+      /* A `while` around a database call with no ceiling is a hang waiting
+         for a pathological table, and this one is reachable by anybody
+         holding the passphrase. */
+      const every = { has: () => true };
+      const forever = (strings, ...vals) => Promise.resolve([{ one: 1 }]);
+      const out = await freeRecipeId(forever, 'x');
+      chk('and it stops rather than looping for ever on a table that says yes to everything',
+        typeof out === 'string' && out.length < 40, String(out));
+    }
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    const put = src.slice(src.indexOf('async function putRecipe'), src.indexOf('/* ---', src.indexOf('async function putRecipe')));
+    const accept = src.slice(src.indexOf('async function acceptJob'), src.indexOf('async function putRecipe'));
+    chk('the write endpoint can be told this is a new recipe',
+      /async function putRecipe\(req, res, id, more, isNew\)/.test(put), 'no isNew parameter');
+    chk('and the route reads it off the address',
+      /u\.searchParams\.get\("new"\) === "1"/.test(src), 'route does not pass new');
+    chk('a create looks for a free name first',
+      /if \(isNew\) rowId = await freeRecipeId\(sql, r\.id\)/.test(put), 'no free-id lookup');
+    chk('and the row it writes is the free one, not the one it was handed',
+      /values\s*\n\s*\(\$\{rowId\}/.test(put), 'insert does not use rowId');
+    chk('the tags follow the row that was actually written',
+      !/recipe_tags where recipe_id = \$\{r\.id\}/.test(put) &&
+      /recipe_tags where recipe_id = \$\{rowId\}/.test(put));
+    chk('and the phone is told where its copy went',
+      /id: rowId/.test(put), 'reply does not carry the id used');
+    /* The load-bearing half: with `new`, the conflict clause must not fire,
+       or freeRecipeId losing a race would still overwrite. */
+    chk('a create cannot fall through to the overwrite',
+      /where \$\{isNew \? 0 : 1\} = 1/.test(put), 'conflict update is unconditional');
+    chk('and knows whether it landed rather than assuming',
+      /returning id`\)\.length/.test(put), 'nothing checks the write happened');
+    chk('an edit still overwrites its own row', /on conflict \(id\) do update/.test(put));
+    chk('and still does not touch position',
+      !/position\s*=\s*excluded\.position/.test(put));
+
+    /* One rule, one home. Two copies of it are two chances to drift, which
+       is exactly how `S09` produced this bug in the first place. */
+    chk('the import path and the write path share the one rule',
+      /await freeRecipeId\(sql, r\.id\)/.test(accept) && /await freeRecipeId\(sql, r\.id\)/.test(put));
+    chk('and neither keeps a hand-rolled copy of it',
+      !/while \(\(await sql`select 1 from kitchen\.recipes/.test(src),
+      'a second suffixing loop is still in server.js');
+  }
+
   console.log('\n== A burst publishes once, after the last row is in (S11) ==');
   {
     /* `S11` sends a bulk tag change one recipe at a time. Without a way to
@@ -1065,9 +1138,9 @@ const { runJob, computeFps } = lib('pipeline');
     const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
     const put = src.slice(src.indexOf('async function putRecipe'), src.indexOf('/* ---', src.indexOf('async function putRecipe')));
     chk('the write endpoint can be told more is coming',
-      /async function putRecipe\(req, res, id, more\)/.test(put), 'no more parameter');
+      /async function putRecipe\(req, res, id, more[,)]/.test(put), 'no more parameter');
     chk('and the route reads it off the address',
-      /putRecipe\(req, res, m\[1\], u\.searchParams\.get\("more"\) === "1"\)/.test(src),
+      /putRecipe\(req, res, m\[1\],\s*u\.searchParams\.get\("more"\) === "1"/.test(src),
       'route does not pass more');
     chk('a deferred write does not poke at all',
       /more \? \{ sent: false[^}]*\} : await publisher\.poke\(\)/.test(put), 'poke not guarded');

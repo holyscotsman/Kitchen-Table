@@ -151,6 +151,12 @@ authentication). What bounds it: the server only does the three things
 above, one import runs at a time with a short queue cap, accepted recipes
 go through the same validation as `db/migrate.js`, and an id collision
 suffixes rather than overwrites, so nothing can be silently replaced.
+`PUT /api/recipes/:id` is the exception that proves it: an **edit** must
+land on the row it names, so it overwrites on purpose — but a recipe being
+**created** says `?new=1`, and that takes the same suffixing rule as an
+import, because its id was minted by a phone against its own copy of the
+book and may belong to somebody else's recipe by now. The reply carries the
+id actually used, so the phone can address its next edit at its own row.
 Accepting is claim-then-write: the ready-for-review list is shared on
 purpose, so two people can be looking at the same finished draft and both
 press Save, and one conditional update decides it rather than both
