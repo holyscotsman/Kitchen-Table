@@ -444,3 +444,36 @@ this arc adds a server on the **write** path only.
 **What it costs if reversed:** unset `KT_WRITE_KEY` and every write is
 refused again, with no code change and no redeploy — the app falls back to
 saving locally and saying so, which is exactly what it did before.
+
+
+## R129 — a shared video waits for one tap
+
+**Provisional; Jason can reverse it in one line.** `V04` had the share
+target submit a shared video by itself: share a Reel to Kitchen Table and
+the import starts, with nothing to press. That was one tap kinder and it
+skipped the only screen in the app that names **Render, Groq and
+Anthropic** — the three services the link goes to. On the app's primary
+path into the video importer, they were named *nowhere*: not before the
+request, not on the progress card that replaced the form.
+
+The rule it broke is written in the app, directly above that disclosure:
+*"Same disclosure discipline as the link importer (050): name every service
+the link touches before anything is sent."*
+
+Two other things follow from it, and both point the same way:
+
+- a share sheet is easy to fumble, and this is the one path where a fumble
+  starts a **paid** pipeline — yt-dlp, Groq, then a `claude-opus-5` call.
+  `backend/lib/budget.js` exists because those calls cost money;
+- the two ways into the video importer now behave the same way, which is
+  the `S09` lesson: a rule nobody could have guessed ("typing it in asks,
+  sharing it doesn't") is worse than either behaviour on its own.
+
+What is kept from `V04`: the share still lands **on the video form with the
+address already filled in**, so it is one tap and never a retype. The
+sentence above it says why it is waiting, so the screen does not read as
+broken.
+
+To reverse: put `submitVideo();` back in the boot handler's `shared.video`
+branch in place of the notice, and the two share tests in `tests/video.js`
+will say exactly what changed.

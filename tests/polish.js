@@ -2988,6 +2988,16 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       await pD.waitForTimeout(600);
       await collect();
     }
+    /* `R129` — the walkthrough now names the button that sends a shared
+       video, and that button lives one tap inside the Add screen. Same
+       judgement as `S11`: the walk goes to the control rather than the doc
+       dropping the quotes, because naming a control a reader must press is
+       exactly what this rule is for. */
+    await pD.goto(B + '/index.html#add');
+    await pD.waitForSelector('.pathbtn');
+    await pD.click('[data-act="add-path"][data-key="video"]');
+    await pD.waitForSelector('#a-vurl');
+    await collect();
     await pD.goto(B + '/index.html#chicken-cordon-bleu');
     await pD.waitForSelector('.r-title');
     await pD.click('[data-act="toggle-edit"]');

@@ -555,6 +555,180 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   }
 
   chk('no JS errors', errs.length===0, errs.join(' | '));
+  console.log('\n== The Add screen could not say anything (R129) ==');
+  {
+    /* Every other screen has had a notice slot since `S12` gathered the
+       four hand-written `if (S.notice)` blocks into `noticeHtml`. This one
+       never did — so `setNotice` on the Add screen wrote to a place nobody
+       rendered.
+
+       What that cost: `083` gave every review line a one-tap "send it to
+       the other list", because a parser guesses the ingredients/steps split
+       and on a photographed card it guesses wrong often. The tap moves the
+       line to the bottom of the other list — off screen on any real
+       import — and `setNotice("Moved to the instructions.")` was the whole
+       confirmation that it went anywhere. It reached `liveMessage`, so a
+       screen reader heard it; the eye got nothing at all. The reverse of
+       `S12`'s rule, and the wrong way round for a line that just vanished
+       from where the reader was looking. */
+    const ctxM = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxM.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    const pM = await ctxM.newPage();
+    const mErrs = []; pM.on('pageerror', (e) => mErrs.push(e.message));
+    await pM.goto(B + '/index.html#add');
+    await pM.waitForSelector('.pathbtn');
+    await pM.click('[data-act="add-path"][data-key="review"]');
+    await pM.waitForSelector('#a-title');
+    await pM.fill('#a-ing-0', '1 cup flour');
+    const before = await pM.locator('.addscreen .notice').count();
+    chk('nothing is said before anything happens', before === 0, String(before));
+    await pM.click('[data-act="amove"][data-key="ingredients"][data-i="0"]');
+    await pM.waitForTimeout(300);
+    const said = await pM.evaluate(() => {
+      const n = document.querySelector('.addscreen .notice');
+      return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+    chk('moving a review line to the other list now says so where it can be seen',
+      /Moved to the instructions/.test(said), said || '(nothing rendered)');
+    chk('and the line really moved',
+      (await pM.inputValue('#a-step-0')) === '1 cup flour' ||
+      (await pM.inputValue('#a-step-1')) === '1 cup flour',
+      await pM.inputValue('#a-step-0'));
+    chk('nothing threw', mErrs.length === 0, mErrs.join(' | '));
+    await ctxM.close();
+  }
+
+  console.log('\n== The photo that would not fit said so to nobody (R130) ==');
+  {
+    /* `saveAdd` stages a photo under a placeholder key, because the recipe's
+       id only exists once the title is known, and moves it across on Save:
+
+         setImage(id, staged).then(function (err) { if (err) setNotice(err); });
+         …
+         location.hash = "#" + id;
+
+       The comment above it says *"if the persist fails the recipe still
+       saves and the failure is said out loud"*. On a phone with IndexedDB
+       that holds: `idbPut` rejects on a database error event, which is a
+       task, so the sentence lands after the route change and shows on the
+       recipe page.
+
+       On the fallback path it does not. With no IndexedDB, `setImage`
+       returns `Promise.resolve(IMG_FULL_MSG)` — already resolved — so its
+       `.then` is a MICROTASK and runs before the `hashchange` the line
+       below queues. `onRoute` then does `S.notice = S.carry || ""` and
+       wipes it. The photo is gone and the only sentence that would have
+       said so is gone with it.
+
+       That fallback is not hypothetical: CLAUDE.md records localStorage
+       holding 12 of the 48 photos before `062` moved them, which is why the
+       "no room" message exists at all. */
+    /* The same one-pixel JPEG `tests/feat.js` uses for its photo path. */
+    const JPG = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKAAAf/Z';
+
+    /* Two shapes of full. `pair` is a phone where ONE copy of the photo
+       fits and two do not — which is the state the old write-then-delete
+       order manufactured out of a phone that had room. `any` is a phone
+       that is genuinely full: nothing more fits at all. */
+    const noRoom = async (killIdb, mode) => {
+      const ctxQ = await br.newContext({ ...devices['iPhone 13'] });
+      await ctxQ.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+      await ctxQ.addInitScript((opt) => {
+        const kill = opt.kill, mode = opt.mode;
+        if (kill) {
+          try {
+            Object.defineProperty(window, 'indexedDB',
+              { configurable: true, value: undefined });
+          } catch (e) {}
+        }
+        /* Models the quota exactly as `saveAdd` meets it. Attaching writes
+           ONE photo and fits. Save writes the same picture under the recipe's
+           real id while the staged copy is still there — TWO copies, in one
+           `kt.images` blob — and that is what does not fit. Nothing else is
+           touched, so the recipe itself saves, which is the case the
+           sentence exists for. */
+        const set = Storage.prototype.setItem;
+        let writes = 0;
+        Storage.prototype.setItem = function (k, v) {
+          if (k === 'kt.images') {
+            let n = 0;
+            try { n = Object.keys(JSON.parse(v) || {}).length; } catch (e) {}
+            writes++;
+            /* `pair`: two pictures at once are what does not fit.
+               `any`: the attach fits and nothing after it does — a delete,
+               which writes an empty store, still has to be allowed or the
+               phone could never make room again. */
+            const full = mode === 'pair' ? n >= 2 : (writes > 1 && n >= 1);
+            if (full) {
+              const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e;
+            }
+          }
+          return set.call(this, k, v);
+        };
+      }, { kill: killIdb, mode: mode });
+      const pQ = await ctxQ.newPage();
+      const qErrs = []; pQ.on('pageerror', (e) => qErrs.push(e.message));
+      await pQ.goto(B + '/index.html#add');
+      await pQ.waitForSelector('.pathbtn');
+      await pQ.click('[data-act="add-path"][data-key="review"]');
+      await pQ.waitForSelector('#a-title');
+      await pQ.fill('#a-title', 'Photo Quota Probe');
+      await pQ.fill('#a-ing-0', '1 cup flour');
+      await pQ.fill('#a-step-0', 'Mix it.');
+      await pQ.setInputFiles('#a-photo-file',
+        { name: 'p.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(JPG, 'base64') });
+      await pQ.waitForTimeout(900);
+      const atAttach = await pQ.evaluate(() => document.body.innerText);
+      await pQ.click('[data-act="add-save"]');
+      await pQ.waitForTimeout(1200);
+      const out = {
+        atAttach: atAttach,
+        hash: await pQ.evaluate(() => location.hash),
+        text: await pQ.evaluate(() => document.body.innerText),
+        saved: await pQ.evaluate(() => {
+          const raw = localStorage.getItem('kt.recipes');
+          return raw ? JSON.parse(raw).some((r) => r.title === 'Photo Quota Probe') : false;
+        }),
+        photos: await pQ.evaluate(() => {
+          const raw = localStorage.getItem('kt.images');
+          try { return Object.keys(JSON.parse(raw) || {}); } catch (e) { return []; }
+        }),
+        hero: await pQ.locator('.r-hero').count(),
+        errs: qErrs
+      };
+      await ctxQ.close();
+      return out;
+    };
+
+    const pair = await noRoom(true, 'pair');
+    chk('attaching the photo worked — one copy fits',
+      !/isn’t room/.test(pair.atAttach),
+      pair.atAttach.replace(/\s+/g, ' ').slice(0, 120));
+    chk('the recipe saved', pair.saved === true);
+    chk('and the reader is on it', /photo-quota-probe/.test(pair.hash), pair.hash);
+    /* The picture never needed twice the room; the old order asked for it. */
+    chk('and the photo came with it, because the move no longer needs two copies',
+      pair.photos.length === 1 && pair.photos[0] === 'photo-quota-probe' && pair.hero === 1,
+      JSON.stringify(pair.photos) + ' hero=' + pair.hero);
+    chk('so nothing is said, because nothing went wrong',
+      !/isn’t room on this phone/.test(pair.text),
+      pair.text.replace(/\s+/g, ' ').slice(0, 160));
+    chk('nothing threw', pair.errs.length === 0, pair.errs.join(' | '));
+
+    const full = await noRoom(true, 'any');
+    chk('on a phone that is genuinely full the recipe still saves',
+      full.saved === true);
+    chk('the photo is not there', full.photos.length === 0 && full.hero === 0,
+      JSON.stringify(full.photos) + ' hero=' + full.hero);
+    /* The half that was lost to a microtask: `setImage` resolves through an
+       already-resolved promise on this path, so its `.then` ran before the
+       hashchange and `onRoute` wiped the sentence. */
+    chk('and the reader is told, rather than finding a recipe with no picture',
+      /isn’t room on this phone/.test(full.text),
+      full.text.replace(/\s+/g, ' ').slice(0, 200));
+    chk('nothing threw there either', full.errs.length === 0, full.errs.join(' | '));
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);

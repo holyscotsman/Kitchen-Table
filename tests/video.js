@@ -252,23 +252,42 @@ async function freshPage(br, opts) {
     await ctx.close();
   }
 
-  console.log('\n== Share sheet → auto-submit ==');
+  console.log('\n== Share sheet → the video form, ready to send ==');
   {
+    /* `V04` had a shared video submit itself. `R129` stopped it one tap
+       short, because that tap is the only place the three services the link
+       touches are ever named — see the R129 block below for the measurement. */
     const { ctx, p, stub } = await freshPage(br, {
       polls: [{ id: 7, status: 'downloading', eta_seconds: 60, overrun: false }]
     });
     await p.goto(B + '/index.html?url=' + encodeURIComponent('https://youtu.be/shared1'));
-    await p.waitForSelector('.vprog', { timeout: 12000 });
-    chk('a shared video link submits itself', stub.posts.length === 1 && stub.posts[0].url === 'https://youtu.be/shared1');
+    /* Tolerant on purpose: if this ever auto-submits again the form never
+       appears, and a timeout that kills the suite hides the checks that say
+       WHY. They report instead. */
+    await p.waitForSelector('#a-vurl', { timeout: 12000 }).catch(() => {});
+    chk('a shared video link arrives ready to send, and not yet sent',
+      stub.posts.length === 0 && (await p.inputValue('#a-vurl')) === 'https://youtu.be/shared1',
+      JSON.stringify(stub.posts));
     chk('the query is consumed from the address bar', await p.evaluate(() => location.search) === '');
     chk('and the app is on #add', await p.evaluate(() => location.hash) === '#add');
+    await p.click('[data-act="video-submit"]', { timeout: 6000 }).catch(() => {});
+    await p.waitForSelector('.vprog', { timeout: 12000 }).catch(() => {});
+    chk('and one tap sends it', stub.posts.length === 1 && stub.posts[0].url === 'https://youtu.be/shared1',
+      JSON.stringify(stub.posts));
     await ctx.close();
   }
   {
     const { ctx, p, stub } = await freshPage(br, {});
     await p.goto(B + '/index.html?text=' + encodeURIComponent('Look! https://youtu.be/intext via app'));
-    await p.waitForSelector('.vprog, .notice--bad', { timeout: 12000 });
-    chk('the url is fished out of shared text', stub.posts.length === 1 && stub.posts[0].url === 'https://youtu.be/intext');
+    await p.waitForSelector('#a-vurl, .notice--bad', { timeout: 12000 }).catch(() => {});
+    chk('the url is fished out of shared text',
+      (await p.locator('#a-vurl').count()) === 1 &&
+      (await p.inputValue('#a-vurl')) === 'https://youtu.be/intext' && stub.posts.length === 0,
+      JSON.stringify(stub.posts));
+    await p.click('[data-act="video-submit"]', { timeout: 6000 }).catch(() => {});
+    await p.waitForSelector('.vprog', { timeout: 12000 }).catch(() => {});
+    chk('and that one sends on a tap too',
+      stub.posts.length === 1 && stub.posts[0].url === 'https://youtu.be/intext');
     await ctx.close();
   }
   {
@@ -990,6 +1009,79 @@ async function freshPage(br, opts) {
       quiet.errs.concat(sent.errs).join(' | '));
   }
 
+
+  console.log('\n== A shared video named nobody before it was sent (R129) ==');
+  {
+    /* The video form carries this comment, directly above its disclosure:
+       *"Same disclosure discipline as the link importer (050): name every
+       service the link touches before anything is sent."* And `tests/video.js`
+       has asserted since the day it was written that the form "names Render,
+       Groq and Anthropic before anything is sent".
+
+       The share target skips that form. `V04` decided a shared video
+       "submits itself", and the boot handler calls `submitVideo()` straight
+       out of `consumeSharedLink` — so on the app's PRIMARY path for the
+       video importer, the three services the link touches are named
+       **nowhere**: not before the request, not on the progress card that
+       replaces the form, not at all.
+
+       It is also the one path where a fumbled share sheet starts a paid
+       pipeline — yt-dlp, Groq, then a `claude-opus-5` call — with no way to
+       say no first. `backend/lib/budget.js` exists because those cost money.
+
+       So the share still lands on the video screen with the address already
+       filled, which is what `V04` was for; it just does not send until
+       somebody says so. One tap, and the two ways into the video importer
+       behave the same way — the `S09` lesson. Recorded as reversible in
+       DECISIONS.md. */
+    const shareIn = async (query) => {
+      const { ctx, p, stub } = await freshPage(br, {});
+      await p.goto(B + '/index.html' + query);
+      await p.waitForTimeout(900);
+      const out = {
+        posts: stub.posts.slice(),
+        url: await p.evaluate(() => {
+          const f = document.querySelector('#a-vurl');
+          return f ? f.value : null;
+        }),
+        text: await p.evaluate(() => document.body.innerText),
+        errs: p.errs.slice(), page: p, ctx: ctx, stub: stub
+      };
+      return out;
+    };
+
+    const shared = await shareIn('?url=' + encodeURIComponent('https://www.youtube.com/watch?v=abc123'));
+    chk('a shared video lands on the video screen with the address already there',
+      shared.url === 'https://www.youtube.com/watch?v=abc123', String(shared.url));
+    chk('and nothing has been sent anywhere yet',
+      shared.posts.length === 0, JSON.stringify(shared.posts));
+    chk('while every service the link would touch is named on screen',
+      /Render/.test(shared.text) && /Groq/.test(shared.text) && /Anthropic/.test(shared.text),
+      shared.text.replace(/\s+/g, ' ').slice(0, 160));
+    chk('and it says why it is waiting rather than looking broken',
+      /shared/i.test(shared.text) && /send/i.test(shared.text),
+      shared.text.replace(/\s+/g, ' ').slice(0, 200));
+
+    await shared.page.click('[data-act="video-submit"]', { timeout: 6000 }).catch(() => {});
+    await shared.page.waitForTimeout(700);
+    chk('one tap sends it, and only then',
+      shared.stub.posts.length === 1, JSON.stringify(shared.stub.posts));
+    chk('with the address that was shared',
+      (shared.stub.posts[0] || {}).url === 'https://www.youtube.com/watch?v=abc123',
+      JSON.stringify(shared.stub.posts[0]));
+    chk('nothing threw', shared.errs.length === 0, shared.errs.join(' | '));
+    await shared.ctx.close();
+
+    /* The other two share shapes were already a tap away, and must stay so. */
+    const link = await shareIn('?url=' + encodeURIComponent('https://cooking.example.com/soup'));
+    chk('a shared web page still waits for the reader too',
+      link.posts.length === 0 &&
+      (await link.page.evaluate(() => {
+        const f = document.querySelector('#a-url');
+        return f ? f.value : null;
+      })) === 'https://cooking.example.com/soup', JSON.stringify(link.posts));
+    await link.ctx.close();
+  }
 
   console.log('\n== A recipe born on this phone must not land on somebody else’s (R127) ==');
   {

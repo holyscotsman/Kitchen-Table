@@ -3789,6 +3789,13 @@
     if (S.addBusy) {
       h += '<p class="notice">' + esc(S.addBusy) + "</p>";
     }
+    /* `R129` — the one screen with nothing to say. Every other screen has
+       had a notice slot since `S12` gathered them into `noticeHtml`; this
+       one never did, so `setNotice` on the Add screen wrote to a place
+       nobody rendered. `R83`'s "Moved to the instructions." — the whole
+       confirmation that a review line went where it was sent — was
+       announced to a screen reader and shown to nobody. */
+    h += noticeHtml("notice", "");
 
     if (S.addStep === "choose") {
       /* Finished video imports wait here for whoever comes back (the spec's
@@ -4232,11 +4239,33 @@
 
     /* The photo was staged under a placeholder key because the id only exists
        once the title is known. Move it across now; if the persist fails the
-       recipe still saves and the failure is said out loud. */
+       recipe still saves and the failure is said out loud.
+
+       `R130` — two bugs lived in the three lines this replaces.
+
+       The move used to WRITE FIRST and delete after, so on the localStorage
+       path — the one a phone without IndexedDB takes, and the one the "no
+       room" message exists for at all — the store briefly held the same
+       picture twice. A photo that fitted once did not fit twice, so the
+       write failed, `setImage` dropped its copy, and the delete below then
+       took the staged one: **the picture was gone from the phone
+       altogether**, on a save the reader was told nothing about. Removing
+       first means one copy at a time and the same photo now fits.
+
+       And when it genuinely does not fit, the sentence has to survive the
+       navigation. `setImage` resolves through an already-resolved promise
+       on that path, so its `.then` is a MICROTASK and used to run before
+       the `hashchange` queued below — `onRoute` then wiped `S.notice` and
+       the reader arrived at a recipe with no picture and no reason. So the
+       move is finished before the route changes, and its message rides
+       across in `S.carry` (`R121`), which is what that key is for. */
     var staged = images()["__new__"];
+    var moved;
     if (staged) {
-      setImage(id, staged).then(function (err) { if (err) setNotice(err); });
       removeImage("__new__");
+      moved = setImage(id, staged);
+    } else {
+      moved = Promise.resolve("");
     }
 
     S.recipes = S.recipes.concat([recipe]);
@@ -4272,11 +4301,16 @@
     S.addDupe = null;
     S.addDupeOk = false;
     clearAddDraft();
-    if (addClamped) {
-      S.carry = "This book keeps serving counts up to 40, so " + addClamped +
-        " was saved as 40.";
-    }
-    location.hash = "#" + id;
+    var carried = addClamped
+      ? "This book keeps serving counts up to 40, so " + addClamped +
+        " was saved as 40."
+      : "";
+    /* Both sentences can be true at once, and each is about something the
+       reader typed or attached, so neither swallows the other. */
+    moved.then(function (imgErr) {
+      S.carry = [carried, imgErr].filter(Boolean).join(" ");
+      location.hash = "#" + id;
+    });
   }
 
   function slugify(text) {
@@ -4466,6 +4500,9 @@
   function submitVideo() {
     var url = (S.videoUrl || "").trim();
     S.addError = "";
+    /* `R129` — the share's "check the address, then send it" has been acted
+       on, so it stops being true the moment this runs. */
+    S.notice = "";
     if (!/^https?:\/\//i.test(url) ||
         !/youtube\.com|youtu\.be|instagram\.com|instagr\.am/i.test(url)) {
       S.addError = "That doesn’t look like a YouTube or Instagram link.";
@@ -6646,9 +6683,25 @@
       onRoute();
       if (shared) {
         if (shared.video) {
+          /* `R129` — it lands on the video form with the address filled and
+             waits for a tap. `V04` had it submit itself, which was one tap
+             kinder and skipped the only screen that names Render, Groq and
+             Anthropic — on the app's primary path into the video importer,
+             so the three services the link touches were named NOWHERE: not
+             before the request, not on the progress card that replaced the
+             form. The comment above that disclosure says the rule it broke:
+             *name every service the link touches before anything is sent*.
+
+             It is also the one path where a fumbled share sheet starts a
+             paid pipeline with no way to say no first — `backend/lib/budget.js`
+             exists because those calls cost money.
+
+             Provisional and reversible, recorded in DECISIONS.md. */
           S.addStep = "video";
           S.videoUrl = shared.url;
-          submitVideo();
+          setNotice("Shared from another app. Check the address below, then " +
+            "send it to the kitchen when you’re ready.");
+          render();
         } else {
           S.addStep = "link";
           if (shared.url) S.addUrl = shared.url;

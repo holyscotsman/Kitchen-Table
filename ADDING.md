@@ -67,7 +67,10 @@ in — pick whichever matches what you're holding:
 
 - **Android**: install the site (browser menu → *Add to home screen*), then
   the share button under any YouTube video or Instagram Reel → **Kitchen
-  Table**. The link lands in the importer and sends itself.
+  Table**. The link lands in the importer with the address already filled
+  in; check it and press **"Send it to the kitchen"**. It waits for that tap
+  on purpose — that screen is where the app tells you which services the
+  link goes to, and a share sheet is easy to fumble.
 - **iPhone**: Apple doesn't let websites join the share sheet, so paste the
   link into **From a video** — or set up a one-time Shortcut, about two
   minutes: open the **Shortcuts** app → **+** → name it "Send to Kitchen
