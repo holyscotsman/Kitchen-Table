@@ -1100,6 +1100,86 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== One dot between two things that are there (R118) ==');
+  {
+    /* The visible tail of the same assumption `R116` and `R117` chased. Four
+       lines were built as `a + " · " + b` with both halves taken on trust, so
+       a recipe with nobody named reads
+
+           Menu card    "Dinner ·"
+           Recipe       "· Dinner"
+           Search hit   "Dinner · · matches ingredient"
+           Main hero    an empty <p> (measured: zero height, so it costs no
+                        space — it is simply an element with nothing in it)
+
+       A stray separator is small on a screen and not small in a kitchen: this
+       app exists because someone reads it with low vision, and a leading
+       middle dot is punctuation noise where a name should be — and a screen
+       reader says it out loud.
+
+       The parts are already escaped where they are assembled (one of them
+       carries a `<span>` for the search match-note), so the helper joins and
+       does NOT escape. That is the one thing about it worth remembering. */
+    const BARE118 = { id: 'bare-118', title: 'Bare Recipe', category: 'Dinner',
+      ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+    const FULL118 = { id: 'full-118', title: 'Full Recipe', category: 'Baking',
+      contributor: 'Joan', servings: 4, prepTime: '10 min',
+      ingredients: ['2 eggs'], steps: ['Whisk.'] };
+
+    const ctxS = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pS = await ctxS.newPage();
+    const sErrs = []; pS.on('pageerror', e => sErrs.push(e.message));
+    await pS.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
+      [BARE118, FULL118]);
+
+    const textsOf = (sel) => pS.evaluate((s) => [...document.querySelectorAll(s)]
+      .map(e => e.textContent.replace(/\s+/g, ' ').trim()), sel);
+    /* A separator with nothing on one side of it. */
+    const dangling = (t) => /^·|·\s*$|·\s*·/.test(t);
+
+    await pS.goto(B + '/index.html#menu');
+    await pS.waitForTimeout(800);
+    const metas = await textsOf('.rcard__meta');
+    chk('no card ends or starts on a separator',
+      metas.length === 2 && !metas.some(dangling), JSON.stringify(metas));
+    chk('and the complete one still reads course then cook',
+      metas.some(t => /Baking · Joan/.test(t)), JSON.stringify(metas));
+
+    await pS.goto(B + '/index.html#bare-118');
+    await pS.waitForTimeout(800);
+    const eyebrow = (await textsOf('.r-eyebrow'))[0] || '';
+    chk('a recipe with nobody named does not open on a stray dot',
+      !dangling(eyebrow) && /Dinner/.test(eyebrow), JSON.stringify(eyebrow));
+
+    await pS.goto(B + '/index.html#full-118');
+    await pS.waitForTimeout(800);
+    const eyebrow2 = (await textsOf('.r-eyebrow'))[0] || '';
+    chk('and one that names somebody still says both',
+      /Joan · Baking/.test(eyebrow2), JSON.stringify(eyebrow2));
+
+    await pS.goto(B + '/index.html');
+    await pS.waitForTimeout(800);
+    const heroMeta = await pS.evaluate(() => {
+      const e = document.querySelector('.hero__meta');
+      return e ? { text: e.textContent.trim(), height: e.getBoundingClientRect().height } : null;
+    });
+    chk('the front page does not keep a line for a name it has not got',
+      heroMeta === null || heroMeta.text !== '',
+      JSON.stringify(heroMeta));
+
+    /* The search match-note rides on the same line, and used to be appended
+       with its own separator. */
+    await pS.goto(B + '/index.html#menu?q=flour');
+    await pS.waitForTimeout(900);
+    const hits = await textsOf('.rcard__meta');
+    chk('a card matched on its ingredients still says so, without a stray dot',
+      hits.length >= 1 && !hits.some(dangling) && hits.some(t => /matches/i.test(t)),
+      JSON.stringify(hits));
+
+    chk('nothing threw', sErrs.length === 0, sErrs.join(' | '));
+    await ctxS.close();
+  }
+
   console.log('\n== The copy that leaves the phone must be as honest as the screen (R117) ==');
   {
     /* `R97` taught every screen to ask whether the book actually says how
