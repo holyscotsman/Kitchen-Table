@@ -13,6 +13,9 @@
  */
 const fs = require('fs');
 const path = require('path');
+/* One list of the app's own addresses, shared with the wire validator so
+   the two boundaries cannot disagree about which words are taken (`R132`). */
+const { ROUTE_WORDS } = require('../backend/lib/validate');
 
 const CATS = ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Sides',
   'Snacks', 'Baking', 'Desserts', 'Cocktails', 'Drinks'];
@@ -47,6 +50,14 @@ function validate(list) {
     const at = `recipe #${i} (${r && r.id ? r.id : 'no id'})`;
     if (!r || typeof r !== 'object') die(`${at} is not an object`);
     if (!r.id || !/^[a-z0-9-]+$/.test(r.id)) die(`${at}: bad id`);
+    /* `R132` — a recipe id is the whole address the app reads it at
+       (`#chicken-fritters`), so an id that IS one of the app's own five
+       screens is a recipe it can store and list but never open. The app
+       moves one out of the way at its own boundary; refusing it here keeps
+       it out of the database, so no phone has to keep renaming it at every
+       boot. `backend/lib/validate.js` holds the same line on the wire, and
+       the two must not disagree about which words are taken. */
+    if (ROUTE_WORDS.includes(r.id)) die(`${at}: “${r.id}” is one of the app’s own screens`);
     if (seen.has(r.id)) die(`${at}: duplicate id`);
     seen.add(r.id);
     /* `R115` — a name made of spaces is not a name. recipes.json is

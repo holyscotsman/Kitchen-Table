@@ -2592,6 +2592,134 @@ const browserContextWithReduce = (br) =>
   console.log('\n== JS errors ==');
   chk('no uncaught errors', errs.length===0, errs.join(' | '));
 
+  console.log('\n== A recipe the app would store, show, and never open (R132) ==');
+  {
+    /* `parseHash` decides what an address means, and it decided by prefix:
+
+         if (raw.indexOf("menu") === 0) …the Menu
+
+       So every recipe whose id merely BEGINS with "menu" was the Menu, and
+       the four bare screens took their words outright — `#plan`, `#add`,
+       `#help`, `#main`. Ids come from `slugify(title)`, so "Menu Of The
+       Week" or a video called "Menu Prep Sunday" mints one, and the recipe
+       is then saveable, listed, tappable — and opens the week planner.
+
+       Measured with seven seeded recipes: six of them drew a card on the
+       Menu and every one of those six opened a different screen. Same
+       family as `R70`, where a recipe "could never be opened at all", and
+       worse in one way: the card is there, so it is a recipe that vanishes
+       when you tap it.
+
+       Two halves, and the order matters. The router is made exact, which
+       rescues every id that merely starts with a screen's name. The five
+       that ARE a screen's name cannot be rescued that way — the app's own
+       screens have to win, or a recipe called "Plan" would take the week
+       planner away from the family — so those are suffixed at the
+       boundary, which is what `R70` does with a duplicate id and for the
+       same reason: the id rides into the next download and fixes the file. */
+    const mk = (id, title) => ({ id, title, category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'] });
+    const SEED = [mk('menu-of-the-week', 'Menu Of The Week'), mk('menuboard', 'Menuboard'),
+      mk('plan', 'Plan'), mk('add', 'Add'), mk('help', 'Help'), mk('main', 'Main'),
+      mk('ordinary', 'Ordinary')];
+    const ctxR = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxR.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    await ctxR.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), SEED);
+    const pR = await ctxR.newPage();
+    const rErrs = []; pR.on('pageerror', (e) => rErrs.push(e.message));
+
+    const landsOn = async (hash) => {
+      await pR.goto(B + '/index.html#' + hash);
+      await pR.waitForTimeout(500);
+      return pR.evaluate(() => {
+        const t = document.querySelector('.r-title');
+        if (t) return 'recipe:' + t.textContent.trim();
+        if (document.querySelector('.dayblock')) return 'planner';
+        if (document.querySelector('.pathbtn')) return 'add';
+        if (document.querySelector('.help__h1')) return 'help';
+        if (document.querySelector('.main__title')) return 'main';
+        if (document.querySelector('.rcard')) return 'menu';
+        return 'nothing';
+      });
+    };
+
+    /* An id that merely starts with a screen's name is a recipe. */
+    chk('a recipe whose name begins with "Menu" opens, instead of the Menu',
+      (await landsOn('menu-of-the-week')) === 'recipe:Menu Of The Week',
+      await landsOn('menu-of-the-week'));
+    chk('and one with no hyphen in it too',
+      (await landsOn('menuboard')) === 'recipe:Menuboard', await landsOn('menuboard'));
+
+    /* The five that ARE a screen's name: the screen wins, and the recipe is
+       moved out of its way rather than left unreachable.
+
+       Read from the addresses the Menu actually links to, not from the
+       stored overlay: the move is at the boundary, like `R70`'s, so the
+       file keeps what a person typed until the next download rewrites it.
+       What matters here is the address the family taps. */
+    await pR.goto(B + '/index.html#menu');
+    await pR.waitForSelector('.rcard');
+    const ids = await pR.evaluate(() =>
+      [...document.querySelectorAll('a.rcard')].map((a) => a.getAttribute('href').slice(1)));
+    chk('the app keeps its own five addresses',
+      ['plan', 'add', 'help', 'main', 'menu'].every((w) => ids.indexOf(w) === -1),
+      JSON.stringify(ids));
+    chk('the week planner is still the week planner', (await landsOn('plan')) === 'planner');
+    chk('the Add screen is still the Add screen', (await landsOn('add')) === 'add');
+    chk('the help page is still the help page', (await landsOn('help')) === 'help');
+    chk('and the front screen is still the front screen', (await landsOn('main')) === 'main');
+
+    /* Moved, not lost: every one of the seven is still in the book and every
+       one of them opens. */
+    await pR.goto(B + '/index.html#menu');
+    await pR.waitForSelector('.rcard');
+    chk('none of them fell out of the book',
+      (await pR.locator('.rcard').count()) === 7,
+      String(await pR.locator('.rcard').count()));
+    const opened = [];
+    for (const id of ids) {
+      const where = await landsOn(id);
+      if (!where.startsWith('recipe:')) opened.push(id + ' -> ' + where);
+    }
+    chk('and every single one of them opens its own recipe',
+      opened.length === 0, opened.join(' | '));
+    /* The reason travels with the recipe, the way `R70`'s does, so nobody
+       has to work out why the address looks odd. */
+    const movedId = ids.find((x) => /^plan-/.test(x));
+    await pR.goto(B + '/index.html#' + movedId);
+    await pR.waitForSelector('.r-title');
+    const said = await pR.evaluate(() => {
+      const f = document.querySelector('.panel--flag');
+      return f ? f.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+    chk('the one that moved says why, on the recipe itself',
+      /one of Kitchen Table’s own screens/.test(said), movedId + ': ' + said.slice(0, 120));
+
+    /* The other half: an id is minted on the Add screen too, and a recipe
+       typed in as "Menu" should open the moment it is saved rather than
+       being moved out of the way at the next boot. "Menu" rather than one
+       of the seeded five, because a second recipe of the same name meets
+       the duplicate warning first and never reaches the id at all. */
+    await pR.goto(B + '/index.html#add');
+    await pR.waitForSelector('.pathbtn');
+    await pR.click('[data-act="add-path"][data-key="review"]');
+    await pR.waitForSelector('#a-title');
+    await pR.fill('#a-title', 'Menu');
+    await pR.fill('#a-ing-0', '1 cup flour');
+    await pR.fill('#a-step-0', 'Mix it.');
+    await pR.click('[data-act="add-save"]');
+    await pR.waitForTimeout(900);
+    chk('a recipe typed in as "Menu" lands on its own page, not the Menu',
+      (await pR.evaluate(() => {
+        const t = document.querySelector('.r-title');
+        return t ? t.textContent.trim() : '(' + location.hash + ')';
+      })) === 'Menu',
+      await pR.evaluate(() => location.hash));
+    chk('and the Menu is still the Menu', (await landsOn('menu')) === 'menu');
+    chk('nothing threw', rErrs.length === 0, rErrs.join(' | '));
+    await ctxR.close();
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50));
   console.log('PASS: '+pass+'   FAIL: '+fail);

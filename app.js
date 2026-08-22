@@ -982,7 +982,24 @@
   function applyOverlay() {
     var overlay = load(K.recipes, null);
     var list = Array.isArray(overlay) ? overlay : (Array.isArray(S.base) ? S.base : []);
-    S.recipes = dedupeIds(list.map(normalizeRecipe).filter(Boolean));
+    S.recipes = settleIds(list.map(normalizeRecipe).filter(Boolean));
+  }
+
+  /* `R132` — the five words this app answers to itself. A recipe id is the
+     whole address (`#chicken-fritters`), so an id that IS one of these is a
+     recipe the app would store, list, and never open: the screen wins, and
+     it has to, or a recipe called "Plan" would take the week planner away
+     from the family. Named here so the router and the two places an id is
+     minted read the same list. */
+  var ROUTE_WORDS = ["main", "menu", "add", "plan", "help"];
+
+  function freeId(base, used) {
+    var id = base, n = 2;
+    while ((used && used[id]) || ROUTE_WORDS.indexOf(id) > -1 ||
+           (!used && byId(id))) {
+      id = base + "-" + n++;
+    }
+    return id;
   }
 
   /* `R70` — two recipes with the same id used to be one recipe. `byId` found
@@ -998,21 +1015,29 @@
      and delete beats a recipe silently replaced. The reason is written onto
      the recipe, so nobody has to guess why its address looks odd — and it
      rides into the next download, where the suffixed id fixes the file. */
-  function dedupeIds(list) {
+  function settleIds(list) {
     var used = {};
     return list.map(function (r) {
-      if (!r.id || !used[r.id]) { if (r.id) used[r.id] = true; return r; }
-      var n = 2;
-      while (used[r.id + "-" + n]) n++;
-      var newId = r.id + "-" + n;
+      if (!r.id) return r;
+      /* `R132` — a recipe that has taken one of the app's own addresses is
+         moved the same way a duplicate is, and for the same reason: a
+         recipe the family can see and open beats one that is silently a
+         different screen. */
+      var route = ROUTE_WORDS.indexOf(r.id) > -1;
+      if (!route && !used[r.id]) { used[r.id] = true; return r; }
+      var newId = freeId(r.id, used);
       used[newId] = true;
       var out = {};
       Object.keys(r).forEach(function (k) { out[k] = r[k]; });
       out.id = newId;
       out.flagged = (Array.isArray(r.flagged) ? r.flagged.slice() : []).concat(
-        "Two recipes in the book had the same id (“" + r.id + "”), so this " +
-        "one is at “" + newId + "” instead. Give it an id of its own next " +
-        "time the file is edited.");
+        route
+          ? "“" + r.id + "” is one of Kitchen Table’s own screens, so this " +
+            "recipe is at “" + newId + "” instead. Give it an id of its own " +
+            "next time the file is edited."
+          : "Two recipes in the book had the same id (“" + r.id + "”), so this " +
+            "one is at “" + newId + "” instead. Give it an id of its own next " +
+            "time the file is edited.");
       return out;
     });
   }
@@ -4150,10 +4175,10 @@
     S.addDupe = null;
     S.addDupeOk = false;
 
-    var base = slugify(title) || "recipe";
-    var id = base;
-    var n = 2;
-    while (byId(id)) id = base + "-" + n++;
+    /* `R132` — free of every id already in the book AND of the five words
+       the app answers to itself, so a recipe typed in as "Plan" opens the
+       moment it is saved rather than being moved at the next boot. */
+    var id = freeId(slugify(title) || "recipe", null);
 
     /* `R121` — this read `Math.min(40, Math.max(1, parseInt(...) || 4))`,
        and both of its guesses were made in silence: a count left blank
@@ -5432,7 +5457,12 @@
     if (raw === "add") return { name: "add", id: "" };
     if (raw === "plan") return { name: "plan", id: "" };
     if (raw === "help") return { name: "help", id: "" };
-    if (raw.indexOf("menu") === 0) {
+    /* `R132` — exactly the Menu, not everything that begins with its name.
+       This read `raw.indexOf("menu") === 0`, so "Menu Of The Week" — a
+       title `slugify` turns into `menu-of-the-week`, and one a video import
+       could easily produce — was a recipe the app would store, list and
+       never open: tapping its card drew the Menu. */
+    if (raw === "menu" || raw.indexOf("menu?") === 0) {
       var qs = raw.indexOf("?") > -1 ? raw.slice(raw.indexOf("?") + 1) : "";
       var who = [], cats = [], tags = [], sort = "", needs = false, q = "";
       qs.split("&").forEach(function (pair) {
