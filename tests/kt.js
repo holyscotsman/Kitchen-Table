@@ -1100,6 +1100,126 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== A flag that has been dealt with must stop saying it has not (R122) ==');
+  {
+    /* `082` gave every flag the name of its field — "Servings — …",
+       "Title — …" — and put a Double-check chip beside that field. What
+       nothing ever did was take one down. `saveDraft` never mentions
+       `flagged`, and there is no dismiss anywhere in the app.
+
+       So: an import cannot read a count, flags *"Servings — no count was
+       found; 4 was assumed."*, and the reader opens Edit and types 6. The
+       recipe now serves 6 **and still carries a flag saying no count was
+       found and 4 was assumed**, for good. A "worth double-checking" list
+       that never empties is a list nobody reads, which costs the reader
+       the one mechanism built to tell them what still needs attention.
+
+       This is the fault this project keeps finding — a sentence that has
+       stopped being true (`R94`, `R102`, `R108`, `R109`, `S06`–`S08`) — on
+       the feature whose entire job is to be true.
+
+       The rule is the naming convention `082` already established: a flag
+       naming a field is answered when that field changes. A flag that
+       names no field is left alone, because nothing can tell whether it was
+       dealt with — inventing a dismissal for those is a different feature. */
+    const FLAGGED = { id: 'flagged-122', title: 'Guessed Recipe', category: 'Dinner',
+      contributor: 'Joan', servings: 4,
+      ingredients: ['1 cup flour'], steps: ['Bake it.'],
+      flagged: ['Servings — no count was found; 4 was assumed.',
+                'Title — none was obvious; add one.',
+                'Ingredients — none were picked up.',
+                'The photos couldn’t be kept on this phone (quota)'] };
+    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pF = await ctxF.newPage();
+    const fErrs = []; pF.on('pageerror', e => fErrs.push(e.message));
+
+    const openEdit = async () => {
+      await pF.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+      await pF.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+      await pF.waitForSelector('#e-serves', { timeout: 5000 });
+    };
+    const save = async () => {
+      await pF.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pF.waitForTimeout(700);
+    };
+    const flags = () => pF.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+    /* Writing localStorage does not disturb the book already in memory, and
+       `goto` to the hash we are on does not reload — so a re-seed has to
+       reload, or every case after the first silently measures the last one's
+       leftovers. */
+    const reseed = async () => {
+      await pF.evaluate((r) =>
+        localStorage.setItem('kt.recipes', JSON.stringify([r])), FLAGGED);
+      await pF.goto(B + '/index.html#flagged-122');
+      await pF.reload();
+      await pF.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+      /* Proof the seed took, so a silent miss cannot read as a pass. */
+      const seeded = await pF.evaluate(() =>
+        (((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []).length);
+      if (seeded !== 4) throw new Error('R122 seed did not take: ' + seeded + ' flags');
+    };
+
+    await pF.goto(B + '/index.html');
+    await reseed();
+
+    /* Editing the count answers the count's flag, and only that one. */
+    await openEdit();
+    await pF.fill('#e-serves', '6');
+    await save();
+    let f = await flags();
+    chk('answering a guessed count takes its flag down',
+      !f.some(x => /^Servings —/.test(x)), JSON.stringify(f));
+    chk('and leaves the flag about a different field standing',
+      f.some(x => /^Title —/.test(x)), JSON.stringify(f));
+    chk('and the one that names no field at all, which nobody can judge',
+      f.some(x => /photos/.test(x)), JSON.stringify(f));
+
+    /* And a save that touches nothing keeps every flag it started with. */
+    await reseed();
+    await openEdit();
+    await save();
+    f = await flags();
+    chk('a save that changed nothing takes nothing down', f.length === 4,
+      JSON.stringify(f));
+
+    /* Editing a different field must not answer a flag it never touched. */
+    await reseed();
+    await openEdit();
+    await pF.fill('#e-prep', '10 min');
+    await save();
+    f = await flags();
+    chk('changing an unrelated field leaves the count flag alone',
+      f.some(x => /^Servings —/.test(x)), JSON.stringify(f));
+
+    /* The title's own flag, and the chip beside it. */
+    await reseed();
+    await openEdit();
+    await pF.fill('#e-title', 'A Real Name');
+    await save();
+    f = await flags();
+    chk('naming the recipe answers the flag that asked for a name',
+      !f.some(x => /^Title —/.test(x)), JSON.stringify(f));
+
+    /* Rewriting the ingredients answers the ingredients flag. */
+    await reseed();
+    await openEdit();
+    await pF.fill('#e-ing-0', '2 cups flour').catch(() => {});
+    await save();
+    f = await flags();
+    chk('and the list flags answer to the lists',
+      !f.some(x => /^Ingredients —/.test(x)), JSON.stringify(f));
+    chk('while the count flag, untouched this time, stays up',
+      f.some(x => /^Servings —/.test(x)), JSON.stringify(f));
+
+    chk('nothing threw', fErrs.length === 0, fErrs.join(' | '));
+    await ctxF.close();
+  }
+
   console.log('\n== After Save, the fields must show what was kept (R120) ==');
   {
     /* `saveDraft` has always tidied on the way past — a title cleared to
