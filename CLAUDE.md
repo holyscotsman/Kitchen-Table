@@ -956,11 +956,80 @@ design. The whole address still goes out in Share and *Download as text*,
 which is checked rather than asserted: that is where somebody goes to find
 their way back to it.
 
+### A shared video named nobody before it was sent
+
+`R129`, and the one screen that could not say anything.
+
+**The consent half.** The video form carries this comment directly above
+its disclosure: *"Same disclosure discipline as the link importer (050):
+name every service the link touches before anything is sent."* The share
+target skipped that form entirely — `V04` had a shared video *submit
+itself*, so the boot handler called `submitVideo()` out of
+`consumeSharedLink` and the progress card replaced the form. On the app's
+**primary** path into the video importer, Render, Groq and Anthropic were
+named nowhere: not before the request, not during it, not at all.
+
+It is also the one path where a fumbled share sheet starts a **paid**
+pipeline — yt-dlp, Groq, then a `claude-opus-5` call — with no way to say
+no first; `backend/lib/budget.js` exists because those cost money.
+
+So the share still lands on the video form with the address already filled
+in, which is what `V04` was for, and waits for one tap. The two ways into
+the video importer behave the same way now — the `S09` lesson. Provisional
+and reversible, with the one-line reversal written down in `DECISIONS.md`.
+`ADDING.md`'s *"The link lands in the importer and sends itself"* went the
+same way as the sentences `S06`–`S08` corrected.
+
+**The slot half, which is why the first half had somewhere to speak.**
+Every other screen has had a notice slot since `S12` gathered four
+hand-written `if (S.notice)` blocks into `noticeHtml`. The Add screen never
+did — so `setNotice` there wrote to a place nobody rendered. `083` gives
+every review line a one-tap *send it to the other list*, because a parser
+guesses the ingredients/steps split and on a photographed card it guesses
+wrong often; the tap moves the line to the **bottom of the other list**,
+off screen on any real import, and `setNotice("Moved to the
+instructions.")` was the entire confirmation it went anywhere. It reached
+`liveMessage`, so a screen reader heard it and the eye got nothing — the
+exact reverse of `S12`'s rule, on a line that had just vanished from where
+the reader was looking.
+
+### A photo that needed twice the room, and a sentence a microtask ate
+
+`R130`, in three lines of `saveAdd`.
+
+A photo is staged under `__new__`, because a recipe's id only exists once
+the title is known, and moved across on Save. The move **wrote first and
+deleted after** — so on the localStorage path (the one a phone without
+IndexedDB takes, and the only reason the "no room" message exists) the
+store briefly held the same picture twice. A photo that fitted once did not
+fit twice: the write failed, `setImage` dropped its copy, and the delete
+then took the staged one. **The picture was gone from the phone
+altogether**, on a save the reader was told nothing about. Removing first
+means one copy at a time, and the same photo now fits — measured, on a
+phone stubbed to refuse exactly the two-copy write.
+
+And when a phone is genuinely full, the sentence has to survive the
+navigation. `setImage` returns an **already-resolved** promise on that path,
+so its `.then` is a microtask and ran before the `hashchange` the next line
+queued; `onRoute` then did `S.notice = S.carry || ""` and wiped it. The
+reader arrived at a recipe with no picture and no reason. The move is
+finished before the route changes now, and its message rides across in
+`S.carry` — which is what `R121` built that key for. Both sentences can be
+true at once (a clamped serving count and a photo with no room), so they
+are joined rather than one swallowing the other.
+
+The comment above those three lines had said, since the day they were
+written, *"if the persist fails the recipe still saves and the failure is
+said out loud."* On the IndexedDB path it was true — `idbPut` rejects on a
+database error event, which is a task, so the sentence lands after the route
+change. The fallback path is where it was false, and the fallback path is
+the one with the smaller quota.
+
 ### Verified
 
-The suite after the video arc: **1505 functional checks** across eleven
-suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 297, sec 56,
-plan 79, video 234, backend 260, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1529 functional checks** across eleven
+suites (kt 308, feat 65, add 113, relay 16, quick 76, polish 297, sec 56,
+plan 79, video 244, backend 260, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
