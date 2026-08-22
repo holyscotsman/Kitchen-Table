@@ -492,6 +492,25 @@ Save in Edit mode writes to `localStorage` exactly as before and says so —
   ("try Save again in a minute"). Saying "yet" about the first would be a
   promise nobody can keep.
 
+**And the thirty seconds it said nothing** (`S12`). `S04` set `S.sharing`
+before each write and `S.shared` after it, and **nothing ever read either
+one** — write-only state that was meant to be an indicator and never
+became one. So the phone saved the change, the button said *Saved ✓*, and
+then a request ran for up to half a minute against a Render free tier that
+has to wake up, with the screen saying nothing at all: `shareEdit` passes
+`quiet` to `kitchenFetch` on purpose, which suppresses even the *waking up
+the kitchen…* card. Somebody who closed the page in that window lost a
+change the app had just told them was safe.
+
+The rule it settles: **the eye gets progress, the ear gets one sentence.**
+The visible line counts through a burst (*"Sending to the family's book —
+3 of 12…"*), while `liveMessage()` returns a deliberately constant
+sentence so `announceOnce` drops the repeat and a 48-recipe burst is not
+read out forty-eight times. Four hand-written `if (S.notice)` blocks
+became one `noticeHtml(cls, style)`: there had been nowhere for a second
+line to go, which is part of why the indicator was never built. `S.shared`
+is deleted rather than wired — it only ever repeated what the notice said.
+
 **One known mismatch, recorded rather than fixed.** The app treats a
 serving count as optional — `R97` made sure a recipe without one does not
 gain one by being edited — while `kitchen.recipes.servings` is `not null`
@@ -555,9 +574,9 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1329 functional checks** across eleven
+The suite after the video arc: **1344 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 53,
-plan 79, video 186, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 201, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

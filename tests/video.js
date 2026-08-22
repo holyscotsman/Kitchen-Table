@@ -21,7 +21,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, failPutAfter: null, publishing: true, postDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, failPutAfter: null, publishing: true, postDelayMs: 0, putDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -48,6 +48,9 @@ function stubKitchen(ctx, opts) {
       o.puts.push({ path: u.pathname, key: req.headers()['x-kitchen-key'] || null,
                     more: u.searchParams.get('more') === '1',
                     body: req.postDataJSON() });
+      /* Holds each write open, so the in-flight window is long enough to
+         look at. A cold Render does this for real, for about 30 seconds. */
+      if (o.putDelayMs) await new Promise(r => setTimeout(r, o.putDelayMs));
       if (o.failPut) return json(o.failPut.status, { error: o.failPut.error || '' });
       /* Lets a burst succeed part-way and then hit one answer, which is the
          only way to measure "N of M reached it before ...". */
@@ -1220,6 +1223,122 @@ async function freshPage(br, opts) {
                 rQuiet.errs, rSent.errs, rAsleep.errs).length === 0,
       [].concat(bQuiet.errs, bSent.errs, bAsleep.errs, bBreak.errs, bRefused.errs,
                 rQuiet.errs, rSent.errs, rAsleep.errs).join(' | '));
+  }
+
+  console.log('\n== The thirty seconds after "Saved" said nothing (S12) ==');
+  {
+    /* `S04` set `S.sharing` before the write and cleared it after, and
+       `S.shared` on success — and NOTHING ever read either one. Write-only
+       state that was meant to be an indicator and never became one.
+       Measured: the phone's copy is saved, the button says "Saved ✓", and
+       then a request runs for up to thirty seconds against a Render free
+       tier that has to wake up. In that window the screen says nothing at
+       all, and `shareEdit` passes `quiet` to `kitchenFetch` on purpose, so
+       even the "waking up the kitchen…" card is suppressed. Somebody who
+       closes the page there loses a change they had every reason to think
+       was finished — the app had told them it was saved and then gone
+       silent while it was still working.
+
+       The split this fixes: **the eye gets progress, the ear gets one
+       sentence.** A 48-recipe burst must not speak forty-eight times. */
+    const BOOK2 = [
+      { id: 'aaa-one', title: 'Aaa One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'], tags: ['soup'] },
+      { id: 'bbb-two', title: 'Bbb Two', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['2 onions'], steps: ['Cook them.'], tags: ['soup'] }
+    ];
+    const onScreen = (p) => p.evaluate(() =>
+      [...document.querySelectorAll('#app .notice, #app .hint')]
+        .map(x => x.textContent.replace(/\s+/g, ' ').trim()).join(' ~ '));
+    const spoken = (p) => p.evaluate(() => {
+      const n = document.getElementById('route-live');
+      return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+
+    /* ---- one recipe: the window between "Saved" and the answer ---- */
+    const single = async (key, delay) => {
+      const { ctx, p, stub } = await freshPage(br, { putDelayMs: delay });
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      await p.goto(B + '/index.html#ninja-cookies');
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.fill('#e-title', 'Ninja Cookies Waiting');
+      await p.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await p.waitForTimeout(700);                       // mid-flight
+      const midSeen = await onScreen(p), midSaid = await spoken(p);
+      await p.waitForTimeout(delay + 1200);              // settled
+      const endSeen = await onScreen(p), endSaid = await spoken(p);
+      const errs = p.errs.slice();
+      await ctx.close();
+      return { midSeen, midSaid, endSeen, endSaid, puts: stub.puts, errs };
+    };
+
+    const waiting = await single('family-secret', 2500);
+    chk('while the write is in flight the screen says so',
+      /sending/i.test(waiting.midSeen) && /famil/i.test(waiting.midSeen), waiting.midSeen);
+    chk('and it is still clear the phone already has it',
+      /saved/i.test(waiting.midSeen), waiting.midSeen);
+    chk('the reader is told out loud once, not left silent',
+      /sending/i.test(waiting.midSaid), waiting.midSaid);
+    chk('and when it lands the waiting line is gone',
+      !/sending/i.test(waiting.endSeen), waiting.endSeen);
+    chk('replaced by what actually happened',
+      /famil/i.test(waiting.endSeen) && /few minutes|nightly/i.test(waiting.endSeen),
+      waiting.endSeen);
+
+    /* A phone with no passphrase has nothing in flight and must not be told
+       to wait for anything. */
+    const quiet2 = await single('', 2500);
+    chk('a phone that shares nothing never shows a waiting line',
+      !/sending/i.test(quiet2.midSeen + ' ' + quiet2.endSeen),
+      quiet2.midSeen + ' | ' + quiet2.endSeen);
+    chk('and sends nothing, as before', quiet2.puts.length === 0);
+
+    /* ---- many recipes: progress for the eye, one sentence for the ear ---- */
+    const burst = async () => {
+      const { ctx, p, stub } = await freshPage(br, { putDelayMs: 1500 });
+      await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)), BOOK2);
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.cardgrid, .rrow, .rcard');
+      await p.click('[data-act="toggle-tagging"]');
+      await p.click('[data-act="tag-pick"][data-id="aaa-one"]');
+      await p.click('[data-act="tag-pick"][data-id="bbb-two"]');
+      await p.click('[data-act="open-bulk"]');
+      await p.waitForSelector('#bulk-tags');
+      await p.fill('#bulk-tags', 'Scottish');
+      await p.click('[data-act="bulk-apply"]');
+      await p.waitForTimeout(700);                       // inside recipe 1
+      const a = { seen: await onScreen(p), said: await spoken(p) };
+      await p.waitForTimeout(1600);                      // inside recipe 2
+      const b2 = { seen: await onScreen(p), said: await spoken(p) };
+      await p.waitForTimeout(2200);                      // settled
+      const c = { seen: await onScreen(p), said: await spoken(p) };
+      const errs = p.errs.slice();
+      await ctx.close();
+      return { a, b: b2, c, puts: stub.puts, errs };
+    };
+
+    const many = await burst();
+    chk('a burst shows how far it has got', /1 of 2/.test(many.a.seen), many.a.seen);
+    chk('and the count moves as it goes', /2 of 2/.test(many.b.seen), many.b.seen);
+    chk('while the spoken sentence stays put, so it is not read out per recipe',
+      many.a.said === many.b.said && /sending/i.test(many.a.said),
+      many.a.said + ' -> ' + many.b.said);
+    chk('and the local half is on screen the whole time',
+      /2 recipes/.test(many.a.seen) && /2 recipes/.test(many.b.seen), many.a.seen);
+    chk('when it finishes the progress line goes', !/sending/i.test(many.c.seen), many.c.seen);
+    chk('and the ear is told the outcome', /famil/i.test(many.c.said), many.c.said);
+    chk('both recipes really went', many.puts.length === 2, String(many.puts.length));
+    chk('nothing threw across any of it',
+      [].concat(waiting.errs, quiet2.errs, many.errs).length === 0,
+      [].concat(waiting.errs, quiet2.errs, many.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');

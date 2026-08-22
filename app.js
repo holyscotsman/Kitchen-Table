@@ -374,8 +374,12 @@
     /* `S04` — which recipe is being sent to the family's book right now, and
        which ones this session has seen land. Session-only on purpose: it
        describes what just happened, not what is true of the book. */
-    sharing: "",
-    shared: {},
+    /* `S12` — null, or {at, of} while writes are in flight. It is READ now:
+       `S04` set this and `shared` and nothing ever looked at either, so the
+       thirty seconds a cold Render takes to answer were completely silent.
+       `shared` is gone rather than wired — it only ever repeated what the
+       notice already said. */
+    sharing: null,
     filterOpen: false,
     sortOpen: false,
     who: [],
@@ -1478,7 +1482,7 @@
     if (S.sortOpen) h += sortMenuHtml();
     h += "</div>";
 
-    if (S.notice) h += '<p class="hint">' + esc(S.notice) + "</p>";
+    h += noticeHtml("hint", "");
     h += "</div></header>";
 
     var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
@@ -2006,10 +2010,7 @@
       h += editBody(r);
       /* Notices must reach edit mode too — the quota failure on attaching a
          photo happens here, and a warning nobody can see is a silent loss. */
-      if (S.notice) {
-        h += '<p class="notice" style="margin-top:16px">' +
-             esc(S.notice) + "</p>";
-      }
+      h += noticeHtml("notice", "margin-top:16px");
       h += "</div>";
       return h;
     }
@@ -2229,10 +2230,7 @@
          '<button type="button" class="actbtn actbtn--primary press" data-act="open-dl">' +
          I.download() + "Download</button></div>";
 
-    if (S.notice) {
-      h += '<p class="notice" style="margin-top:16px">' +
-           esc(S.notice) + "</p>";
-    }
+    h += noticeHtml("notice", "margin-top:16px");
 
     if (r.source) {
       h += '<p class="sourceline">From Joan’s screenshots · ' + esc(r.source) + "</p>";
@@ -2523,6 +2521,28 @@
     S.saved = false;
   }
 
+  /* `S12` — what is still happening, for the eye. The count moves; the
+     sentence the ear gets (`liveMessage`) deliberately does not, or a
+     48-recipe burst would be read out forty-eight times. */
+  function sharingMsg() {
+    if (!S.sharing) return "";
+    return S.sharing.of > 1
+      ? "Sending to the family’s book — " + S.sharing.at + " of " + S.sharing.of + "…"
+      : "Sending to the family’s book…";
+  }
+
+  /* The transient message slot and, under it, the work still running. One
+     helper so a screen that shows one always shows the other — before this
+     each screen wrote its own `if (S.notice)` line and there was nowhere
+     for a second line to go. */
+  function noticeHtml(cls, style) {
+    var st = style ? ' style="' + style + '"' : "";
+    var h = "";
+    if (S.notice) h += '<p class="' + cls + '"' + st + ">" + esc(S.notice) + "</p>";
+    if (S.sharing) h += '<p class="' + cls + '"' + st + ">" + esc(sharingMsg()) + "</p>";
+    return h;
+  }
+
   /* ------------------------------------------------------ sharing an edit
    *
    * `S04`. Until now every edit stopped at the phone that made it, and the
@@ -2547,19 +2567,20 @@
   function shareEdit(recipe) {
     var key = kitchenKey();
     if (!key) return;                       // local-only, exactly as before
-    S.sharing = recipe.id;
-    render();
+    /* Local truth first and visible, then the work, so the gap between
+       "Saved ✓" and the answer is never blank. */
+    S.sharing = { at: 1, of: 1 };
+    setNotice("Saved on this phone.");
     kitchenFetch("/api/recipes/" + encodeURIComponent(recipe.id),
       { method: "PUT", body: { recipe: orderFields(recipe) }, key: key, timeout: 30000 }, true)
       .then(function (data) {
-        S.sharing = "";
-        S.shared[recipe.id] = true;
+        S.sharing = null;
         setNotice(data && data.publishing
           ? "Saved, and sent to the family’s book — everyone will see it in a few minutes."
           : "Saved, and sent to the family’s book. It appears for everyone at the next nightly update.");
       })
       .catch(function (err) {
-        S.sharing = "";
+        S.sharing = null;
         var st = (err && err.status) || 0;
         var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
         setNotice(refused
@@ -2601,6 +2622,7 @@
     var sent = 0, publishing = false;
 
     function done() {
+      S.sharing = null;
       var one = list.length === 1;
       setNotice(localMsg + " Sent to the family’s book — " +
         (publishing
@@ -2610,6 +2632,7 @@
     }
 
     function stop(err) {
+      S.sharing = null;
       var st = (err && err.status) || 0;
       var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
       /* A rate limit is its own thing: not a refusal of the recipe, not the
@@ -2646,12 +2669,13 @@
     function step(i) {
       if (i >= list.length) { done(); return; }
       var r = list[i];
+      S.sharing = { at: i + 1, of: list.length };
+      render();
       kitchenFetch("/api/recipes/" + encodeURIComponent(r.id) +
           (i < list.length - 1 ? "?more=1" : ""),
         { method: "PUT", body: { recipe: orderFields(r) }, key: key, timeout: 30000 }, true)
         .then(function (data) {
           sent++;
-          S.shared[r.id] = true;
           /* Sticky: the burst pokes on its LAST write, and a poke inside the
              server's cooldown reports false. Reading only the final answer
              would call a republish that is happening "the nightly update". */
@@ -3107,7 +3131,7 @@
     h += '<button type="button" class="outlinebtn press planprint" data-act="plan-print">' +
          "Print this week</button>";
 
-    if (S.notice) h += '<p class="notice">' + esc(S.notice) + "</p>";
+    h += noticeHtml("notice", "");
     h += "</div>";
 
     if (S.pickOpen) h += pickSheetHtml();
@@ -4980,6 +5004,11 @@
 
   /* Whatever the screen is currently saying that a person needs to hear. */
   function liveMessage() {
+    /* `S12` — while a write is in flight this is what a person needs to
+       hear, and it is deliberately the SAME sentence for every recipe of a
+       burst: `announceOnce` drops a repeat, so the count on screen can move
+       without the live region speaking again. */
+    if (S.sharing) return "Sending to the family’s book.";
     if (S.notice) return S.notice;
     if (S.addBusy) return S.addBusy;
     if (S.videoWaking) return "Waking up the kitchen server.";
