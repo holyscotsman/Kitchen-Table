@@ -3946,7 +3946,43 @@
        something to go back and check, and a number the reader typed a
        moment ago needs telling now. */
     var typedServ = parseInt(d.servings, 10);
-    var addFlags = (d.flagged || []).slice();
+    /* `R123` — the review screen shows the flags AND every field they name,
+       and then carried all of them through verbatim. So an import that found
+       no title flagged "Title — none was found on the page; add one.", the
+       reader typed one in the box directly beneath that sentence, and the
+       recipe was born still carrying it.
+
+       `R122` taught Edit mode to take a flag down when its field is answered;
+       this is the same rule on the screen built for answering them.
+
+       No baseline is needed, which is what keeps it cheap: "none was found"
+       is answerable from what is being saved, and the count's flag is not
+       inherited at all — the block below re-adds it exactly when the field
+       was left blank, so regenerating beats carrying.
+
+       The course is the one judgement call. Its flag says *Dinner was
+       assumed*; if the category being saved is no longer Dinner the reader
+       plainly changed it. If it is still Dinner they either agreed or never
+       looked, and nothing here can tell those apart — so it stands. */
+    var savedIng = d.ingredients.filter(function (x) { return x.trim(); });
+    var savedSteps = d.steps.filter(function (x) { return x.trim(); });
+    var addAnswered = {
+      Title: !!title,
+      Ingredients: savedIng.length > 0,
+      Steps: savedSteps.length > 0,
+      /* Not "regenerated below", which is what the first attempt assumed and
+         the suite caught: the block below can only tell a blank field from a
+         filled one, and a draft that arrived holding an assumed 4 looks
+         exactly like a reader typing 4. So the count takes the course's rule
+         instead — the flag says *4 was assumed*, and a saved count that is
+         no longer 4 is one the reader changed. */
+      Servings: (typedServ >= 1 ? Math.min(40, typedServ) : 4) !== 4,
+      Course: (CATS.indexOf(d.category) > -1 ? d.category : "Dinner") !== "Dinner"
+    };
+    var addFlags = (d.flagged || []).filter(function (f) {
+      var m = /^([A-Za-z]+)\s+—/.exec(String(f));
+      return !(m && addAnswered[m[1]]);
+    });
     var addClamped = 0;
     var servings;
     if (typedServ >= 1) {
@@ -3965,8 +4001,8 @@
       category: CATS.indexOf(d.category) > -1 ? d.category : "Dinner",
       contributor: (d.contributor || "").trim() || WHO[0],
       servings: servings,
-      ingredients: d.ingredients.filter(function (x) { return x.trim(); }),
-      steps: d.steps.filter(function (x) { return x.trim(); })
+      ingredients: savedIng,
+      steps: savedSteps
     };
     if ((d.prepTime || "").trim()) recipe.prepTime = d.prepTime.trim();
     if ((d.cookTime || "").trim()) recipe.cookTime = d.cookTime.trim();

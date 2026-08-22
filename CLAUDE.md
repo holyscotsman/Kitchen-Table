@@ -376,6 +376,27 @@ dismissal for those is a different feature, not a corollary of this one.
 Both directions are mutation-tested: never clearing, and clearing
 everything, each fail by name.
 
+### Fixing a flagged field on the review screen kept the flag anyway
+
+`R123`, the sibling of `R122` on the screen built for exactly this job. The
+import review shows the flags **and** every field they name, and then carried
+all of them through verbatim. So an import that found no title flagged
+*"Title — none was found on the page; add one."*, the reader typed one in the
+box directly beneath that sentence, and the recipe was born still carrying it.
+
+No baseline was needed, which is what kept it cheap: *"none was found"* is
+answerable from what is being saved. **The count was not**, and the first
+attempt got that wrong — it assumed `R121`'s save-time logic would regenerate
+an inherited assumption, when that logic can only tell a blank field from a
+filled one, and a draft holding an assumed 4 looks exactly like a reader
+typing 4. The suite caught it. The count takes the course's rule instead: the
+flag says *4 was assumed*, so a saved count that is no longer 4 is one the
+reader changed.
+
+The course is the one real judgement call and is left standing when the
+category is still Dinner — the reader either agreed or never looked, and
+nothing there can tell those apart.
+
 ### After Save, the fields show what was kept
 
 `R120`. `saveDraft` has always tidied on the way past — a title cleared to
@@ -779,8 +800,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1430 functional checks** across eleven
-suites (kt 301, feat 65, add 89, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1440 functional checks** across eleven
+suites (kt 301, feat 65, add 99, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

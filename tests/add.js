@@ -447,6 +447,113 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('nothing threw', aErrs.length === 0, aErrs.join(' | '));
   }
 
+
+  console.log('\n== Fixing a flagged field on the review screen kept the flag anyway (R123) ==');
+  {
+    /* `R122` taught Edit mode to take a flag down when its field is answered.
+       The review screen — the screen built for exactly that job, which shows
+       the flags AND every field they name — still carried all of them through
+       verbatim: `addFlags = (d.flagged || []).slice()`.
+
+       So an import that could not find a title flags *"Title — none was found
+       on the page; add one."*, the reader types one in the box right under
+       the flag, presses Save, and the new recipe is born carrying a flag
+       saying no title was found.
+
+       No baseline is needed to know better, which is what keeps this cheap:
+       four of the five flag kinds are answerable from what is being saved.
+       "None was found" is false if the thing is now there; and the count's
+       flag is not carried at all — `R121` re-adds it at save time exactly
+       when the field was left blank, so regenerating beats inheriting.
+
+       The course flag is the one real judgement call: it says *Dinner was
+       assumed*, and if the category being saved is no longer Dinner the
+       reader plainly changed it. If it is still Dinner, they either agreed or
+       never looked, and nothing here can tell those apart — so it stands. */
+    const ctxR = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pR = await ctxR.newPage();
+    const rErrs = []; pR.on('pageerror', e => rErrs.push(e.message));
+
+    /* A draft as an importer would hand it over: nothing read, everything
+       flagged. sessionStorage is where the Add screen keeps a draft. */
+    const seedDraft = (patch) => pR.evaluate((p) => {
+      /* The shape restoreAddDraft reads: the draft under `draft`, with the
+         step that puts the review screen on show. Seeding the bare draft
+         leaves the Add screen on its chooser and nothing to measure. */
+      sessionStorage.setItem('kt.addDraft', JSON.stringify({ step: 'review',
+        draft: Object.assign({
+        title: '', category: 'Dinner', contributor: 'Joan', servings: 4,
+        prepTime: '', cookTime: '', ingredients: [''], steps: [''],
+        notes: '', source: '', tags: '',
+        flagged: ['Title — none was found on the page; add one.',
+                  'Ingredients — none were found; check the original page.',
+                  'Steps — none were found; check the original page.',
+                  'Servings — no count was found; 4 was assumed.',
+                  'Course — none was given; Dinner was assumed. ' +
+                  'Change it above if it belongs somewhere else.']
+      }, p) }));
+    }, patch);
+
+    const saveReview = async (patch, fills) => {
+      await pR.goto(B + '/index.html#add');
+      await pR.waitForTimeout(400);
+      await seedDraft(patch);
+      await pR.goto(B + '/index.html#add');
+      await pR.reload();
+      await pR.waitForSelector('#a-title', { timeout: 8000 });
+      for (const [sel, val] of fills) await pR.fill(sel, val).catch(() => {});
+      await pR.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pR.waitForTimeout(900);
+      return pR.evaluate(() => {
+        const rs = JSON.parse(localStorage.getItem('kt.recipes') || '[]');
+        const r = rs[rs.length - 1] || {};
+        return { flagged: r.flagged || [], title: r.title,
+                 category: r.category, servings: r.servings };
+      });
+    };
+
+    const fixed = await saveReview({}, [
+      ['#a-title', 'A Real Name'], ['#a-ing-0', '2 eggs'],
+      ['#a-step-0', 'Whisk them.'], ['#a-serves', '6']]);
+    chk('the review screen really saved what was typed into it',
+      fixed.title === 'A Real Name' && fixed.servings === 6,
+      JSON.stringify([fixed.title, fixed.servings]));
+    chk('a title supplied on that screen answers the flag asking for one',
+      !fixed.flagged.some(f => /^Title —/.test(f)), JSON.stringify(fixed.flagged));
+    chk('ingredients supplied answer theirs',
+      !fixed.flagged.some(f => /^Ingredients —/.test(f)), JSON.stringify(fixed.flagged));
+    chk('steps supplied answer theirs',
+      !fixed.flagged.some(f => /^Steps —/.test(f)), JSON.stringify(fixed.flagged));
+    chk('and a count typed over the assumption answers its own',
+      !fixed.flagged.some(f => /^Servings —/.test(f)), JSON.stringify(fixed.flagged));
+    chk('while the course, left on the assumed one, keeps saying so',
+      fixed.flagged.some(f => /^Course —/.test(f)), JSON.stringify(fixed.flagged));
+
+    /* Change the course and its flag goes too. */
+    const moved = await saveReview({}, [
+      ['#a-title', 'Moved Course'], ['#a-ing-0', '2 eggs'], ['#a-step-0', 'Whisk.']]);
+    await pR.waitForTimeout(100);
+    const movedCat = await saveReview({ category: 'Baking' }, [
+      ['#a-title', 'Baked Thing'], ['#a-ing-0', '2 eggs'], ['#a-step-0', 'Whisk.']]);
+    chk('a course that is no longer the assumed one answers its flag',
+      !movedCat.flagged.some(f => /^Course —/.test(f)), JSON.stringify(movedCat.flagged));
+
+    /* And a reader who fixes nothing keeps every warning they were given. */
+    const untouched = await saveReview({}, [['#a-title', 'Still Empty']]);
+    chk('leaving the lists empty keeps the flags that say they are',
+      untouched.flagged.some(f => /^Ingredients —/.test(f)) &&
+      untouched.flagged.some(f => /^Steps —/.test(f)), JSON.stringify(untouched.flagged));
+    chk('and leaving the count alone keeps its flag too',
+      untouched.flagged.some(f => /^Servings —/.test(f)), JSON.stringify(untouched.flagged));
+
+    chk('nothing threw', rErrs.length === 0, rErrs.join(' | '));
+    await ctxR.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
