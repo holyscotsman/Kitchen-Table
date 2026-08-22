@@ -134,6 +134,11 @@ async function freshPage(br, opts) {
     await p.waitForURL(/#video-test-soup/, { timeout: 5000 });
     await p.waitForTimeout(500);
     chk('save told the kitchen (accept)', stub.accepted.length === 1 && /jobs\/7\/accept/.test(stub.accepted[0].path));
+    /* `S09` — and told it ONCE. Accept already writes that recipe, so a
+       video draft must not also go down the ordinary sharing path: two
+       writes for one Save is one of them arguing with the other. */
+    chk('and told it exactly once, not twice',
+      stub.puts.length === 0, 'also PUT ' + stub.puts.length + ' time(s)');
     const sent = stub.accepted[0].body.recipe;
     chk('accept carries the reviewed recipe, id chosen by the phone',
       sent && sent.id === 'video-test-soup' && sent.title === 'Video Test Soup');
@@ -838,6 +843,120 @@ async function freshPage(br, opts) {
       /takes a recipe off this phone/i.test(on.text.replace(/\s+/g, ' ')),
       (on.text.match(/Remove[^.]*\./) || [''])[0].slice(0, 90));
     chk('nothing threw', off.errs.length === 0 && on.errs.length === 0);
+  }
+
+  console.log('\n== The panic button had to stop over-promising (S08) ==');
+  {
+    /* "Undo all my changes on this phone" is what somebody presses when they
+       are worried, so its sentence has to be the most honest in the app.
+
+       It drops the local overlay and falls back to the published book. That
+       was the whole story until `S04`: a change sent to everyone IS the
+       published book now, so pressing this RESTORES it rather than removing
+       it. Someone could press the panic button believing a shared mistake
+       was gone while it sat on the website and on everyone else's phone.
+
+       Read from the dialog itself rather than from the source, because what
+       matters is the sentence a person is actually shown. */
+    const askedWith = async (key) => {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', r => r.abort('failed'));
+      await ctx.addInitScript((k) => {
+        /* The undo only appears once this phone has local changes. */
+        localStorage.setItem('kt.recipes', JSON.stringify([{
+          id: 'ninja-cookies', title: 'Ninja Cookies', category: 'Desserts',
+          contributor: 'Joan', servings: 12, ingredients: ['1 cup butter'],
+          steps: ['Bake.'] }]));
+        if (k) localStorage.setItem('kt.kitchenKey', JSON.stringify(k));
+      }, key);
+      const p = await ctx.newPage();
+      let asked = '';
+      p.on('dialog', d => { asked = d.message(); d.dismiss(); });
+      await p.goto(B + '/index.html#ninja-cookies');
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.evaluate(() => {
+        const b = document.querySelector('[data-act="reset-local"]');
+        if (b) b.click();
+      });
+      await p.waitForTimeout(500);
+      const stillThere = await p.evaluate(() => !!localStorage.getItem('kt.recipes'));
+      await ctx.close();
+      return { asked, stillThere };
+    };
+
+    const alone = await askedWith('');
+    chk('the undo still asks before doing anything', alone.asked.length > 40, alone.asked.slice(0, 60));
+    chk('and dismissing it changes nothing', alone.stillThere === true);
+    chk('on a phone that shares nothing, it promises what it always did',
+      /undoes everything changed, added, or removed on this phone/i.test(alone.asked));
+    chk('and says nothing about everyone, because there is no everyone',
+      !/sent to everyone/i.test(alone.asked), alone.asked.slice(-90));
+
+    const shares = await askedWith('family-secret');
+    chk('on a phone that shares, it warns what it cannot take back',
+      /will NOT take those back/i.test(shares.asked), shares.asked.slice(-160));
+    chk('and says what to do about those instead',
+      /Save again/i.test(shares.asked), shares.asked.slice(-90));
+    chk('while still saying what it DOES undo',
+      /undoes everything changed, added, or removed on this phone/i.test(shares.asked));
+    chk('and it never prints the passphrase into a dialog',
+      !shares.asked.includes('family-secret'));
+  }
+
+  console.log('\n== Typing a new recipe in shares it too (S09) ==');
+  {
+    /* `S04` wired sharing into Edit mode only, which left the family a rule
+       nobody could have guessed: change a recipe and everyone sees it, type
+       a new one in and only you do. The video path had told the server
+       since the day it was built, so two of the three ways in already
+       shared — and the quiet one was the one somebody uses to add Joan's
+       card off the counter. */
+    const addOne = async (opts, key, title) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      await p.click('[data-act="add-path"][data-key="review"]');
+      await p.waitForSelector('#a-title');
+      await p.fill('#a-title', title);
+      await p.fill('#a-ing-0', '2 cups flour');
+      await p.fill('#a-step-0', 'Mix it.');
+      await p.click('[data-act="add-save"]');
+      await p.waitForTimeout(1400);
+      const out = {
+        puts: stub.puts, accepted: stub.accepted,
+        notice: await p.evaluate(() => {
+          const n = document.querySelector('.notice');
+          return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+        }),
+        stored: await p.evaluate(() => {
+          const raw = localStorage.getItem('kt.recipes');
+          return raw ? JSON.parse(raw).some(r => /S09/.test(r.title)) : false;
+        }),
+        errs: p.errs.slice()
+      };
+      await ctx.close();
+      return out;
+    };
+
+    const quiet = await addOne({}, '', 'Typed In S09 Local');
+    chk('with no passphrase a new recipe goes nowhere', quiet.puts.length === 0);
+    chk('and is still saved on the phone', quiet.stored === true);
+
+    const sent = await addOne({}, 'family-secret', 'Typed In S09 Shared');
+    chk('with one, a typed-in recipe reaches the family too',
+      sent.puts.length === 1, String(sent.puts.length));
+    chk('at its own address', /\/api\/recipes\/typed-in-s09-shared$/.test(sent.puts[0].path),
+      sent.puts[0].path);
+    chk('carrying the passphrase', sent.puts[0].key === 'family-secret');
+    chk('and the recipe as typed', sent.puts[0].body.recipe.title === 'Typed In S09 Shared');
+    chk('it is on the phone as well', sent.stored === true);
+    chk('and the reader is told', /famil/i.test(sent.notice), sent.notice);
+    chk('nothing threw', quiet.errs.length === 0 && sent.errs.length === 0,
+      quiet.errs.concat(sent.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
