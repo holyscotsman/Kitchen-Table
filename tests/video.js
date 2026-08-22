@@ -1679,9 +1679,10 @@ async function freshPage(br, opts) {
       { id: 'bbb-two', title: 'Bbb Two', category: 'Dinner', servings: 4,
         contributor: 'Joan', ingredients: ['2 onions'], steps: ['Cook them.'], tags: ['soup'] }
     ];
-    const openMenu = async (opts, key, seed) => {
+    const openMenu = async (opts, key, seed, book) => {
       const { ctx, p, stub } = await freshPage(br, opts);
-      await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)), BOOK3);
+      await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)),
+        book || BOOK3);
       if (key) await p.addInitScript(k =>
         localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
       if (seed !== undefined) await p.addInitScript(
@@ -1759,6 +1760,92 @@ async function freshPage(br, opts) {
       /send 1 change\b/i.test(await outbox(junk2.p)), await outbox(junk2.p));
     chk('nothing threw', junk2.p.errs.length === 0, junk2.p.errs.join(' | '));
     await junk.ctx.close(); await junk2.ctx.close();
+
+    /* `R136` — and the undo has to take the queue with it.
+     *
+     * `R127` wrote the rule this breaks: an entry stops being true when the
+     * copy it describes is gone. It then reasoned that `kt.unsent` needed no
+     * equivalent, "because it is read through `byId` and an id with nothing
+     * behind it simply drops out". That is true of Remove and false of the
+     * undo: the undo drops the OVERLAY, so `byId` stops finding this phone's
+     * changed copy and starts finding the PUBLISHED one — an id with
+     * something behind it, and not the thing that was queued.
+     *
+     * So the reader presses the most honest button in the app, is told every
+     * change on this phone is undone, and the Menu goes on offering to send
+     * one to everyone. Tapping it sends the published copy back over the
+     * family's row, which is a no-op on a good day and an overwrite of
+     * somebody else's newer edit on a bad one.
+     *
+     * The id has to be one the published book really holds, because that is
+     * the whole mechanism: an invented id drops out on its own and the
+     * screen check goes quiet with the bug still in place — measured. So it
+     * is TAKEN FROM the shipped file rather than typed here, which is the
+     * only version of this test that cannot be hollowed out by an edit to
+     * recipes.json. */
+    const PUBLISHED = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'recipes.json'), 'utf8'));
+    const REAL_ID = PUBLISHED[0].id;
+    chk('the published book has an id to test the undo with', !!REAL_ID, REAL_ID);
+    const REAL = [{ id: REAL_ID, title: PUBLISHED[0].title + ' (my way)',
+      category: 'Dinner', servings: 4, contributor: 'Joan',
+      ingredients: ['1 steak'], steps: ['Grill it.'] }];
+    const undone = await openMenu({}, 'family-secret', [REAL_ID], REAL);
+    chk('a queued change is offered before the undo',
+      /send 1 change\b/i.test(await outbox(undone.p)), await outbox(undone.p));
+    undone.p.on('dialog', d => d.accept());
+    await undone.p.evaluate((id) => { location.hash = '#' + id; }, REAL_ID);
+    await undone.p.waitForSelector('[data-act="toggle-edit"]');
+    await undone.p.click('[data-act="toggle-edit"]');
+    await undone.p.waitForSelector('[data-act="reset-local"]');
+    await undone.p.click('[data-act="reset-local"]');
+    await undone.p.waitForTimeout(400);
+    await undone.p.evaluate(() => { location.hash = '#menu'; });
+    await undone.p.waitForSelector('.cardgrid, .rrow, .rcard');
+    chk('the undo takes the queue with it',
+      (await outbox(undone.p)) === '', await outbox(undone.p));
+    chk('and the queue is empty in storage, not just on screen',
+      ((await stored(undone.p)) || []).length === 0,
+      JSON.stringify(await stored(undone.p)));
+    chk('and the undo sends nothing \u2014 it undoes, it does not flush',
+      undone.stub.puts.length === 0,
+      JSON.stringify(undone.stub.puts.map(x => x.path)));
+    chk('and nothing threw across the undo', undone.p.errs.length === 0,
+      undone.p.errs.join(' | '));
+    await undone.ctx.close();
+
+    /* And on a phone that shares nothing, where the offer was never on
+       screen to give it away. The queue outlives the passphrase — someone
+       who clears that box and later puts it back would meet the same stale
+       offer, with no undo left to blame. */
+    const quietUndo = await openMenu({}, '', [REAL_ID], REAL);
+    quietUndo.p.on('dialog', d => d.accept());
+    await quietUndo.p.evaluate((id) => { location.hash = '#' + id; }, REAL_ID);
+    await quietUndo.p.waitForSelector('[data-act="toggle-edit"]');
+    await quietUndo.p.click('[data-act="toggle-edit"]');
+    await quietUndo.p.waitForSelector('[data-act="reset-local"]');
+    await quietUndo.p.click('[data-act="reset-local"]');
+    await quietUndo.p.waitForTimeout(400);
+    chk('the undo empties the queue whether or not this phone shares',
+      ((await stored(quietUndo.p)) || []).length === 0,
+      JSON.stringify(await stored(quietUndo.p)));
+    await quietUndo.ctx.close();
+
+    /* The other half of `R127`'s sentence, which is still true and is left
+       alone on purpose: Remove takes the recipe out of the overlay, so `byId`
+       finds nothing and the id drops out with no bookkeeping at all. Pinned
+       so the asymmetry stays a decision rather than an accident. */
+    const removed = await openMenu({}, 'family-secret', ['aaa-one', 'bbb-two']);
+    removed.p.on('dialog', d => d.accept());
+    await removed.p.click('[data-act="toggle-remove"]');
+    await removed.p.waitForSelector('[data-act="remove"][data-id="aaa-one"]');
+    await removed.p.click('[data-act="remove"][data-id="aaa-one"]');
+    await removed.p.waitForTimeout(400);
+    await removed.p.evaluate(() => { location.hash = '#menu'; });
+    await removed.p.waitForTimeout(200);
+    chk('a removed recipe drops out of the queue with no bookkeeping',
+      /send 1 change\b/i.test(await outbox(removed.p)), await outbox(removed.p));
+    await removed.ctx.close();
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
