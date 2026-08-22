@@ -104,7 +104,14 @@
        preferences on purpose: it is not an identity and it names nobody,
        so there is nothing here to keep secret from the person holding the
        phone — only from the internet. */
-    kitchenKey: "kt.kitchenKey"
+    kitchenKey: "kt.kitchenKey",
+    /* `S13` — ids whose local change did not reach the family, so the phone
+       can offer to send them again. **Ids only, never recipes**: every one
+       is read fresh from the overlay at the moment it is sent, so a change
+       made after the failure goes too and an id whose recipe has since been
+       removed simply drops out. A second copy of the book stored here would
+       be a second thing to keep right. */
+    unsent: "kt.unsent"
   };
 
   /* The week planner's slots. All three exist on every day; the UI shows
@@ -1483,6 +1490,17 @@
     h += "</div>";
 
     h += noticeHtml("hint", "");
+    /* `S13` — the way back. Only on a phone that shares (a phone in
+       local-only mode has nothing to send and never queued anything), only
+       when the queue still points at recipes this phone has, and never
+       while a send is already running. */
+    var waiting = kitchenKey() && !S.sharing ? unsentRecipes() : [];
+    if (waiting.length) {
+      h += '<button type="button" class="outlinebtn press" data-act="send-unsent">' +
+           "Send " + waiting.length +
+           (waiting.length === 1 ? " change" : " changes") +
+           " to the family’s book</button>";
+    }
     h += "</div></header>";
 
     var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
@@ -2521,6 +2539,55 @@
     S.saved = false;
   }
 
+  /* `S13` — the queue of changes the kitchen could not take.
+   *
+   * `DECISIONS.md S` left this open deliberately: a failed single edit could
+   * honestly say "try Save again", but a failed bulk tag could not, because
+   * redoing it means re-picking every recipe and a rename cannot be redone
+   * at all once the old name is gone. So `S11` named the state and stopped.
+   * This is the feature that ruling said was the real fix.
+   *
+   * Coerced where it is read, like every other key this app reads back
+   * (`R21`, `R40`, `R62`): a queue that is not a list is no queue, and one
+   * holding rubbish keeps the ids it can use rather than throwing.
+   */
+  function unsentIds() {
+    var raw;
+    try { raw = load(K.unsent, []); } catch (e) { return []; }
+    if (!Array.isArray(raw)) return [];
+    var seen = {}, out = [];
+    raw.forEach(function (x) {
+      var id = typeof x === "string" ? x.trim() : "";
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push(id);
+    });
+    return out;
+  }
+
+  /* Best effort, and it says nothing either way. The sentence about the
+     change itself was already told truthfully; a queue that could not be
+     written costs the reader a button, not their words. */
+  function setUnsent(ids) {
+    try { save(K.unsent, ids); } catch (e) {}
+  }
+
+  function queueUnsent(ids) {
+    var have = unsentIds();
+    ids.forEach(function (id) { if (have.indexOf(id) === -1) have.push(id); });
+    setUnsent(have);
+  }
+
+  function clearUnsent(ids) {
+    setUnsent(unsentIds().filter(function (id) { return ids.indexOf(id) === -1; }));
+  }
+
+  /* The recipes behind the queue, read fresh. An id with nothing behind it
+     is dropped here rather than stored away — it is not a recipe any more. */
+  function unsentRecipes() {
+    return unsentIds().map(byId).filter(Boolean);
+  }
+
   /* `S12` — what is still happening, for the eye. The count moves; the
      sentence the ear gets (`liveMessage`) deliberately does not, or a
      48-recipe burst would be read out forty-eight times. */
@@ -2581,12 +2648,15 @@
       { method: "PUT", body: { recipe: orderFields(recipe) }, key: key, timeout: 30000 }, true)
       .then(function (data) {
         S.sharing = null;
+        clearUnsent([recipe.id]);
         setNotice(data && data.publishing
           ? "Saved, and sent to the family’s book — everyone will see it in a few minutes."
           : "Saved, and sent to the family’s book. It appears for everyone at the next nightly update.");
       })
       .catch(function (err) {
         S.sharing = null;
+        /* `S13` — it is still only here, so the phone remembers to offer it. */
+        queueUnsent([recipe.id]);
         var st = (err && err.status) || 0;
         var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
         setNotice(refused
@@ -2618,6 +2688,11 @@
    *   - every recipe but the last says `?more=1`, so the republish reads a
    *     database holding the whole change instead of racing it.
    */
+  /* One sentence, one place. Said after every bulk failure, and pointing at
+     the button `S13` put on the Menu — the only screen it lives on, so it is
+     named rather than gestured at. */
+  var AGAIN = "Send them again from the All recipes screen.";
+
   function shareEdits(list, localMsg) {
     var key = kitchenKey();
     if (!key || !list.length) { setNotice(localMsg); return; }
@@ -2629,6 +2704,7 @@
 
     function done() {
       S.sharing = null;
+      clearUnsent(list.map(function (r) { return r.id; }));
       var one = list.length === 1;
       setNotice(localMsg + " Sent to the family’s book — " +
         (publishing
@@ -2639,6 +2715,10 @@
 
     function stop(err) {
       S.sharing = null;
+      /* Everything that landed is off the queue; everything from the one
+         that failed onwards goes on it. `sent` is the boundary. */
+      clearUnsent(list.slice(0, sent).map(function (r) { return r.id; }));
+      queueUnsent(list.slice(sent).map(function (r) { return r.id; }));
       var st = (err && err.status) || 0;
       var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
       /* A rate limit is its own thing: not a refusal of the recipe, not the
@@ -2650,26 +2730,25 @@
       if (st === 429) {
         setNotice(localMsg + " The family’s book asked for a break" +
           (sent ? " after " + sent + " of " + list.length + ". The rest are"
-                : ", so this change is") + " still only on this phone.");
+                : ", so this change is") + " still only on this phone. " + AGAIN);
         return;
       }
       if (refused) {
         setNotice(localMsg + " The family’s book would not take " +
           (sent ? "the rest" : "them") + ": " + err.message +
-          " They stay on this phone until that is sorted.");
+          " They stay on this phone until that is sorted, and then " +
+          AGAIN.charAt(0).toLowerCase() + AGAIN.slice(1));
         return;
       }
-      /* No "try again" here, unlike `S04`'s single edit. Pressing Save
-         once more is one tap; redoing a bulk tag means re-picking every
-         recipe, and a rename cannot be redone at all once the old name is
-         gone. An instruction the reader cannot follow is worse than none —
-         the state is named, and the paths that always work (another edit,
-         or Download updated recipes.json) are on the help page. */
+      /* `S11` ended these sentences here on purpose: redoing a bulk tag
+         means re-picking every recipe and a rename cannot be redone at all,
+         so "try again" was an instruction nobody could follow. `S13` built
+         the thing that makes it followable, so the sentence names it. */
       setNotice(localMsg + " " + (sent
         ? sent + " of " + list.length + " reached the family’s book before it " +
-          "stopped answering — the rest are still only on this phone."
+          "stopped answering — the rest are still only on this phone. "
         : "The family’s book couldn’t be reached just now, so this change " +
-          "is still only on this phone."));
+          "is still only on this phone. ") + AGAIN);
     }
 
     function step(i) {
@@ -3036,7 +3115,11 @@
             "or merging a tag, go to everyone the same way. The app tells " +
             "you which happened every time; if it says <em>saved on this " +
             "phone</em>, or <em>only on this phone</em>, it means only this " +
-            "phone."
+            "phone. " +
+            /* `S13` — and the way back, now that there is one. */
+            "When something doesn’t get through, a button appears at the top " +
+            "of the <strong>All recipes</strong> screen offering to send it " +
+            "again — it stays there until it does."
           : "<strong>Your changes live on your phone only.</strong> Nobody " +
             "else sees them until they’re published. To send them straight " +
             "to everyone instead, put the family passphrase in the " +
@@ -5478,6 +5561,14 @@
       var pid = el.getAttribute("data-id");
       S.tagSel[pid] = !S.tagSel[pid];
       render(); return;
+    }
+    if (act === "send-unsent") {
+      var again = unsentRecipes();
+      if (!again.length) { setUnsent([]); render(); return; }
+      shareEdits(again, again.length === 1
+        ? "Sending the change that was still only here."
+        : "Sending the " + again.length + " changes that were still only here.");
+      return;
     }
     if (act === "open-bulk") { openSheet("tagSheetOpen", el); return; }
     if (act === "close-bulk") { closeSheet("tagSheetOpen"); return; }

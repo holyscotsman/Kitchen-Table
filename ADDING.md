@@ -24,6 +24,11 @@ else sees it depends on one box.
 this phone*, or *only on this phone*, it means only this phone — whatever the
 box says, whatever you expected. Believe the sentence, not the setting.
 
+If something doesn't get through — the site can be asleep, and takes about a
+minute to wake — a button appears at the top of the **All recipes** screen
+offering to send it again. It stays there until it goes, so you can shut the
+phone and come back to it.
+
 Two things never go to everyone, no matter what: **removing** a recipe, and
 **photos**. Both stay on your phone until a file is published in the ordinary
 way.
