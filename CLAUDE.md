@@ -1389,10 +1389,47 @@ happily as a whole one, so the ordering changes nothing today. The order is
 kept, because the next rule added may not be as forgiving, and the comment
 now says that instead of the thing that sounded better.
 
+### By eye the two modes could not be confused; by ear they were one list
+
+`R140`. `R85` asked whether Remove mode and Tag mode can be told apart **by
+eye**, found that they were drawn in the same colours, and settled it with
+the danger outline — checked ever since. Nobody asked the same question of
+the other channel, and this app exists because someone reads it with low
+vision.
+
+Measured. A row in the ordinary list is a link named *"Bacon Ranch Chicken
+Casserole, Dinner · Joan American"*. **The same row in Remove mode is a
+button named "Bacon Ranch Chicken Casserole Joan"** — the recipe's name, and
+nothing whatever about removing it. The only difference a screen reader can
+perceive is link-versus-button, which is not a warning. Tag mode was already
+right: its rows carry `aria-pressed`, so they announce as toggles. Remove —
+the one action that cannot be undone — announced nothing.
+
+It is exactly what `R131`'s sweep cannot catch. That sweep asks whether every
+control **has** a name; this is the next question, whether the name says what
+the control **does**.
+
+The sentence is the app's own, twice over: the planner's delete button has
+always read *"Remove <name> from the plan"*, and `S10` settled that Menu
+removal says *"from this phone"* because that is the truth about its scope —
+so the row that starts the removal now says the same words as the confirm
+that finishes it, which `R138` had just taught to name the recipe properly.
+The contributor drops out of the name and stays on the screen: in this mode
+it is decoration, and the action and the recipe are what a reader needs.
+
+**The mode buttons are left alone, and that is a decision rather than an
+oversight.** They convey themselves by relabelling — "Remove" becomes
+"Done" — which is weak, because "Done" alone does not say what is being
+finished. Giving them `aria-pressed` while the label also changes is
+double-signalling; giving them a stable label instead would change what the
+screen says, which is a design question and Jason's call, not a bug fix.
+With the rows now naming the action, the mode's meaning is carried where the
+reader actually is.
+
 ### Verified
 
-The suite after the video arc: **1631 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 325, sec 56,
+The suite after the video arc: **1636 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 330, sec 56,
 plan 79, video 252, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
