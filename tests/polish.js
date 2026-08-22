@@ -3015,6 +3015,31 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     const line = (adding.match(/one of ([^.]+)\./) || [])[1] || '';
     const docCats = line.replace(/\s+/g, ' ').split(/,\s*|\s+and\s+/)
       .map(x => x.trim()).filter(Boolean);
+    /* `S07` — and the claim the `S` arc falsified in this file too. `S06`
+       fixed the in-app help; the walkthrough said the same thing in two
+       more places and nobody had looked, so for a while the document handed
+       to the family **contradicted itself**: its opening said an edit is
+       yours alone, and the section the same arc had just added said the
+       passphrase sends it to everyone.
+
+       Two-way, keyed off whether the app can actually share at all: if
+       `shareEdit` ever goes away, a walkthrough still promising the
+       passphrase fails just as loudly as one denying it does today. */
+    const canShare = /function shareEdit\(/.test(appSrc) && /kitchenKey\(\)/.test(appSrc);
+    chk('the app really does have a way to share an edit', canShare === true);
+    const saysAlone = /saves \*\*on your phone only\*\*|on your phone until published/i.test(adding);
+    chk('the walkthrough does not flatly deny what the app can do',
+      saysAlone !== canShare,
+      saysAlone ? 'it still says edits stay on the phone, full stop' : 'ok');
+    chk('and it names the box that decides it',
+      /Family passphrase/.test(adding) === canShare);
+    /* The two things that genuinely never leave the phone must still say so
+       — `DECISIONS.md S` left removal local on purpose, and photos have
+       never travelled. Sweeping those along would be the opposite mistake. */
+    chk('while removal is still described as staying put',
+      /\*\*removing\*\* a recipe|Remove a recipe/i.test(adding));
+    chk('and so are photos', /photo/i.test(adding));
+
     chk('the app still has ten courses', appCats.length === 10, appCats.join(','));
     chk('and the walkthrough lists exactly those, in that order',
         docCats.join('|') === appCats.join('|'),
