@@ -2939,6 +2939,90 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxH.close();
   }
 
+  console.log('\n== The family-facing walkthrough is held to the app (R111) ==');
+  {
+    /* `ADDING.md` is the page a person is handed — "no GitHub account, no
+       technical anything required" — and its own opening says that a step
+       which does not work as written is a bug in the page. Nothing checked
+       that. `R109` found the in-app help had drifted three times (`R94`,
+       `R102`, `R109`); a document sitting in the repo, read by whoever is
+       standing in a kitchen, drifts faster than the screen does, and the
+       reader it is written for is the least able to work around a wrong
+       instruction.
+
+       The rule is derivable rather than a list anyone maintains: **a label
+       these docs put in bold quotes must exist, verbatim, in the app.**
+       Bold alone is not enough of a signal — the docs bold plenty that is
+       not a control ("Android", "you don't have to wait") — but bold plus
+       quotes is how they mark a thing to press.
+
+       Everything checked out when this was written. That is the point of
+       writing it down: it stays checked. */
+    const fs = require('fs'), path = require('path');
+    const doc = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const adding = doc('ADDING.md'), readme = doc('README.md'), appSrc = doc('app.js');
+
+    const quoted = [...new Set([...adding.matchAll(/\*\*"([^"]+)"\*\*/g),
+                                ...readme.matchAll(/\*\*"([^"]+)"\*\*/g)].map(m => m[1]))];
+    chk('the walkthrough names controls in bold quotes', quoted.length >= 3, quoted.join(' | '));
+
+    const ctxD = await br.newContext({ ...devices['iPhone 13'] });
+    await ctxD.route('**/*.onrender.com/**', r => r.abort('failed'));
+    /* A photo and a local change, because two of the controls the doc names
+       only exist once there is something to download or undo — which is
+       itself behaviour the doc describes correctly ("If you added photos…"). */
+    await ctxD.addInitScript(() => localStorage.setItem('kt.images', JSON.stringify({
+      'chicken-cordon-bleu':
+        'data:image/gif;base64,R0lGODdhAgACAIABAICAgP///ywAAAAAAgACAAACA0QCBQA7' })));
+    const pD = await ctxD.newPage();
+    const dErrs = []; pD.on('pageerror', e => dErrs.push(e.message));
+    const seen = new Set();
+    const collect = async () => (await pD.evaluate(() =>
+      [...document.querySelectorAll('#app button, #app a, #app label')]
+        .map(e => (e.innerText || e.getAttribute('aria-label') || '')
+          .replace(/\s+/g, ' ').trim()).filter(Boolean)
+    )).forEach(l => seen.add(l));
+
+    for (const h of ['', '#menu', '#plan', '#add', '#help', '#chicken-cordon-bleu']) {
+      await pD.goto(B + '/index.html' + h);
+      await pD.waitForTimeout(600);
+      await collect();
+    }
+    await pD.goto(B + '/index.html#chicken-cordon-bleu');
+    await pD.waitForSelector('.r-title');
+    await pD.click('[data-act="toggle-edit"]');
+    await pD.waitForSelector('#e-title');
+    await pD.waitForTimeout(400);
+    await collect();
+    /* Save an edit so the phone has local changes: the undo only appears
+       once there is something to undo. */
+    await pD.fill('#e-title', 'Chicken Cordon Bleu');
+    await pD.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pD.waitForTimeout(600);
+    await collect();
+
+    const missing = quoted.filter(q => !seen.has(q));
+    chk('every control the walkthrough names in quotes exists, word for word',
+        missing.length === 0, missing.join(' | '));
+
+    /* And the one list it spells out. The categories went from six to ten
+       once already, so a doc naming them by hand is a standing bet. */
+    const cats = (appSrc.match(/var CATS = \[([^\]]+)\]/) || [])[1] || '';
+    const appCats = [...cats.matchAll(/"([^"]+)"/g)].map(m => m[1]);
+    const line = (adding.match(/one of ([^.]+)\./) || [])[1] || '';
+    const docCats = line.replace(/\s+/g, ' ').split(/,\s*|\s+and\s+/)
+      .map(x => x.trim()).filter(Boolean);
+    chk('the app still has ten courses', appCats.length === 10, appCats.join(','));
+    chk('and the walkthrough lists exactly those, in that order',
+        docCats.join('|') === appCats.join('|'),
+        docCats.join('|') + '  vs  ' + appCats.join('|'));
+    chk('nothing threw', dErrs.length === 0, dErrs.join(' | '));
+    await ctxD.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

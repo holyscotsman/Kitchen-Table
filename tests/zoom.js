@@ -32,7 +32,25 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
      `R61` and `R16`: a route in the list is not the same as the route's
      content in the list. */
   const seedPlan = () => {
-    const iso = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    /* `R113` — days inside the week the planner is SHOWING, not offsets from
+       today. The planner draws Monday to Sunday of the current week, so
+       `today + 2` falls off the end of it every Saturday and Sunday: the
+       seed drew four meals Monday through Friday, three on Saturday and two
+       on Sunday, and the floor below rightly called that a seed that missed.
+       It failed every weekend, on any change or none — this suite went red
+       at midnight on a Friday with nothing touching it.
+
+       Local date parts, not `toISOString()`, for the same reason the app
+       uses them (`isoDate`): the UTC day and the local day are not the same
+       day for half the world, and a plan is kept in the cook's own days. */
+    const now = new Date();
+    const monday = new Date(now.getFullYear(), now.getMonth(),
+      now.getDate() - ((now.getDay() + 6) % 7));
+    const iso = (n) => {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + n);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+        '-' + String(d.getDate()).padStart(2, '0');
+    };
     localStorage.setItem('kt.plan', JSON.stringify([
       { id: 'pseed1', date: iso(0), slot: 'dinner', recipeId: 'chicken-cordon-bleu', servings: 8, titleThen: 'Chicken Cordon Bleu' },
       { id: 'pseed2', date: iso(0), slot: 'lunch', recipeId: 'potato-bacon-soup', servings: 6, titleThen: 'Potato Bacon Soup' },
