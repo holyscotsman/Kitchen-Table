@@ -297,6 +297,22 @@ is a real number while `r.servings` is absent, which is precisely how
 *adjusted from undefined* was produced. Print was already honest — `dl-pdf`
 and `plan-print` render the DOM, so only the two text paths were wrong.
 
+### One dot between two things that are there
+
+`R118`, the visible tail of what `R116` and `R117` chased. Four lines were
+built as `a + " · " + b` with both halves taken on trust, so a recipe with
+nobody named read **"Dinner ·"** on its card, **"· Dinner"** on its own page,
+**"Dinner · · matches ingredient"** when the search had something to add, and
+left an empty `<p>` on the front page (measured at zero height, so it cost no
+space — simply an element with nothing in it).
+
+Small on a screen and not small in a kitchen: this app exists because someone
+reads it with low vision, and a leading middle dot is punctuation noise where
+a name should be — and a screen reader says it out loud. `metaLine(parts)`
+drops the empties and joins the rest; it deliberately does **not** escape,
+because every caller assembles parts that are already escaped and one of them
+carries a `<span>` for the search match-note.
+
 ### A validator must judge what it stores, not what it was handed
 
 `R115`. `validateRecipe` read the **raw** string for every check and then
@@ -681,8 +697,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1389 functional checks** across eleven
-suites (kt 270, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1396 functional checks** across eleven
+suites (kt 277, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`

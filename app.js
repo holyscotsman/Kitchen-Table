@@ -740,6 +740,25 @@
    * (`startDraft`), so the field stays empty and Save cannot bake it in.
    * "Untitled recipe" is the app's own existing word for a nameless thing,
    * already used for a video job that arrives without one. */
+  /* `R118` — one dot between two things that are there.
+   *
+   * Four lines were built as `a + " · " + b` with both halves taken on
+   * trust, so a recipe with nobody named read "Dinner ·" on its card,
+   * "· Dinner" on its own page, and "Dinner · · matches ingredient" when
+   * the search had something to add. A stray separator is small on a screen
+   * and not small in a kitchen: this app exists because someone reads it
+   * with low vision, and a leading middle dot is punctuation noise where a
+   * name should be — and a screen reader says it out loud.
+   *
+   * Joins, and deliberately does NOT escape: every caller assembles parts
+   * that are already escaped, and one of them carries a `<span>` for the
+   * search match-note. */
+  function metaLine(parts) {
+    return parts.filter(function (x) {
+      return x !== undefined && x !== null && String(x).trim() !== "";
+    }).join(" · ");
+  }
+
   function titleOf(r) {
     var t = r && r.title !== undefined && r.title !== null ? String(r.title).trim() : "";
     return t || "Untitled recipe";
@@ -1320,8 +1339,10 @@
                '" alt="' + esc(titleOf(pick)) + '" />'
              : '<div class="hero__blank">' + ART.steam() + "</div>") +
            '<div class="hero__body">' +
-           '<p class="hero__meta">' + esc(pick.contributor) +
-           (pick.cookTime ? " · " + esc(pick.cookTime) : "") + "</p>" +
+           (function () {
+             var m = metaLine([esc(pick.contributor), esc(pick.cookTime)]);
+             return m ? '<p class="hero__meta">' + m + "</p>" : "";
+           })() +
            '<p class="hero__title">' + esc(titleOf(pick)) + "</p>" +
            "</div></a></section>";
     }
@@ -1382,11 +1403,12 @@
     var time = r.cookTime || r.prepTime || "";
     if (time.length > 14) time = "";
     /* meta is pre-escaped here — it is interpolated bare below. */
-    var meta = esc(r.contributor) + (time ? " · " + esc(time) : "");
+    var meta = metaLine([esc(r.contributor), time ? esc(time) : ""]);
     /* 088: a hit on something not visible on the card says so, so a tag or
        ingredient match doesn't read as a wrong result. */
     if (matchNote) {
-      meta += ' · <span class="matchnote">matches ' + esc(matchNote) + "</span>";
+      meta = metaLine([meta, '<span class="matchnote">matches ' +
+        esc(matchNote) + "</span>"]);
     }
     var src = imageFor(r);
     /* A photo replaces the category icon; without one, the icon is what tells
@@ -1402,7 +1424,7 @@
       lead +
       '<span class="rcard__body">' +
       '<span class="rcard__title">' + esc(titleOf(r)) + "</span>" +
-      '<span class="rcard__meta">' + esc(r.category) + " · " + meta + "</span>" +
+      '<span class="rcard__meta">' + metaLine([esc(r.category), meta]) + "</span>" +
       (tags.length
         ? '<span class="rcard__tags">' +
           tags.map(function (t) {
@@ -2065,7 +2087,8 @@
            '" decoding="async" /></button>';
     }
 
-    h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
+    h += '<p class="r-eyebrow">' +
+         metaLine([esc(r.contributor), esc(r.category)]) + "</p>";
     h += '<h1 class="r-title">' + esc(titleOf(r)) +
          fieldFlagChip("title", fieldFlags) + "</h1>";
 
