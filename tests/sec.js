@@ -360,6 +360,113 @@ const hostile = JSON.stringify({
     chk('and the scan actually found the attributes', found.length > 40,
       String(found.length));
   }
+  console.log('\n== The exemptions check themselves now (R114) ==');
+  {
+    /* `R54`'s list above exempts `id`, `act` and `cls` as "literals passed
+       by the caller", and every one of them is a literal today — checked by
+       hand, twice, once when each was added.
+
+       But that sentence is an assertion about CALL SITES, and nothing
+       verified it. One `tagsFieldHtml(r.id, …)` written next year leaves
+       this suite green while a recipe id goes unescaped into an `id=` and a
+       `for=` attribute — and `normalizeRecipe` deliberately does not
+       constrain ids, because `recipes.json` is hand-editable by design and
+       `db-sync` regenerates it nightly with nobody watching. An exemption
+       allowed to drift is a hole (`R49`), so the exemption is enforced
+       rather than remembered, exactly as `R48` did for colours. */
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const CALLER_LITERAL = ['id', 'act', 'cls'];
+
+    /* Top-level functions, by this file's one consistent indent. */
+    const chunks = src.split(/\n  function /).slice(1).map((c) => {
+      const close = c.indexOf(')');
+      const head = c.slice(0, close);
+      return { name: head.slice(0, head.indexOf('(')),
+               params: head.slice(head.indexOf('(') + 1).split(',')
+                 .map((s) => s.trim()).filter(Boolean),
+               body: c };
+    });
+
+    /* Split an argument list on commas that are not inside brackets, quotes
+       or a nested call — "esc(a, b)" must count as one argument. */
+    const splitArgs = (s) => {
+      const out = []; let depth = 0, cur = '', q = '';
+      for (const ch of s) {
+        if (q) { cur += ch; if (ch === q) q = ''; continue; }
+        if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+        if ('([{'.includes(ch)) depth++;
+        if (')]}'.includes(ch)) depth--;
+        if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+        cur += ch;
+      }
+      if (cur.trim()) out.push(cur.trim());
+      return out;
+    };
+    const isLiteral = (a) => /^(["'])(?:(?!\1)[^\\])*\1$/.test(a.trim());
+
+    let paramsChecked = 0, localsChecked = 0;
+    const bad = [];
+
+    for (const fn of chunks) {
+      for (const p of CALLER_LITERAL) {
+        const at = fn.params.indexOf(p);
+        if (at === -1) continue;
+        /* Only functions that actually put it in an attribute matter. */
+        if (!new RegExp('="\'\\s*\\+\\s*' + p + '\\s*\\+').test(fn.body)) continue;
+        paramsChecked++;
+        const calls = [...src.matchAll(new RegExp('\\b' + fn.name + '\\(', 'g'))];
+        for (const c of calls) {
+          /* The declaration matches `name(` too, and its "arguments" are the
+             parameter names — which are never literals. */
+          if (src.slice(Math.max(0, c.index - 9), c.index) === 'function ') continue;
+          const rest = src.slice(c.index + c[0].length);
+          const end = (() => {
+            let d = 1, q = '';
+            for (let i = 0; i < rest.length; i++) {
+              const ch = rest[i];
+              if (q) { if (ch === q) q = ''; continue; }
+              if (ch === '"' || ch === "'") { q = ch; continue; }
+              if (ch === '(') d++;
+              if (ch === ')') { d--; if (!d) return i; }
+            }
+            return -1;
+          })();
+          if (end < 1) continue;
+          const args = splitArgs(rest.slice(0, end));
+          if (!args.length) continue;
+          if (!isLiteral(args[at] || '')) {
+            bad.push(fn.name + '(' + (args[at] || '') + ') — argument ' +
+                     (at + 1) + ' (' + p + ') is not a literal');
+          }
+        }
+      }
+      /* And the same name declared locally: `var cls = <ternary of literals>`
+         is fine, `var cls = r.something` is the same hole wearing a `var`. */
+      for (const p of CALLER_LITERAL) {
+        const decl = new RegExp('\\bvar ' + p + ' = ([^;]+);', 'g');
+        let m;
+        while ((m = decl.exec(fn.body))) {
+          if (!new RegExp('="\'\\s*\\+\\s*' + p + '\\s*\\+').test(fn.body)) continue;
+          localsChecked++;
+          /* No property access on the right: that is what lets data in. */
+          if (/[A-Za-z_$][A-Za-z0-9_$]*\s*\./.test(m[1])) {
+            bad.push(fn.name + ': var ' + p + ' = ' + m[1].trim().slice(0, 40) +
+                     ' — reads a property, so it is not the app\'s own literal');
+          }
+        }
+      }
+    }
+
+    chk('every caller-literal exemption really is a literal at every call site',
+      bad.length === 0, bad.join(' | '));
+    /* Floors, so a rename or a refactor cannot quietly empty this. */
+    chk('and the scan found the functions it is meant to police',
+      paramsChecked >= 2, 'params checked: ' + paramsChecked);
+    chk('and the locally-declared ones too', localsChecked >= 1,
+      'locals checked: ' + localsChecked);
+  }
+
 
   console.log('\n== What the workflows are allowed to do (R38) ==');
   {
