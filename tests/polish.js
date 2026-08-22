@@ -2028,6 +2028,71 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       missing.length === 0, missing.join(', '));
   }
 
+  console.log('\n== Nothing writes a store from a stale copy of it (R135) ==');
+  {
+    /* `R134` and `R135` fixed three stores that were written whole from a
+       boot-time snapshot, so a second tab's save erased the first's. The
+       fix is only durable if a NEW call site cannot go round it, which is
+       checkable rather than remembered: the two low-level writers must be
+       reachable from their re-reading wrapper and from nowhere else.
+
+       The asymmetry is worth stating because it is the reason `kt.images`
+       needed only half a fix: IndexedDB writes one key at a time and was
+       never in the way; the localStorage fallback serialises the whole map.
+
+       And two stores had the rule from the start — `kt.unsent` and
+       `kt.shared` both read fresh before writing — which is what made the
+       omission in the other three worth naming. */
+    const src135 = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const nRecipes = (src135.match(/persistRecipes\(\)/g) || []).length;
+    const nPlan = (src135.match(/persistPlan\(\)/g) || []).length;
+
+    /* One definition plus one call, inside the wrapper. */
+    chk('persistRecipes is called only from writeRecipes',
+      nRecipes === 2 &&
+      /function writeRecipes\([\s\S]*?return persistRecipes\(\);/.test(src135),
+      'persistRecipes call sites: ' + nRecipes);
+    chk('persistPlan is called only from writePlan',
+      nPlan === 2 &&
+      /function writePlan\([\s\S]*?return persistPlan\(\);/.test(src135),
+      'persistPlan call sites: ' + nPlan);
+    /* Sliced, not regexed across the whole file: `[\s\S]*?` from a function
+       name happily matches something in the NEXT function, which makes the
+       check pass for a body that does no such thing. Caught by mutating the
+       queue below and watching nothing fail. */
+    const bodyOf = (name) => {
+      const at = src135.indexOf('function ' + name + '(');
+      return at < 0 ? '' : src135.slice(at, src135.indexOf('\n  }', at));
+    };
+    chk('each wrapper reads the store before it changes it',
+      /load\(K\.recipes/.test(bodyOf('writeRecipes')) &&
+      /load\(K\.plan/.test(bodyOf('writePlan')),
+      'writeRecipes/writePlan do not re-read');
+
+    /* The photo map is written in two places and both go through the
+       re-read; the IndexedDB branch is per-key and needs none. */
+    const imgWrites = (src135.match(/(localStorage\.setItem|save)\(K\.images/g) || []).length;
+    chk('every write of the photo map starts from what is stored',
+      imgWrites === 2 && (src135.match(/storedImages\(\)/g) || []).length >= 3,
+      imgWrites + ' writes, ' + (src135.match(/storedImages\(\)/g) || []).length + ' reads');
+    chk('while the IndexedDB path stays per-key, which never needed this',
+      /function idbPut\([\s\S]*?objectStore\("images"\)\.put\(/.test(src135));
+
+    /* The two that always had it. Pinned so a tidy-up cannot take it away. */
+    chk('the queue still reads itself before writing',
+      /unsentIds\(\)/.test(bodyOf('queueUnsent')), bodyOf('queueUnsent').slice(0, 80));
+    chk('and so does the note of where the family’s book put each recipe',
+      /sharedIds\(\)/.test(bodyOf('noteSharedId')), bodyOf('noteSharedId').slice(0, 80));
+    /* A floor: a slice that stopped finding these would read as a clean
+       pass for the same reason the regex above did. */
+    chk('and the slices really found those functions',
+      ['writeRecipes', 'writePlan', 'queueUnsent', 'noteSharedId']
+        .every((n) => bodyOf(n).length > 40),
+      ['writeRecipes', 'writePlan', 'queueUnsent', 'noteSharedId']
+        .map((n) => n + '=' + bodyOf(n).length).join(' '));
+  }
+
   console.log('\n== Which screens go on paper is a question about the list (R133) ==');
   {
     /* The print pass kept four names of its own, in another file, with its

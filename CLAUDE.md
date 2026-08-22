@@ -1181,10 +1181,47 @@ recipe while this one is editing it. The edit wins and puts it back —
 the reader is about to be told it was saved, so it has to be, and an edit is
 typing where a removal is one tap that can be made again.
 
+### The other two stores were written whole as well
+
+`R135`. `R134` fixed `kt.recipes`; the app owns two more stores and both had
+the same hole.
+
+**The week.** `persistPlan()` wrote `S.plan` from three call sites —
+planning a meal, changing its servings, removing it. Measured with two tabs
+planning two *different* days: one meal survived. `writePlan(change)` reads
+the stored week, applies the change to that, and writes it back, coerced on
+the way in through the same `planFrom` the boot read uses, because a plan
+written by another tab is a stored shape like any other.
+
+**The photos, on one path only.** `setImage` serialises the whole in-memory
+map. On IndexedDB that is per-key and was never in the way; the
+**localStorage fallback** — the path a phone without IndexedDB takes, and
+the only reason the "no room" message exists — wrote the whole map from this
+tab's boot-time copy. Measured with two tabs attaching to two different
+recipes: one picture survived. Reading the stored map back also lets a tab
+*see* the other's photos, so the entries are folded into the in-memory cache
+rather than only into the write.
+
+**Two stores already had the rule**, which is what made the omission in the
+other three worth naming: `queueUnsent` reads `unsentIds()` fresh and
+`noteSharedId` reads `sharedIds()` fresh, and always have. The rule existed;
+it had simply never reached the two biggest stores.
+
+So the fix is pinned where a new call site could go round it: `persistRecipes`
+and `persistPlan` are reachable from their re-reading wrapper and from
+nowhere else, and both writes of the photo map start from `storedImages()`.
+
+And the check that nearly did not check anything: `/function queueUnsent\(
+[\s\S]*?unsentIds\(\)/` matches `unsentIds()` in the *next* function, so it
+passed for a body that had stopped reading. Found by mutating the queue and
+watching nothing fail. The bodies are sliced now, with a floor that the
+slices found them — the second time this session a cross-file lazy match
+produced a check that could not fail.
+
 ### Verified
 
-The suite after the video arc: **1571 functional checks** across eleven
-suites (kt 323, feat 71, add 113, relay 16, quick 76, polish 307, sec 56,
+The suite after the video arc: **1583 functional checks** across eleven
+suites (kt 323, feat 75, add 113, relay 16, quick 76, polish 315, sec 56,
 plan 79, video 244, backend 271, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

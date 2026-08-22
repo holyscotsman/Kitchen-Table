@@ -1246,7 +1246,9 @@
       );
     }
     try {
-      localStorage.setItem(K.images, JSON.stringify(IMG));
+      var map = storedImages();
+      map[id] = dataUrl;
+      localStorage.setItem(K.images, JSON.stringify(map));
       return Promise.resolve("");
     } catch (e) {
       delete IMG[id];
@@ -1254,10 +1256,32 @@
     }
   }
 
+  /* `R135` — the photo map, on `R134`'s rule, and only where the rule was
+     broken. IndexedDB writes one key at a time, so a second tab's photo is
+     never in the way; the fallback serialises the WHOLE map from this tab's
+     boot-time copy, so a photo attached in another tab was written over.
+     Measured with two tabs attaching to two different recipes: one picture
+     survived.
+
+     Reading the stored map back also lets this tab SEE the other one's
+     photos, which is why the entries are folded into the in-memory cache
+     rather than only into the write. */
+  function storedImages() {
+    var raw;
+    try { raw = load(K.images, {}); } catch (e) { return {}; }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    Object.keys(raw).forEach(function (k) {
+      if (IMG[k] === undefined) IMG[k] = raw[k];
+    });
+    return raw;
+  }
+
   function removeImage(id) {
     delete IMG[id];
-    if (imgDb) idbDelete(id);
-    else save(K.images, IMG);
+    if (imgDb) { idbDelete(id); return; }
+    var map = storedImages();
+    delete map[id];
+    save(K.images, map);
   }
 
   /* Downscaled in the browser: a phone photo is several megabytes and
@@ -3260,9 +3284,10 @@
      10a. The week planner — Phase 15, ruled into 1.0
      ====================================================================== */
 
-  function loadPlan() {
-    var p = load(K.plan, []);
-    S.plan = Array.isArray(p) ? p.filter(function (e) {
+  function loadPlan() { S.plan = planFrom(load(K.plan, [])); }
+
+  function planFrom(p) {
+    return Array.isArray(p) ? p.filter(function (e) {
       return e && e.date && SLOTS.indexOf(e.slot) > -1;
     }).map(function (e) {
       /* Servings is a number by construction, so anything else is rotten
@@ -3280,6 +3305,19 @@
      later — but "later" is not "never", and the sentence that follows a plan
      is a promise. */
   function persistPlan() { return save(K.plan, S.plan); }
+
+  /* `R135` — the week, on `R134`'s rule. `persistPlan` writes `S.plan`: the
+     week this tab read at boot with this tab's change applied, so a second
+     tab planning a meal wrote a plan that had never heard of the first.
+     Measured with two tabs planning two different days: one meal survived.
+
+     Read fresh, change that, write it back — and coerced on the way in
+     through the same `planFrom` the boot read uses, because a plan written
+     by another tab is a stored shape like any other. */
+  function writePlan(change) {
+    S.plan = change(planFrom(load(K.plan, [])));
+    return persistPlan();
+  }
 
   function isoDate(d) {
     return d.getFullYear() + "-" +
@@ -6125,16 +6163,16 @@
       if (!pr || !S.pickFor) return;
       /* 126: the same recipe twice in a week is a plan, not an error — each
          entry stands alone with its own servings. */
-      S.plan.push({
+      var meal = {
         id: "p" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
         date: S.pickFor.date,
         slot: S.pickFor.slot,
         recipeId: pr.id,
         titleThen: titleOf(pr),
         servings: pr.servings
-      });
-      if (!persistPlan()) {
-        S.plan.pop();
+      };
+      if (!writePlan(function (list) { return list.concat([meal]); })) {
+        S.plan = S.plan.filter(function (e) { return e.id !== meal.id; });
         S.pickOpen = false;
         S.pickFor = null;
         setNotice(RECIPES_FULL_MSG);
@@ -6148,19 +6186,22 @@
     if (act === "plan-meal") { S.mealFor = key; openSheet("mealOpen", el); return; }
     if (act === "close-meal") { S.mealFor = null; closeSheet("mealOpen"); return; }
     if (act === "meal-serv-" || act === "meal-serv+") {
-      S.plan.forEach(function (e) {
-        if (e.id !== S.mealFor) return;
-        e.servings = act === "meal-serv-"
-          ? Math.max(1, e.servings - 1)
-          : Math.min(40, e.servings + 1);
+      writePlan(function (list) {
+        list.forEach(function (e) {
+          if (e.id !== S.mealFor) return;
+          e.servings = act === "meal-serv-"
+            ? Math.max(1, e.servings - 1)
+            : Math.min(40, e.servings + 1);
+        });
+        return list;
       });
-      persistPlan();
       render();
       return;
     }
     if (act === "plan-remove") {
-      S.plan = S.plan.filter(function (e) { return e.id !== key; });
-      persistPlan();
+      writePlan(function (list) {
+        return list.filter(function (e) { return e.id !== key; });
+      });
       if (S.mealOpen) { S.mealFor = null; closeSheet("mealOpen"); } else render();
       return;
     }
