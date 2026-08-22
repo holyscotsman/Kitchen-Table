@@ -40,12 +40,26 @@ function validateRecipe(r) {
   const out = {};
   if (!r.id || !/^[a-z0-9-]{1,80}$/.test(r.id)) return { error: "bad recipe id" };
   out.id = r.id;
+  /* `R115` — judge the value this will STORE, not the one it was handed.
+   * Every check here used to read the raw string and then `.trim()` it on
+   * the way out, which are two different strings: "   " is truthy, is a
+   * string, and is under the limit, so a title of three spaces passed the
+   * gate and landed in the database empty. A nameless recipe in everyone's
+   * book, from the one function whose whole job is to refuse what the app
+   * would never send.
+   *
+   * The contributor mattered more than the title: `putRecipe` inserts it
+   * into `kitchen.contributors`, so an empty one mints a blank row that
+   * shows up as a blank tile under "Whose recipe?" — and a contributor
+   * outlives the recipe that created it. */
   if (!r.title || typeof r.title !== "string" || r.title.length > 300) return { error: "bad title" };
   out.title = r.title.trim();
+  if (!out.title) return { error: "bad title" };
   if (!CATS.includes(r.category)) return { error: "unknown category " + JSON.stringify(r.category) };
   out.category = r.category;
   if (!r.contributor || typeof r.contributor !== "string" || r.contributor.length > 60) return { error: "bad contributor" };
   out.contributor = r.contributor.trim();
+  if (!out.contributor) return { error: "bad contributor" };
   if (!Number.isInteger(r.servings) || r.servings < 1 || r.servings > 40) return { error: "servings must be a whole number 1–40" };
   out.servings = r.servings;
   for (const k of ["ingredients", "steps", "flagged", "tags"]) {
@@ -81,7 +95,15 @@ function validateRecipe(r) {
     if (k === "image" && !/^images\/[a-z0-9-]{1,80}\.jpg$/.test(r[k].trim())) {
       return { error: "image must look like images/<name>.jpg" };
     }
-    out[k] = r[k].trim();
+    /* `R115` — and an optional field is absent or it has something in it.
+       Storing "" in a column that means "nothing here" gives the schema two
+       ways to say the same thing, and the app renders an empty time as
+       though it were a value. `r[k] === ""` was already skipped above; a
+       string that becomes empty once trimmed is the same thing said less
+       obviously. */
+    const trimmed = r[k].trim();
+    if (!trimmed) continue;
+    out[k] = trimmed;
   }
   return { recipe: out };
 }

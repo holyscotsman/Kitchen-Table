@@ -49,9 +49,17 @@ function validate(list) {
     if (!r.id || !/^[a-z0-9-]+$/.test(r.id)) die(`${at}: bad id`);
     if (seen.has(r.id)) die(`${at}: duplicate id`);
     seen.add(r.id);
-    if (!r.title || typeof r.title !== 'string') die(`${at}: missing title`);
+    /* `R115` — a name made of spaces is not a name. recipes.json is
+       hand-editable by design and this reads it every night with nobody
+       watching, so "   " passing here becomes a nameless recipe in the
+       database and then in everyone's book. The backend's validateRecipe
+       holds the same line at the other boundary; the two must not disagree
+       about what counts as a name. */
+    if (!r.title || typeof r.title !== 'string' || !r.title.trim()) die(`${at}: missing title`);
     if (!CATS.includes(r.category)) die(`${at}: unknown category "${r.category}"`);
-    if (!r.contributor || typeof r.contributor !== 'string') die(`${at}: missing contributor`);
+    if (!r.contributor || typeof r.contributor !== 'string' || !r.contributor.trim()) {
+      die(`${at}: missing contributor`);
+    }
     if (!Number.isInteger(r.servings) || r.servings < 1 || r.servings > 40)
       die(`${at}: servings must be an integer 1–40, got ${JSON.stringify(r.servings)}`);
     ['ingredients', 'steps', 'flagged', 'tags'].forEach(k => {
