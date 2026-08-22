@@ -724,6 +724,27 @@
      deletes a servings value it cannot read, so the answer is genuinely no
      for a hand-edited or half-known recipe, and every screen that shows a
      count or offers to rescale has to ask before it does either. */
+  /* `R116` — the name a screen shows, which is not always the name stored.
+   *
+   * `R62` coerced the lists and the servings at the storage boundary and left
+   * `title` alone, and three places sort by one — the Menu's A–Z, the Menu's
+   * Course, and the week planner's picker — with `a.title.localeCompare(...)`.
+   * `undefined.localeCompare` throws, and measured with ONE nameless recipe
+   * that took the whole Menu to zero cards and the planner to nothing, with
+   * `pageerror` empty: it failed silently and read as an empty book.
+   *
+   * Deliberately render-time only. `normalizeRecipe`'s output is what
+   * "Download updated recipes.json" writes, so putting a made-up name in
+   * there would commit it to everyone's book as though a person had typed
+   * it — the one thing this app never does. Edit mode reads the stored value
+   * (`startDraft`), so the field stays empty and Save cannot bake it in.
+   * "Untitled recipe" is the app's own existing word for a nameless thing,
+   * already used for a video job that arrives without one. */
+  function titleOf(r) {
+    var t = r && r.title !== undefined && r.title !== null ? String(r.title).trim() : "";
+    return t || "Untitled recipe";
+  }
+
   function hasCount(r) {
     return !!r && typeof r.servings === "number" && r.servings > 0;
   }
@@ -851,7 +872,7 @@
      needs no explanation. */
   function matchField(r, q) {
     if (!q) return "title";
-    if (fieldMatches(r.title, q)) return "title";
+    if (fieldMatches(titleOf(r), q)) return "title";
     if (tagsOf(r).some(function (t) { return fieldMatches(t, q); })) return "tag";
     if ((r.ingredients || []).some(function (i) { return fieldMatches(i, q); })) return "ingredient";
     return "";
@@ -1296,12 +1317,12 @@
            '<a class="hero press" href="#' + esc(pick.id) + '">' +
            (imageFor(pick)
              ? '<img class="hero__img" src="' + esc(imageFor(pick)) +
-               '" alt="' + esc(pick.title) + '" />'
+               '" alt="' + esc(titleOf(pick)) + '" />'
              : '<div class="hero__blank">' + ART.steam() + "</div>") +
            '<div class="hero__body">' +
            '<p class="hero__meta">' + esc(pick.contributor) +
            (pick.cookTime ? " · " + esc(pick.cookTime) : "") + "</p>" +
-           '<p class="hero__title">' + esc(pick.title) + "</p>" +
+           '<p class="hero__title">' + esc(titleOf(pick)) + "</p>" +
            "</div></a></section>";
     }
 
@@ -1380,7 +1401,7 @@
       '<a class="rcard press" href="#' + esc(r.id) + '">' +
       lead +
       '<span class="rcard__body">' +
-      '<span class="rcard__title">' + esc(r.title) + "</span>" +
+      '<span class="rcard__title">' + esc(titleOf(r)) + "</span>" +
       '<span class="rcard__meta">' + esc(r.category) + " · " + meta + "</span>" +
       (tags.length
         ? '<span class="rcard__tags">' +
@@ -1428,11 +1449,11 @@
     });
 
     if (S.sort === "az") {
-      list.sort(function (a, b) { return a.title.localeCompare(b.title); });
+      list.sort(function (a, b) { return titleOf(a).localeCompare(titleOf(b)); });
     } else if (S.sort === "course") {
       list.sort(function (a, b) {
         var d = CATS.indexOf(a.category) - CATS.indexOf(b.category);
-        return d || a.title.localeCompare(b.title);
+        return d || titleOf(a).localeCompare(titleOf(b));
       });
     }
     return list;
@@ -1552,7 +1573,7 @@
         return '<button type="button" class="rrow press" data-act="remove" ' +
                'data-id="' + esc(r.id) + '">' +
                '<span class="rcard__body"><span class="rcard__title">' +
-               esc(r.title) + "</span>" +
+               esc(titleOf(r)) + "</span>" +
                '<span class="rcard__meta">' + esc(r.contributor) + "</span></span>" +
                '<span class="rrow__minus">' + I.minus(20) + "</span></button>";
       }).join("") + "</div>";
@@ -1565,7 +1586,7 @@
                'aria-pressed="' + on + '" data-id="' + esc(r.id) + '">' +
                '<span class="checkbox">' + (on ? I.check(18) : "") + "</span>" +
                '<span class="rcard__body"><span class="rcard__title">' +
-               esc(r.title) + "</span>" +
+               esc(titleOf(r)) + "</span>" +
                '<span class="rcard__meta">' +
                (tagsOf(r).length ? tagsOf(r).join(", ") : "No tags yet") +
                "</span></span></button>";
@@ -2040,12 +2061,12 @@
          got cropped. */
       h += '<button type="button" class="herobtn press" data-act="open-lb" ' +
            'aria-label="Show the photo full screen">' +
-           '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(r.title) +
+           '<img class="r-hero" src="' + esc(hero) + '" alt="' + esc(titleOf(r)) +
            '" decoding="async" /></button>';
     }
 
     h += '<p class="r-eyebrow">' + esc(r.contributor) + " · " + esc(r.category) + "</p>";
-    h += '<h1 class="r-title">' + esc(r.title) +
+    h += '<h1 class="r-title">' + esc(titleOf(r)) +
          fieldFlagChip("title", fieldFlags) + "</h1>";
 
     if (tagsOf(r).length) {
@@ -2225,7 +2246,7 @@
       h += '<section class="r-section"><h2 class="r-h2">Recipe card photos</h2>' +
            extraPages.map(function (u, i) {
              return '<img class="r-page" src="' + esc(u) + '" alt="' +
-                    esc(r.title) + " — card " + (i + 2) + '" decoding="async" />';
+                    esc(titleOf(r)) + " — card " + (i + 2) + '" decoding="async" />';
            }).join("") + "</section>";
     }
 
@@ -2258,10 +2279,10 @@
     if (S.dlOpen) h += downloadSheetHtml(r);
     if (S.lbOpen && hero) {
       h += '<div class="lightbox" role="dialog" aria-modal="true" ' +
-           'aria-label="Photo of ' + esc(r.title) + '" id="lightbox">' +
+           'aria-label="Photo of ' + esc(titleOf(r)) + '" id="lightbox">' +
            '<button type="button" class="iconbtn lightbox__close press" ' +
            'data-act="close-lb" aria-label="Close photo">' + I.x() + "</button>" +
-           '<img class="lightbox__img" src="' + esc(hero) + '" alt="' + esc(r.title) + '" />' +
+           '<img class="lightbox__img" src="' + esc(hero) + '" alt="' + esc(titleOf(r)) + '" />' +
            "</div>";
     }
     return h;
@@ -2525,7 +2546,13 @@
 
   function startDraft(r) {
     S.draft = {
-      title: r.title,
+      /* `R116` — the STORED name, not `titleOf`'s placeholder: this becomes
+         the field a person edits, and Save writes what the field holds. A
+         nameless recipe must offer an empty box, or the first save would
+         commit "Untitled recipe" to the family's book as though somebody
+         had typed it. String() only so a hand-written number does not reach
+         an input as a number. */
+      title: r.title === undefined || r.title === null ? "" : String(r.title),
       category: r.category,
       servings: r.servings,
       contributor: r.contributor,
@@ -2966,7 +2993,7 @@
     return '<button type="button" class="mealcard press" data-act="plan-meal" ' +
       'data-key="' + esc(entry.id) + '">' + lead +
       '<span class="rcard__body">' +
-      '<span class="rcard__title">' + esc(r.title) + "</span>" +
+      '<span class="rcard__title">' + esc(titleOf(r)) + "</span>" +
       '<span class="rcard__meta">' + esc(cap(entry.slot)) +
       (hasCount(r) ? " · serves " + esc(entry.servings) : "") + "</span></span>" +
       '<span class="rcard__chev">' + I.chevR() + "</span></button>";
@@ -3352,7 +3379,7 @@
     var q = S.pickQ.trim().toLowerCase();
     var hits = q
       ? S.recipes.filter(function (r) { return matchesQuery(r, q); }).slice(0, 8)
-      : S.recipes.slice().sort(function (a, b) { return a.title.localeCompare(b.title); }).slice(0, 8);
+      : S.recipes.slice().sort(function (a, b) { return titleOf(a).localeCompare(titleOf(b)); }).slice(0, 8);
     var slot = S.pickFor ? cap(S.pickFor.slot) : "";
     return (
       '<button type="button" class="scrim" data-act="close-pick" aria-label="Close"></button>' +
@@ -3369,7 +3396,7 @@
         return '<button type="button" class="mealcard press" data-act="plan-assign" ' +
           'data-key="' + esc(r.id) + '">' +
           '<span class="rcard__icon" aria-hidden="true">' + catIcon(r.category, 24) + "</span>" +
-          '<span class="rcard__body"><span class="rcard__title">' + esc(r.title) + "</span>" +
+          '<span class="rcard__body"><span class="rcard__title">' + esc(titleOf(r)) + "</span>" +
           '<span class="rcard__meta">' + esc(r.category) +
           (hasCount(r) ? " · serves " + esc(r.servings) : "") +
           "</span></span></button>";
@@ -3765,8 +3792,8 @@
     var dIng = (d.ingredients || []).map(norm).filter(Boolean);
     for (var i = 0; i < S.recipes.length; i++) {
       var r = S.recipes[i];
-      if (norm(r.title) === dTitle) return r;
-      var tScore = overlap(dTok, tokens(r.title));
+      if (norm(titleOf(r)) === dTitle) return r;
+      var tScore = overlap(dTok, tokens(titleOf(r)));
       if (tScore >= 0.5) {
         var iScore = overlap(dIng, (r.ingredients || []).map(norm));
         if (iScore >= 0.4) return r;
@@ -4821,7 +4848,7 @@
 
   function recipeText(r) {
     var mult = S.serves && r.servings ? S.serves / r.servings : 1;
-    var lines = [r.title, ""];
+    var lines = [titleOf(r), ""];
     lines.push("From: " + r.contributor);
     lines.push(
       S.serves === r.servings
@@ -4884,7 +4911,7 @@
       }).catch(file);
     };
     if (navigator.share) {
-      navigator.share({ title: r.title, text: text }).catch(function (err) {
+      navigator.share({ title: titleOf(r), text: text }).catch(function (err) {
         /* AbortError is the reader closing the sheet. Anything else is the
            sheet refusing, and refusing quietly is what this used to do. */
         var name = (err && err.name) || "";
@@ -5062,7 +5089,7 @@
     if (S.route.name === "help") return "How to use it — Kitchen Table";
     if (S.route.name === "recipe") {
       var r = byId(S.route.id);
-      return (r ? r.title + " — " : "") + "Kitchen Table";
+      return (r ? titleOf(r) + " — " : "") + "Kitchen Table";
     }
     return "Kitchen Table";
   }
@@ -5593,7 +5620,7 @@
         date: S.pickFor.date,
         slot: S.pickFor.slot,
         recipeId: pr.id,
-        titleThen: pr.title,
+        titleThen: titleOf(pr),
         servings: pr.servings
       });
       if (!persistPlan()) {
@@ -5603,7 +5630,7 @@
         setNotice(RECIPES_FULL_MSG);
         return;
       }
-      setNotice(pr.title + " planned for " + prettyDate(S.pickFor.date) + ".");
+      setNotice(titleOf(pr) + " planned for " + prettyDate(S.pickFor.date) + ".");
       S.pickFor = null;
       closeSheet("pickOpen");
       return;
