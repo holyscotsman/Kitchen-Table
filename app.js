@@ -3173,7 +3173,27 @@
         "to put the keyboard away and aim at the card.",
         "Or browse: tap a person to see their recipes, or a course like " +
         "Dinner or Baking. The <strong>View all</strong> button under the " +
-        "names shows the lot."]],
+        "names shows the lot.",
+        /* `R126` — the page explained browsing by person and by course and
+           mentioned tags exactly once, as something the search box reads.
+           It never said what a tag IS. Then `S11`, keeping the sharing rule
+           honest, wrote "Tagging several recipes at once, and renaming or
+           merging a tag, go to everyone the same way" — naming two controls
+           the page had never introduced, so a reader met what Tag mode does
+           to the family's book before being told it exists. `R90` set the
+           precedent with Remove, which was in the same position. */
+        "<strong>Tags</strong> are for anything else true about a dish — " +
+        "where it’s from, that it’s quick, that it suits the air fryer. " +
+        "They show under the name on each card, and tapping one on a recipe " +
+        "shows you every other recipe wearing it.",
+        "To browse them all, tap <strong>Filter</strong> on the All recipes " +
+        "screen: the tags are listed there, and picking more than one " +
+        "narrows to the recipes that have all of them.",
+        "To put the same tag on several recipes at once, tap " +
+        "<strong>Tag</strong> at the top of All recipes, choose the ones you " +
+        "mean, and add it. Spelled a tag two ways by mistake? " +
+        "<strong>Rename or merge</strong>, inside Filter, puts them back " +
+        "together everywhere at once."]],
 
       ["Making the writing bigger",
        ["On the All recipes screen, tap <strong>Aa</strong> at the top. " +

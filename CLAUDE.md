@@ -376,6 +376,28 @@ dismissal for those is a different feature, not a corollary of this one.
 Both directions are mutation-tested: never clearing, and clearing
 everything, each fail by name.
 
+### The help explains tags, which it had only ever assumed
+
+`R126`. The help page told a reader how to browse by person and by course,
+and mentioned tags exactly once — as something the search box reads. It
+never said what a tag **is**, that tapping one on a recipe shows everything
+else wearing it, or that the Filter sheet lists them.
+
+`S11` then made the omission worse rather than better: keeping the sharing
+rule honest, it added *"Tagging several recipes at once, and renaming or
+merging a tag, go to everyone the same way"* — naming two controls the page
+had never introduced, so a reader met what Tag mode does to the family's
+book before being told it exists. `R90` set the precedent when Remove was in
+the same position: the page names the control, says where it is, and says
+what it is for.
+
+**And the labels it names are checked against the buttons the app draws** —
+taken *from the section* rather than a list beside it. A hardcoded list was
+written first and the mutation testing killed it: renaming a control in the
+prose to a button that does not exist passed, because the list did not
+follow the words. `CONCEPTS` is the named exemption in `R114`'s shape, one
+entry long, for a bold word that is an idea rather than a button.
+
 ### Every rule in the stylesheet is for something the app draws
 
 `R125`. `tokens.css` has been protected since `R48` — no colour may exist
@@ -843,8 +865,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1450 functional checks** across eleven
-suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 275, sec 56,
+The suite after the video arc: **1459 functional checks** across eleven
+suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 284, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
