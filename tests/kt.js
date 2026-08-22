@@ -1100,6 +1100,85 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== A recipe with no name must not take two screens with it (R116) ==');
+  {
+    /* `R62` coerced `ingredients`, `steps`, `flagged`, `tags` and `servings`
+       at this boundary, for exactly the reason written above it — the file is
+       hand-editable by design and db-sync rewrites it nightly unattended. It
+       did not coerce `title`, and three places sort by one:
+       `a.title.localeCompare(b.title)` on the Menu's A–Z, on Course, and in
+       the week planner's picker. `undefined.localeCompare` throws.
+
+       Measured before this fix, with ONE recipe missing a name:
+         A–Z sort   → 0 cards, #app down to 205 characters
+         #plan      → 3 elements
+       Both whole screens, not one broken row — and `pageerror` stayed EMPTY,
+       so it fails silently and looks like an empty book rather than a bug.
+
+       And where a name did render, a missing one reached the reader as the
+       literal word "undefined" in the browser tab.
+
+       The fix must not invent a name into the DATA: `normalizeRecipe`'s
+       output is what "Download updated recipes.json" writes, so a made-up
+       title would be committed to everyone's book as though somebody had
+       typed it. The placeholder is render-time only, and Edit mode must
+       still show an empty field so Save cannot bake it in. */
+    const NAMELESS = { id: 'no-name-here', category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+    const NAMED = { id: 'ok-two', title: 'Alpha Recipe', category: 'Dinner',
+      contributor: 'Joan', servings: 4, ingredients: ['a'], steps: ['b'] };
+
+    const ctxN = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pN = await ctxN.newPage();
+    const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
+    await pN.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
+      [NAMED, NAMELESS]);
+
+    await pN.goto(B + '/index.html#menu?sort=az');
+    await pN.waitForTimeout(900);
+    chk('sorting A–Z still draws the whole book',
+      await pN.locator('.rcard').count() === 2,
+      String(await pN.locator('.rcard').count()));
+
+    await pN.goto(B + '/index.html#menu?sort=cat');
+    await pN.waitForTimeout(900);
+    chk('and so does sorting by course',
+      await pN.locator('.rcard').count() === 2,
+      String(await pN.locator('.rcard').count()));
+
+    await pN.goto(B + '/index.html#plan');
+    await pN.waitForTimeout(900);
+    chk('the week planner still draws',
+      await pN.locator('#app *').count() > 20,
+      String(await pN.locator('#app *').count()));
+
+    await pN.goto(B + '/index.html#menu');
+    await pN.waitForTimeout(700);
+    const cardTitles = await pN.locator('.rcard__title').allTextContents();
+    chk('a recipe with no name says so rather than showing a blank row',
+      cardTitles.some(t => /untitled recipe/i.test(t)), JSON.stringify(cardTitles));
+
+    await pN.goto(B + '/index.html#no-name-here');
+    await pN.waitForTimeout(700);
+    chk('it opens as itself, not the front page',
+      /untitled recipe/i.test(await pN.locator('.r-title').first()
+        .textContent({ timeout: 2000 }).catch(() => '')),
+      await pN.locator('.r-title').first().textContent({ timeout: 2000 }).catch(() => 'MISSING'));
+    chk('and the browser tab never reads the word "undefined"',
+      !/undefined/i.test(await pN.title()), await pN.title());
+
+    /* The line that must NOT move: Edit shows what is stored, so Save cannot
+       write the placeholder into the family's file as though it were typed. */
+    await pN.click('[data-act="toggle-edit"]', { timeout: 3000 }).catch(() => {});
+    await pN.waitForSelector('#e-title', { timeout: 5000 }).catch(() => {});
+    chk('editing it offers an empty name field, not the placeholder',
+      (await pN.inputValue('#e-title').catch(() => 'MISSING')) === '',
+      JSON.stringify(await pN.inputValue('#e-title').catch(() => 'MISSING')));
+
+    chk('and nothing threw across any of it', nErrs.length === 0, nErrs.join(' | '));
+    await ctxN.close();
+  }
+
   console.log('\n== One badly-shaped recipe must not take the book down (R62) ==');
   {
     /* The overlay and recipes.json are both hand-editable by design — the

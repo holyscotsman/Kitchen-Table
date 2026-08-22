@@ -244,6 +244,36 @@ written never says "Saved" or "planned", because a change reported as kept
 and silently dropped is the worst thing this app could do to a book of
 someone's recipes.
 
+### A recipe with no name took two whole screens with it
+
+`R116`, and the worst blast radius this loop has found. `R62` coerced
+`ingredients`, `steps`, `flagged`, `tags` and `servings` at the storage
+boundary, for exactly the reason written above it — the file is hand-editable
+by design and `db-sync` rewrites it nightly with nobody watching. It did not
+coerce **`title`**, and three places sort by one: the Menu's A–Z, the Menu's
+Course, and the week planner's picker, all calling
+`a.title.localeCompare(b.title)`. `undefined.localeCompare` throws.
+
+Measured with **one** nameless recipe: A–Z sort drew **0 cards** and `#app`
+fell to 205 characters; `#plan` fell to 3 elements. Two entire screens, not
+one broken row — and `pageerror` stayed **empty**, so it failed silently and
+read as an empty book rather than a bug. Where a name did render, a missing
+one reached the reader as the literal word *undefined* in the browser tab.
+
+**The fix is render-time only, and that is the load-bearing part.**
+`normalizeRecipe`'s output is what "Download updated recipes.json" writes, so
+putting a made-up name in there would commit it to everyone's book as though
+a person had typed it — the one thing this app never does. `titleOf(r)`
+supplies *"Untitled recipe"* — the app's own existing word for a nameless
+thing, already used for a video job that arrives without one — for display,
+sorting and matching, while `startDraft` keeps reading the **stored** value
+so Edit mode offers an empty box and Save cannot bake the placeholder in.
+That distinction has its own check, and reverting it fails by name.
+
+It composes with `R115` the way it should: a nameless recipe on a sharing
+phone is refused by the server ("bad title"), queued by `S13`, and the reader
+is told — because the recipe genuinely has no name, and refusing is right.
+
 ### A validator must judge what it stores, not what it was handed
 
 `R115`. `validateRecipe` read the **raw** string for every check and then
@@ -628,8 +658,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1374 functional checks** across eleven
-suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1382 functional checks** across eleven
+suites (kt 263, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
