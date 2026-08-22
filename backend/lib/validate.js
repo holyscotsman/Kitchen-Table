@@ -57,6 +57,30 @@ function validateRecipe(r) {
   for (const k of ["prepTime", "cookTime", "notes", "source", "image"]) {
     if (r[k] === undefined || r[k] === null || r[k] === "") continue;
     if (typeof r[k] !== "string" || r[k].length > 2000) return { error: "bad " + k };
+    /* `S05` — `image` is the one field the app turns into a URL, and it took
+     * any 2,000 characters at all. The app itself only ever writes one shape
+     * (`orderFields`: "images/" + id + ".jpg"), and "Download photos" writes
+     * the files to match, so anything else is either a mistake or somebody
+     * being clever.
+     *
+     * Nothing catastrophic was reachable through it — the page's CSP is
+     * `img-src 'self' data: blob:`, so a remote address never loads, and
+     * `R98` clears a broken picture away quietly — but the result is a dead
+     * link committed into recipes.json and published to everyone. Since the
+     * `S` arc that string arrives from a phone rather than only from an
+     * import review, so it is worth being exact about.
+     *
+     * The shape, not the exact id: recipes.json is hand-editable by design,
+     * and two recipes sharing one photo is a reasonable thing for a person
+     * to write by hand. `https://…`, `javascript:…`, `../../` and a
+     * kilobyte of noise are not. The name allows exactly what an id
+     * allows — the same [a-z0-9-]{1,80} the check above enforces — so a
+     * recipe the validator accepts can never have a photo path it then
+     * refuses. Two rules about the same slug that disagree is a bug
+     * waiting for whoever writes the first id starting with a hyphen. */
+    if (k === "image" && !/^images\/[a-z0-9-]{1,80}\.jpg$/.test(r[k].trim())) {
+      return { error: "image must look like images/<name>.jpg" };
+    }
     out[k] = r[k].trim();
   }
   return { recipe: out };

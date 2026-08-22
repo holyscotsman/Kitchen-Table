@@ -796,6 +796,52 @@ const { runJob, computeFps } = lib('pipeline');
       'commit at ' + commitAt + ', gate at ' + gate);
   }
 
+  console.log('\n== The one field that becomes a URL (S05) ==');
+  {
+    /* `image` is the only recipe field the app turns into an address, and it
+       took any 2,000 characters at all. Nothing catastrophic was reachable
+       through it — the page's CSP is `img-src 'self' data: blob:` so a
+       remote address never loads, and `R98` clears a broken picture away
+       quietly — but the result is a dead link committed into recipes.json
+       and published to everyone. Since `S04` that string arrives from a
+       phone rather than only from an import review, which is reason enough
+       to be exact about it. */
+    const { validateRecipe } = require('../backend/lib/validate');
+    const base = { id: 'x', title: 'T', category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['a'], steps: ['b'] };
+    const withImage = (v) => validateRecipe(Object.assign({}, base, { image: v }));
+
+    chk('the shape the app itself writes is accepted',
+      withImage('images/x.jpg').recipe.image === 'images/x.jpg');
+    chk('and a recipe with no photo is still fine',
+      !validateRecipe(base).error && validateRecipe(base).recipe.image === undefined);
+    for (const [v, why] of [
+      ['https://evil.example/x.jpg', 'a remote address'],
+      ['//evil.example/x.jpg', 'a protocol-relative one'],
+      ['javascript:alert(1)', 'a script URL'],
+      ['../../etc/passwd', 'a path climbing out'],
+      ['images/../x.jpg', 'one climbing out halfway'],
+      ['images/x.png', 'a type the download never writes'],
+      ['x'.repeat(1500), 'a kilobyte of noise']
+    ]) chk(why + ' is refused', !!withImage(v).error, v.slice(0, 40));
+
+    /* Two rules about the same slug that disagree is a bug waiting for
+       whoever writes the first id starting with a hyphen. */
+    const ids = ['x', 'a-b-c', '-lead', 'trail-', '9', 'warm-chocolate-pudding-cake'];
+    const mismatched = ids.filter(id => validateRecipe(
+      Object.assign({}, base, { id, image: 'images/' + id + '.jpg' })).error);
+    chk('every id the validator accepts can have a photo path it also accepts',
+      mismatched.length === 0, mismatched.join(', '));
+
+    /* And the app's own writer must never produce something the server
+       refuses — the two live in different files and drifted before (`R100`). */
+    const appSrc = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const writes = appSrc.match(/out\.image = ([^;]+);/);
+    chk('the app writes the photo path in exactly that shape',
+      !!writes && /"images\/" \+ recipe\.id \+ "\.jpg"/.test(writes[1]),
+      writes ? writes[1] : 'no writer found');
+  }
+
   console.log('\n== Who may change the book for everybody (S01) ==');
   {
     /* The single most dangerous thing in this arc. Until now a stranger who
