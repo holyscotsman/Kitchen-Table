@@ -522,6 +522,26 @@ hand-edited id went unescaped into an `id=` and a `for=`. Every such call
 site is now checked to pass a real literal, and a local `var cls = …` is
 checked to read no property. An exemption allowed to drift is a hole.
 
+**And a way back for a change that did not get through** (`S13`).
+`DECISIONS.md S` had recorded this as deliberately not built: a failed
+single edit could honestly say *try Save again*, one tap away, but a failed
+bulk tag could not — redoing it means re-picking every recipe, and a rename
+cannot be redone at all once the old name is gone — so `S11` named the state
+and stopped rather than giving an instruction nobody could follow, and wrote
+down that the real fix was a queue with a button. `kt.unsent` is that queue.
+
+It holds **ids only, never recipes**: every one is read fresh from the
+overlay at the moment it is sent, so a change made after the failure goes
+too, and an id whose recipe has since been removed simply drops out. It is
+coerced where it is read like every other key (`R21`, `R40`, `R62`) — a
+queue that is not a list is no queue, and one holding rubbish keeps the ids
+it can use. The offer appears on the Menu only on a phone that shares, only
+while something is waiting, and never during a send. Every bulk failure
+sentence points at it now that pointing is honest; the single-edit sentence
+still says *try Save again in a minute*, because that reader is looking
+straight at the Save button and sending them to another screen would be
+worse advice.
+
 **One known mismatch, recorded rather than fixed.** The app treats a
 serving count as optional — `R97` made sure a recipe without one does not
 gain one by being edited — while `kitchen.recipes.servings` is `not null`
@@ -585,9 +605,9 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1347 functional checks** across eleven
+The suite after the video arc: **1364 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
-plan 79, video 201, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 218, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

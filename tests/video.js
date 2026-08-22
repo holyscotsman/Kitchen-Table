@@ -850,6 +850,12 @@ async function freshPage(br, opts) {
       (on.text.match(/[^.]*Tagging[^.]*\./) || [''])[0]);
     chk('which the phone without a passphrase is not told, having nothing to tell',
       !/Tagging several recipes at once/i.test(off.text));
+    /* `S13` — and the way back is on the page too, so a reader who finds a
+       change stuck knows where to look without being told by a notice they
+       have already scrolled past. */
+    chk('and the help page names where a stuck change can be sent again',
+      /All recipes/.test(on.text) && /send it again/i.test(on.text),
+      (on.text.match(/[^.]*send it again[^.]*\./) || [''])[0]);
 
     /* The path that cannot break is still offered in both states — it is
        what the whole download-and-commit workflow rests on. */
@@ -1150,6 +1156,10 @@ async function freshPage(br, opts) {
     chk('and the notice does not claim the family has them',
       !/sent to the famil/i.test(bAsleep.notice) && /only on this phone|couldn/i.test(bAsleep.notice),
       bAsleep.notice);
+    /* `S13` — and now points at the way back, which `S11` had no right to
+       promise because it did not exist yet. */
+    chk('and now says how to send it again',
+      /send them again from the all recipes screen/i.test(bAsleep.notice), bAsleep.notice);
 
     /* A rate limit is the one answer a burst can actually provoke, and it is
        neither a refusal nor an outage. Half the change landing is the case
@@ -1162,6 +1172,8 @@ async function freshPage(br, opts) {
       /1 of 2/.test(bBreak.notice), bBreak.notice);
     chk('while still saying the rest are only here',
       /only on this phone/i.test(bBreak.notice), bBreak.notice);
+    chk('and pointing at the button that sends them',
+      /send them again/i.test(bBreak.notice), bBreak.notice);
     chk('and both recipes are tagged here regardless',
       /Scottish/.test(bBreak.stored['aaa-one']) && /Scottish/.test(bBreak.stored['ccc-three']),
       JSON.stringify(bBreak.stored));
@@ -1173,6 +1185,9 @@ async function freshPage(br, opts) {
       /not the family/i.test(bRefused.notice), bRefused.notice);
     chk('and does not invite a retry that would fail the same way',
       !/try again/i.test(bRefused.notice), bRefused.notice);
+    chk('but does say what to do once it is sorted',
+      /until that is sorted, and then send them again/i.test(bRefused.notice),
+      bRefused.notice);
 
     /* ---- The Tags sheet: rename one tag across the book ---- */
     const rename = async (opts, key, to) => {
@@ -1339,6 +1354,109 @@ async function freshPage(br, opts) {
     chk('nothing threw across any of it',
       [].concat(waiting.errs, quiet2.errs, many.errs).length === 0,
       [].concat(waiting.errs, quiet2.errs, many.errs).join(' | '));
+  }
+
+  console.log('\n== A change the kitchen could not take can be sent again (S13) ==');
+  {
+    /* `DECISIONS.md S` left this open on purpose. A single edit that failed
+       said *try Save again in a minute*, which is one tap; a bulk tag change
+       could not honestly say the same, because redoing it means re-picking
+       every recipe and a rename cannot be redone at all once the old name is
+       gone. So `S11` named the state and stopped — *the rest are still only
+       on this phone* — rather than giving an instruction nobody could
+       follow. The ruling said the real fix is a queue with a button, and
+       that it is a feature rather than a sentence. This is the feature.
+
+       What it must not become: a second copy of the recipes. The queue holds
+       ids only, and every recipe it sends is read fresh from the overlay at
+       the moment it sends — so a change made after the failure goes too, and
+       an id whose recipe has since been removed simply drops out. */
+    const BOOK3 = [
+      { id: 'aaa-one', title: 'Aaa One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'], tags: ['soup'] },
+      { id: 'bbb-two', title: 'Bbb Two', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['2 onions'], steps: ['Cook them.'], tags: ['soup'] }
+    ];
+    const openMenu = async (opts, key, seed) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)), BOOK3);
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      if (seed !== undefined) await p.addInitScript(
+        v => localStorage.setItem('kt.unsent', JSON.stringify(v)), seed);
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.cardgrid, .rrow, .rcard');
+      return { ctx, p, stub };
+    };
+    const outbox = (p) => p.evaluate(() => {
+      const b = document.querySelector('[data-act="send-unsent"]');
+      return b ? b.innerText.replace(/\s+/g, ' ').trim() : '';
+    });
+    const stored = (p) => p.evaluate(() => {
+      try { return JSON.parse(localStorage.getItem('kt.unsent') || 'null'); }
+      catch (e) { return 'UNPARSEABLE'; }
+    });
+
+    /* A bulk tag the kitchen refused leaves both recipes queued. */
+    const failed = await openMenu({ failPut: { status: 503 } }, 'family-secret');
+    await failed.p.click('[data-act="toggle-tagging"]');
+    await failed.p.click('[data-act="tag-pick"][data-id="aaa-one"]');
+    await failed.p.click('[data-act="tag-pick"][data-id="bbb-two"]');
+    await failed.p.click('[data-act="open-bulk"]');
+    await failed.p.waitForSelector('#bulk-tags');
+    await failed.p.fill('#bulk-tags', 'Scottish');
+    await failed.p.click('[data-act="bulk-apply"]');
+    await failed.p.waitForTimeout(1800);
+    const queued = await stored(failed.p);
+    chk('a bulk change the kitchen would not take is remembered',
+      Array.isArray(queued) && queued.length === 2, JSON.stringify(queued));
+    chk('and the screen offers to send it again',
+      /send 2 changes/i.test(await outbox(failed.p)), await outbox(failed.p));
+    await failed.ctx.close();
+
+    /* The button sends what is queued, and clears it when it lands. */
+    const retry = await openMenu({}, 'family-secret', ['aaa-one', 'bbb-two']);
+    chk('a phone opened with a queue still offers to send it',
+      /send 2 changes/i.test(await outbox(retry.p)), await outbox(retry.p));
+    await retry.p.click('[data-act="send-unsent"]');
+    await retry.p.waitForTimeout(1800);
+    chk('tapping it sends every queued recipe', retry.stub.puts.length === 2,
+      String(retry.stub.puts.length));
+    chk('reading each one fresh from the phone, not from the queue',
+      retry.stub.puts.every(x => x.body.recipe.title), 
+      JSON.stringify(retry.stub.puts.map(x => x.body.recipe.title)));
+    chk('and the queue is empty afterwards',
+      (await stored(retry.p) || []).length === 0, JSON.stringify(await stored(retry.p)));
+    chk('so the offer is gone', (await outbox(retry.p)) === '', await outbox(retry.p));
+    await retry.ctx.close();
+
+    /* A queued recipe that has since been removed is not a recipe any more. */
+    const gone = await openMenu({}, 'family-secret', ['aaa-one', 'no-such-recipe']);
+    chk('an id whose recipe is gone drops out of the count',
+      /send 1 change\b/i.test(await outbox(gone.p)), await outbox(gone.p));
+    await gone.p.click('[data-act="send-unsent"]');
+    await gone.p.waitForTimeout(1500);
+    chk('and is never sent', gone.stub.puts.length === 1 &&
+      /aaa-one$/.test(gone.stub.puts[0].path),
+      JSON.stringify(gone.stub.puts.map(x => x.path)));
+    await gone.ctx.close();
+
+    /* A phone that shares nothing has nothing to offer, whatever it holds. */
+    const noKey = await openMenu({}, '', ['aaa-one', 'bbb-two']);
+    chk('a phone with no passphrase is offered nothing',
+      (await outbox(noKey.p)) === '', await outbox(noKey.p));
+    await noKey.ctx.close();
+
+    /* Coerced where it is read, like every other key this app reads back. */
+    const junk = await openMenu({}, 'family-secret', { nope: 1 });
+    chk('a queue that is not a list does not take the screen down',
+      (await outbox(junk.p)) === '' && junk.p.errs.length === 0,
+      junk.p.errs.join(' | '));
+    const junk2 = await openMenu({}, 'family-secret', ['aaa-one', 7, null, 'aaa-one']);
+    chk('and one holding rubbish keeps only the ids it can use',
+      /send 1 change\b/i.test(await outbox(junk2.p)), await outbox(junk2.p));
+    chk('nothing threw', junk2.p.errs.length === 0, junk2.p.errs.join(' | '));
+    await junk.ctx.close(); await junk2.ctx.close();
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
