@@ -402,6 +402,99 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     await ctx2.close();
   }
 
+  console.log('\n== Two tabs, the other two stores (R135) ==');
+  {
+    /* `R134` fixed `kt.recipes`: every write re-reads the book and applies
+       its change to what is actually stored. The app owns two more stores
+       and both were still written whole.
+
+         - `persistPlan()` writes `S.plan` from three call sites — planning a
+           meal, changing its servings, removing it — so two tabs planning
+           meals lose each other's exactly as recipes did.
+         - `setImage` serialises the whole in-memory photo map. On the
+           IndexedDB path that is per-key and safe; on the localStorage
+           FALLBACK — the path a phone without IndexedDB takes, and the only
+           reason the "no room" message exists — it is a whole-map write.
+
+       The rule already existed in this codebase, which is what makes the
+       omission worth naming: `kt.unsent` (`queueUnsent` reads `unsentIds()`
+       fresh) and `kt.shared` (`noteSharedId` reads `sharedIds()` fresh) have
+       always read before writing. It simply had not reached the two biggest
+       stores. */
+    const ctx3 = await br.newContext({ ...devices['iPhone 13'] });
+    await ctx3.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    const pa = await ctx3.newPage(), pb = await ctx3.newPage();
+    const pErrs = [];
+    pa.on('pageerror', (e) => pErrs.push('A:' + e.message));
+    pb.on('pageerror', (e) => pErrs.push('B:' + e.message));
+
+    /* Both tabs open on the planner before either plans anything. */
+    for (const pg of [pa, pb]) {
+      await pg.goto(B + '/index.html#plan');
+      await pg.waitForSelector('.dayblock');
+    }
+    /* Monday in one tab, Tuesday in the other — two different days, so
+       nothing here is a genuine conflict. */
+    const planOn = async (pg, nth) => {
+      await pg.evaluate((n) => {
+        const b = document.querySelectorAll('[data-act="plan-pick"][data-key$="|dinner"]')[n];
+        if (b) b.click();
+      }, nth);
+      await pg.waitForSelector('#pick-q');
+      await pg.click('[data-act="plan-assign"]');
+      await pg.waitForTimeout(600);
+    };
+    await planOn(pa, 0);
+    await planOn(pb, 1);
+    const plan = await pa.evaluate(() => {
+      const raw = localStorage.getItem('kt.plan');
+      const list = raw ? JSON.parse(raw) : [];
+      return { n: list.length, days: list.map((e) => e.date).sort() };
+    });
+    chk('a meal planned in one tab survives the other tab planning one',
+      plan.n === 2, JSON.stringify(plan));
+    chk('and they are the two different days that were planned',
+      plan.days.length === 2 && plan.days[0] !== plan.days[1], JSON.stringify(plan.days));
+    await ctx3.close();
+
+    /* The photo store, on the path that writes it whole. */
+    const ctx4 = await br.newContext({ ...devices['iPhone 13'] });
+    await ctx4.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    await ctx4.addInitScript(() => {
+      try {
+        Object.defineProperty(window, 'indexedDB', { configurable: true, value: undefined });
+      } catch (e) {}
+    });
+    const qa = await ctx4.newPage(), qb = await ctx4.newPage();
+    qa.on('pageerror', (e) => pErrs.push('PA:' + e.message));
+    qb.on('pageerror', (e) => pErrs.push('PB:' + e.message));
+    const attach = async (pg, id) => {
+      await pg.goto(B + '/index.html#' + id);
+      await pg.waitForSelector('.r-title');
+      await pg.click('[data-act="toggle-edit"]');
+      await pg.waitForSelector('#e-photo');
+      await pg.setInputFiles('#e-photo',
+        { name: 'p.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(JPG, 'base64') });
+      await pg.waitForTimeout(900);
+    };
+    /* Both tabs on the book first, so each holds its own boot-time copy of
+       the photo map. */
+    for (const pg of [qa, qb]) {
+      await pg.goto(B + '/index.html#menu');
+      await pg.waitForSelector('.rcard');
+    }
+    await attach(qa, 'chops');
+    await attach(qb, 'crepes');
+    const shots = await qa.evaluate(() => {
+      const raw = localStorage.getItem('kt.images');
+      try { return Object.keys(JSON.parse(raw) || {}).sort(); } catch (e) { return []; }
+    });
+    chk('a photo attached in one tab survives one attached in the other',
+      shots.length === 2 && shots.join(',') === 'chops,crepes', JSON.stringify(shots));
+    chk('nothing threw in any of the four tabs', pErrs.length === 0, pErrs.join(' | '));
+    await ctx4.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
