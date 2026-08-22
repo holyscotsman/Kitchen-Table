@@ -1346,11 +1346,54 @@ because a floor said an excused name no longer appeared. Both directions are
 pinned now: the stripper must keep `image/*`, must drop the quoted comment,
 and `startDraft`'s declaration must survive.
 
+### The one failure nobody wrote a sentence for said too much
+
+`R139`. Every failure path in `backend/lib/pipeline.js` writes a
+**hand-written sentence** — *"That video is private, so it can't be
+fetched."*, *"This video is about 40 minutes long…"*, the whole of
+`friendlyDownloadError`. The one place that stores machine text on purpose,
+`failDownload`'s debug tail, runs it through `media.scrubInternal()` first,
+whose very first rule strips absolute filesystem paths, because raw tool
+output leaks internals.
+
+The catch-all did not — and the catch-all is the one that handles everything
+nobody predicted: an SDK error, an `fs` error, a `sql` error. It stored
+
+    Something went wrong while importing — please try the link again.
+    (ENOENT: no such file or directory, open
+    '/tmp/kt-job-9f2a/frames/frame-003.jpg' while reaching
+    http://127.0.0.1:5432)
+
+and `import_jobs.error_message` is rendered to the reader in **two** places —
+the failed-imports list on the Add screen, and `S.addError`. So the server's
+own temp paths reached the family's screen through the single path whose text
+nobody can predict, on a page where every other sentence was written for a
+person.
+
+The rule is the simple one, and it is `R124`'s lesson again — one tolerant
+reader beats a list of writers: **text this server did not write itself is
+scrubbed before a reader sees it.** That takes in the model's
+`not_recipe_reason` too, which is prose about the video rather than
+internals; scrubbing it costs nothing and means there is no exception to
+remember. A `fail()` built only from the app's own words needs nothing, and
+most of them are exactly that — so the check is written that way: every
+`fail(...)` whose argument carries a caught value must pass through
+`scrubInternal`, with floors under both the argument reader and the test that
+decides which arguments carry one.
+
+**And one claim that did not survive being checked.** The first version of
+this said the scrub must run *before* the 200-character cap "so a path cannot
+survive by being cut in half" — and the mutation that swapped the order
+passed every check. `scrubInternal`'s path rule matches a truncated path as
+happily as a whole one, so the ordering changes nothing today. The order is
+kept, because the next rule added may not be as forgiving, and the comment
+now says that instead of the thing that sounded better.
+
 ### Verified
 
-The suite after the video arc: **1622 functional checks** across eleven
+The suite after the video arc: **1631 functional checks** across eleven
 suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 325, sec 56,
-plan 79, video 252, backend 287, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 252, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

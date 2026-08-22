@@ -747,6 +747,101 @@ const { runJob, computeFps } = lib('pipeline');
     chk('no media was downloaded', !/ -f /.test(calls));
   }
 
+  console.log('\n== runJob: the catch-all says nothing a reader should not see (R139) ==');
+  {
+    /* Every failure path in `pipeline.js` writes a HAND-WRITTEN SENTENCE.
+       The one place that stores machine text — `failDownload`'s debug tail —
+       runs it through `media.scrubInternal()` first, whose very first rule
+       strips absolute filesystem paths, because raw tool output leaks
+       internals.
+
+       The catch-all does not, and the catch-all is the one that handles
+       everything nobody predicted: an SDK error, an `fs` error, a `sql`
+       error. `String(e.message).slice(0, 200)` goes into
+       `import_jobs.error_message`, which the app renders to the reader in
+       two places — the failed-imports list on the Add screen, and
+       `S.addError`. So the server's own temp paths reach the family's
+       screen through the single path whose text nobody can predict. */
+    const boom = { messages: { stream: () => {
+      throw new Error("ENOENT: no such file or directory, open " +
+        "'/tmp/kt-job-9f2a/frames/frame-003.jpg' while reaching " +
+        "http://127.0.0.1:5432");
+    } } };
+    const sql = sqlStub({ id: 9, status: 'queued', url: 'https://youtu.be/fake',
+      platform: 'youtube', contributor: null });
+    await runJob({ sql, anthropic: boom, groqKey: '', uptimeS: () => 999 }, 9);
+    const said = String(sql.state.error || '');
+    chk('an unexpected failure still fails the job', /failed/.test(sql.state.statuses.join(',')),
+      sql.state.statuses.join(','));
+    chk('and still leads with the sentence written for a person',
+      /^Something went wrong while importing/.test(said), said);
+    chk('but the server\u2019s own paths never reach the reader',
+      said.indexOf('/tmp/kt-job-9f2a') === -1, said);
+    chk('nor an address only the server can reach',
+      said.indexOf('127.0.0.1') === -1, said);
+    /* A floor: dropping the tail entirely would pass all three above, and
+       lose the one clue anybody has when something unexpected breaks. */
+    chk('while what is left still says what went wrong',
+      /frame-003\.jpg/.test(said) && /ENOENT/.test(said), said);
+
+    /* A path in a message long enough to be cut short is still scrubbed,
+       wherever in it the cut falls. The scrub runs before the cap so it
+       reads the whole message — which, measured, changes nothing today
+       (`scrubInternal` matches a half path as happily as a whole one) and
+       is kept for the next rule that may not be so forgiving. */
+    const pad = 'x'.repeat(170);
+    const long = { messages: { stream: () => {
+      throw new Error(pad + " /tmp/kt-job-1c3d/frames/frame-0042.jpg");
+    } } };
+    const sqlLong = sqlStub({ id: 10, status: 'queued', url: 'https://youtu.be/fake',
+      platform: 'youtube', contributor: null });
+    await runJob({ sql: sqlLong, anthropic: long, groqKey: '', uptimeS: () => 999 }, 10);
+    const longSaid = String(sqlLong.state.error || '');
+    chk('and a path in a message long enough to be cut short is still gone',
+      longSaid.indexOf('/tmp/kt-job') === -1, longSaid.slice(-90));
+
+    /* And the rule, in `R114`'s shape, so the next failure path cannot go
+       round it: every `fail(...)` whose message carries a value this server
+       did not write — a caught error, a tool's stderr — passes through
+       `scrubInternal`. A `fail()` built only from the app's own words needs
+       nothing, and most of them are exactly that. */
+    const pipeSrc = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'backend', 'lib', 'pipeline.js'), 'utf8');
+    const argOf = (from) => {
+      let i = pipeSrc.indexOf('(', from), depth = 0, out = '';
+      for (; i < pipeSrc.length; i++) {
+        const c = pipeSrc[i];
+        if (c === '(') { depth++; if (depth === 1) continue; }
+        if (c === ')') { depth--; if (depth === 0) break; }
+        out += c;
+      }
+      return out;
+    };
+    const calls = [];
+    let at = pipeSrc.indexOf('fail(');
+    while (at > -1) {
+      /* `failDownload(` ends in `fail` + `Download(`, so anchor on the word. */
+      if (!/[\w.]/.test(pipeSrc[at - 1] || '')) calls.push(argOf(at + 4));
+      at = pipeSrc.indexOf('fail(', at + 1);
+    }
+    const carries = (a) => /\be\b|\berr\b|stderr|run\./.test(a);
+    const unscrubbed = calls.filter((a) => carries(a) && a.indexOf('scrubInternal') === -1);
+    chk('every fail() carrying a value this server did not write scrubs it',
+      unscrubbed.length === 0,
+      unscrubbed.map((a) => a.replace(/\s+/g, ' ').slice(0, 70)).join(' | '));
+    /* And the download path, which stores the tool's own last words on
+       purpose so the next YouTube-defence shift can diagnose from the row. */
+    chk('and the debug tail kept for diagnosis is scrubbed too',
+      /debug:\s*media\.scrubInternal\(/.test(pipeSrc),
+      (/debug:[^,\n]*/.exec(pipeSrc) || ['MISSING'])[0]);
+    /* Floors: a scan that found no calls, or an argument reader that
+       returned nothing, would read as a clean pass for both checks above. */
+    chk('and the scan really read the failure paths',
+      calls.length >= 4 && calls.every((a) => a.length > 0) &&
+      calls.filter(carries).length >= 2,
+      calls.length + ' fail() calls, ' + calls.filter(carries).length + ' carrying a caught value');
+  }
+
   console.log('\n== runJob: failure paths ==');
   {
     fs.writeFileSync(path.join(toolDir, 'yt-dlp'),
