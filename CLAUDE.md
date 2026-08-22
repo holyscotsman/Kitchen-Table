@@ -313,6 +313,25 @@ drops the empties and joins the rest; it deliberately does **not** escape,
 because every caller assembles parts that are already escaped and one of them
 carries a `<span>` for the search match-note.
 
+### Editing must not quietly rewrite a count nobody touched
+
+`R119`, and `R97`'s principle from the other side. `R97` settled that a
+recipe with **no** count must not gain one by being edited; this ran
+`Math.min(40, typed)` over whatever the servings field held — including a
+value the reader never went near. Measured: a recipe stored as **200** (a
+church-hall pot, which people genuinely write), opened in Edit, the title
+changed and nothing else, Save pressed → stored servings **40**. No warning,
+and on a sharing phone straight into the family's book.
+
+**Three places disagree about the range, and that is what let it hide**:
+`normalizeRecipe` accepts 1–999, `saveDraft` clamped to 40, and both
+`validateRecipe` and the `kitchen.recipes` column allow 1–40. Making them
+agree is a schema change and Jason's call — recorded, not taken. Not
+rewriting what a person wrote is not a schema change, so: a count the reader
+did not touch survives untouched, and one they **did** type past the limit is
+clamped *and said*. This app does not change someone's words behind their
+back.
+
 ### A validator must judge what it stores, not what it was handed
 
 `R115`. `validateRecipe` read the **raw** string for every check and then
@@ -697,8 +716,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1396 functional checks** across eleven
-suites (kt 277, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1404 functional checks** across eleven
+suites (kt 285, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
