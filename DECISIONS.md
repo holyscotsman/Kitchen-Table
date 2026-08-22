@@ -422,6 +422,16 @@ this arc adds a server on the **write** path only.
   database, and the file is regenerated from it) without pretending to.
   Worth revisiting if two people ever actually collide.
 
+- **A retry for a bulk change the kitchen could not take** (`S11`). A
+  single edit that fails says *try Save again in a minute*, because that is
+  one tap. A bulk tag change cannot say the same honestly: redoing it means
+  re-picking every recipe, and a rename cannot be redone at all once the old
+  name is gone. So the failure names the state — *the rest are still only on
+  this phone* — and stops there, rather than giving an instruction the
+  reader cannot follow. A queue of unsent changes with a "send these" button
+  would fix both cases properly; it is a feature, not a sentence, and is not
+  in this arc.
+
 **What it costs if reversed:** unset `KT_WRITE_KEY` and every write is
 refused again, with no code change and no redeploy — the app falls back to
 saving locally and saying so, which is exactly what it did before.

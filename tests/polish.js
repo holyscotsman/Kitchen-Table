@@ -3003,6 +3003,21 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     });
     await pD.waitForTimeout(600);
     await collect();
+    /* `S11` — Tag mode's controls live two taps deep (turn it on, pick a
+       recipe, open the sheet), so a label the walkthrough names in there
+       was unreachable by this walk and would have read as missing. The
+       walk goes there now rather than the doc dropping the quotes: the
+       whole point of this check is that naming a control in bold quotes
+       proves it exists. */
+    await pD.goto(B + '/index.html#menu');
+    await pD.waitForSelector('[data-act="toggle-tagging"]');
+    await pD.click('[data-act="toggle-tagging"]');
+    await pD.waitForSelector('[data-act="tag-pick"]');
+    await pD.click('[data-act="tag-pick"]');
+    await collect();
+    await pD.click('[data-act="open-bulk"]');
+    await pD.waitForSelector('#bulk-tags');
+    await collect();
 
     const missing = quoted.filter(q => !seen.has(q));
     chk('every control the walkthrough names in quotes exists, word for word',

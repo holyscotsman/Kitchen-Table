@@ -1880,7 +1880,7 @@
 
   function renameTag(oldTag, nextRaw) {
     var next = String(nextRaw || "").trim().replace(/\s+/g, " ");
-    if (!next || next === oldTag) return "";
+    if (!next || next === oldTag) return null;
     /* Same letters, new casing is a plain rename; a different existing tag
        (any casing) is a merge and says so before it happens. */
     var target = null;
@@ -1889,10 +1889,10 @@
     });
     if (target) {
       if (!window.confirm('Merge "' + oldTag + '" into "' + target + '"? Every recipe tagged "' +
-          oldTag + '" will carry "' + target + '" instead.')) return "";
+          oldTag + '" will carry "' + target + '" instead.')) return null;
       next = target;
     }
-    var touched = 0;
+    var moved = [];
     S.recipes = S.recipes.map(function (r) {
       var have = tagsOf(r);
       if (have.indexOf(oldTag) === -1) return r;
@@ -1906,15 +1906,20 @@
           seen[lt] = true;
           return true;
         });
-      touched++;
+      moved.push(out);
       return out;
     });
     persistRecipes();
     /* An active filter on the old name follows the rename. */
     S.tags = S.tags.map(function (t) { return t === oldTag ? next : t; })
       .filter(function (t, i, a) { return a.indexOf(t) === i; });
-    return (target ? "Merged into “" + next + "”" : "Renamed to “" + next + "”") +
-           " — " + touched + (touched === 1 ? " recipe updated." : " recipes updated.");
+    /* `S11` — the sentence and the recipes it is about, together, because
+       the caller now has to send them as well as say them. */
+    return {
+      msg: (target ? "Merged into “" + next + "”" : "Renamed to “" + next + "”") +
+           " — " + moved.length + (moved.length === 1 ? " recipe updated." : " recipes updated."),
+      moved: moved
+    };
   }
 
   function downloadSheetHtml(r) {
@@ -2565,6 +2570,99 @@
       });
   }
 
+  /* `S11` — the same rule, where the app changes MANY recipes at once.
+   *
+   * `S04` wired sharing into the two places a recipe is written one at a
+   * time, and missed the two places it is written in bulk: Tag mode's
+   * "Add tags", and renaming or merging a tag. Both wrote the overlay and
+   * stopped, on a phone where every single edit reached the family.
+   *
+   * That is the worst place for the gap to be. Tag hygiene is the one part
+   * of this app built specifically to keep the WHOLE book consistent
+   * (`067`–`069`), so a rename landing on one phone only is precisely how
+   * the near-duplicate tags it exists to prevent get made — and the next
+   * ordinary edit from the other phone puts the old spelling back into the
+   * family's book.
+   *
+   * Three rules, in order:
+   *   - the phone's copy is written and reported first, exactly as `S04`;
+   *   - one outage is one answer, so the first failure stops the run
+   *     rather than repeating a doomed request once per recipe;
+   *   - every recipe but the last says `?more=1`, so the republish reads a
+   *     database holding the whole change instead of racing it.
+   */
+  function shareEdits(list, localMsg) {
+    var key = kitchenKey();
+    if (!key || !list.length) { setNotice(localMsg); return; }
+    /* Local truth on screen before a byte goes anywhere: on a cold Render
+       this sentence stands alone for up to half a minute, and it is the
+       half that is already true. */
+    setNotice(localMsg);
+    var sent = 0, publishing = false;
+
+    function done() {
+      var one = list.length === 1;
+      setNotice(localMsg + " Sent to the family’s book — " +
+        (publishing
+          ? "everyone will see " + (one ? "it" : "them") + " in a few minutes."
+          : (one ? "it appears" : "they appear") +
+            " for everyone at the next nightly update."));
+    }
+
+    function stop(err) {
+      var st = (err && err.status) || 0;
+      var refused = st >= 400 && st < 500 && st !== 408 && st !== 429;
+      /* A rate limit is its own thing: not a refusal of the recipe, not the
+         server being unreachable, and the one answer a burst can actually
+         provoke — the kitchen allows 120 requests a minute and a whole book
+         is 48, so it takes several phones at one address to reach it.
+         Saying "stopped answering" about a server that answered clearly
+         would be the same fault this arc keeps finding. */
+      if (st === 429) {
+        setNotice(localMsg + " The family’s book asked for a break" +
+          (sent ? " after " + sent + " of " + list.length + ". The rest are"
+                : ", so this change is") + " still only on this phone.");
+        return;
+      }
+      if (refused) {
+        setNotice(localMsg + " The family’s book would not take " +
+          (sent ? "the rest" : "them") + ": " + err.message +
+          " They stay on this phone until that is sorted.");
+        return;
+      }
+      /* No "try again" here, unlike `S04`'s single edit. Pressing Save
+         once more is one tap; redoing a bulk tag means re-picking every
+         recipe, and a rename cannot be redone at all once the old name is
+         gone. An instruction the reader cannot follow is worse than none —
+         the state is named, and the paths that always work (another edit,
+         or Download updated recipes.json) are on the help page. */
+      setNotice(localMsg + " " + (sent
+        ? sent + " of " + list.length + " reached the family’s book before it " +
+          "stopped answering — the rest are still only on this phone."
+        : "The family’s book couldn’t be reached just now, so this change " +
+          "is still only on this phone."));
+    }
+
+    function step(i) {
+      if (i >= list.length) { done(); return; }
+      var r = list[i];
+      kitchenFetch("/api/recipes/" + encodeURIComponent(r.id) +
+          (i < list.length - 1 ? "?more=1" : ""),
+        { method: "PUT", body: { recipe: orderFields(r) }, key: key, timeout: 30000 }, true)
+        .then(function (data) {
+          sent++;
+          S.shared[r.id] = true;
+          /* Sticky: the burst pokes on its LAST write, and a poke inside the
+             server's cooldown reports false. Reading only the final answer
+             would call a republish that is happening "the nightly update". */
+          publishing = publishing || !!(data && data.publishing);
+          step(i + 1);
+        })
+        .catch(stop);
+    }
+    step(0);
+  }
+
   function saveDraft(r) {
     /* Each save speaks for itself. `S.notice` lives until the route
        changes, so without this the sentence from the LAST save is still on
@@ -2900,9 +2998,15 @@
         (kitchenKey()
           ? "<strong>This phone has the family passphrase in it</strong>, so " +
             "pressing Save puts your change in everyone’s copy as well as " +
-            "your own — usually within a few minutes. The app tells you " +
-            "which happened every time; if it says <em>saved on this " +
-            "phone</em>, it means only this phone."
+            "your own — usually within a few minutes. " +
+            /* `S11` — the bulk paths share now too, and a page that lists
+               only Save would leave a reader guessing about the two
+               actions that change the most recipes at once. */
+            "<strong>Tagging several recipes at once</strong>, and renaming " +
+            "or merging a tag, go to everyone the same way. The app tells " +
+            "you which happened every time; if it says <em>saved on this " +
+            "phone</em>, or <em>only on this phone</em>, it means only this " +
+            "phone."
           : "<strong>Your changes live on your phone only.</strong> Nobody " +
             "else sees them until they’re published. To send them straight " +
             "to everyone instead, put the family passphrase in the " +
@@ -5432,10 +5536,13 @@
       return;
     }
     if (act === "tag-rename-apply") {
-      var msg = renameTag(key, S.tagEditVal);
+      var renamed = renameTag(key, S.tagEditVal);
       S.tagEditing = ""; S.tagEditVal = "";
-      if (msg) setNotice(msg);
       render();
+      /* `S11` — every renamed recipe goes to the family too, or nobody is
+         told it did. `shareEdits` owns the sentence from here because only
+         it knows how far the sending got. */
+      if (renamed) shareEdits(renamed.moved, renamed.msg);
       return;
     }
     if (act === "bulk-apply") {
@@ -5447,7 +5554,7 @@
       var canon = {};
       allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
       toAdd = toAdd.map(function (t) { return canon[t.toLowerCase()] || t; });
-      var touched = 0;
+      var tagged = [];
       S.recipes = S.recipes.map(function (r) {
         if (!S.tagSel[r.id]) return r;
         var out = {};
@@ -5458,14 +5565,16 @@
           if (lower.indexOf(t.toLowerCase()) === -1) { have.push(t); lower.push(t.toLowerCase()); }
         });
         out.tags = have;
-        touched++;
+        tagged.push(out);
         return out;
       });
       persistRecipes();
       S.tagSheetOpen = false;
       S.tagging = false; S.tagSel = {}; S.bulkTags = "";
-      setNotice("Tagged " + touched + (touched === 1 ? " recipe." : " recipes."));
       render();
+      /* `S11` — as above: said here, and sent, or said honestly why not. */
+      shareEdits(tagged, "Tagged " + tagged.length +
+        (tagged.length === 1 ? " recipe." : " recipes."));
       return;
     }
     if (act === "reset-local") { resetLocal(); return; }

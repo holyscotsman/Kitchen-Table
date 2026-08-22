@@ -21,7 +21,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, publishing: true, postDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, failPutAfter: null, publishing: true, postDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -46,8 +46,14 @@ function stubKitchen(ctx, opts) {
     }
     if (req.method() === 'PUT' && /^\/api\/recipes\//.test(u.pathname)) {
       o.puts.push({ path: u.pathname, key: req.headers()['x-kitchen-key'] || null,
+                    more: u.searchParams.get('more') === '1',
                     body: req.postDataJSON() });
       if (o.failPut) return json(o.failPut.status, { error: o.failPut.error || '' });
+      /* Lets a burst succeed part-way and then hit one answer, which is the
+         only way to measure "N of M reached it before ...". */
+      if (o.failPutAfter && o.puts.length > o.failPutAfter.after) {
+        return json(o.failPutAfter.status, { error: o.failPutAfter.error || '' });
+      }
       return json(200, { ok: true, id: u.pathname.split('/').pop(),
                          publishing: o.publishing !== false });
     }
@@ -758,6 +764,9 @@ async function freshPage(br, opts) {
     chk('the passphrase never travels inside the recipe itself',
       !JSON.stringify(sent.puts[0].body.recipe).includes('family-secret'));
     chk('it is saved here too, not only there', sent.stored === 'Ninja Cookies Shared');
+    chk('a single edit still publishes straight away (no S11 burst flag)',
+      !/[?&]more=/.test(sent.puts[0].path + (sent.puts[0].more ? '?more=1' : '')) &&
+      sent.puts[0].more !== true, String(sent.puts[0].more));
     chk('and the reader is told everyone will see it',
       /famil/i.test(sent.notice) && /few minutes/i.test(sent.notice), sent.notice);
 
@@ -830,6 +839,14 @@ async function freshPage(br, opts) {
       !/instantly|immediately/i.test(on.text));
     chk('the passphrase itself is never printed on the page',
       !on.text.includes('family-secret'));
+    /* `S11` — Save is not the only thing that reaches everyone now. A page
+       naming only Save would leave a reader guessing about the two actions
+       that change the most recipes at once. */
+    chk('and it names the bulk changes that reach everyone too',
+      /Tagging several recipes at once/i.test(on.text) && /renaming/i.test(on.text),
+      (on.text.match(/[^.]*Tagging[^.]*\./) || [''])[0]);
+    chk('which the phone without a passphrase is not told, having nothing to tell',
+      !/Tagging several recipes at once/i.test(off.text));
 
     /* The path that cannot break is still offered in both states — it is
        what the whole download-and-commit workflow rests on. */
@@ -1011,6 +1028,198 @@ async function freshPage(br, opts) {
       /keeps to itself|stays in everyone/i.test(shares.asked));
     chk('and the passphrase is never printed in that dialog',
       !shares.asked.includes('family-secret'));
+  }
+
+  console.log('\n== The change made to twenty at once reached nobody (S11) ==');
+  {
+    /* `S04` wired sharing into the two places a recipe is written one at a
+       time — Save in Edit mode, and Save on the Add screen (`S09`). It
+       missed the two places the app writes to MANY recipes at once: Tag
+       mode's "Add tags", and renaming or merging a tag in the Tags sheet.
+       Both wrote the overlay and stopped.
+
+       That is the worst place for this gap to be, because tag hygiene is
+       the one part of the app built specifically to keep the whole book
+       consistent (`067`–`069`). A rename that lands on one phone only is
+       how the near-duplicate tags that machinery exists to prevent get
+       made: phone A calls it "Scottish", phone B still says "scottish",
+       and the next single edit from B puts the old spelling back into the
+       family's book. Divergence with a slow leak.
+
+       And both told the reader it was done — "Tagged 20 recipes.",
+       "Renamed to X — 14 recipes updated." — with nothing to say that on
+       this phone, "updated" had stopped meaning everyone. */
+    const BOOK = [
+      { id: 'aaa-one', title: 'Aaa One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'], tags: ['soup'] },
+      { id: 'bbb-two', title: 'Bbb Two', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['2 onions'], steps: ['Cook them.'], tags: ['soup'] },
+      { id: 'ccc-three', title: 'Ccc Three', category: 'Baking', servings: 4,
+        contributor: 'Joan', ingredients: ['flour'], steps: ['Bake it.'] }
+    ];
+
+    const open = async (opts, key) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)), BOOK);
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.rrow, .rcard, .cardgrid');
+      return { ctx, p, stub };
+    };
+    const readOut = async (p, stub) => ({
+      puts: stub.puts,
+      /* The Menu renders its notice as a .hint paragraph; #route-live is the
+         one stable live region and is what a screen reader actually gets.
+         Both are read, and every assertion below is made against the spoken
+         one — a sentence the reader can see but never hears is half a fix. */
+      notice: await p.evaluate(() => {
+        const n = document.getElementById('route-live');
+        return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+      }),
+      seen: await p.evaluate(() => [...document.querySelectorAll('#app .hint, #app .notice')]
+        .map(x => x.textContent.replace(/\s+/g, ' ').trim()).join(' ~ ')),
+      stored: await p.evaluate(() => {
+        const raw = localStorage.getItem('kt.recipes');
+        return raw ? JSON.parse(raw).reduce((m, r) => (m[r.id] = (r.tags || []).join(','), m), {}) : {};
+      }),
+      errs: p.errs.slice()
+    });
+
+    /* ---- Tag mode: add a tag to two recipes at once ---- */
+    const bulk = async (opts, key) => {
+      const { ctx, p, stub } = await open(opts, key);
+      await p.click('[data-act="toggle-tagging"]');
+      await p.click('[data-act="tag-pick"][data-id="aaa-one"]');
+      await p.click('[data-act="tag-pick"][data-id="ccc-three"]');
+      await p.click('[data-act="open-bulk"]');
+      await p.waitForSelector('#bulk-tags');
+      await p.fill('#bulk-tags', 'Scottish');
+      await p.click('[data-act="bulk-apply"]');
+      await p.waitForTimeout(1800);
+      const out = await readOut(p, stub);
+      await ctx.close();
+      return out;
+    };
+
+    const bQuiet = await bulk({}, '');
+    chk('with no passphrase a bulk tag still goes nowhere', bQuiet.puts.length === 0,
+      String(bQuiet.puts.length));
+    chk('and is still applied on the phone',
+      /Scottish/.test(bQuiet.stored['aaa-one']) && /Scottish/.test(bQuiet.stored['ccc-three']),
+      JSON.stringify(bQuiet.stored));
+    chk('and claims nothing about the family', !/famil/i.test(bQuiet.notice), bQuiet.notice);
+
+    const bSent = await bulk({}, 'family-secret');
+    chk('with one, every recipe it touched is sent', bSent.puts.length === 2,
+      String(bSent.puts.length));
+    chk('each to its own address, and only the ones picked',
+      bSent.puts.map(x => x.path.split('/').pop()).sort().join(',') === 'aaa-one,ccc-three',
+      bSent.puts.map(x => x.path).join(' '));
+    chk('carrying the passphrase',
+      bSent.puts.length === 2 && bSent.puts.every(x => x.key === 'family-secret'));
+    chk('and the new tag, not the old record',
+      bSent.puts.length === 2 &&
+      bSent.puts.every(x => (x.body.recipe.tags || []).indexOf('Scottish') > -1),
+      JSON.stringify(bSent.puts.map(x => x.body.recipe.tags)));
+    chk('the untouched recipe is not sent',
+      bSent.puts.length === 2 && !bSent.puts.some(x => /bbb-two/.test(x.path)));
+    chk('and the reader is told both halves happened',
+      /2 recipes/.test(bSent.notice) && /famil/i.test(bSent.notice), bSent.notice);
+    chk('and can see the same sentence, not only hear it',
+      bSent.seen.indexOf(bSent.notice) > -1, bSent.seen);
+    /* The republish has to read a database holding the WHOLE change. Every
+       write but the last says "more coming", so the poke fires once, after
+       the last row is in — rather than on the first, racing the rest. */
+    chk('every write but the last says more is coming',
+      bSent.puts.length === 2 && bSent.puts[0].more === true, JSON.stringify(bSent.puts.map(x => x.more)));
+    chk('and the last one does not, so the republish fires there',
+      bSent.puts[bSent.puts.length - 1].more === false,
+      JSON.stringify(bSent.puts.map(x => x.more)));
+
+    /* A sleeping kitchen refuses all of them the same way, so asking
+       twenty times is twenty pointless waits. One is the measurement. */
+    const bAsleep = await bulk({ failPut: { status: 503 } }, 'family-secret');
+    chk('a sleeping kitchen is asked once, not once per recipe',
+      bAsleep.puts.length === 1, String(bAsleep.puts.length));
+    chk('the tags are still applied here', /Scottish/.test(bAsleep.stored['aaa-one']),
+      JSON.stringify(bAsleep.stored));
+    chk('and the notice does not claim the family has them',
+      !/sent to the famil/i.test(bAsleep.notice) && /only on this phone|couldn/i.test(bAsleep.notice),
+      bAsleep.notice);
+
+    /* A rate limit is the one answer a burst can actually provoke, and it is
+       neither a refusal nor an outage. Half the change landing is the case
+       the sentence has to survive. */
+    const bBreak = await bulk({ failPutAfter: { after: 1, status: 429 } }, 'family-secret');
+    chk('a kitchen asking for a break says so, not that it stopped answering',
+      /asked for a break/i.test(bBreak.notice) && !/stopped answering/i.test(bBreak.notice),
+      bBreak.notice);
+    chk('and counts what did get through',
+      /1 of 2/.test(bBreak.notice), bBreak.notice);
+    chk('while still saying the rest are only here',
+      /only on this phone/i.test(bBreak.notice), bBreak.notice);
+    chk('and both recipes are tagged here regardless',
+      /Scottish/.test(bBreak.stored['aaa-one']) && /Scottish/.test(bBreak.stored['ccc-three']),
+      JSON.stringify(bBreak.stored));
+
+    const bRefused = await bulk(
+      { failPut: { status: 401, error: 'That passphrase is not the family’s one.' } },
+      'wrong-one');
+    chk('a refused passphrase repeats what the kitchen said',
+      /not the family/i.test(bRefused.notice), bRefused.notice);
+    chk('and does not invite a retry that would fail the same way',
+      !/try again/i.test(bRefused.notice), bRefused.notice);
+
+    /* ---- The Tags sheet: rename one tag across the book ---- */
+    const rename = async (opts, key, to) => {
+      const { ctx, p, stub } = await open(opts, key);
+      await p.click('[data-act="open-filter"]');
+      await p.waitForSelector('[data-act="tag-manage"]');
+      await p.click('[data-act="tag-manage"]');
+      await p.waitForSelector('[data-act="tag-edit"][data-key="soup"]');
+      await p.click('[data-act="tag-edit"][data-key="soup"]');
+      await p.waitForSelector('#tag-rename');
+      await p.fill('#tag-rename', to);
+      await p.click('[data-act="tag-rename-apply"]');
+      await p.waitForTimeout(1800);
+      const out = await readOut(p, stub);
+      await ctx.close();
+      return out;
+    };
+
+    const rQuiet = await rename({}, '', 'Broth');
+    chk('with no passphrase a rename goes nowhere', rQuiet.puts.length === 0,
+      String(rQuiet.puts.length));
+    chk('and is still done on the phone',
+      rQuiet.stored['aaa-one'] === 'Broth' && rQuiet.stored['bbb-two'] === 'Broth',
+      JSON.stringify(rQuiet.stored));
+
+    const rSent = await rename({}, 'family-secret', 'Broth');
+    chk('with one, every renamed recipe is sent', rSent.puts.length === 2,
+      String(rSent.puts.length));
+    chk('carrying the new name, so two phones cannot drift apart',
+      rSent.puts.length === 2 &&
+      rSent.puts.every(x => (x.body.recipe.tags || []).join(',') === 'Broth'),
+      JSON.stringify(rSent.puts.map(x => x.body.recipe.tags)));
+    chk('the recipe that never had the tag is left alone',
+      rSent.puts.length === 2 && !rSent.puts.some(x => /ccc-three/.test(x.path)));
+    chk('and the reader is told the family got it too',
+      /famil/i.test(rSent.notice), rSent.notice);
+    chk('while still saying what happened here',
+      /Broth/.test(rSent.notice) && /2 recipes/.test(rSent.notice), rSent.notice);
+
+    const rAsleep = await rename({ failPut: { status: 503 } }, 'family-secret', 'Broth');
+    chk('a rename the kitchen never took is not claimed as shared',
+      !/sent to the famil/i.test(rAsleep.notice), rAsleep.notice);
+    chk('and the rename still stands on this phone',
+      rAsleep.stored['bbb-two'] === 'Broth', JSON.stringify(rAsleep.stored));
+
+    chk('nothing threw across any of it',
+      [].concat(bQuiet.errs, bSent.errs, bAsleep.errs, bBreak.errs, bRefused.errs,
+                rQuiet.errs, rSent.errs, rAsleep.errs).length === 0,
+      [].concat(bQuiet.errs, bSent.errs, bAsleep.errs, bBreak.errs, bRefused.errs,
+                rQuiet.errs, rSent.errs, rAsleep.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
