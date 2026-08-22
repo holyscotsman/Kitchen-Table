@@ -359,6 +359,94 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       !stated.flags.some(f => /^Course —/.test(f)), JSON.stringify(stated.flags));
   }
 
+
+  console.log('\n== Typing a recipe in guesses like an import, but never said so (R121) ==');
+  {
+    /* The Add screen's own save read
+       `Math.min(40, Math.max(1, parseInt(d.servings, 10) || 4))`, so a
+       serving count left blank silently became **4** and one typed past the
+       limit silently became **40**. Measured: both, with an empty `flagged`
+       list and nothing said.
+
+       What makes it wrong rather than merely terse is that this app already
+       knows how to do it properly. Every import path that cannot read a
+       count defaults to 4 and **flags it** — "Servings — no count was found;
+       4 was assumed." — which the recipe page then shows as a Double-check
+       chip beside the field (`082`). An import cannot ask; a person typing
+       can simply leave the box empty, and this is the one path where the
+       guess was made in silence.
+
+       So: a blank count is still 4, because the schema needs one, but it is
+       disclosed in the words the app already uses; and a count typed past
+       the limit is clamped and said, exactly as `R119` settled for Edit. */
+    const aErrs = [];
+    /* A fresh context per case: these save real recipes into the overlay, and
+       a draft or a book left over from the last one is not the thing under
+       test. */
+    const typeIn = async (servesValue) => {
+      const ctxA = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pA = await ctxA.newPage();
+      pA.on('pageerror', e => aErrs.push(e.message));
+      await pA.goto(B + '/index.html#add');
+      await pA.waitForTimeout(500);
+      await pA.click('[data-act="add-path"][data-key="review"]', { timeout: 5000 }).catch(() => {});
+      await pA.waitForSelector('#a-title', { timeout: 5000 }).catch(() => {});
+      await pA.fill('#a-title', 'Typed Recipe ' + (servesValue || 'blank'));
+      await pA.fill('#a-ing-0', '1 cup flour').catch(() => {});
+      await pA.fill('#a-step-0', 'Bake it.').catch(() => {});
+      await pA.fill('#a-serves', servesValue).catch(() => {});
+      /* If the field did not take the value there is nothing to measure, and
+         a silent miss would read as a pass. */
+      const inField = await pA.inputValue('#a-serves').catch(() => 'MISSING');
+      await pA.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pA.waitForTimeout(900);
+      const out = await pA.evaluate(() => {
+        const rs = JSON.parse(localStorage.getItem('kt.recipes') || '[]');
+        const r = rs[rs.length - 1] || {};
+        /* The visible notice, not the live region: a save on this screen
+           ends in a navigation, and the route announcement rightly owns the
+           ear at that moment — the reader needs to know where they landed.
+           What must survive is the sentence on the page they landed on. */
+        const seen = [...document.querySelectorAll('#app .notice, #app .hint')]
+          .map(x => x.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' ~ ');
+        return { servings: r.servings, flagged: r.flagged || [], said: seen };
+      });
+      out.inField = inField;
+      await ctxA.close();
+      return out;
+    };
+
+    const blank = await typeIn('');
+    chk('a count left blank still gets one, because the book needs one',
+      blank.servings === 4, String(blank.servings));
+    chk('but it is written down as an assumption, not passed off as typed',
+      blank.flagged.some(f => /^Servings —/.test(f)), JSON.stringify(blank.flagged));
+    chk('in the same words every other guessed count uses',
+      blank.flagged.some(f => /no count was found/.test(f)), JSON.stringify(blank.flagged));
+
+    const over = await typeIn('300');
+    chk('the field really held the count being tested', over.inField === '300',
+      JSON.stringify(over.inField));
+    chk('a count typed past the limit comes back to the highest allowed',
+      over.servings === 40, String(over.servings));
+    chk('and the reader is told it was, on the page they land on',
+      /40/.test(over.said) && /serv/i.test(over.said), over.said || '(nothing shown)');
+    chk('while an ordinary save lands with nothing to explain',
+      !/saved as/i.test((await typeIn('6')).said));
+
+    const fine = await typeIn('6');
+    chk('an ordinary count is saved exactly as typed', fine.servings === 6,
+      String(fine.servings));
+    chk('with nothing assumed and nothing flagged about it',
+      !fine.flagged.some(f => /^Servings —/.test(f)), JSON.stringify(fine.flagged));
+
+    chk('nothing threw', aErrs.length === 0, aErrs.join(' | '));
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));

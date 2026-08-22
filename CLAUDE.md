@@ -332,6 +332,27 @@ did not touch survives untouched, and one they **did** type past the limit is
 clamped *and said*. This app does not change someone's words behind their
 back.
 
+### Typing a recipe in guessed like an import, and never said so
+
+`R121`, and the last of the servings trio. The Add screen's own save read
+`Math.min(40, Math.max(1, parseInt(...) || 4))`, so a count left blank became
+**4** and one typed past the limit became **40** — both correct values, both
+arrived at in silence.
+
+The silence is what was wrong, because this app already knows better: every
+import path that cannot read a count defaults to 4 and **flags it** —
+*"Servings — no count was found; 4 was assumed."* — which the recipe page
+shows as a Double-check chip beside the field (`082`). An import cannot ask;
+a person typing can simply leave the box empty, so this was the one path
+guessing without disclosing. It now uses the same sentence, so one situation
+has one wording.
+
+The clamp is **said** rather than flagged, matching `R119`: a flag is for
+something to go back and check, and a number the reader typed a moment ago
+needs telling now. That needed `S.carry` — a sentence that outlives one
+navigation, since this screen saves and then goes straight to the new recipe
+and `onRoute` clears the notice on the way.
+
 ### After Save, the fields show what was kept
 
 `R120`. `saveDraft` has always tidied on the way past — a title cleared to
@@ -735,8 +756,8 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1411 functional checks** across eleven
-suites (kt 292, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
+The suite after the video arc: **1421 functional checks** across eleven
+suites (kt 292, feat 65, add 89, relay 16, quick 76, polish 272, sec 56,
 plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
