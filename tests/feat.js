@@ -315,6 +315,93 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     await ctxP.close();
   }
 
+  console.log('\n== Two tabs of the same book (R134) ==');
+  {
+    /* `persistRecipes` wrote `S.recipes` wholesale — the list this tab read
+       at boot, with this tab's change applied. Two tabs of the same site
+       share one `localStorage`, so the second save wrote a snapshot that
+       had never heard of the first.
+
+       Measured before the fix: tab A renamed Chops and was told "Saved";
+       tab B then saved a change to Crepes, and the book held
+       `chops = "Air Fryer Chops"` — the original. Tab A's change was gone,
+       silently, while tab A still showed it on screen. CLAUDE.md's own
+       words for that: a change reported as kept and silently dropped is the
+       worst thing this app could do to a book of someone's recipes. On a
+       sharing phone it is worse — tab A's save reached the family, so the
+       family and the phone that made the change now disagree.
+
+       iOS Safari keeps tabs for months, and a home-screen install beside an
+       open tab is two instances of this app. It is not an exotic state.
+
+       The fix is that every write re-reads the book first and applies its
+       change to what is actually stored, rather than to a snapshot. Two
+       tabs editing THE SAME recipe is still last-write-wins, which is a
+       different question and an honest one; two tabs editing two different
+       recipes must not lose either. */
+    const ctx2 = await br.newContext({ ...devices['iPhone 13'] });
+    await ctx2.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    const tabA = await ctx2.newPage(), tabB = await ctx2.newPage();
+    const tErrs = [];
+    tabA.on('pageerror', (e) => tErrs.push('A:' + e.message));
+    tabB.on('pageerror', (e) => tErrs.push('B:' + e.message));
+    tabA.on('dialog', (d) => d.accept());
+    tabB.on('dialog', (d) => d.accept());
+
+    const editAndSave = async (pg, id, title) => {
+      await pg.goto(B + '/index.html#' + id);
+      await pg.waitForSelector('.r-title');
+      await pg.click('[data-act="toggle-edit"]');
+      await pg.waitForSelector('#e-title');
+      await pg.fill('#e-title', title);
+      await pg.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pg.waitForTimeout(700);
+    };
+    const book = (pg) => pg.evaluate(() => {
+      const raw = localStorage.getItem('kt.recipes');
+      const list = raw ? JSON.parse(raw) : [];
+      const t = (id) => (list.find((r) => r.id === id) || {}).title;
+      return { chops: t('chops'), crepes: t('crepes'), n: list.length,
+               added: list.some((r) => r.title === 'Two Tab Cake') };
+    });
+
+    /* Both tabs are open and on the book before either saves — which is
+       what two tabs actually is. */
+    await tabA.goto(B + '/index.html#menu'); await tabA.waitForSelector('.rcard');
+    await tabB.goto(B + '/index.html#menu'); await tabB.waitForSelector('.rcard');
+
+    await editAndSave(tabA, 'chops', 'Chops FROM TAB A');
+    await editAndSave(tabB, 'crepes', 'Crepes FROM TAB B');
+    const both = await book(tabA);
+    chk('the second tab’s save keeps the first tab’s change',
+      both.chops === 'Chops FROM TAB A', String(both.chops));
+    chk('and its own', both.crepes === 'Crepes FROM TAB B', String(both.crepes));
+    chk('with no recipe lost or duplicated', both.n === 48, String(both.n));
+
+    /* A recipe added in one tab must survive a save in the other. */
+    await tabA.goto(B + '/index.html#add');
+    await tabA.waitForSelector('.pathbtn');
+    await tabA.click('[data-act="add-path"][data-key="review"]');
+    await tabA.waitForSelector('#a-title');
+    await tabA.fill('#a-title', 'Two Tab Cake');
+    await tabA.fill('#a-ing-0', '1 cup flour');
+    await tabA.fill('#a-step-0', 'Bake it.');
+    await tabA.click('[data-act="add-save"]');
+    await tabA.waitForTimeout(900);
+    await editAndSave(tabB, 'scones', 'Scones FROM TAB B');
+    const after = await book(tabB);
+    chk('a recipe added in one tab survives a save in the other',
+      after.added === true, JSON.stringify(after));
+    chk('and the earlier changes are all still there',
+      after.chops === 'Chops FROM TAB A' && after.crepes === 'Crepes FROM TAB B',
+      after.chops + ' / ' + after.crepes);
+    chk('nothing threw in either tab', tErrs.length === 0, tErrs.join(' | '));
+    await ctx2.close();
+  }
+
   chk('no JS errors', errs.length===0, errs.join(' | '));
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
