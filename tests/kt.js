@@ -1,4 +1,5 @@
 const { chromium, devices } = require('playwright');
+const { SCREENS, seedInit, openScreen } = require('./screens');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0, fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
@@ -205,35 +206,9 @@ const browserContextWithReduce = (br) =>
        Jason's instruction so "Kitchen Table" still fits on one line at 390px.
        It is checked at exactly 44 — a deliberate exception that is allowed to
        drift is not an exception, it is a hole. */
-    const MAIN_EXCEPTION = '.themebtn--main';
-    const wrong = [];
-    for (const [name, hash, open] of [
-      ['Main', '#', null], ['Menu', '#menu', null],
-      ['Recipe', '#chicken-cordon-bleu', null],
-      ['Week planner', '#plan', null],
-      ['Menu text sheet', '#menu', '[data-act="open-text"]']
-    ]) {
-      await p.goto(B+'/index.html'+hash);
-      await p.reload();
-      await p.waitForSelector('h1');
-      if (open) { await p.click(open); await p.waitForTimeout(300); }
-      const bad = await p.evaluate((EXC) => {
-        const out = [];
-        document.querySelectorAll('.iconbtn').forEach(el => {
-          if (el.offsetParent === null) return;
-          if (el.matches(EXC)) return;
-          const r = el.getBoundingClientRect();
-          if (Math.round(r.width) !== 48 || Math.round(r.height) !== 48) {
-            out.push((el.getAttribute('aria-label') || el.className) + ' ' +
-              Math.round(r.width) + '×' + Math.round(r.height));
-          }
-        });
-        return out;
-      }, MAIN_EXCEPTION);
-      for (const b of bad) wrong.push(name + ': ' + b);
-    }
-    chk('every icon button is 48×48, not merely over the floor',
-      wrong.length === 0, wrong.slice(0, 3).join(' | '));
+    /* `R131` — the sweep that used to sit here walked five routes of its
+       own. It walks every screen the app has now, with the other two, out
+       of `tests/screens.js`; its assertion is down there with theirs. */
     await p.goto(B+'/index.html');
     await p.reload();
     await p.waitForSelector('.main__title');
@@ -2341,108 +2316,103 @@ const browserContextWithReduce = (br) =>
       heads.length >= 3 && !/padding-top:\s*5[0-9]px/.test(css), tops.join(', '));
   }
 
-  console.log('\n== Tap targets + a11y ==');
-  // Every screen, not just the Menu: the servings number shipped a hair under
-  // the floor (R16) precisely because this sweep only ever visited one route.
-  const routes = [['Main','#'], ['Menu','#menu'], ['Recipe','#chicken-cordon-bleu'],
-    ['Add','#add'], ['Week planner','#plan'], ['How to use it','#help']];
-  const tooSmall = [];
-  for (const [name, hash] of routes) {
-    await p.goto(B+'/index.html'+hash);
-    await p.waitForSelector('h1');
-    const bad = await p.evaluate(()=>{
-      const out=[];
-      document.querySelectorAll('button, a[href], input, select, textarea').forEach(el=>{
-        const r=el.getBoundingClientRect();
-        if(r.height>0 && r.height<44) out.push((el.className||el.tagName)+' h='+r.height.toFixed(1));
-      });
-      return out;
-    });
-    for (const b of bad) tooSmall.push(name+': '+b);
-  }
-  chk('nothing interactive under 44px, on any screen',
-    tooSmall.length===0, tooSmall.join(', '));
-  /* R23 — four of design/a11y-criteria.md's "checked by the reviewer, by
-     hand" items are cheap to check by machine, and a reviewer's attention is
-     not a durable guarantee. These run on every screen, every time. */
-  const named = [], unlabelled = [], positive = [], loudSvg = [];
+  console.log('\n== Tap targets, names and focus rings, on every screen the app has (R131) ==');
+  /* Three sweeps used to live here and in the R49 block above, each with a
+     hand-typed route list: five routes for the 48x48 icon rule, six for the
+     44px floor, sixteen for the accessible-name sweep — while the contrast
+     audit walked thirty-two. The a11y list's comment said "Same list the
+     contrast audit walks", which was false by sixteen screens.
+
+     The floor sweep's own comment is the argument, one level down:
+
+         Every screen, not just the Menu: the servings number shipped a hair
+         under the floor (R16) precisely because this sweep only ever
+         visited one route.
+
+     `tests/screens.js` is the one list now, and the one opening procedure —
+     several of these states need more than one tap to exist, and a state
+     one sweep can reach is a state all of them can. */
+  const MAIN_EXCEPTION = '.themebtn--main';
+  const wrong = [], tooSmall = [], named = [], unlabelled = [],
+        positive = [], loudSvg = [], ringless = [], unopened = [];
   let inspected = 0;
-  /* Every screen AND the states you have to open to reach — the sheets, edit
-     mode and the review form are exactly where an unlabelled field hides.
-     Same list the contrast audit walks. */
-  const a11yScreens = routes.map(r => [r[0], r[1], null]).concat([
-    ['Menu + filter sheet', '#menu', '[data-act="open-filter"]'],
-    ['Menu + search open', '#menu', '[data-act="toggle-search"]'],
-    ['Menu text sheet', '#menu', '[data-act="open-text"]'],
-    ['Recipe edit', '#chicken-cordon-bleu', '[data-act="toggle-edit"]'],
-    ['Recipe download sheet', '#bacon-ranch-chicken-casserole', '[data-act="open-dl"]'],
-    ['Recipe flagged', '#chops', null],
-    ['Add review form', '#add', '[data-key="review"]'],
-    ['Add from a link', '#add', '[data-key="link"]'],
-    ['Add from a photo', '#add', '[data-key="photo"]'],
-    ['Add from a video', '#add', '[data-key="video"]']
-  ]);
-  for (const [name, hash, open] of a11yScreens) {
-    /* A full reload per screen: a sheet left open by the previous one would
-       otherwise sit over this one and swallow the click that opens it. */
-    await p.goto(B+'/index.html'+hash);
-    /* …and no half-finished import snapshot either (084): restored, it lands
-       on the review form instead of the three ways in. */
-    await p.evaluate(()=>sessionStorage.removeItem('kt.addDraft'));
-    await p.reload();
-    await p.waitForSelector('h1');
-    if (open) { await p.click(open, { timeout: 8000 }); await p.waitForTimeout(350); }
-    const bad = await p.evaluate(()=>{
-      const out = { named: [], unlabelled: [], positive: [], loudSvg: [], seen: 0 };
+  for (const entry of SCREENS) {
+    const scr = entry[0], seed = entry[3], net = entry[4];
+    const ctxA = await br.newContext({ ...devices['iPhone 13'] });
+    /* Hermetic: the kitchen server is never poked from CI. */
+    await ctxA.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    if (net) {
+      await ctxA.route(net.url, async (r) => {
+        await new Promise((x) => setTimeout(x, net.holdMs || 2500));
+        return r.abort('failed');
+      });
+    }
+    const pA = await ctxA.newPage();
+    await pA.addInitScript(seedInit, { t: 'dark', e: false, s: seed || null });
+    const why = await openScreen(pA, B, entry);
+    if (why) unopened.push(scr + ': ' + why);
+    const bad = await pA.evaluate((EXC) => {
+      const out = { icon: [], small: [], named: [], unlabelled: [],
+                    positive: [], loudSvg: [], seen: 0 };
       const seen = (el) => el.offsetParent !== null || el === document.activeElement;
-      document.querySelectorAll('button, a[href]').forEach(b=>{
+      document.querySelectorAll('.iconbtn').forEach((el) => {
+        if (!seen(el) || el.matches(EXC)) return;
+        const r = el.getBoundingClientRect();
+        if (Math.round(r.width) !== 48 || Math.round(r.height) !== 48) {
+          out.icon.push((el.getAttribute('aria-label') || el.className) + ' ' +
+            Math.round(r.width) + 'x' + Math.round(r.height));
+        }
+      });
+      document.querySelectorAll('button, a[href], input, select, textarea').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.height < 44) {
+          out.small.push((el.className || el.tagName) + ' h=' + r.height.toFixed(1));
+        }
+      });
+      document.querySelectorAll('button, a[href]').forEach((b) => {
         if (!seen(b)) return;
         out.seen++;
-        const name = (b.textContent||'').trim() || b.getAttribute('aria-label') ||
+        const nm = (b.textContent || '').trim() || b.getAttribute('aria-label') ||
           b.getAttribute('title') || '';
-        if (!name) out.named.push(b.className || b.tagName);
+        if (!nm) out.named.push(b.className || b.tagName);
       });
-      document.querySelectorAll('input, textarea, select').forEach(f=>{
+      document.querySelectorAll('input, textarea, select').forEach((f) => {
         if (!seen(f) || f.type === 'hidden') return;
-        const has = (f.id && document.querySelector('label[for="'+CSS.escape(f.id)+'"]')) ||
-          f.getAttribute('aria-label') || f.getAttribute('aria-labelledby') ||
-          f.closest('label');
+        const has = (f.id && document.querySelector('label[for="' + CSS.escape(f.id) + '"]')) ||
+          f.getAttribute('aria-label') || f.getAttribute('aria-labelledby') || f.closest('label');
         if (!has) out.unlabelled.push(f.className || f.id || f.type);
       });
-      document.querySelectorAll('[tabindex]').forEach(e=>{
+      document.querySelectorAll('[tabindex]').forEach((e) => {
         if (parseInt(e.getAttribute('tabindex'), 10) > 0) out.positive.push(e.className || e.tagName);
       });
       /* Decorative artwork must not be read out. An <svg> with no title, no
          aria-label and no role="img" is decoration by definition. */
-      document.querySelectorAll('svg').forEach(g=>{
+      document.querySelectorAll('svg').forEach((g) => {
         if (!seen(g.parentElement || g)) return;
         const speaks = g.getAttribute('aria-label') || g.querySelector('title') ||
           g.getAttribute('role') === 'img';
         const hidden = g.getAttribute('aria-hidden') === 'true' ||
           (g.closest('[aria-hidden="true"]') !== null) ||
           (g.closest('button,a[href]') && (g.closest('button,a[href]').getAttribute('aria-label') ||
-            (g.closest('button,a[href]').textContent||'').trim()));
+            (g.closest('button,a[href]').textContent || '').trim()));
         if (!speaks && !hidden) out.loudSvg.push((g.parentElement && g.parentElement.className) || 'svg');
       });
       return out;
-    });
-    for (const x of bad.named) named.push(name + ': ' + x);
-    for (const x of bad.unlabelled) unlabelled.push(name + ': ' + x);
-    for (const x of bad.positive) positive.push(name + ': ' + x);
-    for (const x of bad.loudSvg) loudSvg.push(name + ': ' + x);
+    }, MAIN_EXCEPTION);
+    for (const x of bad.icon) wrong.push(scr + ': ' + x);
+    for (const x of bad.small) tooSmall.push(scr + ': ' + x);
+    for (const x of bad.named) named.push(scr + ': ' + x);
+    for (const x of bad.unlabelled) unlabelled.push(scr + ': ' + x);
+    for (const x of bad.positive) positive.push(scr + ': ' + x);
+    for (const x of bad.loudSvg) loudSvg.push(scr + ': ' + x);
     inspected += bad.seen;
-  }
-  /* R35 — criterion 8, the last of the cheap ones: a focus ring you can
-     actually see. Tabbed for real, because :focus-visible is about keyboard
-     focus and a programmatic .focus() is a different thing. */
-  const ringless = [];
-  for (const [name, hash] of routes) {
-    await p.goto(B+'/index.html'+hash);
-    await p.reload();
-    await p.waitForSelector('h1');
+
+    /* R35 — criterion 8: a focus ring you can actually see. Tabbed for
+       real, because :focus-visible is about keyboard focus and a
+       programmatic .focus() is a different thing. */
     for (let i = 0; i < 12; i++) {
-      await p.keyboard.press('Tab');
-      const seen = await p.evaluate(() => {
+      await pA.keyboard.press('Tab');
+      const got = await pA.evaluate(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return null;
         const c = getComputedStyle(el);
@@ -2452,23 +2422,33 @@ const browserContextWithReduce = (br) =>
         return { what: (el.className || el.tagName) + '', ok: hasRing || shadow,
                  detail: c.outlineStyle + ' ' + c.outlineWidth };
       });
-      if (!seen) break;
-      if (!seen.ok) ringless.push(name + ': ' + seen.what + ' (' + seen.detail + ')');
+      if (!got) break;
+      if (!got.ok) ringless.push(scr + ': ' + got.what + ' (' + got.detail + ')');
     }
+    await ctxA.close();
   }
+  chk('every icon button is 48x48, not merely over the floor',
+    wrong.length === 0, wrong.slice(0, 3).join(' | '));
+  chk('nothing interactive under 44px, on any screen',
+    tooSmall.length === 0, tooSmall.slice(0, 3).join(', '));
   chk('every control tabbed to shows a focus ring', ringless.length === 0,
     ringless.slice(0, 3).join(' | '));
-
   chk('every control has a name a screen reader can say, on every screen',
-    named.length===0, named.join(', '));
-  chk('every field has a label, on every screen', unlabelled.length===0, unlabelled.join(', '));
+    named.length === 0, named.join(', '));
+  chk('every field has a label, on every screen', unlabelled.length === 0, unlabelled.join(', '));
   chk('nothing jumps the focus order with a positive tabindex',
-    positive.length===0, positive.join(', '));
-  chk('decorative artwork is not read out', loudSvg.length===0, loudSvg.join(', '));
-  /* The sweep above is only worth its green tick if it actually looked at
+    positive.length === 0, positive.join(', '));
+  chk('decorative artwork is not read out', loudSvg.length === 0, loudSvg.join(', '));
+  /* Floors. A sweep is only worth its green tick if it actually looked at
      something: a selector that stopped matching, or a state that failed to
-     open, would otherwise read as a clean pass (R21's lesson). */
-  chk('and the sweep actually reached the controls', inspected > 200, String(inspected));
+     open, would otherwise read as a clean pass (`R21`'s lesson, and `R86`
+     found four routes auditing the screen behind a sheet that never
+     opened). */
+  chk('every screen in the shared list really opened', unopened.length === 0,
+    unopened.slice(0, 3).join(' | '));
+  chk('and the sweep actually reached the controls', inspected > 600, String(inspected));
+  chk('and it walked the whole app, not a corner of it', SCREENS.length >= 30,
+    String(SCREENS.length));
   await p.goto(B+'/index.html#menu');
   await p.waitForSelector('.rcard');
   chk('one h1 per screen', await p.locator('h1').count()===1);
