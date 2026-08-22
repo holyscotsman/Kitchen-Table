@@ -490,7 +490,12 @@ ones that tell a cook which amounts did *not* rescale. Nothing interactive measu
 every screen, not just one (`R16`). All of it
 runs on every pull request via `tests/run.sh`, hermetically — the suites
 stub the kitchen server and abort the Render origin, so CI never wakes the
-real one. Off-CI, the live-OCR gate (`tests/ocr-live.js`) proves that
+real one. Off-CI, `tests/live.js` drives the **deployed** book — the one the
+family opens — in a real browser and checks it renders, holds every
+recipe in the published file, opens one with its method, steps its
+servings and ticks a line off, with no missing file and a clean
+console (`R112`; 14 checks, all green against Pages). The live-OCR
+gate (`tests/ocr-live.js`) proves that
 pipeline device-local and, in its `KT_OCR_NOISE=1` variant, that garbage
 flags rather than invents; the video pipeline's own live checklist (real
 videos, cold start, restart mid-job) runs once the server has its keys.
