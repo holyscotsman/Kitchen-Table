@@ -67,6 +67,12 @@ const CONTRAST = `(() => {
       ['Add from a photo','#add','[data-key="photo"]'],
       ['Add from a video','#add','[data-key="video"]'],
       ['How to use it','#help',''],
+      /* `S06` — the help page now reads the phone rather than describing
+         phones in general, which makes its shared-edit half a state of its
+         own that nothing had looked at. Same question as `R110`: which
+         states can this audit even reach. */
+      ['How to use it, on a phone that shares',  '#help', '',
+        { 'kt.kitchenKey': JSON.stringify('family-secret') }],
       /* `R101` — the two states the last rounds added, and the reason the
          table could not hold them before: every route got the SAME seeded
          data, so a state that only exists for a particular recipe was
@@ -214,6 +220,7 @@ const CONTRAST = `(() => {
         'Week planner, a plan that outlived its recipe':'.mealcard--gone',
         'Recipe with nothing written down':'.panel--flag',
         'Recipe photo that failed while open':'.lightbox__gone',
+        'How to use it, on a phone that shares':'.help__h1',
         'Add, waiting on the kitchen server':'.vprog',
         'Add, a link the server will not take':'.notice--bad',
         'Recipe photo lightbox':'.lightbox','Menu sort menu':'.sortmenu','Menu search, nothing found':'.emptybox, .empty, #main-content',
