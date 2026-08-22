@@ -2636,6 +2636,13 @@
     /* `R127` — every copy this phone made is gone with the overlay, so
        every note about where the book put one is stale. */
     forgetAllSharedIds();
+    /* `R136` — and so is every change waiting to reach the family, since
+       this just undid all of them. Left behind, the Menu goes on offering
+       to send a change that no longer exists, and sends the published copy
+       in its place — over whatever the family's book holds by then. It
+       forgets rather than flushes: the reader asked for the changes to be
+       undone, not delivered. */
+    forgetAllUnsent();
     applyOverlay();
     S.editing = false;
     S.draft = null;
@@ -2796,6 +2803,14 @@
     setUnsent(unsentIds().filter(function (id) { return ids.indexOf(id) === -1; }));
   }
 
+  /* `R136` — the undo throws away every local change, so it throws away
+     every reason an id is in here. See `forgetSharedId` below for why this
+     is the one place that needs saying: everywhere else an id stops being
+     a change by its recipe leaving the overlay, and `byId` notices. */
+  function forgetAllUnsent() {
+    try { localStorage.removeItem(K.unsent); } catch (e) {}
+  }
+
   /* The recipes behind the queue, read fresh. An id with nothing behind it
      is dropped here rather than stored away — it is not a recipe any more. */
   function unsentRecipes() {
@@ -2846,9 +2861,17 @@
      else's recipe, and a stale entry would address their edit at this
      phone's abandoned row: the wrong recipe changed, and reported saved.
 
-     `kt.unsent` needs no equivalent because it is read through `byId` and
-     an id with nothing behind it simply drops out. This one is read with
-     the recipe already in hand, so it cannot notice. */
+     This one is read with the recipe already in hand, so it cannot notice.
+
+     `R127` said `kt.unsent` needed no equivalent, "because it is read
+     through `byId` and an id with nothing behind it simply drops out".
+     Half of that is right and half of it cost the reader a lie (`R136`).
+     Remove takes the recipe out of the overlay, so `byId` finds nothing and
+     the id really does drop out — that half stands, and is pinned. The undo
+     takes the OVERLAY out instead, so `byId` stops finding this phone's
+     changed copy and starts finding the PUBLISHED one: an id with something
+     behind it, and not the thing that was queued. So the undo says it and
+     `forgetAllUnsent` above is what it says. */
   function forgetSharedId(id) {
     var map = sharedIds();
     if (!(id in map)) return;

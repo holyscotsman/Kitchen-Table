@@ -493,6 +493,14 @@ const server = http.createServer((req, res) => {
         pot_provider: potUp,
         accepts_changes: writeGate.configured,
         publishes_on_change: publisher.configured,
+        /* `R137` — `publishes_on_change` only ever meant "a token is set".
+           A token that has stopped working reads exactly the same while
+           every change quietly waits for the nightly sync, so say when a
+           poke last landed and why the most recent one did not. Both null
+           after a restart is normal: this server sleeps. */
+        last_publish_s: publisher.lastSentAt() === null ? null
+          : Math.round((Date.now() - publisher.lastSentAt()) / 1000),
+        last_publish_error: publisher.lastError(),
         missing: [!sql && "KT_DB", !anthropic && "ANTHROPIC_API_KEY",
           !ctx.groqKey && "GROQ_API_KEY (optional)",
           !ctx.ytKey && "YT_API_KEY (optional — rescues robot-blocked YouTube imports)",

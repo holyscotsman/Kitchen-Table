@@ -1218,11 +1218,98 @@ watching nothing fail. The bodies are sliced now, with a floor that the
 slices found them — the second time this session a cross-file lazy match
 produced a check that could not fail.
 
+### The undo left a queue pointing at changes it had just undone
+
+`R136`. `R127` wrote the rule: **an entry stops being true when the copy it
+describes is gone.** It applied that to `kt.shared` and then reasoned that
+`kt.unsent` needed no equivalent, *"because it is read through `byId` and an
+id with nothing behind it simply drops out"*.
+
+Half of that is right. Remove takes the recipe out of the overlay, so `byId`
+finds nothing and the id really does drop out with no bookkeeping at all —
+that half stands, and is pinned now so it stays a decision. **The undo takes
+the overlay out instead**, and then `byId` stops finding this phone's changed
+copy and starts finding the *published* one: an id with something behind it,
+and not the thing that was queued.
+
+So "Undo all my changes on this phone" — the control whose own comment says
+*this is the control somebody reaches for when they are worried, so its
+sentence has to be the most honest one in the app* — told the reader every
+local change was undone, and the Menu went on offering **"Send 1 change to
+the family's book"**, with `kt.unsent` still holding the id. Measured, with
+an id the published book really holds; an invented one drops out on its own
+and hides the whole thing, which is why the test takes its id **from
+`recipes.json`** rather than typing one.
+
+And tapping that button is not a no-op. `bornHere` is false for anything in
+the published file, so the send goes up as an **edit**, and `putRecipe`
+overwrites the family's row on purpose. What it overwrites it with is this
+phone's copy of the published file — which is the same content on a good day,
+and somebody else's newer edit on a bad one, because the database is ahead of
+`recipes.json` between nightly syncs. A phone told it had undone everything
+reaching out and writing an old copy over a newer one is the wrong direction
+for this app to err in.
+
+It **forgets rather than flushes**, and that is the one judgement call: the
+reader asked for those changes to be undone, not delivered. Clearing is
+unconditional too — the queue outlives the passphrase, so a phone that shares
+nothing today would meet the same stale offer the day somebody puts the
+passphrase back in, with no undo left to blame.
+
+And **which stores the undo must take with it is decided once** rather than
+remembered at each new one. Every key in `K` is either cleared by the undo or
+named with its reason — a preference, the photos it keeps on purpose and says
+so, the week, the passphrase — in `R114`'s shape, so a sixth store added later
+fails by name instead of quietly inheriting whichever answer its author
+assumed. That is the check that would have caught this one.
+
+### A poke that never happened still spent the ninety seconds
+
+`R137`, and the first thing this loop has found on the path that publishes
+to everyone.
+
+An edit lands in the database and then asks `db-sync` to run, so the family
+sees it in minutes rather than overnight. That ask is **debounced** — and
+the debounce is not a rate limit. Its whole justification, written at the
+top of `backend/lib/publish.js`, is that *"the sync regenerates the whole
+file, so a single run covers everything that landed before it"*: it is a
+**promise that a run is already covering this**.
+
+`lastAt = now` was set before the request and never given back, so a poke
+GitHub refused — an expired token, a 5xx, a name that would not resolve —
+held the window for ninety seconds exactly as though it had succeeded.
+Measured: two edits twenty seconds apart with GitHub unreachable make
+**one** API call, and the second writer is told **"debounced"** — *a run is
+already on its way for you* — when there is none. Both changes then wait
+for the nightly sync.
+
+Late-never-wrong is the direction this app errs in, and that is the point:
+it is meant to be the cost of a phone closing mid-burst, not the cost of one
+unlucky request. The claim stays **before** the request, because that is
+what stops two writes landing together from both calling GitHub; it is
+**given back** when the request did not land. A failure after a success
+restores the success rather than clearing it, so the window a real publish
+earned is not reopened.
+
+Every existing failure test passed `cooldownMs: 0`, which is exactly why the
+seam between *failing* and *debouncing* had never been looked at.
+
+**And the accessor that named a lie nothing read.** `lastSentAt()` was set
+for pokes that were never sent, its comment said *"for the tests and the
+health endpoint"*, and neither used it — so there was nowhere for the fault
+above to show. Health reported `publishes_on_change`, which only ever meant
+*a token is set*: a `KT_GH_TOKEN` that has stopped working reads exactly
+like one that works, while every change quietly waits for morning. It now
+also says when a publish last **landed** and why the most recent one did
+not, so a token that expires is discoverable instead of silent. The reason
+carries a status code and never the token, which is checked — health is a
+public page.
+
 ### Verified
 
-The suite after the video arc: **1583 functional checks** across eleven
-suites (kt 323, feat 75, add 113, relay 16, quick 76, polish 315, sec 56,
-plan 79, video 244, backend 271, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1611 functional checks** across eleven
+suites (kt 323, feat 75, add 113, relay 16, quick 76, polish 319, sec 56,
+plan 79, video 252, backend 287, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

@@ -2091,6 +2091,59 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
         .every((n) => bodyOf(n).length > 40),
       ['writeRecipes', 'writePlan', 'queueUnsent', 'noteSharedId']
         .map((n) => n + '=' + bodyOf(n).length).join(' '));
+  
+
+    /* `R136` — and what the undo has to take with it, decided once here
+       rather than remembered at each new store.
+
+       "Undo all my changes on this phone" drops the overlay. `R127` cleared
+       `kt.shared` with it and reasoned `kt.unsent` needed nothing, because
+       an id read through `byId` drops out when its recipe is gone — true of
+       Remove, false of the undo, which removes the overlay itself so `byId`
+       starts finding the PUBLISHED recipe instead. The Menu then went on
+       offering to send a change that had just been undone.
+
+       A key that holds a change to the book must be cleared. A key that
+       holds something else must be named here with the reason, in `R114`'s
+       shape, so a sixth store added later fails by name rather than
+       quietly inheriting whichever answer its author assumed. */
+    const KEPT = {
+      theme:      'a preference, not a change to the book',
+      fs:         'the reading size — a preference',
+      easyRead:   'a preference',
+      images:     'kept on purpose, and the confirm says so (R71/S08)',
+      addDraft:   'sessionStorage; an unfinished import is not a saved change',
+      plan:       'a week of meals, not a recipe; survives on purpose (R110)',
+      importApi:  'where the kitchen server lives — a test hook, not a change',
+      dismissed:  'failed imports waved away; not a change to the book',
+      kitchenKey: 'the passphrase; clearing it would lock the reader out of ' +
+                  'sharing, which the undo was never asked to do'
+    };
+    const kAt = src135.indexOf('var K = {');
+    const kBlock = src135.slice(kAt, src135.indexOf('\n  };', kAt));
+    const kKeys = (kBlock.match(/^\s{4}([A-Za-z]+):/gm) || [])
+      .map((x) => x.trim().replace(':', ''));
+    const undoSrc = bodyOf('resetLocal') +
+      (bodyOf('resetLocal').match(/forgetAll\w+/g) || [])
+        .map((n) => bodyOf(n)).join('\n');
+    const cleared = kKeys.filter((k) =>
+      new RegExp('removeItem\\(K\\.' + k + '\\b').test(undoSrc));
+
+    chk('every store the undo does not clear is named with a reason',
+      kKeys.every((k) => cleared.indexOf(k) > -1 || KEPT[k]),
+      kKeys.filter((k) => cleared.indexOf(k) === -1 && !KEPT[k]).join(', '));
+    chk('and nothing is both cleared and excused',
+      cleared.every((k) => !KEPT[k]),
+      cleared.filter((k) => KEPT[k]).join(', '));
+    chk('the undo clears the overlay, the shared-id notes and the queue',
+      ['recipes', 'shared', 'unsent'].every((k) => cleared.indexOf(k) > -1),
+      'cleared: ' + cleared.join(', '));
+    /* Floors: a slice that found nothing, or a key list that found nothing,
+       would read as a clean pass for every check above. */
+    chk('and the undo really was read, with the whole key list beside it',
+      bodyOf('resetLocal').length > 40 && kKeys.length >= 10 &&
+      kKeys.indexOf('unsent') > -1,
+      'resetLocal=' + bodyOf('resetLocal').length + ' keys=' + kKeys.length);
   }
 
   console.log('\n== Which screens go on paper is a question about the list (R133) ==');

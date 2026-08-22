@@ -15,6 +15,13 @@
  *  2. It is DEBOUNCED. Someone fixing four typos in a row should cause one
  *     publish, not four: the sync regenerates the whole file, so a single
  *     run covers everything that landed before it.
+ *
+ *     Which makes the debounce a PROMISE THAT A RUN IS ALREADY COVERING
+ *     THIS, not a rate limit (`R137`). A poke GitHub never took covers
+ *     nothing, so it gives the window back rather than spending ninety
+ *     seconds it did not earn — otherwise one unlucky request quietly sends
+ *     the next writer's change to the nightly sync as well, and tells them
+ *     it is already on its way.
  *  3. No token, no poke, and no complaint in the write path — the health
  *     endpoint is where "this is not set up" belongs.
  */
@@ -36,6 +43,12 @@ function makePublisher(opts) {
    * a start" is most of them. The one that got dropped would be the one
    * somebody was waiting on. */
   let lastAt = null;
+  /* Why the most recent attempt did not land, for the health endpoint —
+     `publishes_on_change` only ever meant "a token is set", so a token that
+     has stopped working reads exactly like one that works while every change
+     waits for morning. Never carries the token: `poke` puts only a status
+     code in `why`. */
+  let lastWhy = null;
 
   return {
     configured: !!token,
@@ -46,6 +59,9 @@ function makePublisher(opts) {
       const now = nowMs === undefined ? Date.now() : nowMs;
       if (!token) return { sent: false, why: "no token" };
       if (lastAt !== null && now - lastAt < cooldownMs) return { sent: false, why: "debounced" };
+      /* Claimed before the request, so two writes landing together do not
+         both call GitHub — and given back below if it did not land. */
+      const prev = lastAt;
       lastAt = now;
       try {
         const res = await doFetch(
@@ -61,18 +77,26 @@ function makePublisher(opts) {
             },
             body: JSON.stringify({ ref: ref })
           });
-        if (res && (res.status === 204 || res.ok)) return { sent: true };
+        if (res && (res.status === 204 || res.ok)) { lastWhy = null; return { sent: true }; }
+        lastAt = prev;
+        lastWhy = "http " + (res && res.status);
         /* Never let the token near a log line or a response body. */
         log("db-sync poke refused: HTTP " + (res && res.status));
-        return { sent: false, why: "http " + (res && res.status) };
+        return { sent: false, why: lastWhy };
       } catch (e) {
+        lastAt = prev;
+        lastWhy = "unreachable";
         log("db-sync poke failed: " + String(e && e.message).slice(0, 120));
-        return { sent: false, why: "unreachable" };
+        return { sent: false, why: lastWhy };
       }
     },
 
-    /* For the tests and the health endpoint. */
-    lastSentAt() { return lastAt; }
+    /* When a poke last LANDED, and why the most recent one did not. Both are
+       for the health endpoint, which is where "this is not working" belongs
+       (`R137`); `lastSentAt` used to be set for pokes that were never sent,
+       and nothing read it, so nothing ever noticed. */
+    lastSentAt() { return lastAt; },
+    lastError() { return lastWhy; }
   };
 }
 

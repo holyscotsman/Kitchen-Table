@@ -548,6 +548,17 @@ const { runJob, computeFps } = lib('pipeline');
       chk('health answers 200 and says what is missing',
         health.status === 200 && body.ok === false &&
         body.missing.indexOf('KT_DB') > -1, JSON.stringify(body.missing || []));
+      /* `R137` — `publishes_on_change` only ever meant "a token is set", so
+         a token that had stopped working looked exactly like one that
+         worked while every change waited for the nightly sync. Both null on
+         a server that has never poked is the honest answer, and is what
+         makes a later non-null one mean something. */
+      chk('health says when a publish last landed, and why one did not',
+        'last_publish_s' in body && 'last_publish_error' in body &&
+        body.last_publish_s === null && body.last_publish_error === null,
+        JSON.stringify({ s: body.last_publish_s, e: body.last_publish_error }));
+      chk('and still says whether it could publish at all',
+        body.publishes_on_change === false, String(body.publishes_on_change));
       chk('and every answer carries its hardening headers',
         health.headers.get('x-content-type-options') === 'nosniff' &&
         health.headers.get('referrer-policy') === 'no-referrer' &&
@@ -1017,6 +1028,87 @@ const { runJob, computeFps } = lib('pipeline');
     await noisy.poke(0);
     chk('and the token never reaches a log line',
       logged.length > 0 && !logged.join(' ').includes('SUPERSECRET'), logged.join(' '));
+    /* `R137` put a reason on the health endpoint, which is a public page. */
+    chk('nor the reason the health endpoint now publishes',
+      !String(noisy.lastError()).includes('SUPERSECRET'), String(noisy.lastError()));
+
+    /* `R137` — and a poke that never happened must not spend the ninety
+       seconds a poke that did would have earned.
+     *
+     * The debounce is not a rate limit. Its whole justification, written at
+     * the top of the file, is that "the sync regenerates the whole file, so
+     * a single run covers everything that landed before it" — it is a
+     * PROMISE THAT A RUN IS ALREADY COVERING THIS. When the run never
+     * started, that promise is false, and the next writer is told
+     * "debounced" while nothing is on its way for either of them.
+     *
+     * Both changes then wait for the nightly sync. That is the direction
+     * this app errs in — late, never wrong — but it is meant to be the cost
+     * of a phone closing mid-burst, not the cost of one unlucky request.
+     *
+     * Every failure test above passes `cooldownMs: 0`, which is exactly why
+     * the seam between failing and debouncing had never been looked at. */
+    const flaky = [];
+    let gh = 'down';
+    const flakyPub = makePublisher({ token: 'ghp_secret', cooldownMs: 90000,
+      fetchImpl: (url) => {
+        flaky.push(url);
+        return gh === 'down'
+          ? Promise.reject(new Error('getaddrinfo ENOTFOUND api.github.com'))
+          : Promise.resolve({ status: 204, ok: true });
+      } });
+    const missed = await flakyPub.poke(0);
+    chk('a poke GitHub never took is reported as such',
+      missed.sent === false && missed.why === 'unreachable', JSON.stringify(missed));
+    chk('and does not count as a publish that happened',
+      flakyPub.lastSentAt() === null, String(flakyPub.lastSentAt()));
+    gh = 'up';
+    const nextWriter = await flakyPub.poke(20000);
+    chk('so the next change is not told a run is already covering it',
+      nextWriter.sent === true, JSON.stringify(nextWriter));
+    chk('and GitHub really was asked the second time', flaky.length === 2,
+      String(flaky.length));
+    chk('now the window is real, and holds',
+      (await flakyPub.poke(21000)).why === 'debounced');
+    chk('and lastSentAt means the poke that landed',
+      flakyPub.lastSentAt() === 20000, String(flakyPub.lastSentAt()));
+    chk('a publisher that has recovered stops reporting the old failure',
+      flakyPub.lastError() === null, String(flakyPub.lastError()));
+
+    /* A failure AFTER a success must not forget the success either, or the
+       window it earned reopens and four typos become four publishes again. */
+    gh = 'down';
+    const after = await flakyPub.poke(200000);
+    chk('a failure after a success is still a failure',
+      after.sent === false, JSON.stringify(after));
+    chk('and leaves the last real publish where it was',
+      flakyPub.lastSentAt() === 20000, String(flakyPub.lastSentAt()));
+    chk('while the fresh failure is the one reported',
+      flakyPub.lastError() === 'unreachable', String(flakyPub.lastError()));
+
+    /* The assignment stays BEFORE the request, which is what stops two
+       writes landing together from both calling GitHub. Pinned, because the
+       obvious way to fix the above is to move it after — and that trades one
+       fault for a worse one. */
+    const slow = [];
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const concurrent = makePublisher({ token: 'ghp_secret', cooldownMs: 90000,
+      fetchImpl: (url) => { slow.push(url); return gate; } });
+    const inFlight = concurrent.poke(0);
+    const alongsideP = concurrent.poke(10);
+    /* Both bodies run to their await before anything is awaited here, and
+       the gate is released before either result is read — otherwise a
+       version that DOES call GitHub twice deadlocks on the second call and
+       this check dies silently instead of by name. */
+    await Promise.resolve();
+    chk('so GitHub is asked once, not twice', slow.length === 1, String(slow.length));
+    release({ status: 204, ok: true });
+    const alongside = await alongsideP;
+    chk('a second write while the first is still in the air is held back',
+      alongside.sent === false && alongside.why === 'debounced',
+      JSON.stringify(alongside));
+    chk('and the one in the air still lands', (await inFlight).sent === true);
   }
 
   console.log('\n== The edit endpoint is wired the way the gate expects (S02) ==');

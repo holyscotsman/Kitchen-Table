@@ -48,6 +48,13 @@ because this folder didn't exist yet. With this code on the deployed branch:
      sees the change in a few minutes; without it the change still lands in
      the database and appears at the nightly sync instead. A fine-grained
      token scoped to this one repository is enough.
+
+     A token that later expires does not announce itself — the write still
+     succeeds and the change still reaches the family, just overnight
+     instead of in minutes. `/api/health` is where to look: `last_publish_s`
+     is how long ago a publish actually landed and `last_publish_error` is
+     why the most recent one did not. Both `null` on a server that has just
+     woken up is normal; an error sitting there is the token to check.
 2. **Settings → Build & Deploy** → confirm **Build Command** is `yarn` and
    **Start Command** is `yarn start`. Leave **Root Directory** empty.
 3. **Manual Deploy → Deploy latest commit.** The build fetches yt-dlp and
@@ -117,7 +124,7 @@ Docker (tools baked in; build from the **repo root** — the server applies
 
 | Route | What it does |
 |---|---|
-| `GET /api/health` | `{ok, uptime_s, queue_pending}` — also the wake-up ping |
+| `GET /api/health` | `{ok, uptime_s, queue_pending, accepts_changes, publishes_on_change, last_publish_s, last_publish_error}` — also the wake-up ping |
 | `POST /api/import/video` `{url, contributor?}` | validates YouTube/Instagram, inserts a `queued` job, returns `{job_id}` immediately — refuses with 429 past 40 imports in 24 hours (`KT_DAY_CAP`) |
 | `GET /api/import/jobs/:id` | status, human stage label, `eta_seconds`, `overrun`, and `result_json` once ready |
 | `GET /api/import/jobs?status=ready_for_review` | finished imports awaiting review (the Add screen's badge) |
