@@ -3623,8 +3623,20 @@
     }
     /* A video import tells the kitchen server its draft was accepted, so
        the database gets the reviewed version and the job leaves the
-       waiting list. The local save above never waits on it. */
+       waiting list. The local save above never waits on it.
+
+       `S09` — and every OTHER new recipe goes the same way, when this phone
+       holds the passphrase. `S04` wired sharing into Edit mode only, which
+       left the family a rule nobody could have guessed: change a recipe and
+       everyone sees it, type a new one in and only you do. The video path
+       had told the server since the day it was built, so two of the three
+       ways in already shared and the quiet one was the one somebody uses to
+       add Joan's card off the counter.
+
+       Not both, for a video draft: `acceptVideoJob` writes that recipe
+       already, and asking twice would be one write to argue with another. */
     if (d.videoJobId) acceptVideoJob(d.videoJobId, recipe);
+    else shareEdit(recipe);
     S.addDraft = null;
     S.addStep = "choose";
     S.addError = "";

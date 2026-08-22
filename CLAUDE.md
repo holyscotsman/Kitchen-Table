@@ -497,6 +497,12 @@ Two variables for Jason, both in Render, neither in this repo or in chat:
 change waits for the nightly sync instead of arriving in minutes).
 `backend/README.md` has the checklist.
 
+**Every way in shares, not just Edit** (`S09`). `S04` wired this into Edit
+mode alone, so changing a recipe reached everyone while typing one in did
+not — and the video path had been telling the server all along. All three
+ways now behave the same; a video draft still goes through `acceptJob` only,
+never both.
+
 **And the sentences it falsified** (`S06`). The help page said *"your
 changes live on your phone only"*, which this arc made false for any phone
 holding the passphrase. It reads the phone now rather than describing phones
@@ -505,9 +511,9 @@ deliberately left alone: removal is still local-only.
 
 ### Verified
 
-The suite after the video arc: **1270 functional checks** across eleven
+The suite after the video arc: **1280 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 53,
-plan 79, video 134, backend 226, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 144, backend 226, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

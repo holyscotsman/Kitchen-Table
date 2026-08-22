@@ -134,6 +134,11 @@ async function freshPage(br, opts) {
     await p.waitForURL(/#video-test-soup/, { timeout: 5000 });
     await p.waitForTimeout(500);
     chk('save told the kitchen (accept)', stub.accepted.length === 1 && /jobs\/7\/accept/.test(stub.accepted[0].path));
+    /* `S09` — and told it ONCE. Accept already writes that recipe, so a
+       video draft must not also go down the ordinary sharing path: two
+       writes for one Save is one of them arguing with the other. */
+    chk('and told it exactly once, not twice',
+      stub.puts.length === 0, 'also PUT ' + stub.puts.length + ' time(s)');
     const sent = stub.accepted[0].body.recipe;
     chk('accept carries the reviewed recipe, id chosen by the phone',
       sent && sent.id === 'video-test-soup' && sent.title === 'Video Test Soup');
@@ -898,6 +903,60 @@ async function freshPage(br, opts) {
       /undoes everything changed, added, or removed on this phone/i.test(shares.asked));
     chk('and it never prints the passphrase into a dialog',
       !shares.asked.includes('family-secret'));
+  }
+
+  console.log('\n== Typing a new recipe in shares it too (S09) ==');
+  {
+    /* `S04` wired sharing into Edit mode only, which left the family a rule
+       nobody could have guessed: change a recipe and everyone sees it, type
+       a new one in and only you do. The video path had told the server
+       since the day it was built, so two of the three ways in already
+       shared — and the quiet one was the one somebody uses to add Joan's
+       card off the counter. */
+    const addOne = async (opts, key, title) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      if (key) await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      await p.goto(B + '/index.html#add');
+      await p.waitForSelector('.pathbtn');
+      await p.click('[data-act="add-path"][data-key="review"]');
+      await p.waitForSelector('#a-title');
+      await p.fill('#a-title', title);
+      await p.fill('#a-ing-0', '2 cups flour');
+      await p.fill('#a-step-0', 'Mix it.');
+      await p.click('[data-act="add-save"]');
+      await p.waitForTimeout(1400);
+      const out = {
+        puts: stub.puts, accepted: stub.accepted,
+        notice: await p.evaluate(() => {
+          const n = document.querySelector('.notice');
+          return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+        }),
+        stored: await p.evaluate(() => {
+          const raw = localStorage.getItem('kt.recipes');
+          return raw ? JSON.parse(raw).some(r => /S09/.test(r.title)) : false;
+        }),
+        errs: p.errs.slice()
+      };
+      await ctx.close();
+      return out;
+    };
+
+    const quiet = await addOne({}, '', 'Typed In S09 Local');
+    chk('with no passphrase a new recipe goes nowhere', quiet.puts.length === 0);
+    chk('and is still saved on the phone', quiet.stored === true);
+
+    const sent = await addOne({}, 'family-secret', 'Typed In S09 Shared');
+    chk('with one, a typed-in recipe reaches the family too',
+      sent.puts.length === 1, String(sent.puts.length));
+    chk('at its own address', /\/api\/recipes\/typed-in-s09-shared$/.test(sent.puts[0].path),
+      sent.puts[0].path);
+    chk('carrying the passphrase', sent.puts[0].key === 'family-secret');
+    chk('and the recipe as typed', sent.puts[0].body.recipe.title === 'Typed In S09 Shared');
+    chk('it is on the phone as well', sent.stored === true);
+    chk('and the reader is told', /famil/i.test(sent.notice), sent.notice);
+    chk('nothing threw', quiet.errs.length === 0 && sent.errs.length === 0,
+      quiet.errs.concat(sent.errs).join(' | '));
   }
 
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
