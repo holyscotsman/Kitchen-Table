@@ -6,10 +6,25 @@ Jason.*
 
 ## The one thing to understand first
 
-When you add or change a recipe, it saves **on your phone only**. You'll see
-it every time you open the site on that phone, but nobody else will — not
-until it's published (step 4). Think of it as writing in your own copy of the
-book, then handing the pages to Jason to put in everyone's copy.
+When you add or change a recipe, it saves **on your phone**. Whether anyone
+else sees it depends on one box.
+
+- **If the Family passphrase box is empty** (it is, until someone fills it
+  in), the change is yours alone. You'll see it every time you open the site
+  on that phone, but nobody else will — not until it's published (step 4).
+  Think of it as writing in your own copy of the book, then handing the
+  pages to Jason to put in everyone's copy.
+- **If the family's passphrase is in it**, pressing Save also sends the
+  change to everyone, usually within a few minutes. You only put it in once,
+  on that phone. Ask Jason for it.
+
+**The app tells you which happened, every single time.** If it says *saved on
+this phone*, it means only this phone — whatever the box says, whatever you
+expected. Believe the sentence, not the setting.
+
+Two things never go to everyone, no matter what: **removing** a recipe, and
+**photos**. Both stay on your phone until a file is published in the ordinary
+way.
 
 ## 1. Open the site
 
@@ -101,7 +116,8 @@ photos in `images/`, and commit. The site republishes itself.
 ## Fixing mistakes
 
 - **Edit anything:** open the recipe, flip the **Edit** switch, change it,
-  Save. (Same rule: on your phone until published.)
+  Save. (Same rule as above: on your phone, unless the passphrase box is
+  filled in — and the app says which.)
 - **Remove a recipe:** on All recipes, tap **Remove**, then the recipe.
 - **Panic button:** if your phone's copy is in a state you don't like,
   **"Undo all my changes on this phone"** (in the Edit footer) puts
