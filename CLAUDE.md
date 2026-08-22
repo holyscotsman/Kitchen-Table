@@ -510,6 +510,11 @@ read out forty-eight times. Four hand-written `if (S.notice)` blocks
 became one `noticeHtml(cls, style)`: there had been nowhere for a second
 line to go, which is part of why the indicator was never built. `S.shared`
 is deleted rather than wired — it only ever repeated what the notice said.
+And `tests/sec.js` caught the new helper writing a raw `style=` within
+minutes of it existing: every caller passes a literal, but the rule is that
+an attribute built by concatenation is escaped, so nobody has to re-derive
+per call site whether that particular value can be reached by anything a
+person typed.
 
 **One known mismatch, recorded rather than fixed.** The app treats a
 serving count as optional — `R97` made sure a recipe without one does not

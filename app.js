@@ -2536,10 +2536,16 @@
      each screen wrote its own `if (S.notice)` line and there was nowhere
      for a second line to go. */
   function noticeHtml(cls, style) {
-    var st = style ? ' style="' + style + '"' : "";
+    /* Both interpolations go through `esc`, even though every caller passes
+       a literal. `tests/sec.js` caught this helper writing a raw `style=`
+       within minutes of it existing, and it is right to: the rule is that an
+       attribute built by concatenation is escaped, so that nobody has to
+       re-derive per call site whether this particular value can be reached
+       by anything a person typed. */
+    var st = style ? ' style="' + esc(style) + '"' : "";
     var h = "";
-    if (S.notice) h += '<p class="' + cls + '"' + st + ">" + esc(S.notice) + "</p>";
-    if (S.sharing) h += '<p class="' + cls + '"' + st + ">" + esc(sharingMsg()) + "</p>";
+    if (S.notice) h += '<p class="' + esc(cls) + '"' + st + ">" + esc(S.notice) + "</p>";
+    if (S.sharing) h += '<p class="' + esc(cls) + '"' + st + ">" + esc(sharingMsg()) + "</p>";
     return h;
   }
 
