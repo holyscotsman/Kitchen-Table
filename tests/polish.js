@@ -2146,6 +2146,105 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       'resetLocal=' + bodyOf('resetLocal').length + ' keys=' + kKeys.length);
   }
 
+  console.log('\n== A recipe from the book is named through titleOf (R138) ==');
+  {
+    /* `R116` gave the app one word for a nameless recipe — "Untitled
+       recipe" — and taught the Menu, both sorts, the recipe page, the search
+       and the browser tab to use it. FOUR places that name a recipe went on
+       reading `.title` raw, and all four are places where the reader is being
+       asked to decide something:
+
+         - the week planner's meal sheet, whose heading is also the dialog's
+           `aria-labelledby`, so the sheet opened with no accessible name —
+           and an empty `<h2>` has no box, so nothing was on screen either;
+         - the Remove confirm, the app's one irreversible dialog, which asked
+           `Remove "undefined" from this phone?`;
+         - the duplicate warning's bold name, which read "It looks a lot
+           like ." — and its link, whose whole text became "Open ".
+
+       Fixing four call sites is one word each. This is the part that makes
+       it stick, in `R114`'s shape: the rule is one sentence, and a fifth
+       site fails by name.
+
+       A recipe FROM THE BOOK is named through `titleOf`. Every other
+       `.title` in the file names something that is not a recipe yet, and
+       says which. */
+    const NOT_A_RECIPE = {
+      d: 'the Edit/Add draft — kept raw on purpose (R116), so Save cannot write the placeholder into the book',
+      draft: 'S.draft.title — the same draft, reached through S',
+      updated: 'the recipe being built for storage, inside saveDraft',
+      s: "a parser's own input, before it is a recipe",
+      j: 'a video import job, which carries its own fallback',
+      CAPS: 'the import size caps, not a recipe',
+      document: 'the browser tab, not a recipe'
+    };
+    /* The only three functions that may read a book recipe's title raw. */
+    const RAW_OK = {
+      titleOf: 'the reader itself',
+      startDraft: 'seeds the Edit field from the STORED name (R116), so Save cannot bake the placeholder in',
+      saveDraft: 'writes the stored value, and compares old against new to answer R122 flags'
+    };
+
+    const rawSrc = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    /* Comments blanked rather than deleted, so line numbers still point at
+       the code — and so the prose above a fix cannot trip its own check
+       (the R116 comment quotes `a.title.localeCompare(b.title)`).
+
+       The lookbehind is load-bearing and was learned the hard way: the file
+       contains `accept="image/*"`, and without it that `/*` opened a comment
+       that ran on to the next close-marker and swallowed `function startDraft(`, which
+       silently mis-attributed every line after it. The floors below pin both
+       directions. */
+    const blank = (m) => m.replace(/[^\n]/g, ' ');
+    const code = rawSrc
+      .replace(/(?<![\w"'])\/\*[\s\S]*?\*\//g, blank)
+      .replace(/(?<![^\s])\/\/[^\n]*/g, '');
+    const srcLines = code.split('\n');
+
+    let fnNow = null;
+    const raws = [];
+    srcLines.forEach((line, i) => {
+      const f = /^\s{0,4}function (\w+)\(/.exec(line);
+      if (f) fnNow = f[1];
+      const re = /\b(\w+)\.title\b/g;
+      let m;
+      while ((m = re.exec(line))) raws.push({ who: m[1], fn: fnNow, n: i + 1, line: line.trim() });
+    });
+
+    const unnamed = raws.filter((x) => !NOT_A_RECIPE[x.who] && !RAW_OK[x.fn]);
+    chk('a recipe from the book is named through titleOf, everywhere',
+      unnamed.length === 0,
+      unnamed.map((x) => x.n + ' (' + x.fn + '): ' + x.line.slice(0, 70)).join(' | '));
+
+    /* Floors. A walk that read nothing, a stripper that ate the code, or an
+       allow-list whose entries no longer occur would each read as a clean
+       pass above — which is exactly how this kind of check dies quietly. */
+    chk('and the stripper kept the code while dropping the prose',
+      code.indexOf('image/*') > -1 &&
+      code.indexOf('a.title.localeCompare') === -1 &&
+      /^\s{0,4}function startDraft\(/m.test(code),
+      'image/*=' + (code.indexOf('image/*') > -1) +
+      ' quoted-comment-gone=' + (code.indexOf('a.title.localeCompare') === -1) +
+      ' startDraft-survived=' + /^\s{0,4}function startDraft\(/m.test(code));
+    chk('and the walk really read the file',
+      raws.length >= 20 && (rawSrc.match(/titleOf\(/g) || []).length >= 25,
+      raws.length + ' reads, ' + (rawSrc.match(/titleOf\(/g) || []).length + ' titleOf calls');
+    chk('the three functions allowed to read one raw still do',
+      Object.keys(RAW_OK).every((f) => raws.some((x) => x.fn === f)),
+      Object.keys(RAW_OK).filter((f) => !raws.some((x) => x.fn === f)).join(', '));
+    chk('and every name excused as "not a recipe" still appears',
+      Object.keys(NOT_A_RECIPE).every((w) => raws.some((x) => x.who === w)),
+      Object.keys(NOT_A_RECIPE).filter((w) => !raws.some((x) => x.who === w)).join(', '));
+
+    /* And the one field beside it that is written by `titleOf` at its single
+       write site, so the plan's own copy of a name cannot drift into a raw
+       read either. */
+    chk('the plan records the name it was planned under through titleOf too',
+      /titleThen:\s*titleOf\(/.test(code),
+      (/titleThen:[^,\n]*/.exec(code) || ['MISSING'])[0]);
+  }
+
   console.log('\n== Which screens go on paper is a question about the list (R133) ==');
   {
     /* The print pass kept four names of its own, in another file, with its

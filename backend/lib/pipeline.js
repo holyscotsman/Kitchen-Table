@@ -204,7 +204,9 @@ async function runJob(ctx, jobId) {
       const parsed = await extract.callExtractor(ctx.anthropic, meta, transcript, frames);
       draft = extract.draftFromResult(parsed, job.url, job.platform);
     } catch (e) {
-      if (e && e.notRecipe) { await fail(e.message); return; }
+      /* `R139` — the app's own sentence wrapped around the MODEL's reason,
+         which is text this server did not write. Scrubbed like any other. */
+      if (e && e.notRecipe) { await fail(media.scrubInternal(e.message)); return; }
       throw e;
     }
     for (const f of extraFlags) draft.flagged.push(f);
@@ -216,8 +218,22 @@ async function runJob(ctx, jobId) {
                where id = ${jobId}`;
   } catch (e) {
     console.error("job " + jobId + " failed:", e);
+    /* `R139` — scrubbed. The whole message is scrubbed before it is capped,
+       so the scrubber reads the text it was written for rather than a
+       truncation. Measured: it makes no difference to today's rules, which
+       match a half path as happily as a whole one — it is kept because the
+       next rule added may not be as forgiving, not because it fixes
+       anything now.
+
+       Every other failure here writes a hand-written sentence; this one
+       handles what nobody predicted — an SDK error, an `fs` error, a `sql`
+       error — and `error_message` is rendered to the reader in two places
+       (the failed-imports list, and `S.addError`). Without this the server's
+       own temp paths reached the family's screen through the single path
+       whose text nobody can predict. The rule is the simple one: text this
+       server did not write itself is scrubbed before a reader sees it. */
     await fail("Something went wrong while importing — please try the link again. (" +
-      String(e && e.message || e).slice(0, 200) + ")").catch(() => {});
+      media.scrubInternal(String(e && e.message || e)).slice(0, 200) + ")").catch(() => {});
   } finally {
     /* Keep nothing but extracted data (spec step 4) — on every exit path. */
     fs.rmSync(tmp, { recursive: true, force: true });
