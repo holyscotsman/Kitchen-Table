@@ -387,6 +387,13 @@
        `shared` is gone rather than wired — it only ever repeated what the
        notice already said. */
     sharing: null,
+    /* `R121` — a sentence that has to outlive one navigation. The Add screen
+       saves and then goes straight to the new recipe, and `onRoute` clears
+       the notice on the way, so a message about what the save just did would
+       be wiped before anyone read it. Held here, moved into `notice` by the
+       route change that would have destroyed it, and cleared immediately so
+       it can never repeat on the next screen. */
+    carry: "",
     filterOpen: false,
     sortOpen: false,
     who: [],
@@ -3891,19 +3898,49 @@
     var n = 2;
     while (byId(id)) id = base + "-" + n++;
 
+    /* `R121` — this read `Math.min(40, Math.max(1, parseInt(...) || 4))`,
+       and both of its guesses were made in silence: a count left blank
+       became 4 with nothing said, and one typed past the limit became 40
+       with nothing said.
+
+       The values were right. The silence was not, and this app already
+       knows better — every import path that cannot read a count defaults to
+       4 and **flags it**, in words the recipe page then shows as a
+       Double-check chip beside the field (`082`). An import cannot ask; a
+       person typing can simply leave the box empty, so this was the one
+       path guessing without disclosing. It uses the same sentence, so the
+       reader meets one wording for one situation.
+
+       The clamp is said rather than flagged, matching `R119`: a flag is for
+       something to go back and check, and a number the reader typed a
+       moment ago needs telling now. */
+    var typedServ = parseInt(d.servings, 10);
+    var addFlags = (d.flagged || []).slice();
+    var addClamped = 0;
+    var servings;
+    if (typedServ >= 1) {
+      servings = Math.min(40, typedServ);
+      if (typedServ > 40) addClamped = typedServ;
+    } else {
+      servings = 4;
+      if (!addFlags.some(function (f) { return /^Servings —/.test(f); })) {
+        addFlags.push("Servings — no count was found; 4 was assumed.");
+      }
+    }
+
     var recipe = {
       id: id,
       title: title,
       category: CATS.indexOf(d.category) > -1 ? d.category : "Dinner",
       contributor: (d.contributor || "").trim() || WHO[0],
-      servings: Math.min(40, Math.max(1, parseInt(d.servings, 10) || 4)),
+      servings: servings,
       ingredients: d.ingredients.filter(function (x) { return x.trim(); }),
       steps: d.steps.filter(function (x) { return x.trim(); })
     };
     if ((d.prepTime || "").trim()) recipe.prepTime = d.prepTime.trim();
     if ((d.cookTime || "").trim()) recipe.cookTime = d.cookTime.trim();
     if ((d.notes || "").trim()) recipe.notes = d.notes.trim();
-    if (d.flagged && d.flagged.length) recipe.flagged = d.flagged.slice();
+    if (addFlags.length) recipe.flagged = addFlags;
     if ((d.source || "").trim()) recipe.source = d.source.trim();
     var newTags = parseTags(d.tags);
     if (newTags.length) recipe.tags = newTags;
@@ -3950,6 +3987,10 @@
     S.addDupe = null;
     S.addDupeOk = false;
     clearAddDraft();
+    if (addClamped) {
+      S.carry = "This book keeps serving counts up to 40, so " + addClamped +
+        " was saved as 40.";
+    }
     location.hash = "#" + id;
   }
 
@@ -5297,7 +5338,8 @@
     if (scrollTick) { clearTimeout(scrollTick); scrollTick = null; }
 
     S.route = next;
-    S.notice = "";
+    S.notice = S.carry || "";
+    S.carry = "";
     /* A new screen starts listening again: the same sentence on a later
        visit is new information, not a repeat. */
     lastAnnounced = "";
