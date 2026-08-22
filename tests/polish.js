@@ -2501,6 +2501,66 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       tag.rowBorder !== rem.rowBorder, tag.rowBorder + ' vs ' + rem.rowBorder);
   }
 
+  console.log('\n== R140 — and by ear the two lists were the same list ==');
+  {
+    /* `R85` asked whether Remove mode and Tag mode can be told apart BY EYE
+       and answered it: the danger outline, checked just above. Nobody ever
+       asked the same question of the other channel — and this app exists
+       because someone reads it with low vision.
+
+       Measured. A row in the ordinary list is a link named *"Bacon Ranch
+       Chicken Casserole, Dinner · Joan American"*. The same row in Remove
+       mode is a button named *"Bacon Ranch Chicken Casserole Joan"* — the
+       recipe's name, and nothing about removing it. The only difference a
+       screen reader can perceive is link-versus-button, which is not a
+       warning. Tag mode is fine: its rows carry `aria-pressed`, so they
+       announce as toggles. Remove — the irreversible one — announced
+       nothing.
+
+       And the app already knows the right sentence one screen over: the
+       planner's delete button reads "Remove <name> from the plan". This is
+       that pattern, with `S10`'s words for what Menu removal actually does. */
+    const rowName = (sel) => p.locator(sel).first().evaluate(
+      (el) => (el.getAttribute('aria-label') || el.innerText || '')
+        .replace(/\s+/g, ' ').trim());
+
+    await p.goto(B + '/index.html#menu');
+    /* A real load, not a hash change: the block above leaves the page in a
+       mode, and `goto` to the same document does not reset what is in
+       memory — the same trap `R138` met with `addInitScript`. */
+    await p.reload();
+    await p.waitForSelector('.rcard');
+    const openName = await rowName('.rcard');
+    await p.click('[data-act="toggle-remove"]');
+    await p.waitForSelector('.rrow');
+    const killName = await rowName('.rrow');
+
+    chk('a row that removes a recipe says that is what it does',
+      /^remove .+ from this phone$/i.test(killName), JSON.stringify(killName));
+    chk('and names the recipe it would remove',
+      killName.toLowerCase().indexOf(openName.split(' ')[0].toLowerCase()) > -1,
+      JSON.stringify([openName.split(' ')[0], killName]));
+    /* Not merely different — the ordinary row LEADS with the recipe's name,
+       so a destructive one that also leads with it sounds like an ordinary
+       row however its tail differs. */
+    chk('so it cannot be mistaken by ear for the row that opens it',
+      killName.toLowerCase().indexOf(openName.toLowerCase().slice(0, 12)) !== 0 &&
+      !/^remove/i.test(openName),
+      JSON.stringify([openName.slice(0, 30), killName]));
+    /* `S10` — removal is deliberately local, and both halves of its confirm
+       say "from this phone". The row that starts it says the same words. */
+    chk('in the same words the confirm uses',
+      /from this phone/i.test(killName), JSON.stringify(killName));
+    /* Floors: a mode that never opened, or a name reader that returned
+       nothing, would read as a clean pass for all four. */
+    chk('and both lists really drew, with names in them',
+      openName.length > 4 && killName.length > 4 &&
+      (await p.locator('.rrow').count()) > 5,
+      JSON.stringify([openName.length, killName.length]));
+    await p.click('[data-act="toggle-remove"]');
+    await p.waitForSelector('.rcard');
+  }
+
   console.log('\n== R83 — the accent fill marks the action you came for ==');
   {
     /* One colour carries one meaning in this app: an accent fill is the
