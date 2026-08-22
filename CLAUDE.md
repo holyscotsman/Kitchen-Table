@@ -244,6 +244,29 @@ written never says "Saved" or "planned", because a change reported as kept
 and silently dropped is the worst thing this app could do to a book of
 someone's recipes.
 
+### A validator must judge what it stores, not what it was handed
+
+`R115`. `validateRecipe` read the **raw** string for every check and then
+stored the **trimmed** one, which are two different strings. A title of
+three spaces is truthy, is a string, and is under 300 characters, so every
+check passed — and `.trim()` made it empty on the way into the database: a
+**nameless recipe in everyone's book**, out of the one function whose whole
+job is to refuse what the app would never send. The contributor mattered
+more than the title, because `putRecipe` inserts it into
+`kitchen.contributors`: an empty one mints a blank row that becomes a blank
+tile under "Whose recipe?", and a contributor outlives the recipe that
+created it. An optional field of spaces became `""` in a column that means
+*nothing here*, giving the schema two ways to say the same thing.
+
+The same gap was in `db/migrate.js`, on the path that reads the
+hand-editable `recipes.json` **every night with nobody watching**. Both are
+fixed, and the two are checked against each other: they guard the same field
+for the same reason and must not disagree about what counts as a name.
+`image` is deliberately not on that rule — it has a required shape (`S05`),
+so whitespace is malformed rather than absent and is refused by name; the
+asymmetry is pinned by a test so it stays a decision rather than an accident
+of statement order.
+
 ### Stored shapes are coerced at the boundary — and so are the server's
 
 **`R87` extended this rule past storage to the one remote input.** The
@@ -605,9 +628,9 @@ errs in.
 
 ### Verified
 
-The suite after the video arc: **1364 functional checks** across eleven
+The suite after the video arc: **1374 functional checks** across eleven
 suites (kt 255, feat 65, add 79, relay 16, quick 76, polish 272, sec 56,
-plan 79, video 218, backend 233, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —

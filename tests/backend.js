@@ -50,6 +50,49 @@ const { runJob, computeFps } = lib('pipeline');
   chk('good recipe passes', validateRecipe(good).recipe.id === 'stub-stew');
   chk('empty lines cleaned', validateRecipe(Object.assign({}, good, { ingredients: ['a', '  ', 'b'] })).recipe.ingredients.length === 2);
   chk('bad id refused', validateRecipe(Object.assign({}, good, { id: 'Bad Id!' })).error !== undefined);
+
+  /* `R115` — this validator checks the RAW value and stores the TRIMMED one,
+     which are not the same string. A title of three spaces is truthy, is a
+     string, and is under 300 characters, so every check passed — and then
+     `.trim()` made it empty on the way into the database. A nameless recipe
+     in everyone's book, from a boundary whose entire job is to refuse what
+     the app would never send.
+
+     The contributor is worse than the title: `putRecipe` inserts it into
+     `kitchen.contributors`, so an empty one mints a blank row that becomes a
+     blank tile under "Whose recipe?" — and contributors are the one thing in
+     this schema that outlive the recipe that created them.
+
+     Reachable by anyone holding the family passphrase, which is the whole
+     point of validating rather than trusting: the app trims before it sends
+     (`saveDraft`), and this boundary must not depend on that. */
+  const blank = (patch) => validateRecipe(Object.assign({}, good, patch));
+  chk('a title of nothing but spaces is refused',
+    /title/.test(blank({ title: '   ' }).error || ''), JSON.stringify(blank({ title: '   ' })));
+  chk('and so is a contributor of nothing but spaces',
+    /contributor/.test(blank({ contributor: '\t \n' }).error || ''),
+    JSON.stringify(blank({ contributor: '\t \n' })));
+  chk('a recipe whose name is real still passes with the spaces gone',
+    blank({ title: '  Real Name  ' }).recipe.title === 'Real Name',
+    JSON.stringify(blank({ title: '  Real Name  ' }).recipe));
+  /* An optional field is absent or it has something in it. Writing "" into a
+     column that means "nothing here" makes two ways to say the same thing,
+     and the app then renders an empty time as though it were a value. */
+  chk('an optional field of only spaces is dropped, not stored empty',
+    blank({ prepTime: '   ' }).recipe.prepTime === undefined,
+    JSON.stringify(blank({ prepTime: '   ' }).recipe));
+  chk('while a real one survives trimmed',
+    blank({ prepTime: ' 10 min ' }).recipe.prepTime === '10 min',
+    JSON.stringify(blank({ prepTime: ' 10 min ' }).recipe));
+  chk('and an empty string is still simply absent, as before',
+    blank({ notes: '' }).recipe.notes === undefined);
+  /* One field is deliberately not on that rule. `image` has a required shape
+     (`S05`), so whitespace is malformed rather than absent, and it is refused
+     with the sentence that names the shape. Pinned here so the asymmetry is a
+     decision rather than an accident of statement order. */
+  chk('a whitespace image is refused, not quietly dropped',
+    /image must look like/.test(blank({ image: '   ' }).error || ''),
+    JSON.stringify(blank({ image: '   ' })));
   chk('unknown category refused', validateRecipe(Object.assign({}, good, { category: 'Tea' })).error !== undefined);
   chk('fraction servings refused', validateRecipe(Object.assign({}, good, { servings: 2.5 })).error !== undefined);
   chk('non-list steps refused', validateRecipe(Object.assign({}, good, { steps: 'stir' })).error !== undefined);
@@ -387,6 +430,34 @@ const { runJob, computeFps } = lib('pipeline');
       /--prune/.test(src) && /argv\.includes\('--prune'\)/.test(src));
     chk('and the orphans are named out loud whether or not they are pruned',
       /orphan/i.test(src) && /console\.log/.test(src));
+
+    /* `R115` — the same gap, on the other boundary. `recipes.json` is
+       hand-editable by design and this is what reads it every night with
+       nobody watching, so a title of three spaces must not become a
+       nameless recipe in the database and then in everyone's book. The
+       server's validator and this one guard the same field for the same
+       reason; they must not disagree about what counts as a name. */
+    const okRow = {
+      id: 'a', title: 'A', category: 'Dinner', contributor: 'Joan', servings: 4,
+      ingredients: ['x'], steps: ['y']
+    };
+    /* `die` stops the process rather than throwing — which is right for a
+       nightly job nobody is watching, and means this has to be measured the
+       way the job actually behaves, in a child. Asserting on a refactored
+       shape would be testing something else. */
+    const dies = (patch) => {
+      const r = require('child_process').spawnSync(process.execPath, ['-e',
+        'const m=require(process.argv[1]);m.validate([JSON.parse(process.argv[2])]);' +
+        'console.log("ACCEPTED")',
+        path.join(__dirname, '..', 'db', 'migrate.js'),
+        JSON.stringify(Object.assign({}, okRow, patch))], { encoding: 'utf8' });
+      return r.status === 0 ? '' : (r.stderr || '').trim();
+    };
+    chk('a title of nothing but spaces stops the nightly run',
+      /title/i.test(dies({ title: '   ' })), dies({ title: '   ' }) || 'accepted');
+    chk('and so does a contributor of nothing but spaces',
+      /contributor/i.test(dies({ contributor: ' \t ' })), dies({ contributor: ' \t ' }) || 'accepted');
+    chk('a real recipe still passes', dies({}) === '', dies({}));
     chk('a delete only ever happens inside the prune branch',
       (src.match(/delete from kitchen\.recipes\b/g) || []).length === 1 &&
       src.indexOf('delete from kitchen.recipes\n') === -1 ||
