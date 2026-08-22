@@ -2028,6 +2028,59 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       missing.length === 0, missing.join(', '));
   }
 
+  console.log('\n== The app answers to five words, and three places have to agree (R132) ==');
+  {
+    /* A recipe id is the whole address it is read at, so an id that IS one
+       of the app's own screens is a recipe it can store and list but never
+       open. Three places have to know which words those are: the router
+       that spends them, the app's boundary that moves a recipe out of their
+       way, and the two server boundaries that keep them out of the database.
+
+       The list is only worth having if it is the SAME list, and — the part
+       that will actually decay — if it still matches the routes the router
+       really has. A sixth screen added without a word here brings the bug
+       straight back, so the routes are derived from `parseHash` rather than
+       trusted to a comment. */
+    const fs2 = require('fs'), path2 = require('path');
+    const root2 = path2.join(__dirname, '..');
+    const app2 = fs2.readFileSync(path2.join(root2, 'app.js'), 'utf8');
+
+    const listed = (app2.slice(app2.indexOf('var ROUTE_WORDS = ['),
+      app2.indexOf(']', app2.indexOf('var ROUTE_WORDS = [')))
+      .match(/"[^"]+"/g) || []).map((x) => x.slice(1, -1)).sort();
+    chk('the app names its own addresses in one place', listed.length === 5, listed.join(','));
+
+    const ph = app2.slice(app2.indexOf('function parseHash()'),
+      app2.indexOf('\n  }', app2.indexOf('function parseHash()')));
+    const phBody = ph.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const routed = [...new Set(
+      [...phBody.matchAll(/raw === "([a-z]+)"/g)].map((m) => m[1])
+        .concat([...phBody.matchAll(/raw\.indexOf\("([a-z]+)\?"\)/g)].map((m) => m[1]))
+    )].sort();
+    chk('and the router really has those screens and no others',
+      routed.join(',') === listed.join(','), routed.join(',') + ' vs ' + listed.join(','));
+
+    const srv = require(path2.join(root2, 'backend', 'lib', 'validate.js'));
+    chk('the server refuses the same five, from the same list',
+      (srv.ROUTE_WORDS || []).slice().sort().join(',') === listed.join(','),
+      (srv.ROUTE_WORDS || []).join(',') + ' vs ' + listed.join(','));
+
+    /* And the floor that keeps this honest: the router must not be matching
+       a screen by prefix again, which is what made every id beginning with
+       "menu" the Menu. Read from the CODE, not the comments — `parseHash`
+       quotes the old line to explain itself, and a check a comment can trip
+       is a check that cries wolf. */
+    chk('no screen is matched by prefix any more',
+      !/raw\.indexOf\("[a-z]+"\) === 0/.test(phBody),
+      (phBody.match(/raw\.indexOf\("[a-z]+"\) === 0/) || [''])[0]);
+    /* A recipe in the shipped book must never hold one, or every phone
+       renames it at every boot. */
+    const book = JSON.parse(fs2.readFileSync(path2.join(root2, 'recipes.json'), 'utf8'));
+    chk('and no recipe in the book has taken one',
+      book.every((r) => listed.indexOf(r.id) === -1),
+      book.filter((r) => listed.indexOf(r.id) > -1).map((r) => r.id).join(','));
+  }
+
   console.log('\n== R100 — two writers, one file ==');
   {
     /* `recipes.json` has two authors. The phone writes it through

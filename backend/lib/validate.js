@@ -6,6 +6,16 @@
 const CATS = ["Breakfast", "Brunch", "Lunch", "Dinner", "Sides",
   "Snacks", "Baking", "Desserts", "Cocktails", "Drinks"];
 
+/* `R132` — the five words the app answers to itself. A recipe id is the
+ * whole address it is read at (`#chicken-fritters`), so an id that IS one
+ * of these is a recipe the app can store and list but never open: the
+ * screen wins, and it has to, or a recipe called "Plan" would take the week
+ * planner away from the family. The app moves one out of the way at its own
+ * boundary; refusing it here keeps it out of the database in the first
+ * place, so no phone has to keep renaming it at every boot. `db/migrate.js`
+ * holds the same line on the file, and the two must not disagree. */
+const ROUTE_WORDS = ["main", "menu", "add", "plan", "help"];
+
 /* The two platforms the pipeline knows how to fetch. Everything else is
  * rejected with a message that names what IS supported, so the failure
  * teaches rather than stonewalls. */
@@ -39,6 +49,9 @@ function validateRecipe(r) {
   if (!r || typeof r !== "object") return { error: "no recipe in the request" };
   const out = {};
   if (!r.id || !/^[a-z0-9-]{1,80}$/.test(r.id)) return { error: "bad recipe id" };
+  if (ROUTE_WORDS.indexOf(r.id) > -1) {
+    return { error: "“" + r.id + "” is one of the app’s own screens, so a recipe cannot live at that address" };
+  }
   out.id = r.id;
   /* `R115` — judge the value this will STORE, not the one it was handed.
    * Every check here used to read the raw string and then `.trim()` it on
@@ -108,4 +121,4 @@ function validateRecipe(r) {
   return { recipe: out };
 }
 
-module.exports = { CATS, parseVideoUrl, validateRecipe };
+module.exports = { ROUTE_WORDS, CATS, parseVideoUrl, validateRecipe };

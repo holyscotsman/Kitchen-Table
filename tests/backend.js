@@ -1046,6 +1046,55 @@ const { runJob, computeFps } = lib('pipeline');
       /api\/recipes"\) === 0/.test(src) || /indexOf\("\/api\/recipes"\)/.test(src));
   }
 
+  console.log('\n== The five words the app answers to itself (R132) ==');
+  {
+    /* A recipe id is the whole address the app reads it at
+       (`#chicken-fritters`), so an id that IS one of the app's own screens
+       is a recipe it can store and list but never open — measured in
+       `tests/kt.js`, where six of seven seeded recipes drew a card on the
+       Menu and every one of them opened a different screen.
+
+       The app moves such an id out of the way at its own boundary, the way
+       `R70` moves a duplicate. Refusing it here keeps it out of the
+       database in the first place, so no phone has to keep renaming it at
+       every boot — and there are two boundaries into that database, the
+       wire and the nightly file, which is `R115`'s lesson about the title:
+       they must not disagree about what is refused. */
+    const { validateRecipe, ROUTE_WORDS } = require('../backend/lib/validate');
+    const ok = { id: 'x', title: 'A Recipe', category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'] };
+
+    chk('the list is the five screens the app has', 
+      ROUTE_WORDS.slice().sort().join(',') === 'add,help,main,menu,plan',
+      ROUTE_WORDS.join(','));
+    for (const w of ROUTE_WORDS) {
+      const v = validateRecipe(Object.assign({}, ok, { id: w }));
+      chk('“' + w + '” is refused, and says why', !!v.error && /own screens/.test(v.error),
+        JSON.stringify(v.error));
+    }
+    chk('while the moved-out-of-the-way id is fine',
+      !validateRecipe(Object.assign({}, ok, { id: 'plan-2' })).error);
+    chk('and so is anything that merely starts with one',
+      !validateRecipe(Object.assign({}, ok, { id: 'menu-of-the-week' })).error &&
+      !validateRecipe(Object.assign({}, ok, { id: 'menuboard' })).error);
+
+    /* The nightly file is the other way in, and it runs at 06:17 with
+       nobody watching. */
+    const mig = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrate.js'), 'utf8');
+    chk('the nightly migration reads the same list rather than typing its own',
+      /require\('\.\.\/backend\/lib\/validate'\)/.test(mig) && /ROUTE_WORDS/.test(mig),
+      'migrate does not share the list');
+    chk('and refuses a recipe that has taken one',
+      /ROUTE_WORDS\.includes\(r\.id\)/.test(mig) && /die\(/.test(mig));
+    /* A floor: the two boundaries guard the same field for the same reason
+       and must not drift apart (`R115`). */
+    const val = fs.readFileSync(path.join(__dirname, '..', 'backend', 'lib', 'validate.js'), 'utf8');
+    chk('and both name the one list, in one place',
+      (val.match(/const ROUTE_WORDS = \[/g) || []).length === 1 &&
+      !/const ROUTE_WORDS = \[/.test(mig),
+      'a second copy of the list exists');
+  }
+
   console.log('\n== A create must not overwrite; an edit must (R127) ==');
   {
     /* `S09` sent a newly typed recipe through the same call as an edit, and

@@ -1066,11 +1066,57 @@ mutation-testing this round, on the Main header's two documented 44px
 controls. The shared opener waits for `document.fonts.ready` now, so neither
 audit is one sub-pixel from a false alarm.
 
+### A recipe the app would store, show, and never open
+
+`R132`. `parseHash` decides what an address means, and it decided by prefix:
+
+```js
+if (raw.indexOf("menu") === 0) …the Menu
+```
+
+An id is the whole address a recipe is read at, and ids come from
+`slugify(title)`. So *Menu Of The Week* — or a video import called *Menu
+Prep Sunday* — minted `menu-of-the-week`, and the recipe was then saveable,
+listed, tappable, and **opened the Menu**. The four bare screens took their
+words outright: a recipe called *Plan*, *Add*, *Help* or *Main* opened the
+week planner, the Add screen, the help page or the front screen.
+
+Measured with seven seeded recipes: six drew a card on the Menu and every
+one of those six opened a different screen. Same family as `R70`, where a
+recipe *"could never be opened at all"*, and worse in one way — the card is
+there, so it is a recipe that vanishes when you tap it.
+
+Two halves, and the order matters:
+
+- **The router is exact** (`raw === "menu" || raw.indexOf("menu?") === 0`),
+  which rescues every id that merely begins with a screen's name.
+- **The five that ARE a screen's name cannot be rescued that way.** The
+  app's own screens have to win, or a recipe called *Plan* would take the
+  week planner away from the family. So they are suffixed at the boundary,
+  which is exactly what `R70` does with a duplicate id and for the same
+  reason — the reason travels on the recipe, and the id rides into the next
+  download, where it fixes the file.
+
+`ROUTE_WORDS` is the one list. The router spends those words, the app's
+boundary moves recipes out of their way, `saveAdd` mints around them so a
+recipe typed in as *Menu* opens the moment it is saved, and both server
+boundaries — `validateRecipe` on the wire and `db/migrate.js` on the
+nightly file — refuse them outright, so no phone has to keep renaming the
+same recipe at every boot. The two server boundaries share the list rather
+than each typing it, which is `R115`'s rule about the title applied to the
+id.
+
+And the check that will actually matter later: the routes are **derived
+from `parseHash`'s own source** and compared to the list, so a sixth screen
+added without a word for it fails by name. Reading the code and not the
+comments, because `parseHash` quotes the old line to explain itself — a
+check a comment can trip is a check that cries wolf.
+
 ### Verified
 
-The suite after the video arc: **1531 functional checks** across eleven
-suites (kt 310, feat 65, add 113, relay 16, quick 76, polish 297, sec 56,
-plan 79, video 244, backend 260, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1560 functional checks** across eleven
+suites (kt 323, feat 65, add 113, relay 16, quick 76, polish 302, sec 56,
+plan 79, video 244, backend 271, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
