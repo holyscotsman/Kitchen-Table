@@ -5483,9 +5483,24 @@
          changes when there is a photo to lose. */
       if (!victim) return;
       var hasPhoto = pagesOf(victim.id).length > 0;
-      var ask = hasPhoto
-        ? 'Remove "' + victim.title + '" and its photo from this phone?'
-        : 'Remove "' + victim.title + '" from the collection?';
+      /* `S10` — one action, one scope, said the same way both times.
+         `R71` wrote the photo half as "from this phone" because that is
+         what it does; the other half still said "from the collection",
+         which is a bigger-sounding place and was already vague.
+
+         The `S` arc made the vagueness a trap. On a phone that shares,
+         "the collection" reads as everyone's book — and removal is
+         deliberately local (`DECISIONS.md S`). Someone who removes a
+         recipe believing it is gone for the family leaves it live for
+         them AND loses their own copy of it, so they cannot even open it
+         to put it right. That is the worst shape a wrong sentence can
+         take in this app. */
+      var ask = 'Remove "' + victim.title + '"' +
+        (hasPhoto ? " and its photo" : "") + " from this phone?" +
+        (kitchenKey()
+          ? "\n\nIt stays in everyone else’s book: removing is the one " +
+            "thing this phone keeps to itself."
+          : "");
       if (window.confirm(ask)) {
         S.recipes = S.recipes.filter(function (x) { return x.id !== victim.id; });
         if (hasPhoto) removeImage(victim.id);

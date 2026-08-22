@@ -959,6 +959,60 @@ async function freshPage(br, opts) {
       quiet.errs.concat(sent.errs).join(' | '));
   }
 
+  console.log('\n== Removing says which book it means (S10) ==');
+  {
+    /* One action, one scope, said the same way both times. `R71` wrote the
+       photo half as "from this phone" because that is what it does; the
+       other half said "from the collection", which is a bigger-sounding
+       place and was already vague.
+
+       The `S` arc made the vagueness a trap. On a phone that shares, "the
+       collection" reads as everyone's book — and removal is deliberately
+       local. Someone who removes a recipe believing it is gone for the
+       family leaves it live for them AND loses their own copy, so they
+       cannot even open it to put it right. */
+    const removeAsk = async (key, recipeId) => {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', r => r.abort('failed'));
+      if (key) await ctx.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      const p = await ctx.newPage();
+      let asked = '';
+      p.on('dialog', d => { asked = d.message(); d.dismiss(); });
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.rcard');
+      await p.click('[data-act="toggle-remove"]');
+      await p.waitForTimeout(400);
+      await p.evaluate(() => {
+        const b = document.querySelector('[data-act="remove"]');
+        if (b) b.click();
+      });
+      await p.waitForTimeout(500);
+      const gone = await p.evaluate(() => !!localStorage.getItem('kt.recipes'));
+      await ctx.close();
+      return { asked, wroteAnything: gone };
+    };
+
+    const alone = await removeAsk('');
+    chk('removing asks first', alone.asked.length > 10, alone.asked);
+    chk('and dismissing it removes nothing', alone.wroteAnything === false);
+    chk('it names this phone, not "the collection"',
+      /from this phone\?/.test(alone.asked) && !/from the collection/.test(alone.asked),
+      alone.asked);
+    chk('and says nothing about everyone, because there is no everyone',
+      !/everyone/i.test(alone.asked), alone.asked);
+
+    const shares = await removeAsk('family-secret');
+    chk('on a phone that shares it still names this phone',
+      /from this phone\?/.test(shares.asked), shares.asked.split('\n')[0]);
+    chk('and says the recipe stays in everyone else’s book',
+      /stays in everyone else/i.test(shares.asked), shares.asked.slice(-90));
+    chk('so nobody removes a recipe believing the family lost it too',
+      /keeps to itself|stays in everyone/i.test(shares.asked));
+    chk('and the passphrase is never printed in that dialog',
+      !shares.asked.includes('family-secret'));
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);
