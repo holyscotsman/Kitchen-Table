@@ -2863,11 +2863,31 @@
       ["Changing a recipe",
        ["Open it and turn on the <strong>Edit</strong> switch at the top. " +
         "Change what you like and press Save.",
-        "<strong>Your changes live on your phone only.</strong> Nobody else " +
-        "sees them until they’re published.",
-        "To make them real for everyone: press <strong>Download updated " +
-        "recipes.json</strong> and send that file to Jason. If you added " +
-        "photos, press <strong>Download photos</strong> too.",
+        /* `S06` — this page said "your changes live on your phone only",
+           and the `S` arc made that false for any phone with the family
+           passphrase in it: there, Save reaches everybody. The same fault
+           `R94`, `R102`, `R108` and `R109` each found — a sentence that has
+           stopped being true — except this time the arc that broke it was
+           mine, one round earlier.
+
+           Written from what THIS phone actually does rather than from a
+           rule about phones in general, so it cannot be half-right: the
+           passphrase is either in the box or it is not, and the page says
+           which. */
+        (kitchenKey()
+          ? "<strong>This phone has the family passphrase in it</strong>, so " +
+            "pressing Save puts your change in everyone’s copy as well as " +
+            "your own — usually within a few minutes. The app tells you " +
+            "which happened every time; if it says <em>saved on this " +
+            "phone</em>, it means only this phone."
+          : "<strong>Your changes live on your phone only.</strong> Nobody " +
+            "else sees them until they’re published. To send them straight " +
+            "to everyone instead, put the family passphrase in the " +
+            "<strong>Family passphrase</strong> box in Edit mode — ask " +
+            "Jason for it."),
+        "Either way, the way that always works: press <strong>Download " +
+        "updated recipes.json</strong> and send that file to Jason. If you " +
+        "added photos, press <strong>Download photos</strong> too.",
         "Changed your mind about everything? <strong>Undo all my changes on " +
         "this phone</strong> puts it all back the way it was published.",
         /* `R90` — Remove sits on the Menu next to Tag and appeared nowhere

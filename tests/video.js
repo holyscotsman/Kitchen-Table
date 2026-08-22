@@ -785,6 +785,61 @@ async function freshPage(br, opts) {
       [].concat(quiet.errs, sent.errs, slow.errs, refused.errs, asleep.errs).join(' | '));
   }
 
+  console.log('\n== The help page had to change with it (S06) ==');
+  {
+    /* "Your changes live on your phone only" was true for the whole life of
+       this app, and `S04` made it false for any phone holding the family
+       passphrase. That is the same fault `R94`, `R102`, `R108` and `R109`
+       each found — a sentence that has stopped being true — except this
+       time the round that broke it was the one before this.
+
+       So the page reads the phone rather than describing phones in general,
+       and this is checked from BOTH sides: a claim that is right only half
+       the time is what got us here. */
+    const helpWith = async (key) => {
+      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      await ctx.route(API + '/**', r => r.abort('failed'));
+      if (key) await ctx.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
+      const p = await ctx.newPage();
+      const errs = []; p.on('pageerror', e => errs.push(e.message));
+      await p.goto(B + '/index.html#help');
+      await p.waitForSelector('.help__h1');
+      const text = await p.evaluate(() => document.querySelector('#app').innerText);
+      await ctx.close();
+      return { text, errs };
+    };
+
+    const off = await helpWith('');
+    chk('with no passphrase the page still says changes stay on this phone',
+      /live on your phone only/i.test(off.text), off.text.slice(0, 120));
+    chk('and says how to change that',
+      /Family passphrase/i.test(off.text));
+
+    const on = await helpWith('family-secret');
+    chk('with one, it no longer claims they stay here',
+      !/live on your phone only/i.test(on.text),
+      (on.text.match(/[^.]*phone only[^.]*\./) || [''])[0]);
+    chk('it says they reach everyone', /everyone’s copy|everyone/i.test(on.text));
+    chk('and it does not promise a speed the server may not manage',
+      !/instantly|immediately/i.test(on.text));
+    chk('the passphrase itself is never printed on the page',
+      !on.text.includes('family-secret'));
+
+    /* The path that cannot break is still offered in both states — it is
+       what the whole download-and-commit workflow rests on. */
+    for (const [name, r] of [['without', off], ['with', on]]) {
+      chk('the download still appears ' + name + ' a passphrase',
+        /Download updated recipes\.json/.test(r.text));
+    }
+    /* Removal is deliberately still local-only (DECISIONS S), so that
+       sentence must NOT have been swept along with the others. */
+    chk('and removal is still described as this phone only',
+      /takes a recipe off this phone/i.test(on.text.replace(/\s+/g, ' ')),
+      (on.text.match(/Remove[^.]*\./) || [''])[0].slice(0, 90));
+    chk('nothing threw', off.errs.length === 0 && on.errs.length === 0);
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);
