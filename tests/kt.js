@@ -1100,6 +1100,86 @@ const browserContextWithReduce = (br) =>
     await pK.close();
   }
 
+  console.log('\n== Editing a recipe must not quietly rewrite a count nobody touched (R119) ==');
+  {
+    /* `R97` settled that a recipe with NO count must not gain one by being
+       edited. This is the same principle from the other side, and it was
+       still wrong: `saveDraft` ran `Math.min(40, typed)` over whatever the
+       field held, including a value the reader never went near.
+
+       Measured: a recipe stored as 200 — a church-hall pot, the kind of
+       thing somebody genuinely writes — opened in Edit mode, the TITLE
+       changed and nothing else, Save pressed. Stored servings afterwards:
+       **40**. No warning, no mention, and on a phone that shares, straight
+       into the family's book.
+
+       Three places disagree about the range, which is what let this hide:
+       `normalizeRecipe` accepts 1–999, `saveDraft` clamped to 40, and both
+       `validateRecipe` and the `kitchen.recipes` column allow 1–40. Fixing
+       the range everywhere is a schema change and Jason's call; **not
+       silently rewriting what a person wrote is not.**
+
+       So: a count the reader did not touch survives untouched, and a count
+       they DID type past the limit is clamped and *said*, because this app
+       does not change someone's words behind their back. */
+    const BIG = { id: 'big-119', title: 'Church Hall Stew', category: 'Dinner',
+      contributor: 'Joan', servings: 200,
+      ingredients: ['20 kg beef'], steps: ['Simmer for hours.'] };
+    const ctxV = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pV = await ctxV.newPage();
+    const vErrs = []; pV.on('pageerror', e => vErrs.push(e.message));
+    await pV.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), [BIG]);
+
+    const storedServings = () => pV.evaluate(() =>
+      (JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0] || {}).servings);
+    const save = async () => {
+      await pV.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(x => /^save/i.test(x.innerText.trim()));
+        if (b) b.click();
+      });
+      await pV.waitForTimeout(700);
+    };
+    const notice = () => pV.evaluate(() => {
+      const n = document.getElementById('route-live');
+      return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+
+    await pV.goto(B + '/index.html#big-119');
+    await pV.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    chk('the book still holds the count it was given', await storedServings() === 200,
+      String(await storedServings()));
+
+    await pV.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pV.waitForSelector('#e-title', { timeout: 5000 }).catch(() => {});
+    await pV.fill('#e-title', 'Church Hall Stew II');
+    await save();
+    chk('changing only the title leaves the count exactly as it was',
+      await storedServings() === 200, String(await storedServings()));
+    chk('and nothing claims a count was changed',
+      !/serves|servings/i.test(await notice()), await notice());
+
+    /* Typing one past the limit is a different act, and gets a different
+       answer: it is clamped, and the reader is told it was. */
+    await pV.fill('#e-serves', '300');
+    await save();
+    chk('a count typed past the limit is brought back to the highest allowed',
+      await storedServings() === 40, String(await storedServings()));
+    chk('and the reader is told, rather than finding out later',
+      /40/.test(await notice()) && /serv/i.test(await notice()), await notice());
+
+    /* And the ordinary case stays ordinary. */
+    await pV.fill('#e-serves', '6');
+    await save();
+    chk('an ordinary count still saves as typed', await storedServings() === 6,
+      String(await storedServings()));
+    chk('with nothing said about limits', !/highest|limit/i.test(await notice()),
+      await notice());
+
+    chk('nothing threw', vErrs.length === 0, vErrs.join(' | '));
+    await ctxV.close();
+  }
+
   console.log('\n== One dot between two things that are there (R118) ==');
   {
     /* The visible tail of the same assumption `R116` and `R117` chased. Four

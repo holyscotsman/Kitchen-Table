@@ -2840,9 +2840,32 @@
        overlay and then into the recipes.json somebody commits. A field the
        book does not have stays absent; 0 and a blank field still fall back
        to what the recipe had, exactly as before. */
+    /* `R119` — and the same principle from the other side. This ran
+       `Math.min(40, typed)` over whatever the field held, including a value
+       the reader never went near: a recipe stored as 200 (a church-hall pot,
+       which people do write) came back as 40 after an edit that changed only
+       the title. No warning, and on a sharing phone straight into the
+       family's book.
+
+       Three places disagree about the range and that is what let it hide:
+       `normalizeRecipe` accepts 1–999, this clamped to 40, and both
+       `validateRecipe` and the `kitchen.recipes` column allow 1–40. Making
+       them agree is a schema change and Jason's call; not rewriting what a
+       person wrote is not.
+
+       So a count the reader did not touch survives untouched, and one they
+       DID type past the limit is clamped **and said** — this app does not
+       change someone's words behind their back. */
     var typed = parseInt(S.draft.servings, 10);
-    if (typed >= 1) updated.servings = Math.min(40, typed);
-    else if (hasCount(r)) updated.servings = r.servings;
+    var clamped = 0;
+    if (typed >= 1) {
+      if (hasCount(r) && typed === r.servings) {
+        updated.servings = r.servings;          // untouched: leave it alone
+      } else {
+        updated.servings = Math.min(40, typed);
+        if (typed > 40) clamped = typed;
+      }
+    } else if (hasCount(r)) updated.servings = r.servings;
     else delete updated.servings;
     updated.contributor = S.draft.contributor.trim() || r.contributor;
     updated.ingredients = S.draft.ingredients.filter(function (x) { return x.trim(); });
@@ -2894,7 +2917,10 @@
          ingredients and finds the ticks gone should know why, rather than
          think the app lost their place. Only when something was actually
          cleared, and only once the save is real (`R44`). */
-      if (hadTicks && (ingMoved || stepMoved)) {
+      if (clamped) {
+        setNotice("This book keeps serving counts up to 40, so " + clamped +
+          " was saved as 40.");
+      } else if (hadTicks && (ingMoved || stepMoved)) {
         setNotice("The list changed, so the check marks were cleared.");
       }
     } else {
