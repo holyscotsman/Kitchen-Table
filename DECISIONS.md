@@ -232,6 +232,13 @@ Two consequences worth naming:
   suffixing rather than overwriting. Real access control remains the
   backend-gate conversation, not a patch.
 
+  **`R127` restored the second half of that last clause.** `S04`'s edit
+  endpoint overwrites by design and `S09` then routed newly typed recipes
+  through it, so "id collisions suffix rather than overwrite" had quietly
+  stopped being true of one path — the one a person uses to add a card off
+  the counter. A create says `?new=1` and suffixes like an import; an edit
+  still overwrites, which is what an edit means.
+
 ## 031/032 — refreshed for the live-write era (the one-paragraph update they were owed)
 
 The merge story gains one new writer: accepting a video import inserts the

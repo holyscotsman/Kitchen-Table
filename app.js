@@ -111,7 +111,20 @@
        made after the failure goes too and an id whose recipe has since been
        removed simply drops out. A second copy of the book stored here would
        be a second thing to keep right. */
-    unsent: "kt.unsent"
+    unsent: "kt.unsent",
+    /* `R127` — where the family's book actually put this phone's copy of a
+       recipe. A recipe typed in here gets its id from `slugify(title)`
+       against THIS phone's copy of the book, and another device may have
+       used that name already; the server suffixes rather than overwrites
+       (the rule `acceptJob` has always followed) and answers with the id it
+       used. Without somewhere to keep that answer the next edit of the
+       recipe would be addressed at the id this phone minted — which by
+       then belongs to somebody else's recipe.
+
+       Ids only, like `kt.unsent`, and it holds every id the book has
+       confirmed rather than only the ones that moved: the absence of an
+       entry is what tells `bornHere` a recipe has never been acknowledged. */
+    shared: "kt.shared"
   };
 
   /* The week planner's slots. All three exist on every day; the UI shows
@@ -2505,6 +2518,9 @@
         : "")
     )) return;
     try { localStorage.removeItem(K.recipes); } catch (e) {}
+    /* `R127` — every copy this phone made is gone with the overlay, so
+       every note about where the book put one is stale. */
+    forgetAllSharedIds();
     applyOverlay();
     S.editing = false;
     S.draft = null;
@@ -2671,6 +2687,81 @@
     return unsentIds().map(byId).filter(Boolean);
   }
 
+  /* ------------------------------------------- where the family's copy is
+   *
+   * `R127`. Coerced where it is read, like every other stored shape in this
+   * app (`R21` the plan, `R40` the dismissed imports, `R62` the recipes,
+   * `S13` the queue). A map that is not a map is no map, and one holding
+   * rubbish keeps the pairs it can use.
+   */
+  function sharedIds() {
+    var raw;
+    try { raw = load(K.shared, {}); } catch (e) { return {}; }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    var out = {};
+    Object.keys(raw).forEach(function (k) {
+      var local = typeof k === "string" ? k.trim() : "";
+      var remote = typeof raw[k] === "string" ? raw[k].trim() : "";
+      if (local && remote) out[local] = remote;
+    });
+    return out;
+  }
+
+  /* Best effort and silent, like `setUnsent`. What it costs when it fails
+     is bookkeeping, not the reader's words: an unrecorded id makes the next
+     share of that recipe a create, so the family gets a duplicate they can
+     see and delete rather than a recipe written over. That is the side this
+     app errs on everywhere else. */
+  function noteSharedId(local, remote) {
+    if (!local || !remote) return;
+    var map = sharedIds();
+    if (map[local] === remote) return;
+    map[local] = remote;
+    try { save(K.shared, map); } catch (e) {}
+  }
+
+  /* The address the family's book knows this recipe by. Before it has ever
+     answered about one, that is simply the id this phone minted. */
+  function bookId(id) { return sharedIds()[id] || id; }
+
+  /* An entry says "the family's book holds THIS PHONE'S copy of <id> at
+     <other id>". Throw that copy away — Remove, or the undo — and the
+     sentence stops being true, because the id now means whatever the
+     published file says it means. After a nightly sync that is somebody
+     else's recipe, and a stale entry would address their edit at this
+     phone's abandoned row: the wrong recipe changed, and reported saved.
+
+     `kt.unsent` needs no equivalent because it is read through `byId` and
+     an id with nothing behind it simply drops out. This one is read with
+     the recipe already in hand, so it cannot notice. */
+  function forgetSharedId(id) {
+    var map = sharedIds();
+    if (!(id in map)) return;
+    delete map[id];
+    try { save(K.shared, map); } catch (e) {}
+  }
+
+  function forgetAllSharedIds() {
+    try { localStorage.removeItem(K.shared); } catch (e) {}
+  }
+
+  /* Was this recipe invented on this phone, or does the family's book
+     already have it?
+     
+     Derived rather than passed down from the call site, so it is right at
+     every one of them — including `S13`'s queue, which re-sends by id long
+     after whoever typed the recipe has put the phone down, and any path
+     written later. Two things can answer yes:
+       - the book has confirmed an id for it, so it is in there;
+       - it came from the published recipes.json, so it is in there.
+     Anything else is in the overlay and nowhere else, which is what typing
+     a recipe in on this phone produces. */
+  function bornHere(r) {
+    if (!r || !r.id) return false;
+    if (sharedIds()[r.id]) return false;
+    return !(S.base || []).some(function (x) { return x && x.id === r.id; });
+  }
+
   /* `S12` — what is still happening, for the eye. The count moves; the
      sentence the ear gets (`liveMessage`) deliberately does not, or a
      48-recipe burst would be read out forty-eight times. */
@@ -2720,6 +2811,39 @@
     try { return String(load(K.kitchenKey, "") || "").trim(); } catch (e) { return ""; }
   }
 
+  /* `R127` — where a write is addressed, and whether it may land on a row
+     that is already there. Both answers come from the recipe, so every
+     caller gets them right without knowing they exist. */
+  function shareUrl(r, tail) {
+    return "/api/recipes/" + encodeURIComponent(bookId(r.id)) +
+      (bornHere(r) ? (tail ? "?new=1&" + tail : "?new=1") : (tail ? "?" + tail : ""));
+  }
+
+  /* The recipe as the family's book knows it. `putRecipe` refuses a body
+     whose id disagrees with the address — on purpose, so a body cannot
+     redirect an edit onto another recipe (`S04`) — so a recipe the book
+     holds under a suffixed id has to go up wearing that id. Its own copy on
+     this phone keeps the id it was born with: photos, the week plan and the
+     queue are all keyed by it, and renaming it here would be a rename of
+     the reader's own book to fix somebody else's collision. */
+  function sharePayload(r) {
+    var out = orderFields(r);
+    out.id = bookId(r.id);
+    return out;
+  }
+
+  /* The reply's id is the family's book saying where it put this copy.
+     Recorded every time, because "the book has confirmed this one" is what
+     stops the NEXT write being sent as a create — and returned so the
+     caller can say something when it is not the id that was sent. */
+  function noteReply(r, data) {
+    var got = data && typeof data.id === "string" ? data.id.trim() : "";
+    if (!got) return "";
+    var was = bookId(r.id);
+    noteSharedId(r.id, got);
+    return got === was ? "" : got;
+  }
+
   function shareEdit(recipe) {
     var key = kitchenKey();
     if (!key) return;                       // local-only, exactly as before
@@ -2727,11 +2851,23 @@
        "Saved ✓" and the answer is never blank. */
     S.sharing = { at: 1, of: 1 };
     setNotice("Saved on this phone.");
-    kitchenFetch("/api/recipes/" + encodeURIComponent(recipe.id),
-      { method: "PUT", body: { recipe: orderFields(recipe) }, key: key, timeout: 30000 }, true)
+    kitchenFetch(shareUrl(recipe, ""),
+      { method: "PUT", body: { recipe: sharePayload(recipe) }, key: key, timeout: 30000 }, true)
       .then(function (data) {
         S.sharing = null;
         clearUnsent([recipe.id]);
+        var moved = noteReply(recipe, data);
+        if (moved) {
+          /* Not a failure and not a warning — the recipe is in, beside the
+             other one rather than over it, which is the whole point. But it
+             is under a different address there, and the reader is the only
+             person who can tell the family whether they are two recipes or
+             one. */
+          setNotice("Saved, and sent to the family’s book — but someone had " +
+            "already added a recipe with this name, so yours is in there as " +
+            "“" + moved + "” rather than over theirs.");
+          return;
+        }
         setNotice(data && data.publishing
           ? "Saved, and sent to the family’s book — everyone will see it in a few minutes."
           : "Saved, and sent to the family’s book. It appears for everyone at the next nightly update.");
@@ -2839,11 +2975,11 @@
       var r = list[i];
       S.sharing = { at: i + 1, of: list.length };
       render();
-      kitchenFetch("/api/recipes/" + encodeURIComponent(r.id) +
-          (i < list.length - 1 ? "?more=1" : ""),
-        { method: "PUT", body: { recipe: orderFields(r) }, key: key, timeout: 30000 }, true)
+      kitchenFetch(shareUrl(r, i < list.length - 1 ? "more=1" : ""),
+        { method: "PUT", body: { recipe: sharePayload(r) }, key: key, timeout: 30000 }, true)
         .then(function (data) {
           sent++;
+          noteReply(r, data);
           /* Sticky: the burst pokes on its LAST write, and a poke inside the
              server's cooldown reports false. Reading only the final answer
              would call a republish that is happening "the nightly update". */
@@ -4579,8 +4715,14 @@
   function acceptVideoJob(jobId, recipe) {
     kitchenFetch(jobPath(jobId, "/accept"),
       { method: "POST", body: { recipe: recipe }, timeout: 90000 }, true)
-      .then(function () {
+      .then(function (data) {
         S.videoReady = S.videoReady.filter(function (j) { return j.id !== jobId; });
+        /* `R127` — accept has always suffixed on an id collision rather than
+           overwrite, and answers with the id it used. Recording it here is
+           what stops a later EDIT of this recipe being taken for a create
+           and suffixed a second time: the book has confirmed a row for it,
+           so the next write is addressed there and may land on it. */
+        noteReply(recipe, data);
       })
       .catch(function (err) {
         /* `R107` — two different failures, and one sentence for both of
@@ -5993,6 +6135,10 @@
       if (window.confirm(ask)) {
         S.recipes = S.recipes.filter(function (x) { return x.id !== victim.id; });
         if (hasPhoto) removeImage(victim.id);
+        /* `R127` — and the note saying where the family's book keeps this
+           phone's copy of it, which stops being true the moment the copy
+           does. */
+        forgetSharedId(victim.id);
         persistRecipes();
         render();
       }

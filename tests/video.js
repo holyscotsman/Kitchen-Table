@@ -21,7 +21,7 @@ const READY_RESULT = {
 
 /* One knob per context: script[i] answers the i-th poll of job 7. */
 function stubKitchen(ctx, opts) {
-  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, failPutAfter: null, publishing: true, postDelayMs: 0, putDelayMs: 0 }, opts);
+  const o = Object.assign({ polls: [], ready: [], failed: [], accepted: [], posts: [], failPost: null, failAccept: null, puts: [], failPut: null, failPutAfter: null, putId: null, publishing: true, postDelayMs: 0, putDelayMs: 0 }, opts);
   let pollN = -1;
   ctx.route(API + '/**', async (route) => {
     const req = route.request();
@@ -47,6 +47,7 @@ function stubKitchen(ctx, opts) {
     if (req.method() === 'PUT' && /^\/api\/recipes\//.test(u.pathname)) {
       o.puts.push({ path: u.pathname, key: req.headers()['x-kitchen-key'] || null,
                     more: u.searchParams.get('more') === '1',
+                    isNew: u.searchParams.get('new') === '1',
                     body: req.postDataJSON() });
       /* Holds each write open, so the in-flight window is long enough to
          look at. A cold Render does this for real, for about 30 seconds. */
@@ -57,7 +58,11 @@ function stubKitchen(ctx, opts) {
       if (o.failPutAfter && o.puts.length > o.failPutAfter.after) {
         return json(o.failPutAfter.status, { error: o.failPutAfter.error || '' });
       }
-      return json(200, { ok: true, id: u.pathname.split('/').pop(),
+      /* `R127` — the family's book may already hold that id, in which case
+         the server suffixes rather than overwrites and answers with the id
+         it actually used. `putId` plays that back. */
+      return json(200, { ok: true,
+                         id: o.putId || decodeURIComponent(u.pathname.split('/').pop()),
                          publishing: o.publishing !== false });
     }
     if (req.method() === 'POST' && /\/accept$/.test(u.pathname)) {
@@ -983,6 +988,211 @@ async function freshPage(br, opts) {
     chk('and the reader is told', /famil/i.test(sent.notice), sent.notice);
     chk('nothing threw', quiet.errs.length === 0 && sent.errs.length === 0,
       quiet.errs.concat(sent.errs).join(' | '));
+  }
+
+
+  console.log('\n== A recipe born on this phone must not land on somebody else’s (R127) ==');
+  {
+    /* `S09` routed a newly typed recipe through `shareEdit`, the function
+       written for an EDIT. The two are opposite instructions and the wire
+       could not tell them apart:
+
+         - an edit says "someone opened THIS recipe and changed it", so
+           `putRecipe` overwrites the row on purpose (`S04`);
+         - a create says "here is a recipe I just wrote", and its id was
+           minted by `slugify(title)` against THIS PHONE'S copy of the book.
+
+       `acceptJob` already had the second case and wrote the rule down —
+       "the phone chose the id against its own copy of the book; another
+       device may have taken it since. Suffix rather than overwrite — a
+       duplicate the family can see and delete beats a recipe silently
+       replaced." Sharing an add went the other way.
+
+       It is reachable, and most reachable on exactly the phones this app
+       is built for: the overlay is authoritative, so once a phone has any
+       local change it stops seeing recipes added to the published file.
+       Two people each type in "Shortbread" and the second one's save
+       DELETES the first one's recipe out of the family's book — no
+       warning, no copy, and the phone that lost it still shows its own. */
+    const shareOne = async (opts, seed, hash, edit) => {
+      const { ctx, p, stub } = await freshPage(br, opts);
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      if (seed) await p.addInitScript(s =>
+        localStorage.setItem('kt.recipes', s), JSON.stringify(seed));
+      await p.goto(B + '/index.html' + hash);
+      await edit(p);
+      const out = {
+        puts: stub.puts,
+        notice: await p.evaluate(() => {
+          const n = document.querySelector('.notice');
+          return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+        }),
+        shared: await p.evaluate(() => {
+          const raw = localStorage.getItem('kt.shared');
+          return raw ? JSON.parse(raw) : null;
+        }),
+        errs: p.errs.slice()
+      };
+      await ctx.close();
+      return out;
+    };
+
+    const typeItIn = (title) => async (p) => {
+      await p.waitForSelector('.pathbtn');
+      await p.click('[data-act="add-path"][data-key="review"]');
+      await p.waitForSelector('#a-title');
+      await p.fill('#a-title', title);
+      await p.fill('#a-ing-0', '2 cups flour');
+      await p.fill('#a-step-0', 'Mix it.');
+      await p.click('[data-act="add-save"]');
+      await p.waitForTimeout(1400);
+    };
+    const editIt = async (p) => {
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.fill('#e-notes', 'A note.');
+      await p.click('[data-act="save"]');
+      await p.waitForTimeout(1400);
+    };
+
+    /* The edit case uses a recipe out of the PUBLISHED file, with no
+       overlay seeded — which is what "a recipe the family's book already
+       has" means on a phone. Seeding one into the overlay instead would
+       have tested the opposite thing: a recipe that exists only on this
+       device is exactly what typing one in produces. */
+    const SHIPPED = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'recipes.json'), 'utf8'))[0].id;
+
+    const born = await shareOne({}, null, '#add', typeItIn('Shortbread'));
+    chk('typing a new recipe in still reaches the family', born.puts.length === 1,
+      String(born.puts.length));
+    chk('and the write says it is a NEW recipe, not an edit of one',
+      born.puts[0].isNew === true,
+      'PUT ' + born.puts[0].path + ' — nothing on the wire tells create from edit');
+
+    const changed = await shareOne({}, null, '#' + SHIPPED, editIt);
+    chk('while editing a recipe the book already has does not', changed.puts.length === 1 &&
+      changed.puts[0].isNew === false, JSON.stringify(changed.puts.map(x => x.path + (x.isNew ? '?new=1' : ''))));
+    chk('so the two opposite instructions are distinguishable on the wire',
+      born.puts[0].isNew !== changed.puts[0].isNew);
+
+    /* The half that makes the first half safe. If the id WAS taken, the
+       server suffixes and answers with the id it used — and the phone has
+       to remember that, or the reader's next edit walks straight onto the
+       stranger's row and destroys it one step later. */
+    const taken = await shareOne({ putId: 'shortbread-2' }, null, '#add',
+      typeItIn('Shortbread'));
+    chk('when the family’s book had that name already, the phone remembers where its copy went',
+      taken.shared && taken.shared['shortbread'] === 'shortbread-2',
+      JSON.stringify(taken.shared));
+    chk('and says so, rather than leaving the reader to find out',
+      /already/i.test(taken.notice) && /shortbread-2/.test(taken.notice), taken.notice);
+
+    /* Second write, same phone, same recipe: it must go to the address the
+       family's book actually used. */
+    const after = await shareOne({ putId: 'shortbread-2' }, null, '#add',
+      async (p) => {
+        await typeItIn('Shortbread')(p);
+        await p.goto(B + '/index.html#shortbread');
+        await editIt(p);
+      });
+    chk('and the next edit of it is addressed there, not at the stranger’s recipe',
+      after.puts.length === 2 && /\/api\/recipes\/shortbread-2$/.test(after.puts[1].path),
+      JSON.stringify(after.puts.map(x => x.path)));
+    chk('as an edit this time, because the book has confirmed that row',
+      after.puts.length === 2 && after.puts[1].isNew === false,
+      JSON.stringify(after.puts.map(x => x.isNew)));
+    /* `putRecipe` refuses a body whose id disagrees with the address, on
+       purpose. So addressing the moved row is only half of it — the recipe
+       has to go up wearing the id the book gave it, or the write comes back
+       400 and the reader is told their edit was rejected. */
+    chk('and the recipe goes up wearing the id the book gave it',
+      after.puts.length === 2 && after.puts[1].body.recipe.id === 'shortbread-2',
+      after.puts.length === 2 ? String(after.puts[1].body.recipe.id) : 'no second write');
+    chk('while this phone’s own copy keeps the id it was born with',
+      after.puts.length === 2 && after.puts[0].body.recipe.id === 'shortbread',
+      after.puts.length ? String(after.puts[0].body.recipe.id) : 'no write');
+
+    /* `S13`'s queue re-sends by id and reads the recipe fresh. A create
+       that failed and is sent again is still a create — sending it as an
+       edit would put the destruction back on the slowest path, which is
+       the one a sleeping Render makes ordinary. */
+    const requeued = await shareOne({ failPut: { status: 503, error: 'waking' } },
+      null, '#add', async (p) => {
+        await typeItIn('Shortbread')(p);
+        await p.goto(B + '/index.html#menu');
+        await p.waitForSelector('.rcard');
+        await p.evaluate(() => {
+          const b = document.querySelector('[data-act="send-unsent"]');
+          if (b) b.click();
+        });
+        await p.waitForTimeout(1400);
+      });
+    chk('a create that failed is offered again', requeued.puts.length === 2,
+      JSON.stringify(requeued.puts.map(x => x.path)));
+    chk('and is still sent as a create the second time',
+      requeued.puts.length === 2 && requeued.puts[1].isNew === true,
+      JSON.stringify(requeued.puts.map(x => x.isNew)));
+
+    /* Found by asking what the map means once the recipe it describes is
+       gone. `kt.shared` says "the family's book holds THIS PHONE'S copy of
+       `shortbread` at `shortbread-2`". Drop that copy — Remove, or the undo
+       — and the entry stops being true, because `shortbread` now means
+       whatever the published file says it means. Which, after a nightly
+       sync, is the OTHER person's recipe: their edit would be addressed at
+       this phone's old row, land on the wrong recipe, and report success. */
+    const dropIt = async (how) => {
+      const { ctx, p, stub } = await freshPage(br, { putId: 'shortbread-2' });
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      p.on('dialog', d => d.accept());
+      await p.goto(B + '/index.html#add');
+      await typeItIn('Shortbread')(p);
+      const before = await p.evaluate(() => localStorage.getItem('kt.shared'));
+      await how(p);
+      await p.waitForTimeout(500);
+      const out = { before, after: await p.evaluate(() => localStorage.getItem('kt.shared')),
+                    errs: p.errs.slice() };
+      await ctx.close();
+      return out;
+    };
+
+    const removed = await dropIt(async (p) => {
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.rcard');
+      await p.click('[data-act="toggle-remove"]');
+      await p.waitForTimeout(300);
+      await p.evaluate(() => {
+        const b = document.querySelector('[data-act="remove"][data-id="shortbread"]');
+        if (b) b.click();
+      });
+    });
+    chk('the phone did record where its copy went', /shortbread-2/.test(removed.before || ''),
+      String(removed.before));
+    chk('and removing the recipe forgets it, so nothing points at that row any more',
+      !/"shortbread"/.test(removed.after || ''), String(removed.after));
+
+    const undone = await dropIt(async (p) => {
+      await p.goto(B + '/index.html#shortbread');
+      await p.waitForSelector('.r-title');
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-title');
+      await p.evaluate(() => {
+        const b = document.querySelector('[data-act="reset-local"]');
+        if (b) b.click();
+      });
+    });
+    chk('and the undo, which throws every local copy away, forgets all of them',
+      !undone.after || undone.after === '{}' || undone.after === 'null',
+      String(undone.after));
+
+    chk('nothing threw anywhere in the sweep',
+      [born, changed, taken, after, requeued, removed, undone]
+        .every(x => x.errs.length === 0),
+      [born, changed, taken, after, requeued, removed, undone]
+        .map(x => x.errs.join(' ')).join(' | '));
   }
 
   console.log('\n== Removing says which book it means (S10) ==');

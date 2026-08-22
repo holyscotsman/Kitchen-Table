@@ -28,6 +28,7 @@ const db = require("./lib/db");
 const { makePublisher } = require("./lib/publish");
 const { makeWriteGate } = require("./lib/writegate");
 const { runJob } = require("./lib/pipeline");
+const { freeRecipeId } = require("./lib/ids");
 
 const PORT = parseInt(process.env.PORT, 10) || 8787;
 const MAX_QUEUE = 8;
@@ -302,12 +303,12 @@ async function acceptJob(req, res, id) {
   try {
     /* The phone chose the id against its own copy of the book; another device
      * may have taken it since. Suffix rather than overwrite — a duplicate the
-     * family can see and delete beats a recipe silently replaced. */
-    let id2 = r.id;
-    let n = 2;
-    while ((await sql`select 1 from kitchen.recipes where id = ${id2}`).length) {
-      id2 = r.id + "-" + n++;
-    }
+     * family can see and delete beats a recipe silently replaced.
+     *
+     * `R127` moved that rule into `lib/ids` so the write endpoint could
+     * follow it too, for a recipe typed in rather than imported. It is the
+     * same situation and must not be answered two different ways. */
+    const id2 = await freeRecipeId(sql, r.id);
 
     await sql`insert into kitchen.contributors (name) values (${r.contributor})
               on conflict (name) do nothing`;
@@ -369,6 +370,15 @@ const publisher = makePublisher({
  * body may not redirect the write somewhere else, which is how an edit to
  * one recipe would land on another.
  *
+ * `R127` — and BOTH instructions arrive here. `S09` routed a newly typed
+ * recipe through the same call as an edit, and a create is `acceptJob`'s
+ * situation, not this one: its id was minted by the phone against its own
+ * copy of the book, so an id already in use belongs to somebody else's
+ * recipe and overwriting it destroys one. `?new=1` says which of the two
+ * this is; a create suffixes through the same `freeRecipeId` the import
+ * path uses, and answers with the id it actually used so the phone can
+ * address the NEXT write at its own row rather than the stranger's.
+ *
  * Upsert rather than update: a recipe that only lives in recipes.json and
  * has never been through the database is the normal state of all 48 of
  * them, and editing one is not a reason to fail.
@@ -381,7 +391,7 @@ const publisher = makePublisher({
    GitHub runner starting up. A phone that closes mid-burst simply never
    pokes, and the nightly sync picks the change up — late, never wrong,
    which is the direction this app errs in. */
-async function putRecipe(req, res, id, more) {
+async function putRecipe(req, res, id, more, isNew) {
   const refusal = writeGate.refusalFor(req.headers, callerIp(req), Date.now());
   if (refusal) return send(res, refusal.status, { error: refusal.error });
 
@@ -396,12 +406,24 @@ async function putRecipe(req, res, id, more) {
 
   await sql`insert into kitchen.contributors (name) values (${r.contributor})
             on conflict (name) do nothing`;
-  await sql`
+
+  /* A create takes a free id; an edit takes the one in the address. The
+     `where ... = 1` on the conflict clause is what makes that binding: with
+     0 the row already there is left exactly as it is and nothing comes back
+     from `returning`, which is the only way a create can be certain it did
+     not overwrite. A create that comes back empty lost a race — someone
+     else took the id in the milliseconds since the check — so it looks for
+     a free one again rather than pretending. */
+  let rowId = r.id;
+  let landed = false;
+  for (let tries = 0; tries < 6 && !landed; tries++) {
+    if (isNew) rowId = await freeRecipeId(sql, r.id);
+    landed = (await sql`
     insert into kitchen.recipes
       (id, title, category, contributor_id, servings, prep_time, cook_time,
        ingredients, steps, notes, flagged, source, image, position)
     values
-      (${r.id}, ${r.title}, ${r.category},
+      (${rowId}, ${r.title}, ${r.category},
        (select id from kitchen.contributors where name = ${r.contributor}),
        ${r.servings}, ${r.prepTime || null}, ${r.cookTime || null},
        ${JSON.stringify(r.ingredients)}, ${JSON.stringify(r.steps)},
@@ -415,25 +437,31 @@ async function putRecipe(req, res, id, more) {
       ingredients = excluded.ingredients, steps = excluded.steps,
       notes = excluded.notes, flagged = excluded.flagged,
       source = excluded.source, image = excluded.image,
-      updated_at = now()`;
+      updated_at = now()
+    where ${isNew ? 0 : 1} = 1
+    returning id`).length;
+  }
+  if (!landed) {
+    return send(res, 409, { error: "that name kept being taken while this was saving — try Save again" });
+  }
   /* position is deliberately NOT in the update list: it is what "recently
      added" sorts on, and editing a recipe is not adding it. Fixing a typo
      must not jump a recipe to the top of the family's list. */
 
   /* Tags are a join table, so the edit is a replace: a tag someone took off
      has to come off here too, or removing one would never stick. */
-  await sql`delete from kitchen.recipe_tags where recipe_id = ${r.id}`;
+  await sql`delete from kitchen.recipe_tags where recipe_id = ${rowId}`;
   for (const t of r.tags) {
     await sql`insert into kitchen.tags (name) values (${t}) on conflict (name) do nothing`;
     await sql`insert into kitchen.recipe_tags (recipe_id, tag_id)
-              values (${r.id}, (select id from kitchen.tags where name = ${t}))
+              values (${rowId}, (select id from kitchen.tags where name = ${t}))
               on conflict do nothing`;
   }
   /* Deliberately not awaited into the response: the write is done and the
      family's copy is safe. Whether the publish fires now or the nightly run
      picks it up changes when they see it, not whether. */
   const poked = more ? { sent: false, why: "more-coming" } : await publisher.poke();
-  send(res, 200, { ok: true, id: r.id, publishing: poked.sent });
+  send(res, 200, { ok: true, id: rowId, publishing: poked.sent });
 }
 
 /* ----------------------------------------------------------------- server */
@@ -485,7 +513,8 @@ const server = http.createServer((req, res) => {
       return acceptJob(req, res, parseInt(m[1], 10));
     }
     if ((m = p.match(/^\/api\/recipes\/([a-z0-9-]{1,80})$/)) && req.method === "PUT") {
-      return putRecipe(req, res, m[1], u.searchParams.get("more") === "1");
+      return putRecipe(req, res, m[1], u.searchParams.get("more") === "1",
+                        u.searchParams.get("new") === "1");
     }
     send(res, 404, { error: "not found" });
   })();

@@ -743,6 +743,7 @@ Save in Edit mode writes to `localStorage` exactly as before and says so —
   from the **path** so a body cannot redirect the write onto another recipe.
   `position` is deliberately never updated: fixing a typo must not jump a
   recipe to the top of "recently added".
+  **And a create is neither** — see below (`R127`).
 - **Tags are replaced, not merged**, or removing one would never stick.
 - **The publish poke never fails the write** (`lib/publish.js`). The recipe
   is already in the database; the nightly run would publish it regardless.
@@ -863,11 +864,78 @@ up. A phone that closes mid-burst simply never pokes and the nightly sync
 picks the change up: **late, never wrong**, which is the direction this app
 errs in.
 
+### A recipe born on one phone landed on top of another's
+
+`R127`. `S09` made every way in share, which was right, and did it by
+sending a newly typed recipe through `shareEdit` — the function written for
+an **edit**. The two are opposite instructions and the wire could not tell
+them apart:
+
+- an edit says *someone opened THIS recipe and changed it*, so `putRecipe`
+  overwrites that row on purpose;
+- a create says *here is a recipe I just wrote*, and its id came from
+  `slugify(title)` against **this phone's** copy of the book.
+
+`acceptJob` had answered this from the day it was built, in words that
+transfer whole: *"the phone chose the id against its own copy of the book;
+another device may have taken it since. Suffix rather than overwrite — a
+duplicate the family can see and delete beats a recipe silently replaced."*
+
+It is most reachable on exactly the phones this app is built for. The
+overlay is authoritative, so a phone with any local change **stops seeing
+recipes added to the published file** — "I have never heard of that id" is
+the normal state, not the rare one. Two people each type in *Shortbread*
+and the second save **deletes the first one's recipe out of the family's
+book**: no warning, no copy, and the phone that lost it still shows its own.
+
+Proven on a real Postgres, not argued from the source: `tests/sql-live.js`
+extracts the shipped statement out of `server.js`, prepares it (which is
+also the only way to know Postgres can *type* a parameter in an
+`on conflict … do update … where` clause) and runs it. Before the fix the
+row at `shortbread` read *Lindsay's Shortbread/6* where Jennifer's had been.
+
+Three parts, and none of them stands alone:
+
+- **`?new=1`** on the write, derived from the recipe rather than passed
+  down from the call site — `bornHere(r)` is false when the book has
+  confirmed an id for it or when it came from the published file, and true
+  otherwise. Derived, so `S13`'s queue re-sending an hour later gets it
+  right, and so does anything written next.
+- **The suffixing rule moved into `backend/lib/ids.js`**, so the import
+  path and the write path cannot drift apart on a question they must answer
+  the same way. The conflict clause carries `where ${isNew ? 0 : 1} = 1`,
+  which is what stops a create falling through to the overwrite when it
+  loses a race; a create that comes back empty looks for a free id again
+  rather than pretending.
+- **`kt.shared`** — the id the family's book actually used, kept per phone.
+  Without it the destruction simply moves one step later: the phone's next
+  edit of its own recipe would be addressed at the id it minted, which by
+  then is the stranger's row. The recipe goes up wearing the book's id
+  (`putRecipe` refuses a body that disagrees with the address, on purpose)
+  while this phone's copy keeps the id it was born with — photos, the week
+  plan and the queue are all keyed by it.
+
+And **an entry stops being true when the copy it describes is gone**, which
+the first version got wrong: Remove and *Undo all my changes on this phone*
+both forget, or a stale note would address someone else's edit at this
+phone's abandoned row after the next nightly sync. `kt.unsent` needs no
+equivalent because it is read through `byId`; this map is read with the
+recipe already in hand, so it cannot notice.
+
+The reader is told when it happens — *"someone had already added a recipe
+with this name, so yours is in there as “shortbread-2” rather than over
+theirs"* — because they are the only person who can say whether those are
+two recipes or one.
+
 ### Verified
 
-The suite after the video arc: **1459 functional checks** across eleven
+The suite after the video arc: **1492 functional checks** across eleven
 suites (kt 308, feat 65, add 99, relay 16, quick 76, polish 284, sec 56,
-plan 79, video 218, backend 243, zoom 15), plus the perf budget (FCP ~900 ms
+plan 79, video 234, backend 260, zoom 15), plus `R127`'s nine-check SQL
+gate — CI runs the shipped write statement against a throwaway Postgres
+service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
+because a gate that quietly does nothing is worse than no gate — plus the
+perf budget (FCP ~900 ms
 median on throttled 3G — *including* the self-hosted fonts — against a
 4000 ms gate; CLS 0.0000 with 48 photos against 0.02; and since `R25`
 three interaction budgets measured in-page under a 6× CPU throttle —
