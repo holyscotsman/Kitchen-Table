@@ -2274,6 +2274,152 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       crit.length + ' chars');
   }
 
+
+  console.log('\n== The ground truth CLAUDE.md said was not here (R149) ==');
+  {
+    /* `R145` read `design/a11y-criteria.md` and found two sentences that had
+       stopped being true. It did not ask the question one level up: whether
+       the ground truth CLAUDE.md DESCRIBES is the ground truth the repo
+       HOLDS.
+
+       CLAUDE.md says twice — once in the rule block at the top and once in
+       a section of its own — that the handoff's `styleguide.html`,
+       `screenshots/` and `*.dc.html` references "were never committed to
+       this repo". All eight of those files are tracked in git. So the file
+       whose first line is "Read this file before writing any code" tells
+       the next person that the stated reference for exact sizes, spacing
+       and state logic does not exist here, and they never open it.
+
+       And the one that could be opened could not render. `styleguide.html`
+       links `tokens.css` relative to `design/`, where there is no such
+       file. Measured: 404, every token unset, the body transparent with
+       black text, and the whole page in **Times New Roman** — a serif, on
+       the reference page for a project whose second rule is "One font:
+       Atkinson Hyperlegible. No serif anywhere", chosen because the reader
+       has low vision. Its own subtitle reads "Every color, size and
+       component in the app. The build must match this page." */
+    const fsD = require('fs'), pathD = require('path');
+    const rootD = pathD.join(__dirname, '..');
+    const readRootD = (f) => fsD.readFileSync(pathD.join(rootD, f), 'utf8');
+
+    const REFS = ['design/styleguide.html', 'design/Home.dc.html',
+      'design/Main.dc.html', 'design/Recipe.dc.html', 'design/screenshots'];
+    const goneD = REFS.filter((f) => !fsD.existsSync(pathD.join(rootD, f)));
+    chk('the design references are in the repo',
+      goneD.length === 0, goneD.join(', '));
+
+    /* Both files that describe them, scoped to the paragraphs that actually
+       talk about them, so a sentence elsewhere about something genuinely
+       uncommitted is not this bug.
+
+       `DESIGN.md` is the second one and there it did more damage. That file
+       is the original handoff, kept unedited on purpose, with an editorial
+       preamble listing what has changed since — and the preamble struck out
+       the handoff's own true instruction ("Open styleguide.html in a browser
+       and match it") with "neither was ever committed". A correction to the
+       handoff that was itself wrong, used to overrule something right. */
+    /* Scoped to what a person is TOLD, not to what happened. CLAUDE.md is
+       two documents in one file: the contract above `## Build state`, and
+       the log of rounds below it. The harm was entirely in the contract —
+       that is the half whose first line says to read it before writing any
+       code — while the log is past-tense by construction and has to be able
+       to quote the sentence it corrected.
+
+       Learned the hard way, and it is `R138`'s lesson in a new place: the
+       first version read the whole file, and the round's own write-up
+       tripped it within minutes of being written. A check its own record
+       cannot survive is a check that gets weakened later by somebody with
+       less context. */
+    const contractOnly = (f) => {
+      const t = readRootD(f);
+      const cut = t.indexOf('\n## Build state');
+      return cut > -1 ? t.slice(0, cut) : t;
+    };
+    /* Read by a WINDOW around the claim rather than by paragraph. Prose
+       wraps — the original said "…`*.dc.html`" on one line and "were never
+       committed to this repo" on the next — and a markdown table has no
+       blank line between its rows, so both a line split and a paragraph
+       split get one of the two files wrong. A window is tolerant of how the
+       text happens to be laid out, which is the only thing that matters
+       here. */
+    const NEARD = 260;
+    const saidGone = [];
+    ['CLAUDE.md', 'DESIGN.md'].forEach((f) => {
+      const text = contractOnly(f);
+      const trig = /never committed|were never (?:part|in)|neither was ever/gi;
+      let m;
+      while ((m = trig.exec(text))) {
+        const win = text.slice(Math.max(0, m.index - NEARD), m.index + NEARD);
+        if (/styleguide\.html|\.dc\.html|screenshots\//.test(win)) {
+          saidGone.push(f + ': …' + win.replace(/\s+/g, ' ').slice(NEARD - 60, NEARD + 60) + '…');
+        }
+      }
+    });
+    chk('and no document tells a reader a file the repo holds is absent',
+      saidGone.length === 0, saidGone.join(' | '));
+    /* A floor: a renamed heading would make the slice read the whole file
+       (harmless) or nothing (silent). Both halves have to be real. */
+    chk('and the half that was read is the contract, not the whole file',
+      contractOnly('CLAUDE.md').length > 2000 &&
+      contractOnly('CLAUDE.md').length < readRootD('CLAUDE.md').length &&
+      /Read this file before writing any code/.test(contractOnly('CLAUDE.md')),
+      contractOnly('CLAUDE.md').length + ' of ' + readRootD('CLAUDE.md').length);
+
+    /* And the handoff's own words are still there to be overruled — only
+       the preamble was changed, which is the whole point of keeping the
+       body unedited. A fix that deleted the instruction instead would pass
+       the rule above. */
+    const designD = readRootD('DESIGN.md');
+    chk('while the handoff still says to open it, unedited',
+      /Open `styleguide\.html` in a browser and match it/.test(designD) &&
+      /rendered reference for every color and component/.test(designD),
+      designD.length + ' chars');
+
+    /* The three `.dc.html` files are design-tool TEMPLATES rather than
+       pages: they carry `{{ … }}` placeholders and reach for a `support.js`
+       runtime that was never part of the handoff, so they are source to
+       READ for exact sizes and state logic — which is what CLAUDE.md says
+       they were read for — and cannot be opened in a browser at all. Named
+       with the reason rather than quietly skipped (`R114`), and each one is
+       held to still being a template below, so an exemption cannot outlive
+       what earned it. */
+    const TEMPLATES = {
+      'Home.dc.html': 'a design-tool template: {{ }} placeholders and a support.js runtime that was never committed',
+      'Main.dc.html': 'the same',
+      'Recipe.dc.html': 'the same'
+    };
+    const pages = fsD.readdirSync(pathD.join(rootD, 'design'))
+      .filter((f) => /\.html$/.test(f));
+    chk('every design page is either openable or a named template',
+      pages.every((f) => TEMPLATES[f] || f === 'styleguide.html'),
+      pages.join(', '));
+    chk('and every named template really is still one',
+      Object.keys(TEMPLATES).every((f) =>
+        /\{\{/.test(fsD.readFileSync(pathD.join(rootD, 'design', f), 'utf8'))),
+      Object.keys(TEMPLATES).filter((f) =>
+        !/\{\{/.test(fsD.readFileSync(pathD.join(rootD, 'design', f), 'utf8'))).join(', '));
+
+    /* And the one that IS meant to be opened: every local thing it asks for
+       exists, and it asks no third party for anything — `049` took Google
+       Fonts out of the app, and a reference page that renders in a
+       different font from the app is a reference that misleads. */
+    const sgSrc = readRootD('design/styleguide.html');
+    const refsD = (sgSrc.match(/(?:href|src)="([^"]+)"/g) || [])
+      .map((m) => m.replace(/^(?:href|src)="/, '').replace(/"$/, ''))
+      .filter((u) => u && u[0] !== '#');
+    const remote = refsD.filter((u) => /^[a-z]+:\/\//i.test(u));
+    const localBad = refsD.filter((u) => !/^[a-z]+:\/\//i.test(u))
+      .filter((u) => !fsD.existsSync(pathD.join(rootD, 'design', u.split('?')[0])));
+    chk('the style guide finds everything it links to',
+      localBad.length === 0, localBad.join(', '));
+    chk('and reaches for no third party, as the app does not',
+      remote.length === 0, remote.join(', '));
+    /* A floor: a page that stopped linking anything would pass both. */
+    chk('while still being the page that names the palette',
+      refsD.length >= 2 && /tokens\.css/.test(sgSrc) && /--acc/.test(sgSrc),
+      refsD.join(', '));
+  }
+
   console.log('\n== A recipe from the book is named through titleOf (R138) ==');
   {
     /* `R116` gave the app one word for a nameless recipe — "Untitled
