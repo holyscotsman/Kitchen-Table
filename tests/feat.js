@@ -226,6 +226,86 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('merged recipes carry the target exactly once', await p.evaluate(()=>{const l=JSON.parse(localStorage.getItem('kt.recipes'));return l[0].tags.join()==='Italian'&&l[1].tags.join()==='Italian,quick'&&l[2].tags.join()==='Italian,Sunday';}));
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== The one tag box that did not read commas (R165) ==');
+  {
+    /* Every other tag input in this app splits on commas — the hint under
+       each one says "Separate with commas" — and the rename box did its own
+       trim-and-collapse instead, which is `parseTags` minus the split.
+
+       Measured before the fix: renaming "italian" to "italian, quick" stored
+       ONE tag called `italian, quick`, listed as a single chip among the
+       real ones. Edit mode showed the field as `italian, quick`, which is
+       indistinguishable from two tags — and saving a change to the TITLE
+       and nothing else turned it into two. `R119`'s rule on the tags, and a
+       near-duplicate generator inside the machinery built to stop
+       near-duplicates. */
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pN = await ctxN.newPage();
+    const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
+    pN.on('dialog', d => d.accept());
+    await pN.addInitScript(async () => {
+      const l = await (await fetch('recipes.json')).json();
+      l[0].tags = ['italian']; l[1].tags = ['italian'];
+      localStorage.setItem('kt.recipes', JSON.stringify(l));
+    });
+    await pN.goto(B + '/index.html#menu');
+    await pN.waitForSelector('.rcard');
+    const openRename = async () => {
+      await pN.click('[data-act="open-filter"]');
+      await pN.waitForSelector('[data-act="tag-manage"]');
+      await pN.click('[data-act="tag-manage"]');
+      await pN.waitForSelector('[data-act="tag-edit"][data-key="italian"]');
+      await pN.click('[data-act="tag-edit"][data-key="italian"]');
+      await pN.waitForSelector('#tag-rename');
+    };
+    const tagsNow = () => pN.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes'))[0].tags);
+
+    await openRename();
+    await pN.fill('#tag-rename', 'italian, quick');
+    await pN.click('[data-act="tag-rename-apply"]');
+    await pN.waitForTimeout(400);
+    chk('a rename carrying a comma does not mint a compound tag',
+      JSON.stringify(await tagsNow()) === '["italian"]', JSON.stringify(await tagsNow()));
+    chk('and it says so, naming the control that does do several',
+      /One name at a time/.test(await pN.evaluate(() => document.body.innerText)) &&
+      /Add tags/.test(await pN.evaluate(() => document.body.innerText)));
+    /* `R120`'s rule: the reader is shown what was kept. A refusal that threw
+       their typing away would make them start again. */
+    chk('and leaves the box open with what was typed still in it',
+      (await pN.locator('#tag-rename').count()) === 1 &&
+      (await pN.inputValue('#tag-rename')) === 'italian, quick',
+      await pN.inputValue('#tag-rename').catch(() => '(gone)'));
+
+    /* THE FLOOR: an ordinary one-name rename still has to work, or the
+       refusal has simply broken renaming. */
+    await pN.fill('#tag-rename', 'Italian');
+    await pN.click('[data-act="tag-rename-apply"]');
+    await pN.waitForTimeout(500);
+    chk('while an ordinary rename still goes through',
+      JSON.stringify(await tagsNow()) === '["Italian"]', JSON.stringify(await tagsNow()));
+
+    /* And the consequence that made it worth fixing: with no compound tag
+       to inherit, editing an unrelated field leaves the tags alone. */
+    const id = await pN.evaluate(() =>
+      JSON.parse(localStorage.getItem('kt.recipes'))[0].id);
+    await pN.goto(B + '/index.html#' + id);
+    await pN.waitForSelector('.r-title');
+    await pN.click('[data-act="toggle-edit"]');
+    await pN.waitForSelector('#e-title');
+    await pN.fill('#e-title', 'A Different Name');
+    await pN.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pN.waitForTimeout(600);
+    chk('so editing only the title no longer rewrites the tags',
+      JSON.stringify(await tagsNow()) === '["Italian"]', JSON.stringify(await tagsNow()));
+    chk('nothing threw', nErrs.length === 0, nErrs.join(' | '));
+    await ctxN.close();
+  }
+
   console.log('\n== 087+088: search folds, tolerates a typo, and names its field ==');
   await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();l[0].ingredients=['2 tbsp crème fraîche'].concat(l[0].ingredients||[]);l[1].tags=['Jamaïcan'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
   await p.goto(B+'/index.html#menu'); await p.reload(); await p.waitForSelector('.rcard');
