@@ -3240,10 +3240,54 @@ way. Putting a chip on the meta line is a design question and Jason's call,
 not a corollary of this list — and it now **fails by name** when somebody
 makes it, rather than the page falling over.
 
+### Three ways back to the whole book, and what each of them did
+
+`R178`. The Menu offers three escapes from a filtered list, and they had
+three different ideas of what "all recipes" means.
+
+| where | label | clears filters | clears the search | left on screen |
+|---|---|---|---|---|
+| Filter sheet footer | **Reset to all recipes** | yes | **no** | **14 of 48** |
+| count row | Clear | yes | yes | 48 |
+| empty state | Show all recipes | yes | yes | 48 |
+
+Measured with `chicken` in the search and a course picked: pressing **"Reset
+to all recipes"** left fourteen, with `chicken` still in the box and
+`?q=chicken` still in the address. **The one label making the strongest
+promise was the only one that did not keep it** — `R167`'s third question,
+on a button whose name is a promise about the whole list. One intent, one
+behaviour (`R121`), so it clears the query too and its label becomes true.
+
+`show-all` still closes the search box where its siblings do not, and that
+stays: it is the escape on the **empty** state, where the search is usually
+what got the reader there.
+
+**And none of the three said anything.** Measured on an empty Menu: press
+*Show all recipes*, forty-eight cards appear, and the live region still
+reads *"Menu — Kitchen Table"* — the sentence from arriving, unchanged.
+`R166`'s finding, on the one control a reader is offered when the screen
+says nothing matches. All three now say *"Showing all 48 recipes."*, with
+the count taken from the list rather than typed, so it cannot rot (`R170`).
+
+**Two of them removed the very button that was pressed**, so the caret
+landed on `<body>`: the empty state is replaced by the list, and *Clear* is
+only drawn while something is filtered. `R167` built `#main-content` for
+exactly that, and they use it. The sheet's own button survives and the
+reader is still inside the sheet, so `reset-filters` is left where it is —
+which is why the caret half is checked on the two that need it and not on
+the third.
+
+**One of this round's own checks read the book before there was a book to
+read.** It fetched `recipes.json` to learn how many recipes there are while
+the page was still on `about:blank`, where a relative URL has no base to
+resolve against — *"Failed to parse URL from recipes.json"*. Moved after the
+first navigation. The count is still read rather than typed, which is the
+half that matters.
+
 ### Verified
 
-The suite after the video arc: **1908 functional checks** across eleven
-suites (kt 380, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
+The suite after the video arc: **1920 functional checks** across eleven
+suites (kt 392, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
 plan 95, video 285, backend 334, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
