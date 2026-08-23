@@ -2373,6 +2373,82 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       (/titleThen:[^,\n]*/.exec(code) || ['MISSING'])[0]);
   }
 
+
+  console.log('\n== An address is read and written through one pair (R148) ==');
+  {
+    /* Both halves of `parseHash`/`menuHash` threw on text a person can
+       produce. `decodeURIComponent` throws on a malformed escape — a lone
+       `%`, a `%zz` — and `encodeURIComponent` throws on a lone surrogate,
+       the broken half of a character a mangled emoji leaves behind. Both
+       throws landed in the boot chain's catch and told the reader "The
+       recipes could not be loaded — check the connection and reload" over a
+       book that HAD loaded, on a connection that was fine, with a reload
+       that reproduces it forever. `#menu?q=50%` did it to the shipped book.
+
+       Fixing fifteen call sites is one word each. This is the part that
+       makes it stick, in `R114`'s shape and by `R138`'s pattern: an address
+       is read through `decodeSafe` and written through `encodeSafe`, with
+       no exemption list on either — a sixteenth call site added later fails
+       by name rather than quietly bringing the fault back. */
+    const rawSrcD = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    /* Same stripper and the same reason as `R138`'s: the prose above each
+       fix quotes the raw function several times, and the lookbehind keeps
+       `accept="image/*"` from opening a comment that eats the file. */
+    const blankD = (m) => m.replace(/[^\n]/g, ' ');
+    const codeD = rawSrcD
+      .replace(/(?<![\w"'])\/\*[\s\S]*?\*\//g, blankD)
+      .replace(/(?<![^\s])\/\/[^\n]*/g, '');
+
+    const PAIR = { decodeURIComponent: 'decodeSafe', encodeURIComponent: 'encodeSafe' };
+    let fnD = null;
+    const raw = [];
+    codeD.split('\n').forEach((line, i) => {
+      const f = /^\s{0,4}function (\w+)\(/.exec(line);
+      if (f) fnD = f[1];
+      Object.keys(PAIR).forEach((name) => {
+        const re = new RegExp('\\b' + name + '\\s*\\(', 'g');
+        while (re.exec(line)) raw.push({ name, fn: fnD, n: i + 1, line: line.trim() });
+      });
+    });
+
+    Object.keys(PAIR).forEach((name) => {
+      const strays = raw.filter((x) => x.name === name && x.fn !== PAIR[name]);
+      chk(name + ' is only ever reached through ' + PAIR[name],
+        strays.length === 0,
+        strays.map((x) => x.n + ' (' + x.fn + '): ' + x.line.slice(0, 70)).join(' | '));
+    });
+
+    /* Floors. A stripper that ate the code, a walk that read nothing, or a
+       version that simply stopped encoding would each read as a clean pass
+       above — which is exactly how this kind of check dies quietly. The
+       last one is the real risk here: "no bare encodeURIComponent" is
+       trivially satisfied by not encoding at all. */
+    chk('and the stripper kept the code while dropping the prose',
+      codeD.indexOf('image/*') > -1 &&
+      codeD.indexOf('a lone "%"') === -1 &&
+      codeD.indexOf('lone surrogate') === -1 &&
+      /^\s{0,4}function decodeSafe\(/m.test(codeD) &&
+      /^\s{0,4}function encodeSafe\(/m.test(codeD),
+      'image/*=' + (codeD.indexOf('image/*') > -1) +
+      ' decode-prose-gone=' + (codeD.indexOf('a lone "%"') === -1) +
+      ' encode-prose-gone=' + (codeD.indexOf('lone surrogate') === -1) +
+      ' both-survived=' + (/^\s{0,4}function decodeSafe\(/m.test(codeD) &&
+                           /^\s{0,4}function encodeSafe\(/m.test(codeD)));
+    chk('the decoding and the encoding still happen, inside the one pair',
+      raw.length >= 3 && raw.every((x) => x.fn === PAIR[x.name]),
+      raw.map((x) => x.fn + ':' + x.n).join(', ') || 'nothing touches an address');
+    /* And every address the app builds really goes through them, so a
+       version that deleted the call sites rather than fixing them cannot
+       pass the rules above by having nothing left to check. */
+    const dCount = (codeD.match(/decodeSafe\(/g) || []).length;
+    const eCount = (codeD.match(/encodeSafe\(/g) || []).length;
+    chk('and every address the app builds goes through the pair',
+      dCount >= 3 && eCount >= 14,
+      'decodeSafe ' + dCount + ', encodeSafe ' + eCount +
+      ' (each counts 1 definition + its call sites)');
+  }
+
   console.log('\n== Which screens go on paper is a question about the list (R133) ==');
   {
     /* The print pass kept four names of its own, in another file, with its

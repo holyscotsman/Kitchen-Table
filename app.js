@@ -150,8 +150,8 @@
      one of them fails there is always the paste box, which needs no network. */
   var RELAYS = [
     { name: "directly", url: function (u) { return u; }, kind: "html" },
-    { name: "allorigins.win", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); }, kind: "html" },
-    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); }, kind: "html" },
+    { name: "allorigins.win", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeSafe(u); }, kind: "html" },
+    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeSafe(u); }, kind: "html" },
     { name: "r.jina.ai", url: function (u) { return "https://r.jina.ai/" + u; }, kind: "text" }
   ];
   var RELAY_TIMEOUT = 12000;
@@ -1526,11 +1526,11 @@
               the words are the signal, so it never rests on colour alone. */
            return n
              ? '<a class="who-tile press" href="#menu?who=' +
-               encodeURIComponent(name) + '">' +
+               encodeSafe(name) + '">' +
                '<span class="who-tile__count">' + n + "</span>" +
                '<span class="who-tile__name">' + esc(name) + "</span></a>"
              : '<a class="who-tile who-tile--empty press" href="#menu?who=' +
-               encodeURIComponent(name) + '">' +
+               encodeSafe(name) + '">' +
                '<span class="who-tile__plus" aria-hidden="true">' + I.plus(26) + "</span>" +
                '<span class="who-tile__name">' + esc(name) + "</span>" +
                '<span class="who-tile__invite">None yet — add the first</span></a>';
@@ -1552,7 +1552,7 @@
          '<div class="cat-grid">' +
          CATS.filter(function (c) { return countBy(S.recipes, "category", c); })
            .map(function (c) {
-             return '<a class="cat-row press" href="#menu?cat=' + encodeURIComponent(c) + '">' +
+             return '<a class="cat-row press" href="#menu?cat=' + encodeSafe(c) + '">' +
                     '<span class="cat-row__label">' +
                     '<span class="cat-row__icon" aria-hidden="true">' + catIcon(c, 20) + "</span>" +
                     esc(c) + "</span>" +
@@ -2277,7 +2277,7 @@
     if (tagsOf(r).length) {
       h += '<p class="r-tags">' + tagsOf(r).map(function (t) {
         return '<a class="minitag minitag--link press" href="#menu?tag=' +
-               encodeURIComponent(t) + '">' + esc(t) + "</a>";
+               encodeSafe(t) + '">' + esc(t) + "</a>";
       }).join("") + "</p>";
     }
 
@@ -2975,7 +2975,7 @@
      that is already there. Both answers come from the recipe, so every
      caller gets them right without knowing they exist. */
   function shareUrl(r, tail) {
-    return "/api/recipes/" + encodeURIComponent(bookId(r.id)) +
+    return "/api/recipes/" + encodeSafe(bookId(r.id)) +
       (bornHere(r) ? (tail ? "?new=1&" + tail : "?new=1") : (tail ? "?" + tail : ""));
   }
 
@@ -4642,7 +4642,7 @@
      that server rather than fail — and quietly doing the wrong thing is the
      failure this app least wants. */
   function jobPath(id, tail) {
-    return "/api/import/jobs/" + encodeURIComponent(String(id)) + (tail || "");
+    return "/api/import/jobs/" + encodeSafe(String(id)) + (tail || "");
   }
 
   function kitchenFetch(path, opts, quiet) {
@@ -5651,6 +5651,72 @@
      12. Router + boot
      ====================================================================== */
 
+  /* `R148` — an address is text somebody may have typed, bookmarked,
+     shared, or had mangled by a messaging app on the way, and
+     `decodeURIComponent` THROWS on a malformed escape: a lone "%", a
+     "%zz", a stray "%e9". It is read in two places below, and both throws
+     landed in the boot chain's own catch, whose sentence is "The recipes
+     could not be loaded (URI malformed). Check the connection and reload."
+
+     Every clause of that was wrong. The book HAD loaded — the fetch had
+     already filled `S.base` — the connection was perfect, and reloading
+     reproduced it exactly, forever. Measured: `#app` fell from ~43,000
+     characters to 157, and `S.error` is never cleared, so navigating to a
+     good address afterwards went on showing it.
+
+     `#menu?q=50%` did it to the shipped book with no bad data anywhere.
+     Nothing the app WRITES is malformed — `menuHash` encodes every value —
+     which is exactly why nothing had ever tested what it does with one
+     that is.
+
+     So: `R62`'s rule, applied to the address. Coerce, never discard — an
+     address that will not decode is used as written. That is not merely a
+     crash averted: a recipe stored at `100%-loaf` (in a file this project
+     edits by hand on purpose) then OPENS, because the raw text is exactly
+     its id. */
+  /* And the same fault WRITING one. `encodeURIComponent` throws too — on a
+     lone surrogate, which is half of a character: what an app that mangled
+     an emoji leaves behind, and what a paste can carry in. `menuHash` runs
+     it over the search box's own text, and the recipe page runs it over
+     every tag chip.
+
+     Measured, and the outcome is identical to the reading half above,
+     because the render throws inside the boot chain and lands in the very
+     same catch: a recipe whose tag held one fell to the same 157 characters
+     and the same sentence about the connection. The reader-facing half is
+     quieter and worse — `syncMenuHash` builds the address BEFORE it
+     renders, so a half character typed into the search froze the list where
+     it stood, the address never moved, and nothing was said at all.
+
+     There is no "use it as written" on this side: an unpaired surrogate is
+     not a character and cannot be in an address at all. So the broken half
+     is replaced with the standard "unknown character" and the address still
+     goes somewhere — a link that finds nothing beats a screen that is not
+     drawn. Whole characters are matched FIRST and kept, so an emoji in a
+     tag encodes exactly as it always did; only the half with no partner is
+     replaced.
+
+     Every site that builds an address goes through this, with no exemption
+     list, for `R124`'s reason: one tolerant writer cannot drift from
+     itself, while a list of the call sites that "cannot be reached" is a
+     list somebody has to keep true. Declared here beside its opposite
+     rather than beside its first caller — both are function declarations in
+     this file's one IIFE, and that hoisting is what makes the relay list at
+     the top of the file legal. */
+  function encodeSafe(text) {
+    try { return encodeURIComponent(text); }
+    catch (e) {
+      return encodeURIComponent(String(text).replace(
+        /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g,
+        function (m) { return m.length === 2 ? m : "\uFFFD"; }));
+    }
+  }
+
+  function decodeSafe(text) {
+    try { return decodeURIComponent(text); }
+    catch (e) { return text; }
+  }
+
   function parseHash() {
     var raw = (location.hash || "#").slice(1);
     if (!raw || raw === "main") return { name: "main", id: "" };
@@ -5667,7 +5733,7 @@
       var who = [], cats = [], tags = [], sort = "", needs = false, q = "";
       qs.split("&").forEach(function (pair) {
         var kv = pair.split("=");
-        var v = kv[1] ? decodeURIComponent(kv[1]) : "";
+        var v = kv[1] ? decodeSafe(kv[1]) : "";
         if (!v) return;
         /* Repeated, not replaced: the filters are multi-select, so an
            address that could only carry one of each described a list the
@@ -5682,7 +5748,7 @@
       return { name: "menu", id: "", who: who, cats: cats, tags: tags, sort: sort,
                needs: needs, q: q };
     }
-    return { name: "recipe", id: decodeURIComponent(raw) };
+    return { name: "recipe", id: decodeSafe(raw) };
   }
 
   /* The address the Menu is currently showing. Filtering and sorting are not
@@ -5695,12 +5761,12 @@
      you chose, not what you were given. */
   function menuHash() {
     var q = [];
-    S.who.forEach(function (w) { q.push("who=" + encodeURIComponent(w)); });
-    S.cats.forEach(function (c) { q.push("cat=" + encodeURIComponent(c)); });
-    S.tags.forEach(function (t) { q.push("tag=" + encodeURIComponent(t)); });
-    if (S.menuQ.trim()) q.push("q=" + encodeURIComponent(S.menuQ.trim()));
+    S.who.forEach(function (w) { q.push("who=" + encodeSafe(w)); });
+    S.cats.forEach(function (c) { q.push("cat=" + encodeSafe(c)); });
+    S.tags.forEach(function (t) { q.push("tag=" + encodeSafe(t)); });
+    if (S.menuQ.trim()) q.push("q=" + encodeSafe(S.menuQ.trim()));
     if (S.needsLook) q.push("needs=1");
-    if (S.sort !== "recent") q.push("sort=" + encodeURIComponent(S.sort));
+    if (S.sort !== "recent") q.push("sort=" + encodeSafe(S.sort));
     return "#menu" + (q.length ? "?" + q.join("&") : "");
   }
 

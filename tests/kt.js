@@ -2809,6 +2809,216 @@ const browserContextWithReduce = (br) =>
     await ctxR.close();
   }
 
+
+  console.log('\n== An address that would not decode took the whole book (R148) ==');
+  {
+    /* `parseHash` is the only thing that reads an address, and it decoded
+       with `decodeURIComponent` — which THROWS on a malformed escape: a
+       lone "%", a "%zz", a stray "%e9". It is called twice there, on the
+       recipe id and on every query value, and both throws land in the boot
+       chain's own catch, whose sentence is
+
+           The recipes could not be loaded (URI malformed).
+           Check the connection and reload.
+
+       Every clause of that is wrong here. The book HAD loaded — the fetch
+       succeeded and `S.base` was already filled — the connection is
+       perfect, and reloading reproduces it exactly, forever. Measured:
+       `#app` falls from ~43,000 characters to 157.
+
+       And `#menu?q=50%` does it to the SHIPPED book with no bad data
+       anywhere: no seeded recipe, no hand-edited file, just an address
+       somebody typed, shared, or had mangled by a messaging app on the
+       way. The app's own writer is careful — `menuHash` encodes every
+       value — so nothing the app produces is malformed; that is exactly
+       why nothing had ever tested what it does with one that is.
+
+       The fix is `R62`'s rule applied to the address: coerce, never
+       discard. An address that will not decode is used as written, which
+       is not merely a crash averted — a recipe stored at `100%-loaf` (in
+       a file this project edits by hand on purpose) then OPENS, because
+       the raw text is exactly its id. */
+    const mkP = (id, title) => ({ id, title, category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'] });
+    const SEEDP = [mkP('100%-loaf', '100% Loaf'), mkP('a b spaced', 'Spaced Out')];
+    const ctxP = await freshContext(br, { ...devices['iPhone 13'] });
+    /* Guarded because this runs on the about:blank the boot helper below
+       goes through, where localStorage is not readable at all — an
+       unguarded write throws there and would show up as the app throwing. */
+    await ctxP.addInitScript((rs) => {
+      try { localStorage.setItem('kt.recipes', JSON.stringify(rs)); } catch (e) {}
+    }, SEEDP);
+    const pP = await ctxP.newPage();
+    const pErrs = []; pP.on('pageerror', (e) => pErrs.push(e.message));
+
+    /* about:blank first, so every one of these is a real BOOT. A goto that
+       changes only the fragment is a same-document navigation, and this
+       screen's failure is sticky — `S.error` is set once and never cleared,
+       so without the blank page the second call would still be looking at
+       the first call's dead screen and would say so for the wrong reason. */
+    const bootAt = async (hash) => {
+      await pP.goto('about:blank');
+      await pP.goto(B + '/index.html' + hash);
+      await pP.waitForTimeout(600);
+      return pP.evaluate(() => {
+        const app = document.getElementById('app');
+        const t = document.querySelector('.r-title');
+        return { len: app ? app.innerHTML.length : -1,
+                 title: t ? t.textContent.trim() : '',
+                 empty: (document.querySelector('.emptystate') || {}).textContent || '',
+                 menu: !!document.querySelector('.rcard') };
+      });
+    };
+
+    /* The one that needs no bad data at all. */
+    const q = await bootAt('#menu?q=50%');
+    chk('a search address carrying a bare % still draws the Menu',
+      q.len > 1000 && !/could not be loaded/.test(q.empty),
+      q.len + ' ' + q.empty.slice(0, 80));
+    chk('and does not blame the connection for an address',
+      !/Check the connection/.test(q.empty), q.empty.slice(0, 80));
+
+    /* A recipe id is the whole address it is read at, and `recipes.json` is
+       hand-editable by design — the same premise `R62`, `R70` and `R132`
+       are built on. */
+    const onMenu = await bootAt('#menu');
+    const cardsP = await pP.locator('.rcard').count();
+    chk('the recipe with a % in its id is listed',
+      cardsP === 2, cardsP + ' :: ' + onMenu.empty.slice(0, 60));
+    if (cardsP) await pP.locator('a.rcard[href="#100%-loaf"]').click();
+    await pP.waitForTimeout(500);
+    chk('and tapping its card opens it rather than staying put',
+      (await pP.evaluate(() => {
+        const t = document.querySelector('.r-title');
+        return t ? t.textContent.trim() : '(' + location.hash + ')';
+      })) === '100% Loaf');
+
+    /* The reload case, which is the one that took the book away: the
+       address is already in the bar when the app boots. */
+    const direct = await bootAt('#100%-loaf');
+    chk('booting straight at that address opens the recipe',
+      direct.title === '100% Loaf', direct.title + ' / ' + direct.empty.slice(0, 60));
+
+    /* The floor under the fix: a tolerant decoder that has quietly stopped
+       decoding passes every check above and breaks every ordinary address.
+       The browser percent-encodes a space on the way out, so this id only
+       matches if the way back in still decodes. */
+    const spaced = await bootAt('#a b spaced');
+    chk('an address that CAN be decoded still is',
+      spaced.title === 'Spaced Out', spaced.title + ' / ' + spaced.empty.slice(0, 60));
+
+    /* The same fault WRITING an address, which is the other half of the
+       same function pair. `encodeURIComponent` throws too — on a lone
+       surrogate, the broken half of a character an app leaves behind when
+       it mangles an emoji. `menuHash` calls it on the search box's own
+       text, and the recipe page calls it on every tag chip.
+
+       Measured, and the outcome is identical to the reading half — the
+       same 157-character screen and the same sentence blaming the
+       connection — because the render throws inside the boot chain and
+       lands in the very same catch. */
+    const HALF = '\uD800';
+    const SEEDH = [{ id: 'tagged-one', title: 'Tagged One', category: 'Dinner',
+      contributor: 'Joan', servings: 4, ingredients: ['1 cup flour'],
+      steps: ['Bake it.'], tags: ['ital' + HALF + 'ian'] }];
+    const ctxH = await freshContext(br, { ...devices['iPhone 13'] });
+    await ctxH.addInitScript((rs) => {
+      try { localStorage.setItem('kt.recipes', JSON.stringify(rs)); } catch (e) {}
+    }, SEEDH);
+    const pH = await ctxH.newPage();
+    const hErrs = []; pH.on('pageerror', (e) => hErrs.push(e.message));
+
+    await pH.goto(B + '/index.html#tagged-one');
+    await pH.waitForTimeout(600);
+    const opened = await pH.evaluate(() => ({
+      title: (document.querySelector('.r-title') || {}).textContent || '',
+      empty: (document.querySelector('.emptystate') || {}).textContent || '',
+      len: document.getElementById('app').innerHTML.length,
+      tagHref: (document.querySelector('.minitag--link') || {}).getAttribute
+        ? document.querySelector('.minitag--link').getAttribute('href') : ''
+    }));
+    chk('a recipe whose tag holds half a character still opens',
+      opened.title === 'Tagged One',
+      opened.len + ' :: ' + opened.empty.slice(0, 70));
+    chk('and its tag is still a link that goes somewhere',
+      /^#menu\?tag=./.test(opened.tagHref || ''), opened.tagHref);
+
+    /* The reader-facing half: a half character pasted into the search box.
+       `syncMenuHash` builds the address BEFORE it renders, so the throw
+       took the render with it — the list never filtered, the address never
+       moved, and nothing was said. */
+    /* about:blank for the same reason `bootAt` uses it: the failure above
+       is sticky, and a goto that only changes the fragment would leave
+       this measuring the previous screen. */
+    await pH.goto('about:blank');
+    await pH.goto(B + '/index.html#menu');
+    await pH.waitForTimeout(700);
+    const beforeH = await pH.locator('.rcard').count();
+    /* Named by its own `data-act`, and NOT wrapped in a catch. The first
+       version of this reached for `[aria-label*="Search" i]` with a
+       `.catch(() => {})` behind it, so the click never landed, the field
+       never opened, and the typing step returned early — a check that read
+       FAIL before the fix and FAIL after it, for a reason that had nothing
+       to do with either. `R143`'s lesson, met again. */
+    await pH.click('[data-act="toggle-search"]');
+    await pH.waitForSelector('#menu-search');
+    /* A term that cannot match anything, so the count says whether the
+       render ran at all. Typing the half character ALONE would have been
+       useless here and the first version of this did exactly that: the
+       seeded recipe's own tag contains it, so it matched, and one card
+       stayed one card whether the app was working or not. */
+    await pH.evaluate((h) => {
+      const el = document.getElementById('menu-search');
+      el.value = 'zzz' + h;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, HALF);
+    await pH.waitForTimeout(400);
+    const afterH = await pH.locator('.rcard').count();
+    chk('and a half character typed into the search still filters the list',
+      beforeH > 0 && afterH === 0, beforeH + ' -> ' + afterH);
+    /* And the address went with it, carrying the standard replacement
+       rather than the broken half — before the fix `syncMenuHash` threw
+       before its own `replaceState`, so the address sat where it was. */
+    chk('and the address it wrote says so',
+      (await pH.evaluate(() => location.hash)) === '#menu?q=zzz%EF%BF%BD',
+      await pH.evaluate(() => location.hash));
+
+    /* The floor under the replacement, and it pins a claim the code makes:
+       whole characters are matched first and KEPT, so an emoji in a tag
+       encodes exactly as it always did.
+
+       Two tags, because the first version of this had only the first and
+       the mutation walked straight past it. A whole emoji never throws, so
+       it never reaches the catch, and a version replacing every surrogate
+       — the obvious one-line way to write this — changed nothing it could
+       see. The rule only has any effect on a string that BOTH throws and
+       carries a whole character, so that is the string the check has to
+       use. */
+    const ctxE = await freshContext(br, { ...devices['iPhone 13'] });
+    await ctxE.addInitScript((rs) => {
+      try { localStorage.setItem('kt.recipes', JSON.stringify(rs)); } catch (e) {}
+    }, [{ id: 'emoji-one', title: 'Emoji One', category: 'Dinner', contributor: 'Joan',
+      servings: 4, ingredients: ['1 cup flour'], steps: ['Bake it.'],
+      tags: ['\uD83D\uDC4D', '\uD83D\uDC4D\uD800'] }]);
+    const pE = await ctxE.newPage();
+    await pE.goto(B + '/index.html#emoji-one');
+    await pE.waitForSelector('.r-title');
+    const tagHrefs = await pE.locator('.minitag--link').evaluateAll(
+      (as) => as.map((a) => a.getAttribute('href')));
+    chk('a whole emoji in a tag is encoded, not replaced',
+      tagHrefs[0] === '#menu?tag=%F0%9F%91%8D', JSON.stringify(tagHrefs));
+    chk('and a whole one survives beside a broken half',
+      tagHrefs[1] === '#menu?tag=%F0%9F%91%8D%EF%BF%BD', JSON.stringify(tagHrefs));
+    await ctxE.close();
+
+    chk('nothing threw while writing an address either',
+      hErrs.length === 0, hErrs.join(' | '));
+    await ctxH.close();
+
+    chk('nothing threw', pErrs.length === 0, pErrs.join(' | '));
+    await ctxP.close();
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50));
   console.log('PASS: '+pass+'   FAIL: '+fail);

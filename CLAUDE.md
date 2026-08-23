@@ -1696,10 +1696,101 @@ below already catches it. Removing `that` one instead puts **"NaN people"** on
 screen, which is how a live guard behaves. A line that cannot be missed is a
 line that is not there.
 
+### An address the app could not read — or write — took the whole book
+
+`R148`. `parseHash` is the only thing in this app that reads an address, and
+it decoded with `decodeURIComponent` — which **throws** on a malformed
+escape: a lone `%`, a `%zz`, a stray `%e9`. It is called twice there, on the
+recipe id and on every query value.
+
+Both throws landed in the boot chain's own catch, whose sentence is
+
+    The recipes could not be loaded (URI malformed).
+    Check the connection and reload.
+
+Every clause of that is wrong here. The book **had** loaded — the fetch
+succeeded and `S.base` was already filled — the connection is perfect, and
+reloading reproduces it exactly, forever. Measured: `#app` falls from ~43,000
+characters to **157**, and `S.error` is never cleared, so navigating to a good
+address afterwards goes on showing it. The reader is left with one sentence
+where their book was, told to do the one thing that cannot help.
+
+**`#menu?q=50%` does it to the shipped book with no bad data anywhere** — no
+seeded recipe, no hand-edited file, just an address somebody typed,
+bookmarked, or had mangled by a messaging app on the way. Nothing the app
+*writes* is malformed (`menuHash` percent-encodes every value), which is
+exactly why nothing had ever tested what it does with one that is.
+
+The fix is `R62`'s rule applied to the address: **coerce, never discard.** An
+address that will not decode is used as written. That is not merely a crash
+averted — a recipe stored at `100%-loaf` then **opens**, because the raw text
+is exactly its id. Same family as `R70` and `R132`, and the third way this app
+has found to list a recipe it cannot open.
+
+Two silences, not one, and they are different: the boot throw is **swallowed**
+by the promise chain into the wrong sentence above, while the tap throw is
+genuinely uncaught — which is why a mutation reverting only the query call
+site leaves `pageerror` empty and only the sentence wrong. Both are checked.
+
+The floor under the fix is the check that a decodable address still decodes:
+a tolerant reader that has quietly stopped decoding passes every other check
+here and breaks every ordinary address, because the browser percent-encodes a
+space on the way out and the id only matches if the way back in undoes it.
+Four mutations fail by name, one per call site.
+
+**The two server boundaries are left refusing, on purpose.** `validateRecipe`
+and `db/migrate.js` both hold an id to `[a-z0-9-]`, so no such id can reach
+the database or the published file — a hand-edited `recipes.json` is loud at
+the nightly run and names the recipe. The app is tolerant where it must be,
+because it is downstream of a file this project edits by hand on purpose and
+serves to phones before any check ever runs. The consequence is recorded
+rather than fixed: a recipe with an id like that works perfectly on the phone
+and can never be shared, since the wire refuses it by name and `S13`'s queue
+holds it. Loosening the id rule or renaming the recipe are both changes to an
+address the family may have bookmarked, and that is Jason's call, not a bug
+fix.
+
+**And the same fault writing one.** `encodeURIComponent` throws too — on a
+**lone surrogate**, the broken half of a character a mangled emoji or a paste
+leaves behind. `menuHash` runs it over the search box's own text, and the
+recipe page runs it over every tag chip, so the outcome measured **identical**
+to the reading half: a recipe whose tag held one fell to the same 157
+characters and the same sentence about the connection, because the render
+throws inside the boot chain and lands in the very same catch.
+
+The reader-facing half is quieter and worse. `syncMenuHash` builds the address
+**before** it renders, so a half character typed into the search froze the
+list where it stood — the address never moved, nothing filtered, and nothing
+was said. Its neighbouring `try` had guarded `replaceState` alone, under a
+comment promising that *"a browser that won't rewrite the address still
+filters"*: the sentence was already right, the guard was one line too narrow.
+
+There is no *use it as written* on this side — an unpaired surrogate is not a
+character and cannot be in an address at all — so the broken half becomes the
+standard replacement character and the address still goes somewhere. A link
+that finds nothing beats a screen that is not drawn. Whole characters are
+matched **first** and kept, so an emoji in a tag encodes exactly as it always
+did. All fifteen sites go through the pair with **no exemption list**, for
+`R124`'s reason: one tolerant reader and one tolerant writer cannot drift from
+themselves, while a list of the call sites that "cannot be reached" is a list
+somebody has to keep true. A sixteenth fails by name.
+
+**Two of this round's own checks could not do their job, and both are recorded
+rather than quietly fixed.** The search check reached for
+`[aria-label*="Search" i]` with a `.catch(() => {})` behind it, so the click
+never landed and the field never opened — a check that read FAIL before the
+fix and FAIL after it, for a reason belonging to neither; `R143`'s lesson,
+met again. And the floor under *whole characters are kept* seeded a tag
+holding only an emoji, which **never throws** and so never reaches the catch
+where that rule lives: the mutation replacing every surrogate walked straight
+past it. The rule only has an effect on a string that both throws **and**
+carries a whole character, so that is the string the check uses now, and the
+mutation fails by name.
+
 ### Verified
 
-The suite after the video arc: **1689 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 354, sec 56,
+The suite after the video arc: **1708 functional checks** across eleven
+suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 359, sec 56,
 plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
