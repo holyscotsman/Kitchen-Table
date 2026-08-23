@@ -1654,10 +1654,52 @@ The abort is at the **origin**, not a path: a suite that wants to answer for
 the kitchen points `kt.importApi` at its own stub host and routes that, which
 never meets this rule. `video.js` already did.
 
+### The one number the app refused without saying so
+
+`R147`, and it was found by counting rather than by hunch: of the 98
+`data-act` values in `app.js`, **twenty are never named by any suite**, and
+`serv-set` was the one among them that takes free text from the reader and
+turns it into a scaling factor. Tapping the servings number and typing one
+exists because *"stepping from 4 to 40 is thirty-six taps, which is not a
+serving stepper, it is a punishment"*.
+
+Measured on a recipe that serves 6:
+
+| typed | what happened |
+|---|---|
+| `12` | works — the card and every quantity move |
+| `100` | **discarded in silence**, the number snaps back to 12 |
+| `0` | discarded in silence |
+| *(cleared)* | discarded in silence |
+
+The data was safe — `R120`'s rule held, the field showed what was kept — but
+the app had already settled what to say here **twice**: `R119` in Edit mode
+and `R121` on the Add screen both clamp **and say** *"This book keeps serving
+counts up to 40, so 300 was saved as 40."* `R121`'s own rule is that one
+situation has one wording. And since `R141` this very screen speaks when the
+count changes, so a rescale announced while a **refused** rescale said nothing
+at all.
+
+It clamps and says so now, in the app's own sentence. Clearing the field stays
+silent, because nothing was typed.
+
+**And Escape became a real cancel.** Typing changes the count as it goes — the
+field deliberately does not re-render — so without putting the old number back,
+this round's own change would have left a half-typed count behind on the
+keystroke that means *no*. That is `R80`'s sheet contract applied to a control
+that had never had one.
+
+**One line came out because a mutation proved it was doing nothing.** There
+was an `if (!raw) return;` guarding the empty field; mutating it away changed
+nothing any check could see, because `parseInt("")` is `NaN` and the guard
+below already catches it. Removing `that` one instead puts **"NaN people"** on
+screen, which is how a live guard behaves. A line that cannot be missed is a
+line that is not there.
+
 ### Verified
 
-The suite after the video arc: **1680 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 345, sec 56,
+The suite after the video arc: **1689 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 354, sec 56,
 plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
