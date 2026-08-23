@@ -3058,11 +3058,75 @@ No flag, for `R162`'s reason: `scottish` → `Scottish` is the same tag,
 spelled the way the book spells it, exactly as `joan` → `Joan` is the same
 person. The reader sees the field before Save either way.
 
+### The boot snapshot that left the phone
+
+`R174`, and the half `R134` did not reach. That round made every **write**
+re-read the book before applying its change, which also refreshes
+`S.recipes` — but only for a tab that writes. A tab that has only been read
+from since boot still holds its snapshot, and **three things that leave the
+phone were built from it**:
+
+- **`recipes.json`** — the file somebody commits;
+- **the photo files** that go beside it;
+- **`S13`'s queue**, the changes waiting for the family's book.
+
+That is worse than the bug `R134` fixed, not milder. A stale screen is a
+stale screen; a stale **file** gets committed, and reverts the other tab's
+change for the whole family, permanently, with nothing said.
+
+Measured, with two real tabs open on the book before either wrote:
+
+| | |
+|---|---|
+| tab A renames Chops; tab B downloads `recipes.json` | the file says **"Air Fryer Chops"** — the original |
+| tab B attaches a photo; tab A removes that recipe | tab B's *Download photos* hands over **`scones.jpg`**, an orphan the book points at from nowhere — which is the whole reason `R71` wrote that filter |
+
+And the queue, which is the one that writes to everyone. `unsentRecipes`'s
+own comment says *"read fresh"*, and it does — of the **queue**. The
+recipes it looked those ids up in came from `byId`, which walks
+`S.recipes`. So the send put *"Aaa One"* on the wire when the stored book
+already said *"Aaa One FROM THE OTHER TAB"*, and `putRecipe` overwrites on
+purpose: an old version written over a newer one, which `R136` named as the
+wrong direction for this app to err in.
+
+**`byId` deliberately stays on `S.recipes`**, and that is the scoping rather
+than an oversight. It is called on every render of every screen, and putting
+a parse and a normalise on the interaction path buys the reader nothing they
+can see. `R134` made the same call: fix what can destroy someone's work, not
+everything that could theoretically be stale. Live cross-tab display — a
+`storage` listener re-rendering under the reader's fingers — is a different
+question and is not taken here.
+
+**And `R135`'s guard caught this round's own refactor, inside one battery.**
+That check requires the two low-level writers to be reachable only from a
+wrapper that re-reads the store, and it looked for the read *in the
+wrapper's body*. Moving it into `currentRecipes()` — which is the whole
+point, since the download and the queue need the same read and a second copy
+is the drift `R124` exists to stop — made it fail by name: *"writeRecipes/
+writePlan do not re-read"*. So it follows **one named helper** now, and holds
+that helper to reading the store; a helper that quietly stopped fails here
+exactly as the wrapper did.
+
+Writing its floor found a second thing, latent since `R135`: `bodyOf` sliced
+a function to the next `\n  }`, so a **one-line** function's body ran on into
+the next one. `persistPlan` is a one-liner sitting directly above
+`writePlan`, so the scan read `writePlan`'s `load(K.plan, [])` as
+`persistPlan`'s own — a pure writer that looked like a reader. No existing
+check was wrong because of it, and it would have made the new floor pass for
+the wrong reason.
+
+**One check simulates the other tab rather than opening one, and says so.**
+`writeRecipes` is load → change → save, so an updated `kt.recipes` with the
+page never reloaded *is* the two-tab state. The real two-page case is
+measured in `tests/feat.js`, on the download and the photos; the video
+suite's is about what the send puts on the wire, and it carries a floor that
+the tab really is stale before it asserts what was sent.
+
 ### Verified
 
-The suite after the video arc: **1876 functional checks** across eleven
-suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 384, sec 62,
-plan 95, video 281, backend 328, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1885 functional checks** across eleven
+suites (kt 372, feat 102, add 136, relay 21, quick 84, polish 385, sec 62,
+plan 95, video 285, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

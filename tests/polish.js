@@ -2089,12 +2089,42 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        queue below and watching nothing fail. */
     const bodyOf = (name) => {
       const at = src135.indexOf('function ' + name + '(');
-      return at < 0 ? '' : src135.slice(at, src135.indexOf('\n  }', at));
+      if (at < 0) return '';
+      const nl = src135.indexOf('\n', at);
+      const first = src135.slice(at, nl < 0 ? undefined : nl);
+      /* A one-line function ends on its own line. Without this the slice
+         below runs on to the NEXT function's closing brace and reads that
+         body as this one's — which is how `persistPlan`, a one-liner,
+         looked like it read the store when the read is really in
+         `writePlan` directly beneath it. Found by the floor below. */
+      if (/\{[\s\S]*\}/.test(first)) return first;
+      return src135.slice(at, src135.indexOf('\n  }', at));
+    };
+    /* The wrapper must read the store before it changes it — itself, or
+       through ONE named helper, which is then held to reading it.
+
+       `R174` moved `writeRecipes`'s read into `currentRecipes()`, because
+       the `recipes.json` download and `S13`'s send queue needed the same
+       read and a second copy is the drift `R124` exists to stop. This check
+       caught that within one battery, which is exactly what it is for — so
+       it follows the helper rather than being loosened. A helper that
+       stopped reading the store fails here by name, and so does a wrapper
+       that calls nothing at all. */
+    const readsStore = (name, key) => {
+      const body = bodyOf(name);
+      const re = new RegExp('load\\(K\\.' + key);
+      if (re.test(body)) return true;
+      const calls = [...new Set((body.match(/\b([a-zA-Z_$][\w$]*)\(/g) || [])
+        .map((x) => x.slice(0, -1)))];
+      return calls.some((fn) => fn !== name && re.test(bodyOf(fn)));
     };
     chk('each wrapper reads the store before it changes it',
-      /load\(K\.recipes/.test(bodyOf('writeRecipes')) &&
-      /load\(K\.plan/.test(bodyOf('writePlan')),
+      readsStore('writeRecipes', 'recipes') && readsStore('writePlan', 'plan'),
       'writeRecipes/writePlan do not re-read');
+    /* The floor: a function that only WRITES must not satisfy it, or the
+       rule above would be true of anything. */
+    chk('(floor) and a writer that only writes does not count as a read',
+      !readsStore('persistRecipes', 'recipes') && !readsStore('persistPlan', 'plan'));
 
     /* The photo map is written in two places and both go through the
        re-read; the IndexedDB branch is per-key and needs none. */
