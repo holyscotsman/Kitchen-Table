@@ -1805,6 +1805,29 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       else serve();
     };
     const srv = http.createServer(handler);
+    /* `R171` — `close()` resolves only once every open connection has ended,
+       and the page under test holds a keep-alive socket to this very server,
+       so on a CI runner it can wait for ever. It did: the `suites` job on
+       `R169`'s pull request sat on the second of these two closes for twenty
+       minutes and was killed at the workflow timeout, so polish's remaining
+       three hundred-odd checks never ran and the pull request read
+       "cancelled" — neither pass nor fail. Destroying the sockets is also
+       the truer outage, since a server that has gone away does not politely
+       finish its keep-alives; and the bounded race means the next hang here
+       FAILS the check below it rather than eating the whole run. */
+    const shutdown = async (s) => {
+      const closed = new Promise(r => s.close(r));
+      if (s.closeAllConnections) s.closeAllConnections();
+      await Promise.race([closed, new Promise(r => setTimeout(r, 5000))]);
+    };
+    /* And the floor under it, because the whole block claims an outage: if a
+       shutdown ever times out without actually closing, every check after it
+       would pass for the wrong reason — the server still answering. */
+    const portDead = () => new Promise(r => {
+      const req = http.get(OWN + '/index.html', res => { res.resume(); r(false); });
+      req.on('error', () => r(true));
+      req.setTimeout(2000, () => { req.destroy(); r(true); });
+    });
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
     const PORT = srv.address().port;
     const OWN = 'http://127.0.0.1:' + PORT;
@@ -1871,7 +1894,8 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
     /* Now the outage: the server is gone, not merely emulated away. */
     await doctor();
-    await new Promise(r => srv.close(r));
+    await shutdown(srv);
+    chk('(floor) the outage is real — the port refuses a fresh connection', await portDead());
     await psw.reload();
     await psw.waitForSelector('.rcard', { timeout: 15000 });
     chk('with the server gone, the whole app still loads from the worker',
@@ -1939,7 +1963,8 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
       /* The proof that matters. The signal goes — the ordinary kitchen, not
          a laboratory — and the book is still on the phone. */
-      await new Promise(r => srv2.close(r));
+      await shutdown(srv2);
+      chk('(floor) and the second outage is real too', await portDead());
       docStatus = 0;
       await psw.reload();
       /* Caught rather than awaited bare: when this regresses the phone shows

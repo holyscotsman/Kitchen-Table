@@ -583,9 +583,16 @@
     render();
   }
 
+  /* The step the stepper cannot go below. `R169` — `stepFs` has always known
+     it; the two A− buttons hardcoded 0, so with Easy Read on the floor was
+     `EASY_MIN_FS` and the button was never disabled. Measured: at the floor
+     it stayed enabled and did nothing, three presses running, while the
+     same button at the plain floor is disabled. One reader, so the stepper
+     and the buttons cannot disagree about where the bottom is. */
+  function fsFloor() { return S.easyRead ? EASY_MIN_FS : 0; }
+
   function stepFs(delta) {
-    var floor = S.easyRead ? EASY_MIN_FS : 0;
-    var next = Math.min(FS.length - 1, Math.max(floor, effectiveFs() + delta));
+    var next = Math.min(FS.length - 1, Math.max(fsFloor(), effectiveFs() + delta));
     if (next === S.fsIndex) return;
     S.fsIndex = next;
     save(K.fs, next);
@@ -2221,7 +2228,7 @@
       "</div>" +
       '<div class="fsrow">' +
       '<button type="button" class="fsbig press" data-act="fs-" ' +
-      'aria-label="Smaller text"' + (effectiveFs() === 0 ? " disabled" : "") +
+      'aria-label="Smaller text"' + (effectiveFs() === fsFloor() ? " disabled" : "") +
       ">A−</button>" +
       '<span class="fsrow__value">' + px + "px</span>" +
       '<button type="button" class="fsbig press" data-act="fs+" ' +
@@ -2444,7 +2451,7 @@
          '<div class="rhead__tools">' + themeBtn() +
          '<div class="fsgroup">' +
          '<button type="button" data-act="fs-" aria-label="Smaller text"' +
-         (effectiveFs() === 0 ? " disabled" : "") + ">A−</button>" +
+         (effectiveFs() === fsFloor() ? " disabled" : "") + ">A−</button>" +
          '<button type="button" data-act="fs+" aria-label="Larger text"' +
          (effectiveFs() === FS.length - 1 ? " disabled" : "") + ">A+</button>" +
          "</div></div></div></header>";
@@ -2907,16 +2914,26 @@
 
   /* The segment being typed is everything after the last comma. Matches are
      existing tags only, the already-listed ones excluded, canonical casing
-     preserved — prefix matches outrank substring ones. */
+     preserved — prefix matches outrank substring ones.
+
+     `R170` — the exclusion means "the reader has already typed this tag
+     exactly", and that is a comparison of what they typed. It was folded, so
+     a segment matching a tag case-insensitively was excluded as well: a book
+     holding `Italian` offered nothing at all to a reader typing `italian` in
+     full, at the one moment the canonical casing is the entire point of the
+     feature. The segment is normalised the way `parseTags` will normalise it
+     on save, so a trailing or doubled space is not a difference — save fixes
+     those itself, and there is nothing to offer. */
   function tagSuggestions(raw) {
     var parts = String(raw || "").split(",");
-    var seg = parts.pop().trim().toLowerCase();
+    var last = parts.pop().trim().replace(/\s+/g, " ");
+    var seg = last.toLowerCase();
     if (!seg) return [];
     var have = parts.map(function (p) { return p.trim().toLowerCase(); });
     return allTags()
       .filter(function (t) {
         var lt = t.toLowerCase();
-        return lt.indexOf(seg) > -1 && lt !== seg && have.indexOf(lt) === -1;
+        return lt.indexOf(seg) > -1 && t !== last && have.indexOf(lt) === -1;
       })
       .sort(function (a, b) {
         var pa = a.toLowerCase().indexOf(seg) === 0 ? 0 : 1;

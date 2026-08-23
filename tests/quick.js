@@ -344,6 +344,34 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('the ledger and the book agree on how many recipes there are',
       new RegExp('of ' + book.length + ' recipes').test(md), String(book.length));
 
+    /* `R170` — the same rule one document over. CLAUDE.md said "Nothing ships
+       pre-tagged" from the day tags were designed, and it stopped being true
+       on 2026-08-02 when the research pass tagged 37 of the 48. Three weeks
+       of a present-tense claim about the shipped file that the shipped file
+       contradicted — in the document whose first line is "read this file
+       before writing any code". `R170`'s own argument turns on which way
+       round it is, so the number is bound to the book rather than typed once
+       and left.
+
+       Scoped to the tags bullet itself rather than to the whole file, and
+       that is load-bearing: the round's own write-up further down QUOTES the
+       sentence it corrected, which is what a record is for, so a
+       document-wide match fails on the fix. `R149` met this once and split
+       CLAUDE.md at `## Build state`; that split does not help here, because
+       this bullet lives below it. The sentence a reader is told is the
+       sentence to check — `R145`'s rule. Whitespace-tolerant, because the
+       file wraps mid-phrase (`R151`). */
+    const taggedN = book.filter(r => Array.isArray(r.tags) && r.tags.length).length;
+    const claudeMd = fsx.readFileSync(pathx.join(ROOT, 'CLAUDE.md'), 'utf8');
+    const tagBullet = (claudeMd.match(/\n- \*\*Tags\*\*,[\s\S]*?(?=\n- \*\*)/) || [''])[0];
+    chk('(floor) the book really is tagged, and the tags bullet was found',
+      taggedN > 0 && tagBullet.length > 40, taggedN + ' :: ' + tagBullet.length);
+    chk('CLAUDE.md’s tags bullet no longer says the book ships untagged',
+      !/[Nn]othing ships pre-tagged/.test(tagBullet), tagBullet.slice(0, 160));
+    chk('and the count it gives is the book’s own',
+      new RegExp('tagged\\s+\\*\\*' + taggedN + ' of the ' + book.length + '\\*\\*').test(tagBullet),
+      taggedN + ' of ' + book.length + ' :: ' + tagBullet.slice(0, 200));
+
     /* §2 — the recipes with nothing to cook from. Named, and counted. */
     const sec2 = between('## 2. Empty ingredient lists', '## 3.');
     const claimedEmpty = idsIn(sec2);
