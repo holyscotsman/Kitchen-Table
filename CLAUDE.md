@@ -2564,10 +2564,71 @@ that question stays open rather than answered. Every suite in this project
 runs Chromium with an iPhone viewport, which is a device profile and not an
 engine.
 
+### R29 built the net and nothing kept the app off the wire
+
+`R164`. That round named this failure mode in its own words:
+
+> if `app.js` itself never runs — truncated by a bad deploy, **or using
+> syntax an older iPhone cannot parse** — there is no catch and no render,
+> and the page reads *"Loading recipes…"* for ever. On the phone this book
+> was built for, that looks like a broken phone rather than a broken
+> deploy, and there is nothing to do about it.
+
+It built the last-resort message, admitted it by its own CSP hash, and
+made that hash self-guarding. **Nothing ever checked the syntax.**
+
+`app.js` is about 7,000 lines of strictly ES5 — measured with a real
+parser, not a regex: **zero** arrow functions, `const`/`let`, template
+literals, spread, optional chaining, nullish coalescing, classes, `async`
+or `for…of`. At that length that is a discipline, not an accident. It is
+also one keystroke from being broken by a round that would pass every
+browser anybody here tests with, every suite, and CI — and blank the app
+on the one phone that matters.
+
+**Syntax, not library**, and the distinction is the whole point. A method
+the engine lacks — `padStart`, which this file does use — throws on one
+line and the rest of the app still runs. A syntax error kills the file
+before a single statement executes, which is exactly the blank screen
+`R29` is about. So the check is a parse at `ecmaVersion: 5`, and nothing
+about which methods are called.
+
+**The two inline scripts in `index.html` are checked too**, because they
+are the pre-paint theme and `R29`'s own last-resort message: the code that
+has to run when everything else has failed. A net written in syntax the
+engine cannot parse is not a net.
+
+**`sw.js` is the one exemption, by name and with its reason** — a service
+worker only exists in an engine that already has ES6 — and the exemption
+is held to still being one: if `sw.js` ever became ES5 the exemption would
+be carrying nothing and should go. That is `R149`'s rule about an
+exemption outliving what earned it, and it fails by name.
+
+**The floor first, because everything else is vacuous without it**: the
+parser must actually refuse post-ES5 syntax. A wrong `ecmaVersion` would
+make every check in the block pass on anything at all, and the mutation
+that sets it to 2020 fails by name.
+
+**And this round's own check was wrong first, caught by CodeQL within
+minutes of the push.** The inline scripts were pulled out of `index.html`
+by a hand-rolled `<script…>…</script>` regex, which is `js/bad-tag-filter`
+— flagged **high severity**, and correctly, naming the exact evasion:
+*"This regular expression does not match upper case `<SCRIPT>` tags."*
+The security label is the least of it: a tag matcher that misses a script makes *this check* pass on
+a file it never read, which is the exact fault the round exists to stop.
+They are read out of the **DOM** now — the browser is a real HTML parser
+and `quick.js` already has one open. The mutation still fails by name, and
+a floor requires both scripts to have actually been found.
+
+One cost, stated plainly: this adds `acorn` to `tests/` — one package,
+no transitive dependencies. The app itself still has none, which is the
+promise `tests/package.json`'s own description makes. It does change
+`tests/package-lock.json`, which is the CI Playwright cache key, so the
+next run re-downloads Chromium once.
+
 ### Verified
 
-The suite after the video arc: **1812 functional checks** across eleven
-suites (kt 368, feat 92, add 127, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1817 functional checks** across eleven
+suites (kt 368, feat 92, add 127, relay 21, quick 81, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
