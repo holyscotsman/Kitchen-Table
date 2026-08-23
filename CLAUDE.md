@@ -2082,11 +2082,48 @@ server are held to **one sentence** rather than each to a copy of it —
 `R115`'s rule for `validateRecipe` and `db/migrate.js`, which guard the same
 field for the same reason and must not disagree about it.
 
+### Every field this function could come up empty on, now says so
+
+`R154` finishes what `R152` started. Three rounds, three fields, one
+function — and the third is the one with the most to lose.
+
+`draftFromResult` flags what it truncates and what it substitutes for a bad
+course, and said nothing at all when a **list** came back empty. Both
+device-side importers already did: the link path flags *"Ingredients — none
+were found; check the original page."*, the photo path *"Ingredients — none
+were picked up."*
+
+Measured: `ingredients: []` and `steps: []` produced a draft with both lists
+empty and **zero flags** — a review screen of blank boxes with no reason
+given. And `saveNewRecipe` refuses only an empty **title**, so that draft is
+saveable: a recipe in the family's book with nothing in it, arrived at in
+silence. The app has a *"No ingredients listed"* panel for that state
+(task `071`) because four handoff recipes genuinely came that way; landing
+there from an import is a different thing entirely.
+
+**The wording is this path's own rather than a copy of either**, and that is
+the point worth keeping. The two existing sentences already differ, because
+the advice differs — *"check the original page"* means nothing for a
+photograph. What carries across between paths is the `Field — ` **shape**
+that `R122` and `R123` answer by, not the sentence; `R153`'s servings flag is
+identical across three writers because there the situation and the remedy
+are identical, and this one is not. One rule, applied honestly in both
+directions.
+
+**And a check of mine measured nothing until I watched which case failed.**
+The shared fixture already carries a model flag reading *"Ingredients —
+mumbled"*, which begins with the exact prefix the check looks for, so two of
+its three cases passed before the fix on text that was always there — only
+the steps case failed, and that discrepancy is what exposed it. `R145`'s
+trap, met in a fixture rather than a document. The model's own flags are
+cleared before the assertion now, so what is measured is what this function
+added.
+
 ### Verified
 
-The suite after the video arc: **1733 functional checks** across eleven
+The suite after the video arc: **1737 functional checks** across eleven
 suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
-plan 79, video 276, backend 312, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

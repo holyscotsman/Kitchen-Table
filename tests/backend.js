@@ -749,6 +749,45 @@ const { runJob, computeFps } = lib('pipeline');
        count: the link importer, the Add screen, and this server. A flag the
        app words differently from the server is two situations wearing one
        name, which is the thing `R121` set out to stop. */
+    /* `R154` — the third field in the same function with the same fault, and
+       the one with the most to lose. Both device-side importers say when a
+       list came back empty: the link path flags "Ingredients — none were
+       found; check the original page.", the photo path "Ingredients — none
+       were picked up." The video path said nothing at all.
+
+       Measured before the fix: ingredients [] and steps [] produced a draft
+       with both lists empty and ZERO flags — a review screen with blank
+       boxes and no reason given. And `saveNewRecipe` only refuses an empty
+       TITLE, so that draft is saveable: a recipe in the family's book with
+       nothing in it, arrived at silently.
+
+       The wording is this path's own rather than a copy. The two existing
+       ones already differ, because the advice differs — "check the original
+       page" means nothing for a photograph — so what carries across is the
+       `Field — ` shape that `R122`/`R123` answer by, not the sentence. */
+    for (const [label, over, field] of [
+      ['ingredients', { ingredients: [] }, 'Ingredients'],
+      ['steps', { steps: [] }, 'Steps'],
+      ['blank strings', { ingredients: ['  ', ''] }, 'Ingredients']
+    ]) {
+      /* The model's own flags are cleared first, or this measures nothing:
+         the shared fixture already carries "Ingredients — mumbled", which
+         starts with the very prefix being looked for, so two of these three
+         cases passed before the fix on text that was always there. Caught by
+         watching which of them failed — the same trap as `R145`, met in a
+         fixture this time rather than a document. */
+      const bare = extract.draftFromResult(
+        Object.assign({}, parsed, { flagged: [] }, over), 'u', 'youtube');
+      chk('an empty ' + label + ' list is said out loud',
+        bare.flagged.some(f => f.indexOf(field + ' — ') === 0),
+        JSON.stringify(bare.flagged.slice(0, 3)));
+    }
+    /* The floor, so disclosure does not become noise on a good import. */
+    chk('and a video that gave both lists is flagged about neither',
+      !d.flagged.some(f => /^(Ingredients|Steps) — /.test(f) &&
+        /none were/.test(f)),
+      JSON.stringify(d.flagged));
+
     const appSrcS = require('fs').readFileSync(
       require('path').join(__dirname, '..', 'app.js'), 'utf8');
     const exSrcS = require('fs').readFileSync(

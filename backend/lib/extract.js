@@ -158,9 +158,25 @@ function draftFromResult(parsed, url, platform) {
   for (const k of ["ingredients", "steps"]) {
     const list = Array.isArray(parsed[k]) ? parsed[k] : [];
     d[k] = list.slice(0, 60).map(s => String(s).trim().slice(0, 500)).filter(Boolean);
+    const field = k === "ingredients" ? "Ingredients" : "Steps";
     if (list.length > 60) {
-      d.flagged.push((k === "ingredients" ? "Ingredients" : "Steps") +
+      d.flagged.push(field +
         " — the video produced more than 60 lines; only the first 60 were kept.");
+    }
+    /* `R154` — the third field in this function with `R152`'s fault, and the
+     * one with the most to lose. Both device-side importers say when a list
+     * came back empty; this one said nothing, so a video that yielded
+     * neither produced a draft with blank boxes and no reason given — and
+     * `saveNewRecipe` only refuses an empty TITLE, so that draft is
+     * saveable: a recipe in the family's book with nothing in it, arrived at
+     * in silence.
+     *
+     * The wording is this path's own rather than a copy of either. The two
+     * existing ones already differ because the advice does — "check the
+     * original page" means nothing for a photograph — so what carries across
+     * is the `Field — ` shape `R122`/`R123` answer by, not the sentence. */
+    if (!d[k].length) {
+      d.flagged.push(field + " — none were picked up from the video.");
     }
   }
   for (const k of ["prepTime", "cookTime", "notes"]) {
