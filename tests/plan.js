@@ -740,6 +740,120 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     await ctxM.close();
   }
 
+  console.log('\n== The planner\'s stepper moved every amount and said nothing (R172) ==');
+  {
+    /* The third control of the trio, and the only one that was silent.
+       Planning says "X planned for Monday 17"; taking one off says "X taken
+       off Monday 17" (`R166`). Stepping how many a meal is for rewrites
+       EVERY quantity on the shopping list — the multiplier is
+       `e.servings / r.servings` — and said nothing at all, so the live
+       region went on holding whichever sentence was there before it.
+
+       `R141` settled this for the recipe screen and its argument transfers
+       whole: the caret stays on "More people", whose label never changes, so
+       the new count is never spoken from anywhere. It is worse here, because
+       what moved is behind the sheet — the recipe screen rescales the list
+       the reader is looking at, this one rescales a list off screen. */
+    const ctxS = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pS = await ctxS.newPage();
+    const sErrs = []; pS.on('pageerror', (e) => sErrs.push(e.message));
+    /* `.notice` alone, not `.notice, .hint`: the planner passes "notice" to
+       `noticeHtml`, and once the shopping list is unfolded there is a `.hint`
+       ("As written, not summed:") ahead of it in document order, so the
+       looser selector reads the list's own caption instead of the sentence.
+       `R166`'s copy is safe only because that block never opens the fold. */
+    const said = () => pS.evaluate(() => {
+      const n = document.querySelector('.notice');
+      return n ? n.textContent.trim() : '';
+    });
+    const spoken = () => pS.evaluate(() => {
+      const l = document.querySelector('[aria-live]');
+      return l ? l.textContent.trim() : '';
+    });
+
+    await pS.goto(B + '/index.html#plan');
+    await pS.waitForSelector('[data-act="plan-pick"]');
+    await pS.click('[data-act="plan-pick"] >> nth=0');
+    await pS.waitForSelector('[data-act="plan-assign"]');
+    /* The SECOND recipe in the picker, not the first, and that is the floor
+       doing its job rather than a preference: `chops` sorts first and is one
+       of the four recipes that arrived with no ingredients at all
+       (`CONTENT.md`), so the shopping list is correctly not drawn for it and
+       the measurement below compared "" with "". `before.length > 20` is
+       what caught it. */
+    await pS.click('[data-act="plan-assign"] >> nth=1');
+    await pS.waitForSelector('[data-act="plan-meal"]');
+    const afterPlan = await said();
+    chk('(floor) planning it still says so, so there is a sentence to displace',
+      /planned for/.test(afterPlan), afterPlan);
+
+    /* The shopping list before the step, so the claim that it moves is
+       measured rather than asserted. */
+    const listText = () => pS.evaluate(() => {
+      const el = document.querySelector('.shoplist__items');
+      return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+    /* The list is a fold, shut by default, and the amounts only exist while
+       it is open. */
+    await pS.click('[data-act="toggle-list"]');
+    await pS.waitForSelector('.shoplist__items li');
+    const before = await listText();
+
+    /* The count is the recipe's own, so it is READ rather than assumed —
+       the first version of this block expected 5 because it guessed the
+       recipe served 4, and measured `chops`, which serves 2. */
+    const servesNow = () => pS.evaluate(() => (JSON.parse(
+      localStorage.getItem('kt.plan') || '[]')[0] || {}).servings);
+    const was = await servesNow();
+    await pS.click('[data-act="plan-meal"] >> nth=0');
+    await pS.waitForSelector('[data-act="meal-serv+"]');
+    await pS.click('[data-act="meal-serv+"]');
+    await pS.waitForTimeout(300);
+    const stepped = await said();
+    const want = 'for ' + (was + 1) + ' people on ';
+    chk('stepping a planned meal now says how many it is for, and when',
+      stepped.indexOf(want) > -1, stepped + ' want ' + want);
+    chk('and the sentence is no longer the one about planning it',
+      stepped !== afterPlan && !/planned for/.test(stepped), stepped);
+    chk('the ear gets it too, not only the eye',
+      (await spoken()).indexOf(want) > -1, await spoken());
+    chk('and it names the shopping list, which is what actually moved',
+      /[Ss]hopping list adjusted/.test(stepped), stepped);
+    /* Named the way its two siblings name it — `R138`'s rule that a recipe
+       from the book is named through `titleOf`. Taken from the planning
+       sentence rather than typed, so it cannot drift from the fixture. */
+    const meal = afterPlan.split(' planned for ')[0];
+    chk('and it names the meal, the way planning and removing it do',
+      meal.length > 3 && stepped.indexOf(meal) === 0, JSON.stringify([meal, stepped]));
+    chk('the plan really holds the new count',
+      (await servesNow()) === was + 1, JSON.stringify([was, await servesNow()]));
+
+    /* And the consequence, so "Shopping list adjusted" is a fact rather than
+       a phrase: close the sheet and the amounts really are different. */
+    /* Escape, not the close control: `close-meal` is on the scrim as well as
+       the button, so a bare click resolves to two elements and lands on the
+       scrim the sheet is covering. The sheet contract (`R80`) makes Escape
+       the honest way out. */
+    await pS.keyboard.press('Escape');
+    await pS.waitForSelector('[data-act="meal-serv+"]', { state: 'detached' });
+    const after = await listText();
+    chk('(floor) the shopping list really did change',
+      before.length > 20 && after.length > 20 && after !== before,
+      JSON.stringify([before.slice(0, 90), after.slice(0, 90)]));
+
+    /* Stepping the other way is a different count, so it is a different
+       sentence and `announceOnce` lets it through (`R141`'s rule). */
+    await pS.click('[data-act="plan-meal"] >> nth=0');
+    await pS.waitForSelector('[data-act="meal-serv-"]');
+    await pS.click('[data-act="meal-serv-"]');
+    await pS.waitForTimeout(300);
+    chk('stepping back down says the new count rather than repeating the last',
+      (await said()).indexOf('for ' + was + ' people on ') > -1, await said());
+    chk('nothing threw', sErrs.length === 0, sErrs.join(' | '));
+    await pS.evaluate(() => localStorage.clear());
+    await ctxS.close();
+  }
+
   console.log('\n== Print view (129) ==');
   await p.emulateMedia({ media: 'print' });
   const printState = await p.evaluate(() => ({

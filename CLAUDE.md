@@ -2967,11 +2967,64 @@ stops listening synchronously, so the old code would have passed it too. The
 hang's only proof is a green CI run, which is the honest thing to say about
 a race that does not happen on this machine.
 
+### The planner's stepper moved every amount and said nothing
+
+`R172`, and the third control of a trio where the other two already speak.
+Planning a meal says *"Air Fryer Chops planned for Monday 17."*; taking one
+off says *"Air Fryer Chops taken off Monday 17."* (`R166`). Stepping how
+many a planned meal is for rewrites **every quantity on the shopping list**
+— the multiplier is `e.servings / r.servings` — and said nothing at all.
+
+Measured, on a casserole planned for six and stepped to seven:
+
+| | |
+|---|---|
+| spoken | *"Bacon Ranch Chicken Casserole planned for Monday 17."* |
+| visible | *"Bacon Ranch Chicken Casserole planned for Monday 17."* |
+
+Not silence — the sentence from planning it, still standing, while the
+reader changes what the shopping list says.
+
+`R141` settled this for the recipe screen and its argument transfers whole:
+`R106` restores the caret to the button that was pressed, so a reader stays
+on *"More people"*, whose label never changes, and the new count is never
+spoken from anywhere. It is worse here than there. The recipe screen
+rescales the list the reader is looking at; this rescales one that is
+**behind the sheet**, so neither eye nor ear had anything until the sheet
+was closed and the amounts had quietly moved.
+
+Said through `setNotice` rather than a pulse flag, because that is this
+screen's own idiom and what both siblings use — it draws the sentence on the
+planner behind the sheet as well as speaking it — and armed only when the
+count actually moved, the way `S.pulseScale` is. The clause about the
+shopping list is `R141`'s second half (*"Serves 6. Amounts adjusted."*): the
+count is what the reader pressed, the amounts are what it did, and it is
+always true here because the stepper is disabled outright on a recipe with
+no count.
+
+**The name needs no check of its own, and that is the point.** `R138`'s scan
+already requires every recipe from the book to be named through `titleOf`,
+so the mutation that reads `mr.title` raw fails there, by name, quoting the
+line — a guarantee written four rounds ago catching a sentence written
+today. A slot the plan outlived keeps `titleThen` (`127`), like the card
+beside it.
+
+**Two of this round's own checks were wrong first, both by assuming rather
+than reading.** The floor that proves the shopping list really moves planted
+the **first** recipe in the picker — `chops`, which sorts first and is one of
+the four that arrived with no ingredients at all (`CONTENT.md`), so the list
+is correctly not drawn and the floor compared `""` with `""`. Its own
+`before.length > 20` guard is what caught it. And the notice was read with
+`.notice, .hint`, copied from `R166`: once the shopping list is unfolded
+there is a `.hint` ahead of it in document order, so the looser selector
+returned the list's own caption, *"As written, not summed:"*. `R166`'s copy
+is safe only because that block never opens the fold.
+
 ### Verified
 
-The suite after the video arc: **1861 functional checks** across eleven
+The suite after the video arc: **1871 functional checks** across eleven
 suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 384, sec 62,
-plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
+plan 95, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

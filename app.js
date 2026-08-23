@@ -6653,16 +6653,50 @@
     if (act === "plan-meal") { S.mealFor = key; openSheet("mealOpen", el); return; }
     if (act === "close-meal") { S.mealFor = null; closeSheet("mealOpen"); return; }
     if (act === "meal-serv-" || act === "meal-serv+") {
+      /* `R172` — the third control of this trio, and the only one that said
+         nothing. Planning a meal says "X planned for Monday 17"; taking one
+         off says "X taken off Monday 17" (`R166`). Stepping how many it is
+         for rewrites EVERY quantity on the shopping list — `mult` is
+         `e.servings / r.servings` — and announced nothing at all, so the
+         live region went on holding whichever sentence was there before.
+
+         `R141` settled this for the recipe screen and its argument transfers
+         whole: the caret stays on "More people", whose label never changes,
+         so the new count is never spoken from anywhere. It is worse here
+         than there, because what moved is behind the sheet: the recipe
+         screen rescales the list the reader is looking at, this rescales one
+         off screen.
+
+         Said through `setNotice` rather than a pulse flag, because that is
+         this screen's own idiom and what its two siblings use — it draws the
+         sentence on the planner behind the sheet as well as speaking it.
+         Armed only when the count actually moved, like `S.pulseScale`: at
+         the floor or the ceiling the button is disabled, but a stray call
+         must not announce a change that did not happen. */
+      var was = null, now = null, ent = null;
       writePlan(function (list) {
         list.forEach(function (e) {
           if (e.id !== S.mealFor) return;
+          was = e.servings;
           e.servings = act === "meal-serv-"
             ? Math.max(1, e.servings - 1)
             : Math.min(40, e.servings + 1);
+          now = e.servings;
+          ent = e;
         });
         return list;
       });
-      render();
+      if (ent && now !== was) {
+        /* Named the way the card beside it is: a recipe still in the book
+           through `titleOf` (`R138`), one the plan outlived by the name it
+           was planned under (`127`). */
+        var mr = byId(ent.recipeId);
+        setNotice((mr ? titleOf(mr) : ent.titleThen) + " for " + now +
+          (now === 1 ? " person" : " people") + " on " + prettyDate(ent.date) +
+          ". Shopping list adjusted.");
+      } else {
+        render();
+      }
       return;
     }
     if (act === "plan-remove") {
