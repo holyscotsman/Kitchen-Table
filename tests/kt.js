@@ -1203,6 +1203,99 @@ const browserContextWithReduce = (br) =>
     await ctxW.close();
     await ctxP.close();
 
+    /* `R160` — and the casing, which `R124` left undone and which every
+       fixture in this very block hid: all six of them capitalise the field
+       name, so the one reader was never asked the one question that would
+       have exposed it. `flagField` returned the word EXACTLY AS WRITTEN
+       while both callers looked it up in a table keyed Title/Servings/
+       Ingredients/Steps/Course — so a model or a hand-edited recipes.json
+       writing "servings — …" produced a flag that could never be answered,
+       while `fieldOfFlag` lowercases and put a Double-check chip beside the
+       field the whole time. `R122`'s permanent stale warning, wearing the
+       badge built to announce it. Measured on all four fields. */
+    const CASE = { id: 'case-160', title: 'Case Flags', category: 'Dinner',
+      contributor: 'Joan', servings: 4,
+      ingredients: ['1 cup flour'], steps: ['Bake it.'],
+      flagged: ['title — none was found on the page; add one.',
+                'SERVINGS — no count was found; 4 was assumed.',
+                'ingredients — none were picked up.',
+                'steps — none were picked up.'] };
+    const ctxU = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pU = await ctxU.newPage();
+    pU.on('pageerror', e => cErrs.push(e.message));
+    await pU.addInitScript((r) =>
+      localStorage.setItem('kt.recipes', JSON.stringify([r])), CASE);
+    await pU.goto(B + '/index.html#case-160');
+    await pU.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    /* The chip is the visible half, and it never cared about casing — which
+       is exactly why the flag beneath it could go on lying. */
+    chk('a flag in any casing wears its Double-check chip',
+      await pU.locator('.fieldflag').count() === 4,
+      String(await pU.locator('.fieldflag').count()));
+    await pU.click('[data-act="toggle-edit"]', { timeout: 5000 }).catch(() => {});
+    await pU.waitForSelector('#e-serves', { timeout: 5000 });
+    await pU.fill('#e-title', 'A Real Name');
+    await pU.fill('#e-serves', '6');
+    await pU.evaluate(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find(x => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await pU.waitForTimeout(700);
+    const leftU = await pU.evaluate(() =>
+      ((JSON.parse(localStorage.getItem('kt.recipes') || '[]')[0]) || {}).flagged || []);
+    chk('a lowercase field name is answered like any other',
+      !leftU.some(f => /^title/i.test(f)), JSON.stringify(leftU));
+    chk('and so is one shouted in capitals',
+      !leftU.some(f => /^SERVINGS/i.test(f)), JSON.stringify(leftU));
+    /* The floor: normalising must not answer everything. `ingredients` and
+       `steps` are answered by MOVING a line between the lists (`R123`), not
+       by this save, so both have to be standing. */
+    chk('while the two nobody dealt with are still standing',
+      leftU.length === 2 &&
+      leftU.some(f => /^ingredients/.test(f)) && leftU.some(f => /^steps/.test(f)),
+      JSON.stringify(leftU));
+    /* And the chip agrees with the flag, which is the whole point of the two
+       readers being one: a badge that outlives the thing it announces is the
+       `R122` fault with a nicer face on it. */
+    /* Back to the viewer WITHOUT reloading, and neither half of that is
+       fussiness. A same-hash `goto` is not a navigation, so it renders
+       nothing and leaves the page in Edit mode where no chip is drawn at
+       all — 0 chips, a pass for entirely the wrong reason. And a reload
+       re-runs this context's `addInitScript`, which puts the original
+       four-flag fixture back — 4 chips, a failure for entirely the wrong
+       reason. Both were measured on the way to this line; it is the same
+       harness cross-contamination the block above already warns about. */
+    await pU.click('[data-act="toggle-edit"]', { timeout: 5000 });
+    /* Proof that Edit mode really closed, and no `.catch` behind it: a wait
+       that cannot fail is a wait that is not there, and this whole check
+       reads 0 while the form is still up. */
+    await pU.waitForSelector('#e-serves', { state: 'detached', timeout: 5000 });
+    chk('and the chips came down with them',
+      await pU.locator('.fieldflag').count() === 2,
+      String(await pU.locator('.fieldflag').count()));
+    await ctxU.close();
+
+    /* And the reason the shared parse is load-bearing rather than tidy.
+       `082`'s keyword fallback is checked in a fixed order — servings,
+       ingredients, steps, title — so on its own it would put a flag that
+       NAMES one field but MENTIONS another beside the wrong one. The named
+       field has to win, which is what reading `flagField` first buys. */
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pN = await ctxN.newPage();
+    pN.on('pageerror', e => cErrs.push(e.message));
+    await pN.addInitScript((r) => localStorage.setItem('kt.recipes', JSON.stringify([r])),
+      Object.assign({}, CASE, { id: 'named-160', flagged: [
+        'title \u2014 the ingredient list was cut, so this may be wrong.'] }));
+    await pN.goto(B + '/index.html#named-160');
+    await pN.waitForSelector('.r-title', { timeout: 8000 }).catch(() => {});
+    chk('a flag that names one field and mentions another chips beside the one it names',
+      await pN.locator('h1 .fieldflag').count() === 1 &&
+      await pN.locator('.fieldflag').count() === 1,
+      'h1=' + (await pN.locator('h1 .fieldflag').count()) +
+      ' total=' + (await pN.locator('.fieldflag').count()));
+    await ctxN.close();
+
     chk('nothing threw', cErrs.length === 0, cErrs.join(' | '));
     await ctxC.close();
   }
