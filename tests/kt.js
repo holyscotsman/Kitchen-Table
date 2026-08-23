@@ -2021,6 +2021,95 @@ const browserContextWithReduce = (br) =>
     chk('nothing threw', kErrs.length === 0, kErrs.join(' | '));
   }
 
+  console.log('\n== A byline that belonged to nobody (R162) ==');
+  {
+    /* The line directly above the one `R161` fixed, and the same fault.
+       `WHO_ALIASES` exists so a file predating the rename keeps resolving,
+       and it was matched by exact key. Every contributor comparison in this
+       app is `===`: the "Whose recipe?" tiles and their counts, the Filter
+       sheet's chips, and `#menu?who=Name`.
+
+       Measured before the fix, and the last column is what makes it worth a
+       round — the recipe page uppercases the byline in CSS, so a reader
+       cannot see the difference at all:
+
+         stored       Joan tile   #menu?who=Joan   the page reads
+         "Joan"           1             1          JOAN
+         "joan"           0             0          JOAN
+         "JOAN"           0             0          JOAN
+         " Joan "         0             0          JOAN
+         "Mom"            1             1          JOAN
+         "mom"            0             0          MOM
+
+       A recipe that looks filed under Joan, is off her tile, out of her
+       filter, and reachable only through the Menu — in the one book where
+       whose recipe it is is the entire point. */
+    const kErrs2 = [];
+    /* One context per spelling: `addInitScript` accumulates and a same-hash
+       `goto` is not a navigation — see `tests/ctx.js`. */
+    const asWho = async (who) => {
+      const ctxW = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pW = await ctxW.newPage();
+      pW.on('pageerror', e => kErrs2.push(e.message));
+      await pW.addInitScript((w) => localStorage.setItem('kt.recipes', JSON.stringify([
+        { id: 'who-162', title: 'Hand Edited Loaf', category: 'Baking',
+          contributor: w, servings: 4, ingredients: ['500g flour'], steps: ['Bake it.'] }
+      ])), who);
+      await pW.goto(B + '/index.html');
+      await pW.waitForSelector('.who-tile', { timeout: 8000 });
+      const tile = await pW.evaluate(() => {
+        const a = [...document.querySelectorAll('.who-tile')]
+          .find((x) => /Joan/.test(x.innerText));
+        return a ? parseInt((a.querySelector('.who-tile__count') || {}).textContent, 10) || 0 : -1;
+      });
+      await pW.goto(B + '/index.html#menu?who=Joan');
+      await pW.waitForTimeout(500);
+      const inFilter = await pW.locator('.rcard').count();
+      await pW.goto(B + '/index.html#who-162');
+      await pW.waitForSelector('.r-title', { timeout: 8000 });
+      const stored = await pW.evaluate(() =>
+        JSON.parse(localStorage.getItem('kt.recipes'))[0].contributor);
+      await ctxW.close();
+      return { tile, inFilter, stored };
+    };
+
+    for (const spelling of ['Joan', 'joan', 'JOAN', ' Joan ', 'Mom', 'mom']) {
+      const got = await asWho(spelling);
+      chk('a byline written ' + JSON.stringify(spelling) + ' is Joan on her tile and in her filter',
+        got.tile === 1 && got.inFilter === 1, JSON.stringify(got));
+    }
+
+    /* THE FLOOR, and the reason this resolves rather than polices: the
+       contributor is a label — CLAUDE.md's "a byline, nothing more" — so a
+       name that is not one of the six must be left exactly as written. A
+       version that forced every contributor into WHO passes every check
+       above and quietly renames somebody's aunt. */
+    const pat = await asWho('Auntie Pat');
+    chk('while a name the book does not know is left exactly as written',
+      pat.tile === 0 && pat.inFilter === 0 && pat.stored === 'Auntie Pat',
+      JSON.stringify(pat));
+
+    /* And at book scale, asked of the app rather than the file: all 48 are
+       Joan's, so her tile has to read 48 and nothing may have been renamed. */
+    const ctxB2 = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pB2 = await ctxB2.newPage();
+    pB2.on('pageerror', e => kErrs2.push(e.message));
+    await pB2.goto(B + '/index.html');
+    await pB2.waitForSelector('.who-tile', { timeout: 8000 });
+    const book = await pB2.evaluate(async () => {
+      const l = await (await fetch('recipes.json')).json();
+      const tile = [...document.querySelectorAll('.who-tile')]
+        .find((x) => /Joan/.test(x.innerText));
+      return { file: l.filter((r) => r.contributor === 'Joan').length,
+               shown: parseInt((tile.querySelector('.who-tile__count') || {}).textContent, 10) || 0 };
+    });
+    chk('and the shipped book is counted exactly as the file has it',
+      book.file > 0 && book.shown === book.file, JSON.stringify(book));
+    await ctxB2.close();
+
+    chk('nothing threw', kErrs2.length === 0, kErrs2.join(' | '));
+  }
+
   console.log('\n== One badly-shaped recipe must not take the book down (R62) ==');
   {
     /* The overlay and recipes.json are both hand-editable by design — the

@@ -2475,10 +2475,55 @@ fixture never replaces the first. Together they made one course's answer
 stand for four cases: BAKING four times running, three of them passing for
 entirely the wrong reason.
 
+### A byline that belonged to nobody
+
+`R162`, on the line **directly above** the one `R161` fixed, and it is the
+same fault. `WHO_ALIASES` exists so a file predating the rename keeps
+resolving (`Mom`→`Joan`, `Me`→`Jason`), and it was matched by exact key.
+Every contributor comparison in this app is `===`: the *"Whose recipe?"*
+tiles and their counts, the Filter sheet's chips and their cross-counts,
+and `#menu?who=Name`.
+
+Measured — and the last column is what makes it worth a round:
+
+| stored | Joan's tile | in `#menu?who=Joan` | the recipe page reads |
+|---|---|---|---|
+| `Joan` | 1 | 1 | JOAN |
+| `joan` | **0** | **0** | **JOAN** |
+| `JOAN` | **0** | **0** | **JOAN** |
+| ` Joan ` | **0** | **0** | **JOAN** |
+| `Mom` | 1 | 1 | JOAN |
+| `mom` | **0** | **0** | MOM |
+
+**The recipe page uppercases the byline in CSS**, so three of those four
+broken spellings render as *JOAN*, identical to a correctly filed recipe.
+The reader cannot see the difference. What they get is a recipe that looks
+like Joan's, is off her tile, out of her filter, and reachable only through
+the Menu — in the one book where whose recipe it is is the entire point,
+and whose contributor split was corrected once already for exactly that
+reason.
+
+`canonWho` folds case and whitespace across `WHO` and `WHO_ALIASES`, the
+same shape `canonCat` took an hour earlier.
+
+**It resolves; it does not police.** A name that is not one of the six is
+left exactly as written, because the contributor is a label — CLAUDE.md's
+own *"a byline, nothing more"* — and *Auntie Pat* is a perfectly good one.
+The mutation that forces every contributor into `WHO` passes every other
+check here and quietly renames somebody's aunt; it fails by name, and
+trips `R117`'s *"a recipe with nobody named simply does not claim one"*
+on the way past.
+
+No flag, and that is the difference from `R161`. A course that is not one
+of the ten is a **substitution** — the recipe is filed somewhere its author
+did not choose — so it says so. `joan` → `Joan` changes nothing about whose
+recipe it is; it is the same person, spelled the way the book spells her,
+exactly as `baking` → `Baking` is the same course.
+
 ### Verified
 
-The suite after the video arc: **1796 functional checks** across eleven
-suites (kt 359, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1805 functional checks** across eleven
+suites (kt 368, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
