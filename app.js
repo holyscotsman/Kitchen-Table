@@ -110,6 +110,33 @@
 
   /* Earlier names, mapped so a device holding a saved overlay keeps resolving. */
   var WHO_ALIASES = { Mom: "Joan", Me: "Jason" };
+
+  /* One reader for a byline — `canonCat`'s lesson on the line directly above
+     it in `normalizeRecipe`, which is where `R161` found it. `WHO_ALIASES`
+     exists so a file predating the rename keeps resolving, and it was
+     matched by exact key, so "mom" never did.
+
+     Every contributor comparison in this app is `===`: the "Whose recipe?"
+     tiles and their counts, the Filter sheet's chips and their cross-counts,
+     and `#menu?who=Name`. So a byline written "joan" is a recipe that
+     belongs to nobody — off Joan's tile, out of her filter, reachable only
+     through the Menu — in the one book where whose recipe it is is the
+     entire point.
+
+     A name that is NOT one of the six is left exactly as written: the
+     contributor is a label (CLAUDE.md: "a byline, nothing more"), and
+     "Auntie Pat" is a perfectly good one. This resolves the six the book
+     knows; it does not police the field. */
+  var WHO_LOOKUP = {};
+  WHO.forEach(function (n) { WHO_LOOKUP[n.toLowerCase()] = n; });
+  Object.keys(WHO_ALIASES).forEach(function (k) {
+    WHO_LOOKUP[k.toLowerCase()] = WHO_ALIASES[k];
+  });
+
+  function canonWho(v) {
+    var k = String(v === undefined || v === null ? "" : v).trim().toLowerCase();
+    return WHO_LOOKUP[k] || "";
+  }
   var FIELD_ORDER = [
     "id", "title", "category", "contributor", "servings", "prepTime",
     "cookTime", "ingredients", "steps", "notes", "flagged", "source",
@@ -1141,7 +1168,10 @@
     if (!r || typeof r !== "object" || Array.isArray(r)) return null;
     var out = {};
     Object.keys(r).forEach(function (k) { out[k] = r[k]; });
-    if (WHO_ALIASES[out.contributor]) out.contributor = WHO_ALIASES[out.contributor];
+    /* `R162` — resolved, not policed: one of the six in any spelling becomes
+       that person, and anything else is left exactly as written. */
+    var who = canonWho(out.contributor);
+    if (who) out.contributor = who;
     /* `R62` — the lists, coerced at the boundary like every other stored
        shape in this app (`R21` the plan, `R40` the dismissed imports).
        Both `recipes.json` and the overlay are hand-editable by design: the
