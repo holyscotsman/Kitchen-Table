@@ -2089,12 +2089,42 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        queue below and watching nothing fail. */
     const bodyOf = (name) => {
       const at = src135.indexOf('function ' + name + '(');
-      return at < 0 ? '' : src135.slice(at, src135.indexOf('\n  }', at));
+      if (at < 0) return '';
+      const nl = src135.indexOf('\n', at);
+      const first = src135.slice(at, nl < 0 ? undefined : nl);
+      /* A one-line function ends on its own line. Without this the slice
+         below runs on to the NEXT function's closing brace and reads that
+         body as this one's — which is how `persistPlan`, a one-liner,
+         looked like it read the store when the read is really in
+         `writePlan` directly beneath it. Found by the floor below. */
+      if (/\{[\s\S]*\}/.test(first)) return first;
+      return src135.slice(at, src135.indexOf('\n  }', at));
+    };
+    /* The wrapper must read the store before it changes it — itself, or
+       through ONE named helper, which is then held to reading it.
+
+       `R174` moved `writeRecipes`'s read into `currentRecipes()`, because
+       the `recipes.json` download and `S13`'s send queue needed the same
+       read and a second copy is the drift `R124` exists to stop. This check
+       caught that within one battery, which is exactly what it is for — so
+       it follows the helper rather than being loosened. A helper that
+       stopped reading the store fails here by name, and so does a wrapper
+       that calls nothing at all. */
+    const readsStore = (name, key) => {
+      const body = bodyOf(name);
+      const re = new RegExp('load\\(K\\.' + key);
+      if (re.test(body)) return true;
+      const calls = [...new Set((body.match(/\b([a-zA-Z_$][\w$]*)\(/g) || [])
+        .map((x) => x.slice(0, -1)))];
+      return calls.some((fn) => fn !== name && re.test(bodyOf(fn)));
     };
     chk('each wrapper reads the store before it changes it',
-      /load\(K\.recipes/.test(bodyOf('writeRecipes')) &&
-      /load\(K\.plan/.test(bodyOf('writePlan')),
+      readsStore('writeRecipes', 'recipes') && readsStore('writePlan', 'plan'),
       'writeRecipes/writePlan do not re-read');
+    /* The floor: a function that only WRITES must not satisfy it, or the
+       rule above would be true of anything. */
+    chk('(floor) and a writer that only writes does not count as a read',
+      !readsStore('persistRecipes', 'recipes') && !readsStore('persistPlan', 'plan'));
 
     /* The photo map is written in two places and both go through the
        re-read; the IndexedDB branch is per-key and needs none. */
@@ -3348,6 +3378,78 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('nothing threw', sErrs.length === 0, sErrs.join(' | '));
     await pS.evaluate(() => localStorage.clear());
     await ctxS.close();
+  }
+
+  console.log('\n== R175 — the Double-check chip, and where it takes you ==');
+  {
+    /* `082` puts a "Double-check" chip beside the field a flag names, and
+       `R160` made that naming load-bearing. Two questions had never been
+       asked of the chip itself.
+
+       `R140`'s — does the name say what the control DOES. Measured on a
+       recipe carrying a servings flag and a steps flag: **two chips, both
+       named exactly "Double-check"**, so a reader who cannot see which
+       field each one sits beside is told nothing that tells them apart,
+       and neither says it moves you anywhere.
+
+       `R167`'s — does the control DO what its name says. Pressing it
+       called `scrollIntoView` and nothing else: the page moved 650px and
+       the caret stayed on the chip, now off screen. For anyone reading
+       with a keyboard or a screen reader the control did nothing they
+       could perceive, on the one affordance built to take them to what
+       needs attention. `#flag-panel` had no `tabindex`, so it could not
+       receive the caret at all — exactly the state `#main-content` was in
+       before `R167`, and its mechanism is what this reuses. */
+    const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    await ctxF.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: 'flagged-one', title: 'Flagged One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'],
+        flagged: ['Servings — no count was found; 4 was assumed.',
+                  'Steps — none were picked up.']
+      }]));
+    });
+    const pF = await ctxF.newPage();
+    const fErrs = []; pF.on('pageerror', (e) => fErrs.push(e.message));
+    await pF.goto(B + '/index.html#flagged-one');
+    await pF.waitForSelector('.fieldflag');
+
+    const names = await pF.evaluate(() => [...document.querySelectorAll('.fieldflag')]
+      .map(b => (b.getAttribute('aria-label') || b.innerText).replace(/\s+/g, ' ').trim()));
+    chk('(floor) the recipe really draws two chips, or the rest is vacuous',
+      names.length === 2, JSON.stringify(names));
+    chk('two chips on one recipe do not share one name',
+      names[0] !== names[1], JSON.stringify(names));
+    chk('and each says which field it is about',
+      /^Servings\b/.test(names[0]) && /^Steps\b/.test(names[1]), JSON.stringify(names));
+    chk('and that it takes you somewhere',
+      names.every(n => /go to/.test(n)), JSON.stringify(names));
+    chk('while the word on the chip is still the designed one',
+      (await pF.locator('.fieldflag').first().innerText()).trim() === 'Double-check',
+      await pF.locator('.fieldflag').first().innerText());
+
+    const y0 = await pF.evaluate(() => window.scrollY);
+    await pF.focus('.fieldflag >> nth=0');
+    await pF.keyboard.press('Enter');
+    await pF.waitForTimeout(900);
+    const landed = await pF.evaluate(() => {
+      const fp = document.getElementById('flag-panel');
+      return {
+        y: window.scrollY,
+        inPanel: !!(fp && document.activeElement && fp.contains(document.activeElement)),
+        onPanel: !!(fp && document.activeElement === fp),
+        tab: fp ? fp.getAttribute('tabindex') : null
+      };
+    });
+    chk('(floor) the page really did move, so the scroll half still works',
+      landed.y > y0 + 100, JSON.stringify([y0, landed.y]));
+    chk('and the caret goes with it, rather than staying on a chip off screen',
+      landed.onPanel, JSON.stringify(landed));
+    chk('the panel is a destination, not a new tab stop',
+      landed.tab === '-1', String(landed.tab));
+    chk('nothing threw', fErrs.length === 0, fErrs.join(' | '));
+    await pF.evaluate(() => localStorage.clear());
+    await ctxF.close();
   }
 
   console.log('\n== R168 — every address the app writes leads somewhere ==');

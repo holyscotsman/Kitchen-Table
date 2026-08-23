@@ -1267,12 +1267,30 @@
    * editing THE SAME recipe is still last-write-wins — a different question,
    * and an honest one; two tabs editing two different recipes must not lose
    * either. */
-  function writeRecipes(change) {
+  /* `R174` — the book as it is actually stored, this moment.
+   *
+   * `S.recipes` is the list this tab read at boot. `R134` made every WRITE
+   * re-read before applying its change, which also refreshes `S.recipes` —
+   * but only for a tab that writes. A tab that has only been read from
+   * since boot holds a snapshot that has never heard of the other tab's
+   * work, and three things that LEAVE THE PHONE were built from it: the
+   * `recipes.json` someone commits, the photo files that go beside it, and
+   * `S13`'s queue of changes waiting for the family's book.
+   *
+   * `byId` deliberately stays on `S.recipes`: it is called on every render
+   * of every screen, and re-reading storage there would put a parse and a
+   * normalise on the interaction path for no benefit the reader can see.
+   * The scoping is `R134`'s own — fix what can destroy someone's work, not
+   * everything that could theoretically be stale. */
+  function currentRecipes() {
     var stored = load(K.recipes, null);
-    var base = Array.isArray(stored)
+    return Array.isArray(stored)
       ? settleIds(stored.map(normalizeRecipe).filter(Boolean))
       : S.recipes;
-    S.recipes = change(base);
+  }
+
+  function writeRecipes(change) {
+    S.recipes = change(currentRecipes());
     return persistRecipes();
   }
 
@@ -1613,8 +1631,12 @@
        photo whose recipe is gone would be saved, committed, and pointed at
        by nothing. Removing a recipe takes its photo now, but a phone that
        removed one before that still holds the orphan. */
+    /* `R174` — against the stored book. On a stale snapshot both directions
+       are wrong: a recipe added in another tab has its photo withheld as
+       "unknown", and one removed in another tab has its photo handed over
+       as an orphan — which is the very thing this filter exists to stop. */
     var known = {};
-    S.recipes.forEach(function (r) { known[r.id] = true; });
+    currentRecipes().forEach(function (r) { known[r.id] = true; });
     var ids = Object.keys(map).filter(function (id) {
       return id !== "__new__" && known[id];
     });
@@ -2454,9 +2476,19 @@
     return "";
   }
 
+  /* `082` puts this beside the field a flag names, and `R160` made the
+     naming load-bearing. `R175` — the visible word stays "Double-check",
+     which is the designed label and a chip is one line by spec (`060`), but
+     the ACCESSIBLE name says which field and where it goes. Measured on a
+     recipe with two flags: two chips, both named exactly "Double-check", so
+     a reader who cannot see which field each sits beside is told nothing
+     that tells them apart, and neither says it moves you anywhere.
+     `R140`'s question — does the name say what the control DOES. */
   function fieldFlagChip(field, flags) {
     if (!flags[field] || !flags[field].length) return "";
-    return '<button type="button" class="fieldflag press" data-act="to-flags">' +
+    return '<button type="button" class="fieldflag press" data-act="to-flags" ' +
+           'aria-label="' + esc(cap(field)) +
+           ' — go to what is worth double-checking">' +
            I.flag(14) + "Double-check</button>";
   }
 
@@ -2710,7 +2742,12 @@
 
     /* Shown in viewer mode too — it is information, not an edit affordance. */
     if (r.flagged && r.flagged.length) {
-      h += '<section class="r-section"><div class="panel panel--flag" id="flag-panel">' +
+      /* `R175` — `tabindex="-1"` so the caret can land here, exactly as
+         `R167` gave `#main-content` one. Not `0`: this is a destination,
+         not a tab stop, and an extra stop on every flagged recipe would be
+         a cost with no reader behind it. */
+      h += '<section class="r-section">' +
+           '<div class="panel panel--flag" id="flag-panel" tabindex="-1">' +
            "<h2>Worth double-checking</h2><ul>" +
            r.flagged.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") +
            "</ul></div></section>";
@@ -3092,9 +3129,18 @@
   }
 
   /* The recipes behind the queue, read fresh. An id with nothing behind it
-     is dropped here rather than stored away — it is not a recipe any more. */
+     is dropped here rather than stored away — it is not a recipe any more.
+
+     `R174` — fresh against the STORED book, not `S.recipes`. This comment
+     said "read fresh" and meant the queue; the recipes it looked them up in
+     were this tab's boot snapshot, so a tab that had made no writes since
+     boot would send the family its own out-of-date copy of a recipe another
+     tab had just changed — `putRecipe` overwrites on purpose, so that is an
+     old version written over a newer one. */
   function unsentRecipes() {
-    return unsentIds().map(byId).filter(Boolean);
+    var by = {};
+    currentRecipes().forEach(function (r) { by[r.id] = r; });
+    return unsentIds().map(function (id) { return by[id] || null; }).filter(Boolean);
   }
 
   /* ------------------------------------------- where the family's copy is
@@ -6554,6 +6600,16 @@
             ? "auto" : "smooth",
           block: "center"
         });
+        /* `R175` — the caret goes where the words promise. Measured before
+           this: pressing the chip scrolled the page 650px and left focus on
+           the chip, now off screen, so for anyone reading with a keyboard
+           or a screen reader the control did nothing they could perceive.
+           `R167`'s third question, and its mechanism.
+
+           `preventScroll` because the smooth, centred scroll above is the
+           one this control designed; letting focus scroll as well would
+           yank the panel to the top of the window and undo it. */
+        fp.focus({ preventScroll: true });
       }
       return;
     }
@@ -7061,8 +7117,12 @@
     }
     if (act === "save") { saveDraft(r); render(); return; }
     if (act === "dl-json") {
+      /* `R174` — the stored book, not this tab's snapshot. This file is
+         the one somebody commits, so a stale copy does not merely look
+         wrong on a screen: it reverts the other tab's change for the whole
+         family, permanently, and nothing says so. */
       downloadBlob(
-        JSON.stringify(S.recipes.map(orderFields), null, 2) + "\n",
+        JSON.stringify(currentRecipes().map(orderFields), null, 2) + "\n",
         "recipes.json",
         "application/json"
       );

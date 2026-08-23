@@ -2166,6 +2166,57 @@ async function freshPage(br, opts) {
     await removed.ctx.close();
   }
 
+  console.log('\n== R174: the queue sent this tab\'s snapshot, not the book (R174) ==');
+  {
+    /* `unsentRecipes`'s own comment says "read fresh", and it does — of the
+       QUEUE. The recipes it looked those ids up in came from `byId`, which
+       walks `S.recipes`: the list this tab read at boot, refreshed only when
+       THIS tab writes (`R134`). So a tab that had made no writes since boot
+       would send the family its own out-of-date copy of a recipe another
+       tab had just changed — and `putRecipe` overwrites on purpose, so that
+       is an old version written over a newer one. `R136` named that
+       direction as the wrong one for this app to err in.
+
+       The other tab is simulated by the write it would actually have made:
+       `writeRecipes` is load → change → save, so an updated `kt.recipes`
+       with this page never reloaded IS the two-tab state. The real
+       two-page case is measured in `tests/feat.js`, on the download; here
+       the question is what the send puts on the wire. */
+    const BOOK174 = [
+      { id: 'aaa-one', title: 'Aaa One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'], tags: ['soup'] },
+      { id: 'bbb-two', title: 'Bbb Two', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['2 onions'], steps: ['Cook them.'], tags: ['soup'] }
+    ];
+    const { ctx, p, stub } = await freshPage(br, {});
+    await p.addInitScript(b => localStorage.setItem('kt.recipes', JSON.stringify(b)), BOOK174);
+    await p.addInitScript(k => localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+    await p.addInitScript(v => localStorage.setItem('kt.unsent', JSON.stringify(v)), ['aaa-one']);
+    await p.goto(B + '/index.html#menu');
+    await p.waitForSelector('[data-act="send-unsent"]');
+
+    /* The other tab's save. No reload here, on purpose. */
+    await p.evaluate(() => {
+      const list = JSON.parse(localStorage.getItem('kt.recipes'));
+      list.find(r => r.id === 'aaa-one').title = 'Aaa One FROM THE OTHER TAB';
+      localStorage.setItem('kt.recipes', JSON.stringify(list));
+    });
+    chk('(floor) this tab really is stale — the card still shows the old name',
+      (await p.textContent('#app')).indexOf('FROM THE OTHER TAB') === -1);
+
+    await p.click('[data-act="send-unsent"]');
+    await p.waitForTimeout(1500);
+    const sent = stub.puts.filter(x => /aaa-one/.test(x.path));
+    chk('(floor) the queued change really was sent', sent.length === 1, JSON.stringify(sent.length));
+    chk('and what went to the family is the stored recipe, not the snapshot',
+      sent.length === 1 && sent[0].body && sent[0].body.recipe &&
+      sent[0].body.recipe.title === 'Aaa One FROM THE OTHER TAB',
+      JSON.stringify(sent[0] && sent[0].body && sent[0].body.recipe &&
+        sent[0].body.recipe.title));
+    chk('nothing threw', p.errs.length === 0, p.errs.join(' | '));
+    await ctx.close();
+  }
+
   console.log('\n== R173: a video draft met neither of the two tag defences ==');
   {
     /* Tags enter this book three ways. Bulk tagging IMPOSES the book's

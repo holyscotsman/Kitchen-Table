@@ -659,6 +659,89 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     await ctx2.close();
   }
 
+  console.log('\n== Two tabs, and the file that leaves the phone (R174) ==');
+  {
+    /* `R134` made every WRITE re-read the book first, which also refreshes
+       `S.recipes` — but only for a tab that writes. A tab that has only
+       been READ from since boot still holds its snapshot, and two things
+       that leave the phone were built from it: the `recipes.json` somebody
+       commits, and the photo files that go beside it.
+
+       That is worse than the bug `R134` fixed, not milder. A stale screen
+       is a stale screen; a stale FILE gets committed, and reverts the other
+       tab's change for the whole family, permanently, with nothing said. */
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'] });
+    await ctxT.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    const tA = await ctxT.newPage(), tB = await ctxT.newPage();
+    const dErrs = [];
+    tA.on('pageerror', (e) => dErrs.push('A:' + e.message));
+    tB.on('pageerror', (e) => dErrs.push('B:' + e.message));
+    tA.on('dialog', (d) => d.accept());
+    tB.on('dialog', (d) => d.accept());
+
+    /* Both open on the book before either writes — which is what two tabs
+       actually is. */
+    await tA.goto(B + '/index.html#menu'); await tA.waitForSelector('.rcard');
+    await tB.goto(B + '/index.html#menu'); await tB.waitForSelector('.rcard');
+
+    await tA.goto(B + '/index.html#chops'); await tA.waitForSelector('.r-title');
+    await tA.click('[data-act="toggle-edit"]'); await tA.waitForSelector('#e-title');
+    await tA.fill('#e-title', 'Chops FROM TAB A');
+    await tA.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /^save/i.test(x.innerText.trim()));
+      if (b) b.click();
+    });
+    await tA.waitForTimeout(700);
+
+    /* Tab B has written nothing since boot. Its Download button is the one
+       that produces the file for the repository. */
+    await tB.goto(B + '/index.html#crepes'); await tB.waitForSelector('.r-title');
+    await tB.click('[data-act="toggle-edit"]'); await tB.waitForSelector('[data-act="dl-json"]');
+    const [dl174] = await Promise.all([tB.waitForEvent('download'),
+      tB.click('[data-act="dl-json"]')]);
+    let txt174 = ''; const st174 = await dl174.createReadStream();
+    for await (const c of st174) txt174 += c;
+    const file174 = JSON.parse(txt174);
+    chk('(floor) the download really is the whole book',
+      Array.isArray(file174) && file174.length === 48, String(file174.length));
+    chk('the file a second tab downloads carries the first tab’s change',
+      (file174.find((r) => r.id === 'chops') || {}).title === 'Chops FROM TAB A',
+      String((file174.find((r) => r.id === 'chops') || {}).title));
+
+    /* And the photos beside it. Tab B attaches one, tab A removes the
+       recipe — which takes the photo with it (`R71`) — and tab B's Download
+       photos must not hand the family a file nothing references, which is
+       the whole reason that filter exists. */
+    await tB.goto(B + '/index.html#scones'); await tB.waitForSelector('.r-title');
+    await tB.click('[data-act="toggle-edit"]'); await tB.waitForSelector('[data-act="dl-json"]');
+    await tB.setInputFiles('#e-photo', {
+      name: 'scone.jpg', mimeType: 'image/jpeg',
+      buffer: Buffer.from(
+        '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a' +
+        'HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAA' +
+        'AQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIh' +
+        'MUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpT' +
+        'VFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5' +
+        'usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iii' +
+        'gD//2Q==', 'base64')
+    });
+    await tB.waitForTimeout(900);
+
+    await tA.goto(B + '/index.html#menu'); await tA.waitForSelector('.rcard');
+    await tA.click('[data-act="toggle-remove"]');
+    await tA.waitForSelector('[data-act="remove"][data-id="scones"]');
+    await tA.click('[data-act="remove"][data-id="scones"]');
+    await tA.waitForTimeout(700);
+
+    let got174 = null;
+    await tB.click('[data-act="dl-photos"]');
+    try { got174 = await tB.waitForEvent('download', { timeout: 2500 }); } catch (e) {}
+    chk('and a photo whose recipe another tab removed is not handed over',
+      got174 === null, got174 && got174.suggestedFilename());
+    chk('nothing threw in either tab', dErrs.length === 0, dErrs.join(' | '));
+    await ctxT.close();
+  }
+
   console.log('\n== Two tabs, the other two stores (R135) ==');
   {
     /* `R134` fixed `kt.recipes`: every write re-reads the book and applies
