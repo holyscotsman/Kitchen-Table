@@ -1390,6 +1390,80 @@ const { runJob, computeFps } = lib('pipeline');
       'more must not steer anything else');
   }
 
+  console.log('\n== The setup note tells the truth about KT_DB (R151) ==');
+  {
+    /* `KT_DB` lives in two unrelated places — Render's Environment tab, so
+       the import server can read the database, and a GitHub Actions secret,
+       so the nightly `db-sync` can turn it back into `recipes.json`. Setting
+       the first implies nothing about the second, and doing only half is
+       worse than doing neither: with `KT_WRITE_KEY` set and the Actions
+       secret missing, every edit a phone shares lands in the database and
+       stops there — saved, reported saved, invisible to the family.
+       `db-sync.yml`'s own warning exists because that went unnoticed for a
+       fortnight.
+
+       Measured on 2026-08-23: the secret is not set. Twenty-two scheduled
+       runs, every one reporting success, every one a no-op — which is the
+       designed behaviour of the warning, not a bug in it.
+
+       The note is now in `backend/README.md`. This holds it to naming things
+       that really exist: a reader following "how to tell in ten seconds"
+       must be told field names the server actually reports and summary text
+       the workflow actually writes, or the instructions send them looking
+       for something that isn't there. `R126`'s rule — the labels a page
+       names are checked against what the app draws. */
+    const fsR = require('fs'), pathR = require('path');
+    const root = pathR.join(__dirname, '..');
+    const rd = (f) => fsR.readFileSync(pathR.join(root, f), 'utf8');
+    const readme = rd('backend/README.md');
+    const sync = rd('.github/workflows/db-sync.yml');
+    const server = rd('backend/server.js');
+
+    /* Scoped to the section that does the telling, not to the file. The
+       first version asked whether the phrase appeared ANYWHERE, and the
+       rotation note further down has always mentioned the Actions secret in
+       passing — so deleting it from the new section left the check green.
+       `R145` wrote this lesson down exactly once before, about requiring a
+       document to name `tests/screens.js` somewhere; met again here, and
+       recorded rather than quietly fixed. */
+    const note = (readme.split(/\n(?=## )/)
+      .find((sec) => /^## `KT_DB` has two homes/.test(sec)) || '');
+    chk('the note exists and is a section of its own',
+      note.length > 400, note.length + ' chars');
+    chk('the note names both homes of KT_DB',
+      /Render's `KT_DB`/.test(note) && /Actions secret `KT_DB`/.test(note),
+      'render=' + /Render's `KT_DB`/.test(note) +
+      ' actions=' + /Actions secret `KT_DB`/.test(note));
+    chk('and says which one has to come first',
+      /before — or at the same time as — `KT_WRITE_KEY`/.test(note),
+      'the ordering constraint must be stated in the section itself');
+
+    /* The two ways to check, bound to what really emits them. */
+    ['accepts_changes', 'publishes_on_change', 'missing'].forEach((f) => {
+      chk('health field `' + f + '` is named in the note and reported by the server',
+        readme.indexOf(f) > -1 && server.indexOf(f) > -1,
+        'readme=' + (readme.indexOf(f) > -1) + ' server=' + (server.indexOf(f) > -1));
+    });
+    /* Whitespace collapsed before matching, because prose wraps and this
+       phrase happens to break across a line in the README. `R149` had just
+       finished writing that lesson down — a line-sensitive matcher misses a
+       claim that is plainly there — and this check walked straight into it
+       anyway, which is why it is recorded rather than quietly fixed. */
+    const flat = (t) => t.replace(/\s+/g, ' ');
+    const warned = 'Skipped: \\`KT_DB\\` secret is not set';
+    chk('and the summary line the note tells a reader to look for is the one the workflow writes',
+      flat(sync).indexOf(flat(warned)) > -1 &&
+      flat(readme).indexOf('Skipped: `KT_DB` secret is not set') > -1,
+      'workflow=' + (flat(sync).indexOf(flat(warned)) > -1) +
+      ' readme=' + (flat(readme).indexOf('Skipped: `KT_DB` secret is not set') > -1));
+    /* A floor: a note that stopped explaining the hazard would pass the
+       string rules above while telling a reader nothing. */
+    chk('and it still explains why half the setup is the dangerous state',
+      /lands in the database and stops there/.test(readme) &&
+      /default branch/.test(readme),
+      readme.length + ' chars');
+  }
+
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('SUITE CRASH:', e); process.exit(1); });

@@ -1957,11 +1957,66 @@ from. Proven to bite by pointing `KT_LIVE` at a local copy with `decodeSafe`
 reverted — both checks fail there, with the 157-character screen in the
 message. Live 14 → 16, and off CI, so it costs the gate nothing.
 
+### Half of this setup is worse than none of it, and nothing said so
+
+`R151`. `R150` ended by asking the deployed book a question; this one asks
+the deployment itself, and the answer was worth writing down.
+
+Measured on 2026-08-23, from primary sources rather than inferred:
+`/api/health` reports `accepts_changes: false` and
+`publishes_on_change: false` — so `KT_WRITE_KEY` and `KT_GH_TOKEN` are unset
+— and the db-sync run log contains, in as many words, `KT_DB:` followed by
+nothing and the workflow's own warning that *"the database was never read."*
+**Twenty-two scheduled runs, every one reporting success, every one a
+no-op** — which is the designed behaviour of that warning rather than a bug
+in it, and exactly why it was written.
+
+Nothing is broken today, and only because all three are off together. The
+danger is the half-configured state: with `KT_WRITE_KEY` set and the Actions
+secret missing, every edit a phone shares lands in the database and stops
+there — saved, reported saved, and invisible to the family. `db-sync.yml`'s
+warning exists because that went unnoticed for a fortnight once.
+
+So the ordering is now written where the person doing the setup will be
+standing: **the Actions secret goes in before — or with — `KT_WRITE_KEY`.**
+`KT_DB` has two unrelated homes, Render's Environment tab and a GitHub
+Actions secret, and setting the first implies nothing about the second; the
+README said both, in two different lists, and never that they are two.
+
+**And a hazard that only appears once the secret is set.** Scheduled
+workflows run on the **default branch**, which is this project's working
+branch and not `main`. So `db-sync` would commit `recipes.json` there — the
+branch that gets force-pushed to realign after every squash-merge, which
+would silently destroy a sync commit that landed in between. Recorded and
+recommended rather than done: changing a repository's default branch is
+Jason's call, and it is the same change the Render **Branch** note already
+asks for.
+
+The check binds the prose to what actually emits it, which is `R126`'s rule
+about the help page applied to a setup note: every health field the note
+tells a reader to look at must be one the server really reports, and the
+summary line it quotes must be the one the workflow really writes. Rename
+`accepts_changes` in `server.js`, or reword the workflow's skip message, and
+the instructions fail by name instead of quietly sending somebody hunting
+for something that is not there.
+
+**Three of this round's own checks needed correcting, each caught by a
+mutation, and all three are recorded rather than quietly fixed.** The first
+matched a quoted phrase literally, and the README wraps mid-phrase — the
+layout-sensitivity `R149` had finished writing up one round earlier, walked
+straight into. The second asked whether the file mentioned the Actions
+secret *anywhere*, and the rotation note further down always had, so
+deleting it from the new section left the check green: `R145`'s lesson,
+met again. The third was not a check fault at all but a document one — the
+new section's slice ran to the next `##` and swallowed the rotation
+paragraph, which is what kept feeding it the phrase. Giving that paragraph
+its own heading fixed the boundary and the document at once.
+
 ### Verified
 
-The suite after the video arc: **1717 functional checks** across eleven
+The suite after the video arc: **1725 functional checks** across eleven
 suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
-plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 304, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
