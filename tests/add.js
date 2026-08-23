@@ -769,6 +769,133 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('nothing threw there either', full.errs.length === 0, full.errs.join(' | '));
   }
 
+  console.log('\n== R159: a staged photo lives exactly as long as its draft ==');
+  {
+    /* The Add screen stages a photo under `__new__`, because a recipe's id
+       does not exist until its title does. The draft lives in
+       sessionStorage; the photo lives in IndexedDB. Different lifetimes,
+       and nothing reconciled them — so a photo outlived the draft it was
+       picked for and was handed to whatever was typed next.
+
+       Measured before the fix, in two taps: attach a photo, press the
+       button that says "Start over", choose "Type it in", type a soup —
+       and the photo was the soup's, saved under the soup's id. */
+    const SHOT = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKAAAf/Z';
+    /* Read the real store rather than the screen: a picture the app has
+       stopped drawing but still holds is still on the phone, still counting
+       against the quota the "no room" message exists for. */
+    const keys = (pg) => pg.evaluate(() => new Promise((res) => {
+      const rq = indexedDB.open('kt', 1);
+      rq.onsuccess = () => {
+        const db = rq.result;
+        if (!db.objectStoreNames.contains('images')) return res([]);
+        const all = db.transaction('images').objectStore('images').getAllKeys();
+        all.onsuccess = () => res(all.result);
+        all.onerror = () => res(['(read failed)']);
+      };
+      rq.onerror = () => res(['(open failed)']);
+    }));
+    const stage = async (pg) => {
+      await pg.goto(B + '/index.html#add');
+      await pg.waitForSelector('.pathbtn');
+      await pg.click('[data-act="add-path"][data-key="review"]');
+      await pg.waitForSelector('#a-title');
+      await pg.fill('#a-title', 'Joan Shortbread Card');
+      await pg.setInputFiles('#a-photo-file',
+        { name: 'card.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(SHOT, 'base64') });
+      await pg.waitForTimeout(900);
+    };
+
+    /* A — the two taps, in one session. */
+    const ctxS = await freshContext(br, { ...devices['iPhone 13'] });
+    const pS = await ctxS.newPage();
+    const sErrs = []; pS.on('pageerror', (e) => sErrs.push(e.message));
+    await stage(pS);
+    chk('a photo attached on the Add screen is staged',
+      (await keys(pS)).indexOf('__new__') > -1, JSON.stringify(await keys(pS)));
+    await pS.click('[data-act="add-back"]');
+    await pS.waitForSelector('.pathbtn');
+    await pS.click('[data-act="add-path"][data-key="review"]');
+    await pS.waitForSelector('#a-title');
+    chk('Start over really starts over — the draft is blank',
+      (await pS.inputValue('#a-title')) === '');
+    chk('and the photo went with it, on screen',
+      (await pS.locator('.photorow__img').count()) === 0);
+    chk('and in the store, not just on screen',
+      (await keys(pS)).indexOf('__new__') === -1, JSON.stringify(await keys(pS)));
+    /* The consequence, end to end: the next recipe typed in must not be
+       wearing the last one's picture. */
+    await pS.fill('#a-title', 'Totally Different Soup');
+    await pS.fill('#a-ing-0', '1 onion');
+    await pS.fill('#a-step-0', 'Boil it.');
+    await pS.click('[data-act="add-save"]');
+    await pS.waitForTimeout(1200);
+    chk('so the next recipe typed in is saved with no picture at all',
+      (await pS.evaluate(() => location.hash)) === '#totally-different-soup' &&
+      (await pS.locator('.r-hero').count()) === 0 &&
+      (await keys(pS)).length === 0, JSON.stringify(await keys(pS)));
+    chk('and nothing threw across any of it', sErrs.length === 0, sErrs.join(' | '));
+    await ctxS.close();
+
+    /* B — the tab was closed. sessionStorage dies with it and IndexedDB
+       does not, which is how a photo reached a session that had never
+       heard of it. iOS Safari keeps tabs for months; this is not exotic. */
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'] });
+    const pT = await ctxT.newPage();
+    await stage(pT);
+    await pT.evaluate(() => sessionStorage.clear());
+    /* A same-hash goto is not a navigation and renders nothing, so the tab
+       has to boot again — which is what closing it does. */
+    await pT.reload();
+    await pT.waitForSelector('.pathbtn');
+    await pT.click('[data-act="add-path"][data-key="review"]');
+    await pT.waitForSelector('#a-title');
+    chk('a photo does not survive into a session that never picked it',
+      (await pT.locator('.photorow__img').count()) === 0 &&
+      (await keys(pT)).indexOf('__new__') === -1, JSON.stringify(await keys(pT)));
+    await ctxT.close();
+
+    /* C — THE FLOOR, and the reason this fix is two conditions rather than
+       one line. `084` exists so a half-finished import survives an
+       accidental refresh, and `onRoute`'s own comment says a detour to
+       check a recipe lands back in it. A version that simply threw the
+       staged photo away would pass both cases above and lose a picture the
+       reader had just chosen — a worse bug than the one being fixed. */
+    const ctxR2 = await freshContext(br, { ...devices['iPhone 13'] });
+    const pR2 = await ctxR2.newPage();
+    await stage(pR2);
+    await pR2.reload();
+    await pR2.waitForSelector('#a-title');
+    chk('but a reload still lands back in the half-finished import',
+      (await pR2.inputValue('#a-title')) === 'Joan Shortbread Card');
+    chk('with the photo it had picked',
+      (await pR2.locator('.photorow__img').count()) === 1 &&
+      (await keys(pR2)).indexOf('__new__') > -1, JSON.stringify(await keys(pR2)));
+    /* And the same for a detour: navigation never discards. */
+    await pR2.goto(B + '/index.html#menu');
+    await pR2.waitForSelector('.rcard');
+    await pR2.goto(B + '/index.html#add');
+    await pR2.waitForSelector('#a-title');
+    chk('and so does a detour to look at a recipe',
+      (await pR2.inputValue('#a-title')) === 'Joan Shortbread Card' &&
+      (await pR2.locator('.photorow__img').count()) === 1);
+    await ctxR2.close();
+
+    /* D — the second floor: an ordinary save still moves it across. */
+    const ctxV = await freshContext(br, { ...devices['iPhone 13'] });
+    const pV = await ctxV.newPage();
+    await stage(pV);
+    await pV.fill('#a-ing-0', '1 cup flour');
+    await pV.fill('#a-step-0', 'Bake it.');
+    await pV.click('[data-act="add-save"]');
+    await pV.waitForTimeout(1200);
+    chk('and saving still moves the photo onto the recipe it was picked for',
+      (await pV.evaluate(() => location.hash)) === '#joan-shortbread-card' &&
+      (await pV.locator('.r-hero').count()) === 1 &&
+      (await keys(pV)).join() === 'joan-shortbread-card', JSON.stringify(await keys(pV)));
+    await ctxV.close();
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);

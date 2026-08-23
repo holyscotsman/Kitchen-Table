@@ -2304,10 +2304,60 @@ defence in depth is for, and also how a single check over the pair would
 have been a check that cannot fail. The header move and the widened scrub
 each have their own, and each mutation fails by name.
 
+### A button that said Start over left the photo behind
+
+`R159`. A photo attached on the Add screen is staged under `__new__`,
+because a recipe's id does not exist until its title does; `saveAdd` moves
+it across. **The draft lives in `sessionStorage` and the photo lives in
+IndexedDB**, and nothing ever reconciled those two lifetimes.
+
+Measured, in two taps, on the shipped app:
+
+| | |
+|---|---|
+| attach a photo of Joan's shortbread card, press **Start over**, choose *Type it in* | the draft is blank — and the photo is still in the field |
+| type a soup and save | `#totally-different-soup`, hero image present, stored under `totally-different-soup` |
+
+The card became the soup's picture. Nothing said so, and *Download photos*
+would then hand the family `totally-different-soup.jpg` with a shortbread
+card in it, to commit. The button is labelled **Start over** — that is the
+word the review screen uses for `add-back` — and it started over with
+everything except the one thing nobody would think to check.
+
+**And a second way in, with no taps at all.** `sessionStorage` dies with
+the tab; IndexedDB does not. So a phone that closed the tab mid-import
+comes back with no draft and the picture still there, and the next recipe
+typed in wears it. CLAUDE.md already leans on that fact in `R134` — *iOS
+Safari keeps tabs for months, and a home-screen install beside an open tab
+is two instances of this app* — which is why this is an ordinary state
+rather than an exotic one.
+
+`R136`'s rule, one store over: **an entry stops being true when the copy it
+describes is gone.** The staged photo's lifetime is the draft's lifetime,
+so it is discarded where the draft is — `add-back`, and a restore that
+found nothing to restore.
+
+**What makes this two conditions rather than one line is the floor.** Task
+`084` exists so a half-finished import survives an accidental refresh, and
+`onRoute`'s own comment says a detour to check a recipe lands back in it.
+A version that simply threw the staged photo away passes both cases above
+and loses a picture the reader chose a moment ago — a worse bug than the
+one being fixed. That mutation is pinned by name, along with the one that
+discards on save.
+
+**One line of the fix is not about this bug at all**, and the suite is what
+found it. `removeImage` on the localStorage path serialises and writes the
+**whole** map, so an unguarded discard spent a write on every arrival at
+the Add screen — on exactly the phones with the smallest quota, which are
+the only reason the *no room* message exists. `R130`'s quota check failed
+by name within minutes: its stub counts writes, and the extra one moved
+the refusal from save-time to attach-time. Guarded with `pagesOf`, the
+app's own way of asking whether a photo is staged.
+
 ### Verified
 
-The suite after the video arc: **1767 functional checks** across eleven
-suites (kt 342, feat 85, add 115, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1778 functional checks** across eleven
+suites (kt 342, feat 85, add 126, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
