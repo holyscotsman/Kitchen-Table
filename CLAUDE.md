@@ -1906,6 +1906,57 @@ and every local thing the style guide links to exists, with no third party,
 with the three templates exempted **by name and reason** and each held to
 still carrying `{{`, so an exemption cannot outlive what earned it.
 
+### The one fix worth asking the real deployment about
+
+`R150`, and the smallest round in a while — which is the finding as much as
+the change is.
+
+Five scouts came back empty first, and they are worth recording so nobody
+spends the afternoon on them again: `design/components.md` names 24 classes
+and every one exists; its numbers — the FS scale, `kt.fsIndex`, `.switch`
+64×36, `.iconbtn` 48, `.chip` 52, `.minitag` 13, `.rcard__thumb` 64,
+`.hero__img` 200, the 3/2/4 focus ring, the stagger's cap at the tenth card,
+and every animation duration — all match `style.css`; `improvised-values.md`
+is accurate row for row; `planFrom` clamps a plan entry's servings to 1–40 so
+the shopping list can never divide by nothing; and the summed-line `mixed`
+flag is read where it is written.
+
+Two of those five nearly became write-ups. The "Not covered by the styleguide
+at all" list names `.minitag` while the document carries a full tag-chip spec,
+which reads as self-contradiction until the sentence is read to the end — it
+is about `styleguide.html`, and it points at this document as the answer. And
+the Motion section's inventory omits two of the eight keyframes, which looks
+like drift until you find the wisps and the scrim described a paragraph
+earlier. Both were killed by reading rather than by assuming.
+
+**A third was killed by measurement, after it had already been built.** The
+reduced-motion sweep in `tests/polish.js` walks its own hand-typed list of
+seven screens while `tests/screens.js` holds 33 — the exact `R131`/`R133`
+fault, a seventh list. It was widened, it passed, and then the mutation that
+should have caught it — an animation on the sort menu, a screen the seven
+never visited — **passed too**. `tokens.css` carries a blanket
+`* { animation: none !important }` under reduced motion, so no screen can
+animate whatever the selector list says. `tests/quick.js` already records
+this in as many words: *"it was a decoy for a whole arc."* Widening the sweep
+would have bought 26 browser contexts of CI time and no detection power at
+all, so it was reverted. A check that cannot fail is not a check, and that
+holds for one that costs three minutes a run.
+
+What was left is one thing, and it is the right one. `R148` fixed the worst
+failure this app has had — an address that could not be decoded replaced the
+whole book with *"The recipes could not be loaded (URI malformed). Check the
+connection and reload"*, measured at 157 characters where 43,000 had been,
+on a perfect connection, with a reload that reproduced it forever. It needed
+no bad data: `#menu?q=50%` did it to the shipped book. That is exactly the
+kind of address a person is handed — typed, bookmarked, or mangled by a
+messaging app on the way — so it is now asked of the **deployed** book in
+`tests/live.js`, which is the suite that asks the real host real questions
+(`R112`). `about:blank` first, so it is a real boot rather than a
+same-document fragment change: the boot path is where the false sentence came
+from. Proven to bite by pointing `KT_LIVE` at a local copy with `decodeSafe`
+reverted — both checks fail there, with the 157-character screen in the
+message. Live 14 → 16, and off CI, so it costs the gate nothing.
+
 ### Verified
 
 The suite after the video arc: **1717 functional checks** across eleven
@@ -1959,7 +2010,7 @@ real one. Off-CI, `tests/live.js` drives the **deployed** book — the one the
 family opens — in a real browser and checks it renders, holds every
 recipe in the published file, opens one with its method, steps its
 servings and ticks a line off, with no missing file and a clean
-console (`R112`; 14 checks, all green against Pages). The live-OCR
+console (`R112`; 16 checks, all green against Pages). The live-OCR
 gate (`tests/ocr-live.js`) proves that
 pipeline device-local and, in its `KT_OCR_NOISE=1` variant, that garbage
 flags rather than invents; the video pipeline's own live checklist (real
