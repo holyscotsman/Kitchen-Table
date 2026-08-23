@@ -97,6 +97,52 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
     await ctx.close();
   }
 
+  console.log('\n== The disabling that stops a second fetch (R143) ==');
+  {
+    /* The other half of `R143`. `S.addBusy` is read in only two places and
+       neither is a guard; what actually stops a second tap is the SUBMIT
+       BUTTON disabling itself in the render — here and on the video form,
+       the app's two network paths out of the Add screen. Nothing checked
+       either one, and a relay chain walks up to four services per attempt,
+       every one of them a third party the reader was told about once. */
+    const ctx = await br.newContext({ ...devices['iPhone 13'] });
+    await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
+    const p = await ctx.newPage();
+    let asked = 0;
+    const isImport = (u) => /example\.com|allorigins|corsproxy|jina/.test(u);
+    await ctx.route('**/*', async (route) => {
+      const u = route.request().url();
+      if (u.startsWith(B)) return route.continue();
+      /* Count only the import's own traffic: this catch-all is registered
+         after the onrender abort, so it wins for the kitchen's job-list
+         fetch too, and counting that would measure the wrong thing. */
+      if (!isImport(u)) return route.abort('failed');
+      asked++;
+      /* Held open — but well inside `RELAY_TIMEOUT` (12s), or the chain
+         falls through to the next relay and the count stops meaning
+         "how many times did one tap start this". */
+      await new Promise(r => setTimeout(r, 5000));
+      return route.fulfill({ status: 200, contentType: 'text/html', body: PAGE });
+    });
+    await p.goto(B + '/index.html#add'); await p.waitForSelector('.pathbtn');
+    await p.click('[data-key="link"]'); await p.waitForSelector('#a-url');
+    chk('the Fetch button is live before anything is sent',
+      !(await p.locator('[data-act="add-fetch"]').isDisabled()));
+    await p.fill('#a-url', 'https://example.com/scones');
+    await p.click('[data-act="add-fetch"]');
+    await p.waitForTimeout(600);
+    chk('the button is still there while the page is being fetched',
+      await p.locator('[data-act="add-fetch"]').count() === 1);
+    chk('but disabled, which is what stops a second walk of the relays',
+      await p.locator('[data-act="add-fetch"]').isDisabled());
+    let tapped = 'landed';
+    try { await p.click('[data-act="add-fetch"]', { timeout: 2500 }); }
+    catch (e) { tapped = 'refused'; }
+    chk('so a second tap cannot land at all', tapped === 'refused', tapped);
+    chk('and one address is one attempt', asked === 1, String(asked));
+    await ctx.close();
+  }
+
   await br.close();
   console.log('\n'+'='.repeat(50)+'\nPASS: '+pass+'   FAIL: '+fail+'\n'+'='.repeat(50));
   process.exit(fail?1:0);

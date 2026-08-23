@@ -457,6 +457,9 @@
        tick that was checked ten renders ago. */
     pulseRow: "",      // "i:3" / "s:0" — the row just checked
     pulseScale: false, // servings just changed
+    /* `R142` — ids re-queued while a send was in the air, so its
+       success cannot clear a change it never carried. */
+    reshare: {},
     pulseTheme: false, // theme just toggled
     pulseSheet: false, // a sheet just opened
     paintedRoute: ""   // last route actually painted, for the enter animation
@@ -2996,9 +2999,52 @@
     return got === was ? "" : got;
   }
 
+  /* `R142` — one send at a time.
+   *
+   * Render's free tier sleeps, so a write can hang for the best part of half
+   * a minute; `S12` built the "Sending to the family's book…" line for that
+   * window. Nothing stopped a reader tapping Save again inside it, and both
+   * of these fired without asking whether one was already in the air.
+   *
+   * An EDIT that way sent twice and the first reply cleared `S.sharing`,
+   * so the screen said "Saved, and sent" while a request was still running —
+   * `S12`'s own fault, back through a door nobody was watching. A CREATE was
+   * worse: two writes both carrying `?new=1`, and the server does what `R127`
+   * tells it to and suffixes rather than overwrites, so the family's book
+   * ends up holding TWO copies because one person tapped twice — with
+   * `kt.shared` recording the second, which leaves the first orphaned in
+   * everyone's book, edited by nobody, and the reader shown `R127`'s
+   * disclosure blaming a stranger for a collision this phone made alone.
+   *
+   * The change is not dropped: it goes on `S13`'s queue, which exists for
+   * exactly "this one did not get through", and the Menu offers it. Late,
+   * never wrong — the direction this app errs in. */
+  function sendingAlready(ids) {
+    if (!S.sharing) return false;
+    queueUnsent(ids);
+    /* And remembered as re-queued, because the send now in the air is about
+       to report success for these very ids and would clear them — throwing
+       away the change it never carried. `clearUnsent` at the end of a send
+       means "what I sent has landed", which is not true of anything queued
+       after it started. */
+    ids.forEach(function (id) { S.reshare[id] = true; });
+    setNotice("Saved on this phone. The family’s book is still taking your " +
+      "last change, so " + (ids.length === 1 ? "this one is" : "these are") +
+      " waiting on the All recipes screen.");
+    return true;
+  }
+
+  /* Clear only what this send actually carried. */
+  function clearSent(ids) {
+    clearUnsent(ids.filter(function (id) { return !S.reshare[id]; }));
+    S.reshare = {};
+  }
+
   function shareEdit(recipe) {
     var key = kitchenKey();
     if (!key) return;                       // local-only, exactly as before
+    if (sendingAlready([recipe.id])) return;
+    S.reshare = {};
     /* Local truth first and visible, then the work, so the gap between
        "Saved ✓" and the answer is never blank. */
     S.sharing = { at: 1, of: 1 };
@@ -3007,7 +3053,7 @@
       { method: "PUT", body: { recipe: sharePayload(recipe) }, key: key, timeout: 30000 }, true)
       .then(function (data) {
         S.sharing = null;
-        clearUnsent([recipe.id]);
+        clearSent([recipe.id]);
         var moved = noteReply(recipe, data);
         if (moved) {
           /* Not a failure and not a warning — the recipe is in, beside the
@@ -3067,6 +3113,11 @@
   function shareEdits(list, localMsg) {
     var key = kitchenKey();
     if (!key || !list.length) { setNotice(localMsg); return; }
+    /* `R142` — the same rule the single write keeps. A bulk change started
+       on top of one already running would interleave its writes with the
+       other's and clear `S.sharing` when the FIRST of the two finished. */
+    if (sendingAlready(list.map(function (r) { return r.id; }))) return;
+    S.reshare = {};
     /* Local truth on screen before a byte goes anywhere: on a cold Render
        this sentence stands alone for up to half a minute, and it is the
        half that is already true. */
@@ -3075,7 +3126,7 @@
 
     function done() {
       S.sharing = null;
-      clearUnsent(list.map(function (r) { return r.id; }));
+      clearSent(list.map(function (r) { return r.id; }));
       var one = list.length === 1;
       setNotice(localMsg + " Sent to the family’s book — " +
         (publishing

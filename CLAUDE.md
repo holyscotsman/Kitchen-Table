@@ -1467,11 +1467,86 @@ the arrival sentence to still be there. That is the second time this session
 a mutation has found my own check hollow, and both are recorded rather than
 quietly fixed.
 
+### Two taps on Save were two writes, and one of them made a duplicate
+
+`R142`. Render's free tier sleeps, so a write can hang for the best part of
+half a minute — `S12` built the *"Sending to the family's book…"* line for
+exactly that window. Nothing stopped a reader tapping Save again inside it,
+and `shareEdit` set `S.sharing` and fired without ever asking whether one was
+already in the air.
+
+Measured, with the write held open for three seconds.
+
+**An edit** sent twice. The first reply cleared `S.sharing`, so the screen
+changed to *"Saved, and sent to the family's book"* **while the second
+request was still running** — `S12`'s own fault, back through a door nobody
+was watching.
+
+**A create was worse.** Two writes, both carrying `?new=1`. The server does
+what `R127` tells it to and suffixes rather than overwrites, so the family's
+book ends up holding **two copies of one recipe because one person tapped
+twice** — and `kt.shared` records the second, which leaves the first orphaned
+in everyone's book, edited by nobody. The reader is even shown `R127`'s
+disclosure — *"someone had already added a recipe with this name"* — blaming
+a stranger for a collision this phone made with itself.
+
+One send at a time now, in `shareEdit` and `shareEdits` both, because a bulk
+change started on top of a running one interleaves its writes and clears
+`S.sharing` when the **first** of the two finishes. Saving a recipe and then
+going off to tag things while the write is still in the air is an ordinary
+thing to do on a phone, and it is checked.
+
+The refused change is not dropped: it goes on `S13`'s queue, which exists for
+exactly *"this one did not get through"*, and the Menu offers it. Late, never
+wrong.
+
+**And the part that needed a second look.** `clearUnsent` at the end of a send
+means *what I sent has landed* — which is not true of anything queued **after**
+it started. Without that distinction the in-flight send's success cleared the
+very id the second tap had just queued, and the change was dropped after all,
+silently. `S.reshare` records what was re-queued mid-flight and `clearSent`
+skips it. The first version of this fix did not have it, and the queue check
+failed by name.
+
+### The one attribute standing between a double tap and a second paid job
+
+`R143`, and the round that did not find the bug it went looking for.
+
+`R142` found an indicator that was never a guard on the write path, so the
+obvious next question was whether `S.addBusy` — the Add screen's busy flag —
+had the same fault on the path that spends money. It is read in exactly two
+places, one that renders a notice line and one that announces it, and
+**nothing consults it before starting work**. The busy line is a `<p>` added
+above the form rather than a card replacing it, so the form is still there.
+
+All of that is true, and the conclusion drawn from it was wrong. The submit
+button reads `S.addBusy` **in the render and disables itself**, which stops
+the second tap just as well and is the visible way to do it. Measured: with
+the request held open, the button is present and `disabled`, and a click on
+it times out rather than posting.
+
+**What was actually missing is the check.** A video job is yt-dlp, then Groq
+Whisper, then a `claude-opus-5` call — `backend/lib/budget.js` exists because
+those cost money, and a duplicate also spends one of the family's forty
+imports a day and leaves two drafts for one video. The link importer walks up
+to four relays, every one a third party the reader was told about once. The
+only thing standing between a double tap and either of those was one
+attribute in one template line, and no suite had ever looked at it.
+
+Both are pinned now, in the two files where each path's network is already
+stubbed, and both mutations bite: delete either `disabled` and the second tap
+lands — **two POSTs for one video**, or a second walk of the relay chain.
+
+Both halves of each check matter and are asserted separately: the button stays
+**present**, so a reader still sees where they are, and is **disabled**, so
+the tap costs nothing. A version that removed the button entirely would pass
+"no second job" and fail the reader.
+
 ### Verified
 
-The suite after the video arc: **1642 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 16, quick 76, polish 336, sec 56,
-plan 79, video 252, backend 296, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1661 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 336, sec 56,
+plan 79, video 266, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
