@@ -2415,7 +2415,7 @@ the form to detach, with nothing swallowing it.
 
 ### Verified
 
-The suite after the video arc: **1784 functional checks** across eleven
+The suite after the video arc: **1785 functional checks** across eleven
 suites (kt 348, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
