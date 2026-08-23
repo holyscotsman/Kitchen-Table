@@ -709,6 +709,56 @@ const { runJob, computeFps } = lib('pipeline');
     chk('and a title the video did give is not flagged',
       !d.flagged.some(f => /^Title — /.test(f)),
       JSON.stringify(d.flagged));
+
+    /* `R153` — `R152`'s sibling, one field over, and this one had a false
+       sentence standing over it. CLAUDE.md states as fact that "every import
+       path that cannot read a count defaults to 4 and flags it — 'Servings —
+       no count was found; 4 was assumed.'" The link path does (app.js), the
+       Add screen does (`R121` made it), and the video path did not: a count
+       the model never gave, or gave as something that is not an integer,
+       became a confident 4 with nothing beside it.
+
+       Measured before the fix: absent → 4 unflagged, "four" → 4 unflagged.
+       The sentence is the app's own, character for character, because
+       `R121`'s rule is that one situation has one wording — and because
+       `R122`/`R123` answer a flag by the field it names. */
+    for (const [label, servings] of [['absent', undefined], ['not a number', 'four']]) {
+      const noServe = extract.draftFromResult(
+        Object.assign({}, parsed, { servings }), 'u', 'youtube');
+      chk('a count the video never gave defaults to 4 and says so (' + label + ')',
+        noServe.servings === 4 &&
+        noServe.flagged.some(f => f === 'Servings — no count was found; 4 was assumed.'),
+        noServe.servings + ' :: ' + JSON.stringify(noServe.flagged.slice(0, 3)));
+    }
+    chk('and a count the video did give is not flagged',
+      !d.flagged.some(f => /^Servings — /.test(f)), JSON.stringify(d.flagged));
+    /* An integer outside 1–40 is CLAMPED and stays silent, which is not an
+       oversight: the link and photo paths clamp a parsed count the same
+       silent way, and `R119`'s rule that a clamp is *said* applies to a
+       number a reader typed a moment ago, not to a guess nobody made. */
+    const wild = extract.draftFromResult(
+      Object.assign({}, parsed, { servings: 500 }), 'u', 'youtube');
+    chk('an out-of-range count is clamped silently, as the other paths clamp',
+      wild.servings === 40 && !wild.flagged.some(f => /^Servings — /.test(f)),
+      wild.servings + ' :: ' + JSON.stringify(wild.flagged.slice(0, 2)));
+
+    /* And the two writers are held to each other rather than each to a copy
+       of the sentence — `R115`'s rule for `validateRecipe` and
+       `db/migrate.js`, which guard the same field for the same reason and
+       must not disagree about it. There are now three places that assume a
+       count: the link importer, the Add screen, and this server. A flag the
+       app words differently from the server is two situations wearing one
+       name, which is the thing `R121` set out to stop. */
+    const appSrcS = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const exSrcS = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'backend', 'lib', 'extract.js'), 'utf8');
+    const SENTENCE = 'Servings — no count was found; 4 was assumed.';
+    chk('the app and the server use one sentence for one situation',
+      (appSrcS.split(SENTENCE).length - 1) >= 2 &&
+      exSrcS.indexOf(SENTENCE) > -1,
+      'app=' + (appSrcS.split(SENTENCE).length - 1) +
+      ' server=' + (exSrcS.indexOf(SENTENCE) > -1));
   }
 
   /* ---- the whole pipeline, tools faked, network stubbed ---- */

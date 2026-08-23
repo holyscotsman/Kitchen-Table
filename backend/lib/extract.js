@@ -135,6 +135,23 @@ function draftFromResult(parsed, url, platform) {
   if (!d.title) {
     d.flagged.push("Title — none was found in the video; add one.");
   }
+  /* `R153` — the same fault as the title, one field over, and this one had a
+   * false sentence standing over it: CLAUDE.md states that "every import
+   * path that cannot read a count defaults to 4 and flags it". The link path
+   * does, the Add screen does (`R121` made it), and this one did not — a
+   * count the model never gave became a confident 4 with nothing beside it.
+   *
+   * The sentence is the app's own, character for character: `R121`'s rule is
+   * that one situation has one wording, and `R122`/`R123` answer a flag by
+   * the field it names, so the wording is machinery rather than prose.
+   *
+   * An integer outside 1–40 is clamped and stays silent on purpose. The link
+   * and photo paths clamp a parsed count the same silent way, and `R119`'s
+   * rule that a clamp must be SAID is about a number a reader typed a moment
+   * ago — not about a guess nobody made. */
+  if (!Number.isInteger(parsed.servings)) {
+    d.flagged.push("Servings — no count was found; 4 was assumed.");
+  }
   if (!CATS.includes(parsed.category)) {
     d.flagged.push("Course — the extraction didn’t pick a valid course; set to Dinner.");
   }

@@ -2047,11 +2047,46 @@ worded *"The video never gave a title"* would name nothing, could never be
 cleared, and would follow the recipe for good — `R122`'s permanent stale
 warning, arriving through the one door that had no flag at all.
 
+### The same fault one field over, with a false sentence standing over it
+
+`R153`, and it should have been found in the same breath as `R152`. That
+round fixed a title the video importer guessed without saying so; the field
+directly beneath it did the same thing, and this one had the contract
+claiming otherwise.
+
+CLAUDE.md's own `R121` section says, as a statement of fact, that *"every
+import path that cannot read a count defaults to 4 and flags it — 'Servings
+— no count was found; 4 was assumed.'"* The link path does. The Add screen
+does, because `R121` made it. **The video path did not.** Measured: a count
+the model never gave came out as a confident **4 with nothing beside it**,
+and so did one it gave as something that is not a number.
+
+So the sentence in the file that says *read me before writing any code* was
+false about a third of the paths it described — the same shape as `R149`,
+arrived at from the other direction. It is true now because the code
+changed, not because the sentence was softened.
+
+**The clamp stays silent, and that is a decision rather than an omission.**
+An integer outside 1–40 is brought into range without a word, exactly as the
+link and photo paths bring a parsed count into range without a word.
+`R119`'s rule that a clamp must be *said* is about a number a reader typed a
+moment ago and can still see; it does not transfer to a guess nobody made.
+Both halves are checked, so neither can drift into the other.
+
+**The wording is machinery, not prose**, and a mutation is what proves it:
+rewording the flag to *"Servings — the video never said; 4 was assumed."*
+reads better and fails by name, because `R122` and `R123` answer a flag by
+the field it names and the reader's Double-check chip (`082`) is keyed to
+the same shape. And since three places now assume a count, the app and the
+server are held to **one sentence** rather than each to a copy of it —
+`R115`'s rule for `validateRecipe` and `db/migrate.js`, which guard the same
+field for the same reason and must not disagree about it.
+
 ### Verified
 
-The suite after the video arc: **1728 functional checks** across eleven
+The suite after the video arc: **1733 functional checks** across eleven
 suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
-plan 79, video 276, backend 307, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 312, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
