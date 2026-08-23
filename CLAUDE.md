@@ -1542,11 +1542,47 @@ Both halves of each check matter and are asserted separately: the button stays
 the tap costs nothing. A version that removed the button entirely would pass
 "no second job" and fail the reader.
 
+### A phone with no signal was told the kitchen might be waking up
+
+`R144`. Nothing in `app.js` or `sw.js` had ever consulted `navigator.onLine`.
+So a share that could not go said the same thing whatever stopped it, and one
+of the two things it said was wrong.
+
+Measured, the same edit saved twice:
+
+| | what the reader is told |
+|---|---|
+| kitchen unreachable, phone online | *"…couldn't be reached just now… **try Save again in a minute**."* |
+| phone offline, no signal at all | the identical sentence |
+
+*Try Save again in a minute* is right for a sleeping Render and useless in a
+kitchen with no bars: pressing it again in a minute fails again, and again,
+and the sentence never suggests the one thing that would help. This app
+precaches its whole shell so the book opens with no signal — the service
+worker's own comment says *"in a kitchen with one bar"* — and then the one
+place it matters, telling somebody why their change did not reach the family,
+never asked the question the browser answers for free.
+
+`R107`'s design is the shape of the fix. `kitchenFetch` carries **facts** and
+the caller words the sentence: `answered` governs retrying, `status` governs
+what a caller may say, and `offline` is a third fact in the same shape. It can
+only ever **improve** a sentence — `navigator.onLine === false` means
+definitely offline, while `true` guarantees nothing — so the request is still
+attempted and still retried exactly as before. This changes what is said,
+never what is done, and the mutation that says it for *every* failure fails by
+name.
+
+Both halves are corrected, because leaving one is the fault `S11` named. The
+single write pointed at Save, which is the wrong button with no signal, so it
+now points at the queue `S13` built — where the change is already waiting. The
+bulk write already ended with *"Send them again from the All recipes screen"*,
+so only its cause was wrong: naming the kitchen for the phone's own connection.
+
 ### Verified
 
-The suite after the video arc: **1661 functional checks** across eleven
+The suite after the video arc: **1671 functional checks** across eleven
 suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 336, sec 56,
-plan 79, video 266, backend 296, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

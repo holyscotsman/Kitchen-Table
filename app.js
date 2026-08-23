@@ -3079,8 +3079,15 @@
         setNotice(refused
           ? "Saved on this phone. The family’s book would not take it: " +
             err.message + " It stays here until that is sorted."
-          : "Saved on this phone. The family’s book couldn’t be reached just " +
-            "now, so this change is still only here — try Save again in a minute.");
+          : err && err.offline
+            /* `R144` — the phone, not the kitchen. Pressing Save again is
+               the wrong advice with no signal, so it points at the queue
+               `S13` built, which is where this change is now waiting. */
+            ? "Saved on this phone. This phone isn’t online, so nothing could " +
+              "be sent — the change is waiting on the All recipes screen for " +
+              "when you have a connection again."
+            : "Saved on this phone. The family’s book couldn’t be reached just " +
+              "now, so this change is still only here — try Save again in a minute.");
       });
   }
 
@@ -3169,8 +3176,15 @@
       setNotice(localMsg + " " + (sent
         ? sent + " of " + list.length + " reached the family’s book before it " +
           "stopped answering — the rest are still only on this phone. "
-        : "The family’s book couldn’t be reached just now, so this change " +
-          "is still only on this phone. ") + AGAIN);
+        : err && err.offline
+          /* `R144` — the same correction as the single write. This half
+             already ended with advice that works offline, so only the cause
+             was wrong; naming the kitchen for the phone's own signal is the
+             sentence this arc keeps finding. */
+          ? "This phone isn’t online, so nothing could be sent — these are " +
+            "still only on this phone. "
+          : "The family’s book couldn’t be reached just now, so this change " +
+            "is still only on this phone. ") + AGAIN);
     }
 
     function step(i) {
@@ -4681,6 +4695,18 @@
             "up, which takes about a minute. Try again shortly.");
         out.answered = !!err.answered;
         out.status = err.status || 0;
+        /* `R144` — a third fact, in the same shape as the two above and for
+           the same reason: this function carries what happened and the
+           caller decides what to say. Nothing here had ever asked the
+           browser whether the phone was online, so a failed share said "try
+           again in a minute" to somebody in a kitchen with no bars, where
+           trying again in a minute fails again and again.
+
+           Only ever used to IMPROVE a sentence. `navigator.onLine === false`
+           means definitely offline; `true` guarantees nothing, so the
+           request is still attempted and still retried exactly as before —
+           this changes what is said, never what is done. */
+        out.offline = typeof navigator !== "undefined" && navigator.onLine === false;
         throw out;
       }).finally(function () {
         if (timer) clearTimeout(timer);
