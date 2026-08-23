@@ -2520,10 +2520,54 @@ did not choose — so it says so. `joan` → `Joan` changes nothing about whose
 recipe it is; it is the same person, spelled the way the book spells her,
 exactly as `baking` → `Baking` is the same course.
 
+### Three promises the help page makes, and nothing checked
+
+`R163`, and a guarantee rather than a fix: all three hold today. `R126`
+bound the help page's **control names** to the buttons the app actually
+draws — rename a control in the prose to a button that does not exist and
+the check fails. It did not bind its **behavioural** promises to anything,
+and three of them had no check at all:
+
+| the help page says | covered before |
+|---|---|
+| *"picking more than one narrows to the recipes that have all of them"* | no |
+| *"It doesn't read the method — searching for a word you remember from the steps won't find it"* | no |
+| *"the keyboard's **go key** opens it — from either box"* | no |
+
+The last one is the sharpest. Two search boxes are named in the reader's own
+words, the whole point is *"with no need to put the keyboard away and aim at
+the card"*, and the entire mechanism is one `document.querySelector("#app
+a.rcard[href]")`. Rename that class, or let anything else render a card
+above the results, and the promise goes silent — no error, no symptom, just
+a key that stops doing anything.
+
+**Each mutation is a change somebody would plausibly make for good reasons**,
+which is `R157`'s bar. AND-ing tags to OR reads as more helpful and is not
+what the page says; a search that also read the method would look like an
+improvement until you notice the page promises it does not; and the
+`querySelector` is a line anybody refactoring the card markup would touch.
+
+**The method check needed a floor, or it could not tell a limit from a
+corpse.** *"Not found"* passes just as well when the search is broken
+entirely, so the same invented word is planted in another recipe's
+**ingredients**: exactly one match, and the card says *matches ingredient*.
+That is what makes the miss a documented limit rather than a dead search.
+
+**And one thing this could not answer, recorded rather than glossed.** The
+scout that found these also asked what `Escape` does to an
+`<input type="search">`, since a browser that clears the field without
+telling the app would leave the box empty and the list filtered. In
+Chromium the field clears **and** fires `input`, so the app re-renders and
+the two agree. WebKit is the engine that matters here — this is a book
+read on an iPhone — and it is **not installed in this environment**, so
+that question stays open rather than answered. Every suite in this project
+runs Chromium with an iPhone viewport, which is a device profile and not an
+engine.
+
 ### Verified
 
-The suite after the video arc: **1805 functional checks** across eleven
-suites (kt 368, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1812 functional checks** across eleven
+suites (kt 368, feat 92, add 127, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

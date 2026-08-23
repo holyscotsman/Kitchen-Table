@@ -305,6 +305,117 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   await p.goto(B + '/index.html#menu'); await p.waitForSelector('.rcard');
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== Three promises the help page makes and nothing checked (R163) ==');
+  {
+    /* `R126` bound the help page's CONTROL NAMES to the buttons the app
+       actually draws. It did not bind its BEHAVIOURAL promises to anything,
+       and three of them had no check at all. Each is written here in the
+       help's own words, and each mutation below is a change somebody would
+       plausibly make for good reasons. */
+    const ctxH = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pH = await ctxH.newPage();
+    const hErrs = []; pH.on('pageerror', e => hErrs.push(e.message));
+
+    /* 1. "picking more than one narrows to the recipes that have all of
+          them" — AND, not OR. The plausible break is somebody "improving"
+          the filter to OR, which reads as more helpful and is not what the
+          page says. */
+    await pH.goto(B + '/index.html#menu');
+    await pH.waitForSelector('.rcard');
+    await pH.evaluate(async () => {
+      const l = await (await fetch('recipes.json')).json();
+      l[0].tags = ['Alpha'];
+      l[1].tags = ['Alpha', 'Beta'];
+      l[2].tags = ['Beta'];
+      localStorage.setItem('kt.recipes', JSON.stringify(l));
+    });
+    await pH.goto(B + '/index.html#menu'); await pH.reload();
+    await pH.waitForSelector('.rcard');
+    await pH.click('[data-act="open-filter"]');
+    await pH.waitForSelector('[data-act="ft"][data-key="Alpha"]');
+    await pH.click('[data-act="ft"][data-key="Alpha"]');
+    await pH.waitForTimeout(250);
+    /* The floor: one tag has to match two recipes, or "both" below could be
+       1 because the filter is simply broken. */
+    await pH.click('.donebtn'); await pH.waitForTimeout(300);
+    const oneTag = await pH.locator('.rcard').count();
+    chk('one tag matches every recipe wearing it', oneTag === 2, String(oneTag));
+    await pH.click('[data-act="open-filter"]');
+    await pH.waitForSelector('[data-act="ft"][data-key="Beta"]');
+    await pH.click('[data-act="ft"][data-key="Beta"]');
+    await pH.waitForTimeout(250);
+    await pH.click('.donebtn'); await pH.waitForTimeout(300);
+    const bothTags = await pH.locator('.rcard').count();
+    chk('picking two narrows to the recipes that have all of them',
+      bothTags === 1, String(bothTags));
+    await pH.click('[data-act="clear-filters"]'); await pH.waitForTimeout(300);
+
+    /* 2. "It doesn't read the method — searching for a word you remember
+          from the steps won't find it." Stated as a deliberate limit, so it
+          has to stay one. */
+    await pH.evaluate(async () => {
+      const l = await (await fetch('recipes.json')).json();
+      l[0].steps = ['Zarfnozzle the mixture until smooth.'].concat(l[0].steps || []);
+      l[1].ingredients = ['1 tsp zarfnozzle'].concat(l[1].ingredients || []);
+      localStorage.setItem('kt.recipes', JSON.stringify(l));
+    });
+    await pH.goto(B + '/index.html#menu'); await pH.reload();
+    await pH.waitForSelector('.rcard');
+    await pH.click('[data-act="toggle-search"]');
+    await pH.waitForSelector('#menu-search');
+    await pH.fill('#menu-search', 'zarfnozzle');
+    await pH.waitForTimeout(400);
+    const found = await pH.locator('.rcard').count();
+    /* The floor is the same word in an INGREDIENT: exactly one match means
+       the search is alive and is reading everything it promises to read,
+       so the miss above is the documented limit and not a dead search. */
+    chk('a word that appears only in the method is not found, but the same word in an ingredient is',
+      found === 1, String(found));
+    chk('and the one it found is the one with it in the ingredients',
+      (await pH.locator('.matchnote').first().textContent()).includes('ingredient'),
+      await pH.locator('.matchnote').first().textContent());
+    await pH.evaluate(() => localStorage.removeItem('kt.recipes'));
+    await ctxH.close();
+
+    /* 3. "the keyboard's go key opens it — from either box — with no need to
+          put the keyboard away and aim at the card." Two boxes, so two
+          checks: the handler names both ids, and one `querySelector` stands
+          between the promise and silence. */
+    for (const [where, open] of [
+      ['the front page', async (pg) => {
+        await pg.goto(B + '/index.html');
+        await pg.waitForSelector('#main-search');
+        return '#main-search';
+      }],
+      ['All recipes', async (pg) => {
+        await pg.goto(B + '/index.html#menu');
+        await pg.waitForSelector('.rcard');
+        await pg.click('[data-act="toggle-search"]');
+        await pg.waitForSelector('#menu-search');
+        return '#menu-search';
+      }]
+    ]) {
+      const ctxG = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pG = await ctxG.newPage();
+      pG.on('pageerror', e => hErrs.push(e.message));
+      const box = await open(pG);
+      await pG.fill(box, 'chicken');
+      await pG.waitForTimeout(400);
+      const first = await pG.evaluate(() => {
+        const a = document.querySelector('#app a.rcard[href]');
+        return a ? a.getAttribute('href') : '';
+      });
+      await pG.press(box, 'Enter');
+      await pG.waitForTimeout(700);
+      const landed = await pG.evaluate(() => location.hash);
+      chk('the go key opens the first result from ' + where,
+        !!first && landed === first, first + ' -> ' + landed);
+      await ctxG.close();
+    }
+
+    chk('nothing threw', hErrs.length === 0, hErrs.join(' | '));
+  }
+
   console.log('\n== A removed recipe left its photo behind (R71) ==');
   {
     /* Photos live outside the recipe records on purpose, so removing a
