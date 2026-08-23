@@ -142,7 +142,13 @@
     <meta name="apple-mobile-web-app-title" content="Kitchen Table" />
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to content</a>
+    <!-- `R167` — data-act, because this is a hash-routed app and a bare
+         href="#main-content" is an ADDRESS, not an anchor: the router read
+         it as a recipe id and the first control on every screen landed the
+         reader on "That recipe isn’t here." The href stays, because that is
+         what a skip link is and what assistive tech expects; app.js
+         intercepts it and moves the caret instead. -->
+    <a class="skip-link" href="#main-content" data-act="skip">Skip to content</a>
 
     <div id="app">
       <p class="boot">Loading recipes…</p>
