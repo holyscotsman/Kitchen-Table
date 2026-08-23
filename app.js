@@ -2476,9 +2476,19 @@
     return "";
   }
 
+  /* `082` puts this beside the field a flag names, and `R160` made the
+     naming load-bearing. `R175` — the visible word stays "Double-check",
+     which is the designed label and a chip is one line by spec (`060`), but
+     the ACCESSIBLE name says which field and where it goes. Measured on a
+     recipe with two flags: two chips, both named exactly "Double-check", so
+     a reader who cannot see which field each sits beside is told nothing
+     that tells them apart, and neither says it moves you anywhere.
+     `R140`'s question — does the name say what the control DOES. */
   function fieldFlagChip(field, flags) {
     if (!flags[field] || !flags[field].length) return "";
-    return '<button type="button" class="fieldflag press" data-act="to-flags">' +
+    return '<button type="button" class="fieldflag press" data-act="to-flags" ' +
+           'aria-label="' + esc(cap(field)) +
+           ' — go to what is worth double-checking">' +
            I.flag(14) + "Double-check</button>";
   }
 
@@ -2732,7 +2742,12 @@
 
     /* Shown in viewer mode too — it is information, not an edit affordance. */
     if (r.flagged && r.flagged.length) {
-      h += '<section class="r-section"><div class="panel panel--flag" id="flag-panel">' +
+      /* `R175` — `tabindex="-1"` so the caret can land here, exactly as
+         `R167` gave `#main-content` one. Not `0`: this is a destination,
+         not a tab stop, and an extra stop on every flagged recipe would be
+         a cost with no reader behind it. */
+      h += '<section class="r-section">' +
+           '<div class="panel panel--flag" id="flag-panel" tabindex="-1">' +
            "<h2>Worth double-checking</h2><ul>" +
            r.flagged.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") +
            "</ul></div></section>";
@@ -6585,6 +6600,16 @@
             ? "auto" : "smooth",
           block: "center"
         });
+        /* `R175` — the caret goes where the words promise. Measured before
+           this: pressing the chip scrolled the page 650px and left focus on
+           the chip, now off screen, so for anyone reading with a keyboard
+           or a screen reader the control did nothing they could perceive.
+           `R167`'s third question, and its mechanism.
+
+           `preventScroll` because the smooth, centred scroll above is the
+           one this control designed; letting focus scroll as well would
+           yank the panel to the top of the window and undo it. */
+        fp.focus({ preventScroll: true });
       }
       return;
     }

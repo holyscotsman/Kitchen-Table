@@ -3122,10 +3122,43 @@ measured in `tests/feat.js`, on the download and the photos; the video
 suite's is about what the send puts on the wire, and it carries a floor that
 the tab really is stale before it asserts what was sent.
 
+### The chip that said Double-check, twice, and took nobody anywhere
+
+`R175`. `082` puts a **Double-check** chip beside the field a flag names,
+and `R160` made that naming load-bearing. Two questions had never been asked
+of the chip itself, and both had the same answer.
+
+**`R140`'s — does the name say what the control DOES.** Measured on a recipe
+carrying a servings flag and a steps flag: **two chips, both named exactly
+"Double-check"**. A reader who cannot see which field each one sits beside
+is told nothing that tells them apart, and neither says it moves you
+anywhere.
+
+**`R167`'s — does the control DO what its name says.** Pressing it called
+`scrollIntoView` and nothing else. Measured: the page moved **650px** and
+the caret stayed on the chip, now off screen. For anyone reading with a
+keyboard or a screen reader the control did nothing they could perceive —
+on the one affordance built to take them to what needs attention.
+`#flag-panel` had **no `tabindex`**, so it could not receive the caret at
+all: exactly the state `#main-content` was in before `R167`, whose mechanism
+is what this reuses.
+
+The visible word stays *Double-check* — it is the designed label and a chip
+is one line by spec (`060`) — while the **accessible** name says which field
+and where it goes, which is `R140`'s precedent exactly: that round changed
+what a row is called, not what it reads.
+
+`preventScroll` on the focus, for `R167`'s reason: the smooth, centred
+scroll above is the one this control designed, and letting focus scroll as
+well would yank the panel to the top of the window and undo it. `tabindex`
+is `-1` and not `0`, because this is a destination rather than a tab stop
+and an extra stop on every flagged recipe would be a cost with no reader
+behind it — the mutation that makes it `0` fails by name.
+
 ### Verified
 
-The suite after the video arc: **1885 functional checks** across eleven
-suites (kt 372, feat 102, add 136, relay 21, quick 84, polish 385, sec 62,
+The suite after the video arc: **1894 functional checks** across eleven
+suites (kt 372, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
 plan 95, video 285, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

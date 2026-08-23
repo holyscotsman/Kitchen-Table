@@ -3380,6 +3380,78 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxS.close();
   }
 
+  console.log('\n== R175 — the Double-check chip, and where it takes you ==');
+  {
+    /* `082` puts a "Double-check" chip beside the field a flag names, and
+       `R160` made that naming load-bearing. Two questions had never been
+       asked of the chip itself.
+
+       `R140`'s — does the name say what the control DOES. Measured on a
+       recipe carrying a servings flag and a steps flag: **two chips, both
+       named exactly "Double-check"**, so a reader who cannot see which
+       field each one sits beside is told nothing that tells them apart,
+       and neither says it moves you anywhere.
+
+       `R167`'s — does the control DO what its name says. Pressing it
+       called `scrollIntoView` and nothing else: the page moved 650px and
+       the caret stayed on the chip, now off screen. For anyone reading
+       with a keyboard or a screen reader the control did nothing they
+       could perceive, on the one affordance built to take them to what
+       needs attention. `#flag-panel` had no `tabindex`, so it could not
+       receive the caret at all — exactly the state `#main-content` was in
+       before `R167`, and its mechanism is what this reuses. */
+    const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    await ctxF.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: 'flagged-one', title: 'Flagged One', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'],
+        flagged: ['Servings — no count was found; 4 was assumed.',
+                  'Steps — none were picked up.']
+      }]));
+    });
+    const pF = await ctxF.newPage();
+    const fErrs = []; pF.on('pageerror', (e) => fErrs.push(e.message));
+    await pF.goto(B + '/index.html#flagged-one');
+    await pF.waitForSelector('.fieldflag');
+
+    const names = await pF.evaluate(() => [...document.querySelectorAll('.fieldflag')]
+      .map(b => (b.getAttribute('aria-label') || b.innerText).replace(/\s+/g, ' ').trim()));
+    chk('(floor) the recipe really draws two chips, or the rest is vacuous',
+      names.length === 2, JSON.stringify(names));
+    chk('two chips on one recipe do not share one name',
+      names[0] !== names[1], JSON.stringify(names));
+    chk('and each says which field it is about',
+      /^Servings\b/.test(names[0]) && /^Steps\b/.test(names[1]), JSON.stringify(names));
+    chk('and that it takes you somewhere',
+      names.every(n => /go to/.test(n)), JSON.stringify(names));
+    chk('while the word on the chip is still the designed one',
+      (await pF.locator('.fieldflag').first().innerText()).trim() === 'Double-check',
+      await pF.locator('.fieldflag').first().innerText());
+
+    const y0 = await pF.evaluate(() => window.scrollY);
+    await pF.focus('.fieldflag >> nth=0');
+    await pF.keyboard.press('Enter');
+    await pF.waitForTimeout(900);
+    const landed = await pF.evaluate(() => {
+      const fp = document.getElementById('flag-panel');
+      return {
+        y: window.scrollY,
+        inPanel: !!(fp && document.activeElement && fp.contains(document.activeElement)),
+        onPanel: !!(fp && document.activeElement === fp),
+        tab: fp ? fp.getAttribute('tabindex') : null
+      };
+    });
+    chk('(floor) the page really did move, so the scroll half still works',
+      landed.y > y0 + 100, JSON.stringify([y0, landed.y]));
+    chk('and the caret goes with it, rather than staying on a chip off screen',
+      landed.onPanel, JSON.stringify(landed));
+    chk('the panel is a destination, not a new tab stop',
+      landed.tab === '-1', String(landed.tab));
+    chk('nothing threw', fErrs.length === 0, fErrs.join(' | '));
+    await pF.evaluate(() => localStorage.clear());
+    await ctxF.close();
+  }
+
   console.log('\n== R168 — every address the app writes leads somewhere ==');
   {
     /* `R167` found a link whose address led nowhere: `#main-content`, which
