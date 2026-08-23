@@ -346,6 +346,109 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('saved through the normal path', JSON.stringify(await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes'))[1].tags))==='["Italian"]');
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
+  console.log('\n== R170: the suggestion went silent at the one word that needed it ==');
+  {
+    /* `067`'s own comment names the thing it exists to prevent: existing tags
+       surface as you type "so ital becomes the Italian that already exists
+       INSTEAD OF A NEW LOWERCASE TWIN". The filter excluded any tag matching
+       the segment case-insensitively, so the reader who typed `italian` in
+       full — the twin itself — was offered nothing at all.
+
+       Nothing downstream folds a tag: `allTags` keys by the exact string,
+       `menuMatches` compares with indexOf, and a chip on a recipe links to
+       that exact spelling. So this suggestion is the whole of the defence,
+       and it stood down at the only moment it was needed.
+
+       The block above never asked. It types "ital", takes the chip, and then
+       types "Italian" into a field that already reads "Italian, " — which is
+       excluded by the already-listed rule, not by the folded comparison. So
+       the one line this round changes had no check on it in either
+       direction. */
+    /* Bounded settles rather than gates. The suggestion row is rebuilt
+       synchronously by the input handler, so there is nothing to wait for
+       once typing has returned — but a version that offers NOTHING must
+       fail on the assertion, by name, rather than abort the suite on a
+       30-second timeout. The selector is proven to exist by the cases that
+       expect a chip, so this is not `R148`'s wait for a selector that never
+       was. */
+    const settle = async (sel, state) => { try { await p.waitForSelector(sel, state ? {state, timeout:2000} : {timeout:2000}); } catch (e) {} };
+    const sug = () => p.evaluate(()=>[...document.querySelectorAll('.sugrow .sugchip')].map(b=>b.textContent));
+    /* The shipped book is tagged — 37 of the 48 carry one — so the seed
+       clears them and puts back exactly two. The first version of this block
+       did not, and measured the file instead of the fixture: `AIR FRYER`
+       offered `["air fryer","Air Fryer"]` because the book really holds the
+       lower-case one on eight recipes, and `#menu?tag=Italian` drew three
+       cards rather than one. The seventh check this session to assume rather
+       than read. */
+    await p.evaluate(async()=>{const l=await(await fetch('recipes.json')).json();
+      l.forEach(r=>{delete r.tags;});
+      l[0].tags=['Italian','Air Fryer'];localStorage.setItem('kt.recipes',JSON.stringify(l));});
+    const rid2=await p.evaluate(async()=>(await(await fetch('recipes.json')).json())[1].id);
+    await p.goto(B+'/index.html#'+rid2); await p.reload(); await p.waitForSelector('.modestrip');
+    await p.click('[data-act="toggle-edit"]'); await p.waitForSelector('#e-tags');
+
+    await p.fill('#e-tags',''); await p.type('#e-tags','italian');
+    await settle('.sugchip');
+    chk('a tag typed out in the wrong case is offered the book’s own spelling',
+        JSON.stringify(await sug())==='["Italian"]', JSON.stringify(await sug()));
+    await p.click('.sugchip');
+    chk('and tapping it replaces what was typed', (await p.inputValue('#e-tags'))==='Italian, ',
+        await p.inputValue('#e-tags'));
+
+    await p.fill('#e-tags',''); await p.type('#e-tags','AIR FRYER');
+    await settle('.sugchip');
+    chk('it folds the other way too — AIR FRYER offers Air Fryer',
+        JSON.stringify(await sug())==='["Air Fryer"]', JSON.stringify(await sug()));
+
+    /* The floor, and it has to prove the row is live before it asserts the
+       row is empty: `fill('')` empties it too, so a version that had stopped
+       suggesting anything would pass an unguarded absence check. */
+    await p.fill('#e-tags',''); await p.type('#e-tags','Itali');
+    await settle('.sugchip');
+    await p.type('#e-tags','an');
+    await settle('.sugchip','detached');
+    chk('(floor) a tag typed exactly as the book has it is not offered back',
+        (await sug()).length===0, JSON.stringify(await sug()));
+
+    /* The stakes, measured rather than argued: a twin that gets past the chip
+       is a second tag for good, and the two recipes stop being findable
+       together under the spelling the book already uses. */
+    await p.fill('#e-tags',''); await p.type('#e-tags','italian');
+    await p.click('[data-act="save"]');
+    await p.waitForSelector('[data-act="save"]:has-text("Saved")');
+    const t1=await p.evaluate(()=>JSON.parse(localStorage.getItem('kt.recipes'))[1].tags);
+    chk('(floor) nothing downstream folds it — the twin is stored as typed',
+        JSON.stringify(t1)==='["italian"]', JSON.stringify(t1));
+    await p.goto(B+'/index.html#menu?tag=Italian'); await p.waitForSelector('.mhead');
+    const n=await p.locator('.rcard').count();
+    chk('(floor) and the twin is invisible under the book’s own spelling', n===1, String(n));
+    await p.goto(B+'/index.html#menu?tag=italian'); await p.waitForSelector('.mhead');
+    const n2=await p.locator('.rcard').count();
+    chk('(floor) while its own spelling finds only itself', n2===1, String(n2));
+    await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
+    /* And the same question of the book as it actually ships, with no seed at
+       all — the tag is taken FROM the file rather than typed here, so this
+       cannot go stale when the content changes. It is reachable today: the
+       published book carries `air fryer` in lower case on eight recipes
+       beside `Italian`, `American` and `French` in title case, so a reader
+       typing `Air Fryer` was minting a twin with nothing said. */
+    const shipped=await p.evaluate(async()=>{
+      const l=await(await fetch('recipes.json')).json();
+      const seen={}; l.forEach(r=>(r.tags||[]).forEach(t=>{seen[t]=(seen[t]||0)+1;}));
+      const t=Object.keys(seen).sort((a,b)=>seen[b]-seen[a])[0];
+      return {tag:t, id:l.find(r=>(r.tags||[]).indexOf(t)>-1).id};
+    });
+    chk('(floor) the shipped book really is tagged, or the case below is vacuous',
+        !!shipped.tag, JSON.stringify(shipped));
+    await p.goto(B+'/index.html#'+shipped.id); await p.reload(); await p.waitForSelector('.modestrip');
+    await p.click('[data-act="toggle-edit"]'); await p.waitForSelector('#e-tags');
+    await p.fill('#e-tags',''); await p.type('#e-tags', shipped.tag.toUpperCase());
+    await settle('.sugchip');
+    chk('a shipped tag shouted back at the book is offered as the book spells it',
+        (await sug()).indexOf(shipped.tag)>-1, JSON.stringify(await sug())+' want '+shipped.tag);
+  }
+
   console.log('\n== The course was the one guess the app never owned up to (R73) ==');
   {
     /* Every other guess an import makes says so. Servings that weren't

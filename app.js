@@ -2914,16 +2914,26 @@
 
   /* The segment being typed is everything after the last comma. Matches are
      existing tags only, the already-listed ones excluded, canonical casing
-     preserved — prefix matches outrank substring ones. */
+     preserved — prefix matches outrank substring ones.
+
+     `R170` — the exclusion means "the reader has already typed this tag
+     exactly", and that is a comparison of what they typed. It was folded, so
+     a segment matching a tag case-insensitively was excluded as well: a book
+     holding `Italian` offered nothing at all to a reader typing `italian` in
+     full, at the one moment the canonical casing is the entire point of the
+     feature. The segment is normalised the way `parseTags` will normalise it
+     on save, so a trailing or doubled space is not a difference — save fixes
+     those itself, and there is nothing to offer. */
   function tagSuggestions(raw) {
     var parts = String(raw || "").split(",");
-    var seg = parts.pop().trim().toLowerCase();
+    var last = parts.pop().trim().replace(/\s+/g, " ");
+    var seg = last.toLowerCase();
     if (!seg) return [];
     var have = parts.map(function (p) { return p.trim().toLowerCase(); });
     return allTags()
       .filter(function (t) {
         var lt = t.toLowerCase();
-        return lt.indexOf(seg) > -1 && lt !== seg && have.indexOf(lt) === -1;
+        return lt.indexOf(seg) > -1 && t !== last && have.indexOf(lt) === -1;
       })
       .sort(function (a, b) {
         var pa = a.toLowerCase().indexOf(seg) === 0 ? 0 : 1;

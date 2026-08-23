@@ -212,7 +212,12 @@ These came from Jason directly and supersede the corresponding parts of
   "Who it's from" were dropped.
 - **Tags**, free-form and comma-separated, including where a dish is from.
   They filter (AND-ed), they are searched, and each one on a recipe links to
-  `#menu?tag=…`. Nothing ships pre-tagged.
+  `#menu?tag=…`. The handoff shipped none; the research pass of 2026-08-02
+  then tagged **37 of the 48** — cuisines mostly, plus `air fryer` on eight —
+  and they are **not consistently cased**, which is what `R170` is about.
+  This bullet went on describing the book as untagged for the three weeks
+  after that stopped being true, so the count is bound to `recipes.json` now
+  rather than typed once and left.
 - **Photos.** See below.
 - The Main subtitle is "A Simmonds Styled Menu"; the Add pill is smaller.
 - **Contributors are Joan, Jason, Jennifer, Lindsay, Siobhan and Jessica.** Every one
@@ -2822,10 +2827,112 @@ One more thing worth keeping: the obvious fix for the sampling — awaiting
 promise never settles for an infinite animation. A fixed settle is the
 blunt instrument that works.
 
+### The suggestion stood down at the one word that needed it
+
+`R170`. `067`'s own comment names the thing the feature exists to prevent:
+
+> existing tags surface as the user types, so "ital" becomes the Italian
+> that already exists **instead of a new lowercase twin**.
+
+It offered nothing at all to a reader who typed `italian` in full — the
+twin itself. The exclusion in `tagSuggestions` means *the reader has
+already typed this tag exactly*, and it compared the **folded** segment
+against the folded tag, so a spelling differing only in case counted as
+already typed.
+
+Measured, against a book holding `Italian` and `Air Fryer`:
+
+| typed | offered |
+|---|---|
+| `ital` | `Italian` |
+| `italian` | **nothing** |
+| `veg` | `Vegetarian` |
+| `AIR FRYER` | **nothing** |
+
+The help arrives all the way through the word and stops on the last
+keystroke.
+
+**And this suggestion is the whole of the defence.** Nothing downstream
+folds a tag: `allTags` keys by the exact string, `menuMatches` compares
+with `indexOf`, and a chip on a recipe links to that exact spelling.
+Measured with two recipes, one tagged `Italian` and one `italian`:
+`#menu?tag=Italian` draws **one** card and `#menu?tag=italian` draws the
+other, and the Filter sheet lists both spellings as separate chips — one
+letter apart, at a size chosen for low vision. `S11` had already written
+down what that costs: tag hygiene is *"the one part of this app built
+specifically to keep the whole book consistent"*.
+
+**And it is reachable in the book as it ships.** `recipes.json` carries
+tags on **37 of the 48** recipes, and they are not consistently cased:
+`air fryer` sits on eight of them in lower case beside `Italian`,
+`American`, `French`, `Scottish`, `British` and `Mexican` in title case. So
+a reader typing `Air Fryer` today was minting a twin of a tag the book has
+had all along, with nothing said. That case is checked against the file
+itself — the tag is taken **from** `recipes.json` at run time rather than
+typed into the suite, so it cannot go stale when the content changes, with
+a floor under it in case the file ever ships untagged.
+
+**`README.md` had already written the promise down, and named this exact
+word as the thing you have to fix afterwards.** Its tag-hygiene paragraph
+lists three mechanisms: *"as you type, the app suggests tags that already
+exist (tap the suggestion — it uses the canonical spelling)"*, then bulk
+Tag mode, then *"Rename or merge … so 'italian' can be folded into
+'Italian' after the fact."* The first mechanism was false for the one
+spelling the third one names as its example. The sentence needed no
+editing — the code changed to match it, which is the direction `R149` and
+`R153` both settled.
+
+**It is a fold in the offer, not a fold at the boundary**, and the
+difference is the decision. `R161` and `R162` folded a **closed** set —
+ten courses, six people — where the app can say what the right spelling
+is. Tags are free-form and the app deliberately keeps the casing a person
+typed; `renameTag` is the control that decides which spelling wins, and it
+has a confirm (`R165` settled its semantics one round earlier). So the app
+still stores exactly what was typed. What changed is that the book's own
+spelling is now **offered**, and the reader chooses.
+
+**The suite never asked.** The `067` block types `ital`, taps the chip,
+then types `Italian` into a field already reading `Italian, ` — excluded
+by the already-listed rule, not by the folded comparison. So the one line
+this round changes had no check on it in either direction, and the check
+named *"an exact, already-present tag is not re-offered"* was measuring a
+different rule than its name says. `R160`'s lesson: a reader is only as
+tolerant as the questions it is asked.
+
+**The floor has to prove the row is alive before it asserts the row is
+empty**, because `fill('')` empties it too — an unguarded absence check
+passes just as well on a feature that has stopped suggesting anything at
+all. It types `Itali`, waits for the chip, completes it to `Italian`, and
+waits for the chip to **detach**.
+
+**Two of this round's own checks were wrong, and both are recorded rather
+than quietly fixed.** One was **truthy rather than true**, caught before it
+ran: written as `chk(name, p.goto(…).then(…).then(c => c === 1))`, it passes
+a **Promise** — which is truthy, always — so it would have read PASS
+whatever the app did. The other **measured the file instead of the
+fixture**: the seed set two tags and assumed the rest of the book had none,
+which stopped being true when `recipes.json` was tagged, so `AIR FRYER`
+came back `["air fryer","Air Fryer"]` and `#menu?tag=Italian` drew three
+cards. It clears every tag before planting its two now. Both have the shape
+every hollow check this session has had — **they assumed rather than
+read** — and the second one turned into the strongest case in the block,
+because what it accidentally measured is a twin the shipped book can
+already produce.
+
+**And the sentence in this file that said the opposite.** CLAUDE.md's tags
+bullet read *"Nothing ships pre-tagged"* — true on the day it was written
+and false since **2026-08-02**, when the research pass tagged 37 of the 48
+and committed them. Three weeks of a present-tense claim about the shipped
+file that the shipped file contradicted, in the document whose first line
+is *"Read this file before writing any code"* — `R149`'s fault, one bullet
+over. It is corrected, and the number is now **bound to `recipes.json`**
+rather than typed once and left, with a floor so the binding is not vacuous
+if the book is ever untagged again.
+
 ### Verified
 
-The suite after the video arc: **1847 functional checks** across eleven
-suites (kt 372, feat 98, add 127, relay 21, quick 81, polish 382, sec 62,
+The suite after the video arc: **1859 functional checks** across eleven
+suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 382, sec 62,
 plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
