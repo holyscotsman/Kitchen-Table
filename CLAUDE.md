@@ -2929,10 +2929,48 @@ over. It is corrected, and the number is now **bound to `recipes.json`**
 rather than typed once and left, with a floor so the binding is not vacuous
 if the book is ever untagged again.
 
+### The suite could wait for ever where it meant to close a server
+
+`R171`, and it was found by CI rather than by reading. The `suites` job on
+`R169`'s pull request ran for **thirty minutes** and came back
+**`cancelled`** — neither pass nor fail. kt, feat, add, relay and quick all
+reported clean; `polish` printed its last check at 19:34:19 and then said
+nothing at all until the workflow timeout killed it, with its remaining
+three hundred-odd checks never run.
+
+The line it stopped on is `await new Promise(r => srv.close(r))`. Node's
+`close()` stops accepting **new** connections at once and then resolves only
+when every **open** one has ended — and the page under test is holding a
+keep-alive socket to that very server. So the close waits for a connection
+that is waiting for the close.
+
+It is a race, which is why eleven pull requests in a row went green through
+the same two lines. **It cannot be reproduced here**, and that is recorded
+rather than glossed: the local battery has passed this block every run,
+before the fix and after it. What the fix guarantees is not that the race is
+won but that it can no longer cost anything — the sockets are destroyed, so
+`close()` has nothing left to wait for, and the wait is **bounded**, so the
+next hang here fails the check under it instead of eating a whole run.
+
+Destroying the sockets is also the truer outage. The block's own comment
+says *"the server is gone, not merely emulated away"*, and a server that has
+gone away does not politely finish its keep-alives.
+
+**And a floor, because the whole block claims an outage.** If a shutdown
+ever returns without closing, every check after it passes for the wrong
+reason — the server still answering. Both outages are proven dead now by a
+fresh connection that must be refused, and the mutation that skips the close
+fails by name.
+
+The floor is deliberately **not** claimed as a check on the hang: `close()`
+stops listening synchronously, so the old code would have passed it too. The
+hang's only proof is a green CI run, which is the honest thing to say about
+a race that does not happen on this machine.
+
 ### Verified
 
-The suite after the video arc: **1859 functional checks** across eleven
-suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 382, sec 62,
+The suite after the video arc: **1861 functional checks** across eleven
+suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 384, sec 62,
 plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
