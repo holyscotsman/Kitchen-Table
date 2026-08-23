@@ -8,12 +8,13 @@
  *   KT_FCP_BUDGET=4000 node tests/perf.js
  */
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 const BUDGET = parseInt(process.env.KT_FCP_BUDGET || '4000', 10);
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
 
   /* Hermetic: third-party hosts are dropped so the number measures the bytes
      this repo ships, on every machine the same. Since 049 the fonts are

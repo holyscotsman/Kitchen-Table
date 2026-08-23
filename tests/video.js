@@ -4,6 +4,7 @@
  * touches the network, Render, or a real video.
  */
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass = 0, fail = 0;
 const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
@@ -76,7 +77,7 @@ function stubKitchen(ctx, opts) {
 }
 
 async function freshPage(br, opts) {
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
   const stub = stubKitchen(ctx, opts);
   const p = await ctx.newPage();
   p.errs = [];
@@ -490,7 +491,7 @@ async function freshPage(br, opts) {
       ['an empty body', {}]
     ];
     for (const [what, body] of SHAPES) {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       const polled = [];
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
@@ -580,7 +581,7 @@ async function freshPage(br, opts) {
         { jobs: [{ id: { n: 1 }, title: [1, 2], platform: 9, created_at: 'soon' }] }]
     ];
     for (const [what, body] of SHAPES) {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
         if (u.pathname === '/api/import/jobs') {
@@ -622,7 +623,7 @@ async function freshPage(br, opts) {
        That turns a future schema change into an empty waiting list with no
        explanation. A job the server says is ready gets shown. */
     {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
         const body = u.pathname === '/api/import/jobs' &&
@@ -838,7 +839,7 @@ async function freshPage(br, opts) {
        and this is checked from BOTH sides: a claim that is right only half
        the time is what got us here. */
     const helpWith = async (key) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       if (key) await ctx.addInitScript(k =>
         localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
@@ -909,7 +910,7 @@ async function freshPage(br, opts) {
        Read from the dialog itself rather than from the source, because what
        matters is the sentence a person is actually shown. */
     const askedWith = async (key) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       await ctx.addInitScript((k) => {
         /* The undo only appears once this phone has local changes. */
@@ -1300,7 +1301,7 @@ async function freshPage(br, opts) {
        family leaves it live for them AND loses their own copy, so they
        cannot even open it to put it right. */
     const removeAsk = async (key, recipeId) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       if (key) await ctx.addInitScript(k =>
         localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
@@ -1656,6 +1657,139 @@ async function freshPage(br, opts) {
     chk('nothing threw across any of it',
       [].concat(waiting.errs, quiet2.errs, many.errs).length === 0,
       [].concat(waiting.errs, quiet2.errs, many.errs).join(' | '));
+  }
+
+  console.log('\n== A phone with no signal is not a sleeping server (R144) ==');
+  {
+    /* Nothing in the app or the service worker has ever consulted
+       `navigator.onLine`. So a failed share says the same thing whatever
+       stopped it, and one of the two things it says is wrong.
+
+       Measured, with the same edit saved twice:
+
+         kitchen unreachable, phone online → "…couldn't be reached just now,
+                                             so this change is still only
+                                             here — try Save again in a
+                                             minute."
+         phone offline, no signal at all  → the identical sentence.
+
+       "Try Save again in a minute" is good advice for a sleeping Render and
+       useless in a kitchen with no bars: pressing it again in a minute fails
+       again, and again, and the sentence never suggests the one thing that
+       would help. This app precaches its whole shell so the book opens with
+       no signal — the service worker's own comment says "in a kitchen with
+       one bar" — and then the one place it matters, telling somebody why
+       their change did not reach the family, never asks the question the
+       browser answers for free.
+
+       `R107`'s design is the shape of the fix: `kitchenFetch` carries FACTS
+       — `answered` governs retrying, `status` governs what a caller may say
+       — and the caller words it. `offline` is a third fact in the same
+       shape. It only ever improves the sentence: `navigator.onLine === false`
+       means definitely offline, while `true` guarantees nothing, so the
+       request is still attempted and still retried exactly as before. */
+    const saveOne = async (offline) => {
+      const { ctx, p, stub } = await freshPage(br, { failPut: null });
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      await p.goto(B + '/index.html#bacon-ranch-chicken-casserole');
+      await p.waitForSelector('[data-act="toggle-edit"]');
+      /* The kitchen is unreachable either way; what differs is whether the
+         PHONE knows it is offline. */
+      await ctx.route(API + '/**', (route) => route.abort('failed'));
+      if (offline) await ctx.setOffline(true);
+      await p.click('[data-act="toggle-edit"]');
+      await p.waitForSelector('#e-notes');
+      await p.fill('#e-notes', 'A note.');
+      await p.click('[data-act="save"]');
+      await p.waitForTimeout(9000);
+      const out = await p.evaluate(() => ({
+        online: navigator.onLine,
+        notice: (document.querySelector('.notice') || {}).textContent
+          .replace(/\s+/g, ' ').trim(),
+        unsent: (function () {
+          try { return JSON.parse(localStorage.getItem('kt.unsent') || '[]'); }
+          catch (e) { return []; }
+        })()
+      }));
+      out.errs = p.errs.slice();
+      await ctx.close();
+      return out;
+    };
+
+    const asleep = await saveOne(false);
+    const noSignal = await saveOne(true);
+
+    chk('the two states really are different to the browser',
+      asleep.online === true && noSignal.online === false,
+      JSON.stringify([asleep.online, noSignal.online]));
+    chk('a sleeping kitchen still says to try again in a minute',
+      /try save again in a minute/i.test(asleep.notice), asleep.notice);
+    chk('but a phone with no signal is not told to keep pressing Save',
+      !/try save again in a minute/i.test(noSignal.notice), noSignal.notice);
+    chk('it is told the connection is the problem',
+      /online|connection|signal/i.test(noSignal.notice), noSignal.notice);
+    chk('and both keep the change waiting rather than losing it',
+      asleep.unsent.indexOf('bacon-ranch-chicken-casserole') > -1 &&
+      noSignal.unsent.indexOf('bacon-ranch-chicken-casserole') > -1,
+      JSON.stringify([asleep.unsent, noSignal.unsent]));
+    chk('and both still say the phone has it',
+      /saved on this phone/i.test(asleep.notice) && /saved on this phone/i.test(noSignal.notice),
+      JSON.stringify([asleep.notice, noSignal.notice]));
+    /* The bulk half. `S11` ended its sentences at "still only on this
+       phone" until `S13` gave them somewhere to point, so this one already
+       carried advice that works with no signal — only the CAUSE was wrong,
+       and naming the kitchen for the phone's own connection is the same
+       fault one size up. */
+    const bulkOffline = async () => {
+      const TWO = [
+        { id: 'mine-one', title: 'Mine One', category: 'Baking', contributor: 'Jason',
+          servings: 4, ingredients: ['a'], steps: ['b'] },
+        { id: 'mine-two', title: 'Mine Two', category: 'Baking', contributor: 'Jason',
+          servings: 4, ingredients: ['c'], steps: ['d'] }
+      ];
+      const { ctx, p } = await freshPage(br, {});
+      await p.addInitScript(k =>
+        localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), 'family-secret');
+      await p.addInitScript(v => localStorage.setItem('kt.recipes', v), JSON.stringify(TWO));
+      await p.goto(B + '/index.html#menu');
+      await p.waitForSelector('.rcard');
+      await ctx.route(API + '/**', (route) => route.abort('failed'));
+      await ctx.setOffline(true);
+      await p.click('[data-act="toggle-tagging"]');
+      await p.waitForSelector('[data-act="tag-pick"][data-id="mine-one"]');
+      await p.click('[data-act="tag-pick"][data-id="mine-one"]');
+      await p.click('[data-act="open-bulk"]');
+      await p.waitForSelector('#bulk-tags');
+      await p.fill('#bulk-tags', 'Scottish');
+      await p.click('[data-act="bulk-apply"]');
+      await p.waitForTimeout(9000);
+      const out = await p.evaluate(() => {
+        /* The Menu draws its notice slot as `.hint`, not `.notice` —
+           `noticeHtml` takes the class from the screen that calls it. */
+        const n = document.querySelector('.notice, .hint');
+        return {
+          notice: n ? n.textContent.replace(/\s+/g, ' ').trim() : '',
+          screen: (document.querySelector('#app') || {}).innerText
+            .replace(/\s+/g, ' ').trim().slice(0, 120)
+        };
+      });
+      out.errs = p.errs.slice();
+      await ctx.close();
+      return out;
+    };
+    const bulk = await bulkOffline();
+    chk('the bulk change really reported something',
+      bulk.notice.length > 0, JSON.stringify(bulk.screen));
+    chk('a bulk change with no signal blames the phone, not the kitchen',
+      /isn’t online|not online/i.test(bulk.notice) &&
+      !/book couldn’t be reached/i.test(bulk.notice), bulk.notice);
+    chk('and still points at the way to send them later',
+      /all recipes screen/i.test(bulk.notice), bulk.notice);
+
+    chk('nothing threw either way',
+      [].concat(asleep.errs, noSignal.errs, bulk.errs).length === 0,
+      [].concat(asleep.errs, noSignal.errs, bulk.errs).join(' | '));
   }
 
   console.log('\n== The disabling that stops a second paid job (R143) ==');

@@ -1,4 +1,5 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0,fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
@@ -6,7 +7,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKAAAf/Z';
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx=await br.newContext({...devices['iPhone 13']});
+  const ctx=await freshContext(br, {...devices['iPhone 13']});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.on('dialog',d=>d.accept());
@@ -158,7 +159,7 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
      fallback: a context with no IndexedDB uses the localStorage store, which
      is jammed to a few KB of headroom before a real-sized photo is attached
      through the actual input. The app must say so, never silently drop it. */
-  const ctxNoIdb = await br.newContext({ ...devices['iPhone 13'] });
+  const ctxNoIdb = await freshContext(br, { ...devices['iPhone 13'] });
   await ctxNoIdb.addInitScript(() => {
     Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: false });
   });
@@ -252,7 +253,7 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
        Removing now takes the photo with it, and the confirm says so when
        there is one to lose — this app does not delete anything a person was
        not told about. */
-    const ctxP = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxP = await freshContext(br, { ...devices['iPhone 13'] });
     const pP = await ctxP.newPage();
     const pErrs = []; pP.on('pageerror', e => pErrs.push(e.message));
     let asked = '';
@@ -339,7 +340,7 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
        tabs editing THE SAME recipe is still last-write-wins, which is a
        different question and an honest one; two tabs editing two different
        recipes must not lose either. */
-    const ctx2 = await br.newContext({ ...devices['iPhone 13'] });
+    const ctx2 = await freshContext(br, { ...devices['iPhone 13'] });
     await ctx2.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     const tabA = await ctx2.newPage(), tabB = await ctx2.newPage();
     const tErrs = [];
@@ -421,7 +422,7 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
        fresh) and `kt.shared` (`noteSharedId` reads `sharedIds()` fresh) have
        always read before writing. It simply had not reached the two biggest
        stores. */
-    const ctx3 = await br.newContext({ ...devices['iPhone 13'] });
+    const ctx3 = await freshContext(br, { ...devices['iPhone 13'] });
     await ctx3.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     const pa = await ctx3.newPage(), pb = await ctx3.newPage();
     const pErrs = [];
@@ -458,7 +459,7 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     await ctx3.close();
 
     /* The photo store, on the path that writes it whole. */
-    const ctx4 = await br.newContext({ ...devices['iPhone 13'] });
+    const ctx4 = await freshContext(br, { ...devices['iPhone 13'] });
     await ctx4.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     await ctx4.addInitScript(() => {
       try {

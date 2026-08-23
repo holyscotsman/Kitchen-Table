@@ -1542,11 +1542,123 @@ Both halves of each check matter and are asserted separately: the button stays
 the tap costs nothing. A version that removed the button entirely would pass
 "no second job" and fail the reader.
 
+### A phone with no signal was told the kitchen might be waking up
+
+`R144`. Nothing in `app.js` or `sw.js` had ever consulted `navigator.onLine`.
+So a share that could not go said the same thing whatever stopped it, and one
+of the two things it said was wrong.
+
+Measured, the same edit saved twice:
+
+| | what the reader is told |
+|---|---|
+| kitchen unreachable, phone online | *"…couldn't be reached just now… **try Save again in a minute**."* |
+| phone offline, no signal at all | the identical sentence |
+
+*Try Save again in a minute* is right for a sleeping Render and useless in a
+kitchen with no bars: pressing it again in a minute fails again, and again,
+and the sentence never suggests the one thing that would help. This app
+precaches its whole shell so the book opens with no signal — the service
+worker's own comment says *"in a kitchen with one bar"* — and then the one
+place it matters, telling somebody why their change did not reach the family,
+never asked the question the browser answers for free.
+
+`R107`'s design is the shape of the fix. `kitchenFetch` carries **facts** and
+the caller words the sentence: `answered` governs retrying, `status` governs
+what a caller may say, and `offline` is a third fact in the same shape. It can
+only ever **improve** a sentence — `navigator.onLine === false` means
+definitely offline, while `true` guarantees nothing — so the request is still
+attempted and still retried exactly as before. This changes what is said,
+never what is done, and the mutation that says it for *every* failure fails by
+name.
+
+Both halves are corrected, because leaving one is the fault `S11` named. The
+single write pointed at Save, which is the wrong button with no signal, so it
+now points at the queue `S13` built — where the change is already waiting. The
+bulk write already ended with *"Send them again from the All recipes screen"*,
+so only its cause was wrong: naming the kitchen for the phone's own connection.
+
+### The ground-truth document nobody had ever read
+
+`R145`. CLAUDE.md names the ground truth in priority order: `tokens.css`,
+then `design/components.md` and `design/a11y-criteria.md`, then `README.md`.
+The first is enforced by `R48` — no colour may exist outside it — and the
+last is read by `tests/quick.js`. **Nothing in any suite had ever opened
+`design/`**: five documents, 413 lines, including the one that says what
+accessibility bar every feature is held to.
+
+So `R131` moved five hand-typed screen lists into `tests/screens.js`, updated
+the code and CLAUDE.md, and left the criteria document saying two things that
+had stopped being true:
+
+- **the contrast route list is in `tests/contrast.js`** — it holds no list at
+  all any more, it requires `./screens`, so a contributor told to add their
+  new screen there opens the file and finds nothing to add it to;
+- **the accessible-name sweep covers "sixteen surfaces"** — the exact number
+  `R131` had already named as the drift, when it now walks the whole shared
+  list.
+
+The second is the worse one, and it is the opposite of the usual fault: it
+**understates** the guarantee. Someone reading it to learn what is already
+enforced is told less is covered than really is, and does the work twice. The
+count is not written down any more, because the list it describes is meant to
+grow.
+
+**And the mutation that mattered most survived the first version of the
+check.** Requiring the document to name `tests/screens.js` *somewhere* passed
+happily with the old pointer put back in criterion 1, because criterion 8
+mentions the file too. The check is scoped to the sentence that actually
+tells a contributor where to add a screen — the fourth time this session a
+mutation has found a check of mine hollow, and the fourth recorded rather
+than quietly fixed.
+
+### The hermetic promise was kept by hand in ninety places
+
+`R146`. This file has said since the video arc that the suites run
+*"hermetically — the suites stub the kitchen server and abort the Render
+origin, so CI never wakes the real one."* That was kept one
+`ctx.route(...)` at a time, per context, and counting what hand-keeping had
+produced:
+
+| suite | contexts | Render aborts |
+|---|---|---|
+| `tests/kt.js` | 19 | **2** |
+| `tests/polish.js` | 36 | 21 |
+| `tests/plan.js` | 6 | **0** |
+| `tests/quick.js` | 2 | **0** |
+
+**What is measured**: a context made the way `kt.js`'s typing sweep made one
+*reaches for* the family's real Render origin on `#add` — four requests per
+`freshAdd` cycle, three cycles in that one sweep, because `onRoute` asks the
+kitchen for the waiting and failed import lists.
+
+**What is not measured, and was claimed anyway before being corrected**:
+whether a CI runner *answers* them. The sandbox this was measured in has no
+route to that host, so an aborted request and an unreachable one look
+identical from here — and `page.on('request')` fires **before routing and
+before any network attempt**, which is exactly how the wrong claim was made.
+A runner has open egress, so they very likely would be answered; *very
+likely* is why this is written down rather than asserted. The 30-second
+`.pathbtn` timeout that failed the suite on `d76fb31` stays **unexplained**
+rather than pinned on it.
+
+Reaching for a third party at all, from suites that claim to be hermetic, is
+the fault worth fixing either way. `tests/ctx.js` is one maker — 92 contexts
+across twelve suites come through it — so a new context cannot be born
+without the rule, which is `R131`'s answer to five drifting screen lists
+applied to the drift underneath the suites themselves. The two suites whose
+whole job is to touch something real, `live.js` and `ocr-live.js`, are
+excused by name with their reasons, in `R114`'s shape.
+
+The abort is at the **origin**, not a path: a suite that wants to answer for
+the kitchen points `kt.importApi` at its own stub host and routes that, which
+never meets this rule. `video.js` already did.
+
 ### Verified
 
-The suite after the video arc: **1661 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 336, sec 56,
-plan 79, video 266, backend 296, zoom 15), plus `R127`'s nine-check SQL
+The suite after the video arc: **1680 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 345, sec 56,
+plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

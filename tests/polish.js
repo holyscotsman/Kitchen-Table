@@ -1,10 +1,11 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0,fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx=await br.newContext({...devices['iPhone 13']});
+  const ctx=await freshContext(br, {...devices['iPhone 13']});
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -123,7 +124,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   /* Browser restart: a brand-new context carrying only the stored state, the
      closest a test can get to quitting and reopening Safari. */
   const state = await ctx.storageState();
-  const ctx2 = await br.newContext({ ...devices['iPhone 13'], storageState: state });
+  const ctx2 = await freshContext(br, { ...devices['iPhone 13'], storageState: state });
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -201,7 +202,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        `R103` is what made this reachable — while the delete button threw,
        the list could not change under you, which is why this arrives with
        it rather than before it. */
-    const ctxK = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxK = await freshContext(br, { ...devices['iPhone 13'] });
     const pK = await ctxK.newPage();
     const kErrs = []; pK.on('pageerror', e => kErrs.push(e.message));
     await ctxK.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -307,7 +308,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        same controls and works, and the Edit-mode tests only ever edited the
        title. Checked here by counting fields, and by requiring silence: a
        swallowed exception is how this survived. */
-    const ctxE = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxE = await freshContext(br, { ...devices['iPhone 13'] });
     const pE = await ctxE.newPage();
     let eErrs = []; pE.on('pageerror', e => eErrs.push(e.message));
     await ctxE.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -400,7 +401,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
            screen. The assertion below is what caught that. */
         seen.set([f.act, f.label, f.id, f.i].join('|'), f));
     };
-    const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxW = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxW.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pW = await ctxW.newPage();
     for (const [hash, ready, clicks] of [
@@ -481,7 +482,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        Behaviourally, the `R94` way: cut every off-origin request, type a
        recipe in, and require it to land in the book. Only then hold the
        help to what was just proved, so a future rewrite has to stay true. */
-    const ctxO = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxO = await freshContext(br, { ...devices['iPhone 13'] });
     const pO = await ctxO.newPage();
     const oErrs = []; pO.on('pageerror', e => oErrs.push(e.message));
     await pO.goto(B + '/index.html');
@@ -543,7 +544,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        offered to a screen reader as "Show the photo full screen". Press it
        and the lightbox opens: a full-screen modal dialog whose only content
        is the broken image, which the handler does not cover at all. */
-    const ctxI = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxI = await freshContext(br, { ...devices['iPhone 13'] });
     const pI = await ctxI.newPage();
     const iErrs = []; pI.on('pageerror', e => iErrs.push(e.message));
     await pI.goto(B + '/index.html');
@@ -672,7 +673,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        §1 is 34 servings counts that are inferred rather than known — "makes
        about 2 dozen" is the honest answer for a batch of cookies, and it is
        exactly what someone will type. */
-    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'] });
     const pN = await ctxN.newPage();
     const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
     await pN.goto(B + '/index.html');
@@ -795,7 +796,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     /* Both of these brick the app if unguarded — and the escape hatch
        ("Undo all my changes on this phone") lives INSIDE the app, so a
        boot crash takes the recovery with it. */
-    const ctxBad = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxBad = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxBad.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pb = await ctxBad.newPage();
     const bootErrs = [];
@@ -820,7 +821,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxBad.close();
 
     /* 2. A published recipes.json that parses but is not a list. */
-    const ctxBad2 = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxBad2 = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxBad2.route('**/*.onrender.com/**', r => r.abort('failed'));
     await ctxBad2.route('**/recipes.json', r => r.fulfill({
       status: 200, contentType: 'application/json', body: '{"oops":"not a list"}' }));
@@ -843,7 +844,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        and a snapshot written by an older build has fewer fields than
        today's form expects. It also survives in sessionStorage, so a
        crash here repeats on every arrival until the tab is closed. */
-    const ctxSnap = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxSnap = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxSnap.route('**/*.onrender.com/**', r => r.abort('failed'));
     const ps = await ctxSnap.newPage();
     const snapErrs = [];
@@ -867,7 +868,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
   console.log('\n== A photo store holding nonsense (R13) ==');
   {
-    const ctxImg = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxImg = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxImg.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pi = await ctxImg.newPage();
     const imgErrs = [];
@@ -900,7 +901,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        the next load: data loss wearing the face of success. Reachable on a
        browser without IndexedDB, where photos fall back into the same
        localStorage this overlay lives in. */
-    const ctxFull = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxFull = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pFull = await ctxFull.newPage();
     const fullErrs = []; pFull.on('pageerror', e => fullErrs.push(e.message));
     await pFull.goto(B + '/index.html#chicken-cordon-bleu');
@@ -1020,7 +1021,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        that has held this app for a year, through a dozen versions, is the
        device most likely to be carrying something the current code did not
        write. */
-    const ctxJunk = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxJunk = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pJunk = await ctxJunk.newPage();
     await ctxJunk.route('**/*.onrender.com/**', r => r.abort('failed'));
     const junkErrs = []; pJunk.on('pageerror', e => junkErrs.push(e.message));
@@ -1067,7 +1068,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        render — and the page reads "Loading recipes…" for ever. On the phone
        this book was built for, that looks like a broken phone rather than a
        broken deploy, and there is nothing to do about it. */
-    const ctxDead = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxDead = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pDead = await ctxDead.newPage();
     await pDead.route('**/app.js', route => route.fulfill({
       status: 200, contentType: 'text/javascript',
@@ -1132,7 +1133,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        downloaded one and pass while proving nothing. (Same shape as R9's
        vacuous offline check and R21's vacuous seeding: a stub that loses to
        the worker is not a stub.) */
-    const ctxRt = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxRt = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pRt = await ctxRt.newPage();
     const rtErrs = []; pRt.on('pageerror', e => rtErrs.push(e.message));
     await pRt.goto(B + '/index.html');
@@ -1287,7 +1288,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        stopping: a selector that no longer matches, a rule that arrives later
        with higher specificity, and the list still reads complete while the
        page still moves. This asks the browser. */
-    const ctxM = await br.newContext({ ...devices['iPhone 13'], reducedMotion: 'reduce' });
+    const ctxM = await freshContext(br, { ...devices['iPhone 13'], reducedMotion: 'reduce' });
     const pM = await ctxM.newPage();
     await pM.goto(B + '/index.html');
     await pM.waitForSelector('.main__title');
@@ -1332,7 +1333,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     /* The counterpart, so the check above is measuring the media query and
        not an app that simply never animates: with motion allowed, the same
        actions do move something. */
-    const ctxA = await br.newContext({ ...devices['iPhone 13'], reducedMotion: 'no-preference' });
+    const ctxA = await freshContext(br, { ...devices['iPhone 13'], reducedMotion: 'no-preference' });
     const pA = await ctxA.newPage();
     await pA.goto(B + '/index.html#chicken-cordon-bleu');
     await pA.waitForSelector('.checkrow');
@@ -1362,7 +1363,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        The browser firing it at all is a platform guarantee; what could
        actually regress is what this app does when it arrives — including the
        two cases where it must do NOTHING. */
-    const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxW = await freshContext(br, { ...devices['iPhone 13'] });
     const pW = await ctxW.newPage();
     await pW.goto(B + '/index.html#chicken-cordon-bleu');
     await pW.waitForSelector('.r-title');
@@ -1491,7 +1492,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     });
 
     for (const easy of [true, false]) {
-      const ctxI = await br.newContext({ ...devices['iPhone 13'] });
+      const ctxI = await freshContext(br, { ...devices['iPhone 13'] });
       const pI = await ctxI.newPage();
       await pI.addInitScript((on) => {
         if (on) { localStorage.setItem('kt.easyRead', 'true'); localStorage.setItem('kt.fsIndex', '4'); }
@@ -1525,7 +1526,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
     /* Upright is only half of it: the note still has to read as a note. */
     {
-      const ctxW = await br.newContext({ ...devices['iPhone 13'] });
+      const ctxW = await freshContext(br, { ...devices['iPhone 13'] });
       const pW = await ctxW.newPage();
       await pW.addInitScript(() => {
         localStorage.setItem('kt.easyRead', 'true');
@@ -1630,7 +1631,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
     for (const [label, size] of [['upright', devices['iPhone 13'].viewport],
       ['on its side', { width: 844, height: 390 }]]) {
-      const ctxS = await br.newContext({ ...devices['iPhone 13'], viewport: size });
+      const ctxS = await freshContext(br, { ...devices['iPhone 13'], viewport: size });
       const pS = await ctxS.newPage();
       const bad = [];
       const covered = [];
@@ -1672,7 +1673,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
     /* Painted in the right place is not the same as working there. */
     {
-      const ctxT = await br.newContext({ ...devices['iPhone 13'] });
+      const ctxT = await freshContext(br, { ...devices['iPhone 13'] });
       const pT = await ctxT.newPage();
       await sheets[0][1](pT);
       await pT.waitForTimeout(650);
@@ -1737,7 +1738,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        the app is just quietly wrong offline, in the typeface or the layout,
        for exactly the reader it was built for. */
     {
-      const ctxCold = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const ctxCold = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
       const pCold = await ctxCold.newPage();
       const asked = new Set();
       pCold.on('request', r => {
@@ -1808,7 +1809,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     const PORT = srv.address().port;
     const OWN = 'http://127.0.0.1:' + PORT;
 
-    const ctxSW = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxSW = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxSW.route('**/*.onrender.com/**', r => r.abort('failed'));
     const psw = await ctxSW.newPage();
     await psw.goto(OWN + '/index.html#menu');
@@ -1989,7 +1990,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        every same-origin file it actually asks for, and require the shell to
        hold all of them.** A new asset added tomorrow is covered without
        anyone remembering. */
-    const ctxA = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxA = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxA.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pA = await ctxA.newPage();
     const asked = new Set();
@@ -2144,6 +2145,133 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       bodyOf('resetLocal').length > 40 && kKeys.length >= 10 &&
       kKeys.indexOf('unsent') > -1,
       'resetLocal=' + bodyOf('resetLocal').length + ' keys=' + kKeys.length);
+  }
+
+  console.log('\n== The hermetic promise, kept in one place (R146) ==');
+  {
+    /* CLAUDE.md has said since the video arc that the suites run
+       "hermetically — the suites stub the kitchen server and abort the Render
+       origin, so CI never wakes the real one." It was kept by hand, one
+       `ctx.route(...)` per context, and hand-keeping produced what
+       hand-keeping produces:
+
+           tests/kt.js      19 contexts,  2 aborts
+           tests/polish.js  36 contexts, 21 aborts
+           tests/plan.js     6 contexts,  0 aborts
+           tests/quick.js    2 contexts,  0 aborts
+
+       Measured on a context made the way `kt.js`'s typing sweep made one:
+       arriving at `#add` REACHES FOR the family's real Render origin — four
+       requests per `freshAdd` cycle, three cycles in that one sweep, because
+       `onRoute` asks the kitchen for the waiting and failed import lists.
+
+       Whether a CI runner ANSWERS them is not measured and was wrongly
+       claimed once: the sandbox this was measured in has no route to that
+       host, so an aborted request and an unreachable one look the same, and
+       `page.on('request')` fires before routing either way. The `.pathbtn`
+       timeout that failed `d76fb31` stays unexplained rather than pinned on
+       this.
+
+       Reaching for a third party at all is the fault worth fixing. One
+       maker, so a new context cannot be born without the rule. */
+    const suites = require('fs').readdirSync(__dirname)
+      .filter((f) => /\.js$/.test(f) && f !== 'ctx.js' && f !== 'screens.js');
+    /* The two whose whole job is to touch something real. Named with the
+       reason, in `R114`'s shape, so a third one has to argue for itself. */
+    const LIVE = {
+      'live.js': 'drives the DEPLOYED book on Pages — the family-facing artefact',
+      'ocr-live.js': 'proves the real Tesseract runs on the device, CDN and all'
+    };
+    const direct = [];
+    suites.forEach((f) => {
+      const src = require('fs').readFileSync(require('path').join(__dirname, f), 'utf8');
+      if (/\bbr\.newContext\(/.test(src) && !LIVE[f]) direct.push(f);
+    });
+    chk('no suite makes a browser context of its own',
+      direct.length === 0, direct.join(', '));
+
+    /* And the maker really installs the rule. */
+    const ctxSrc = require('fs').readFileSync(require('path').join(__dirname, 'ctx.js'), 'utf8');
+    chk('the shared maker aborts the Render origin',
+      /onrender\.com/.test(ctxSrc) && /abort\(/.test(ctxSrc), ctxSrc.slice(0, 80));
+
+    /* Floors: a scan that found no suites, or an exemption list naming files
+       that no longer exist, would read as a clean pass for both. */
+    chk('and the scan really read the suites',
+      suites.length >= 10 &&
+      suites.filter((f) => /freshContext/.test(
+        require('fs').readFileSync(require('path').join(__dirname, f), 'utf8'))).length >= 10,
+      suites.length + ' suites');
+    chk('while every suite excused from it still exists',
+      Object.keys(LIVE).every((f) => suites.indexOf(f) > -1),
+      Object.keys(LIVE).filter((f) => suites.indexOf(f) === -1).join(', '));
+  }
+
+  console.log('\n== The ground-truth document nobody checked (R145) ==');
+  {
+    /* CLAUDE.md names the ground truth in priority order: `tokens.css`,
+       then `design/components.md` and `design/a11y-criteria.md`, then
+       `README.md`. The first is enforced by `R48` — no colour may exist
+       outside it — and the last is read by `tests/quick.js`. **Nothing in
+       any suite has ever read `design/`.**
+
+       So `R131` moved five hand-typed screen lists into `tests/screens.js`,
+       updated the code and CLAUDE.md, and left the criteria document saying
+       two things that had stopped being true:
+
+         - the contrast route list is in `tests/contrast.js` (it requires
+           `./screens` and holds no list of its own), so a contributor told
+           to add their screen there finds nothing to add it to;
+         - the accessible-name sweep covers "sixteen surfaces" — the exact
+           number `R131` called out as the drift, when it now walks the whole
+           shared list.
+
+       The second is the worse one: it UNDERSTATES the guarantee, so someone
+       reading it to learn what is already enforced is told less is covered
+       than really is. */
+    /* `doc` lives inside the doc-walk block further down, so this keeps
+       its own reader. */
+    const readRepo = (f) => require('fs').readFileSync(
+      require('path').join(__dirname, '..', f), 'utf8');
+    const crit = readRepo('design/a11y-criteria.md');
+    const named = (crit.match(/tests\/[a-z-]+\.js/g) || []);
+    const missing = [...new Set(named)].filter((f) => {
+      try { require('fs').accessSync(require('path').join(__dirname, '..', f)); return false; }
+      catch (e) { return true; }
+    });
+    chk('every suite the criteria document names exists',
+      missing.length === 0 && named.length >= 5, missing.join(', ') || named.length + ' named');
+
+    /* Where the shared list actually lives. `tests/contrast.js` consumes it
+       and defines nothing, so naming it is sending someone to the wrong
+       file. */
+    const contrastSrc = require('fs').readFileSync(
+      require('path').join(__dirname, 'contrast.js'), 'utf8');
+    chk('the shared screen list is not defined in the contrast suite',
+      /require\(['"]\.\/screens['"]\)/.test(contrastSrc) &&
+      !/^\s*const SCREENS\s*=/m.test(contrastSrc));
+    /* Scoped to the sentence that TELLS A CONTRIBUTOR WHERE TO ADD ONE, not
+       to the document as a whole: the first version only required the string
+       to appear somewhere, and putting the old pointer back in criterion 1
+       still passed because criterion 8 mentions the file too. Measured — the
+       mutation that matters most was the one that survived. */
+    const rule1 = (crit.split(/\n(?=\d+\. \*\*)/)
+      .find((sec) => /Every new screen\/state appears in/.test(sec)) || '');
+    chk('and the criterion that says where to add a screen names that file',
+      /tests\/screens\.js/.test(rule1) && !/tests\/contrast\.js/.test(rule1),
+      rule1.slice(0, 120) || 'the criterion was not found at all');
+
+    /* And no fixed count for a sweep whose whole point is that it grew.
+       "the six screens" is a different, still-true claim about the routes,
+       so this is scoped to the word the drift attached itself to. */
+    const counted = crit.match(/\b([a-z]+|\d+)\s+surfaces\b/gi) || [];
+    chk('and claims no fixed number of surfaces, which has drifted once already',
+      counted.length === 0, JSON.stringify(counted));
+    /* A floor: a document that stopped mentioning the sweep at all would
+       pass every check above. */
+    chk('while still describing the sweep it is talking about',
+      /accessible name|aria-label|accessibility tree/i.test(crit) && crit.length > 3000,
+      crit.length + ' chars');
   }
 
   console.log('\n== A recipe from the book is named through titleOf (R138) ==');
@@ -2402,7 +2530,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
         [...emitted].filter(k => appOrder.indexOf(k) === -1).join(','));
 
     /* The one that matters: the same recipe, through both writers. */
-    const ctxD = await br.newContext({ ...devices['iPhone 13'], acceptDownloads: true });
+    const ctxD = await freshContext(br, { ...devices['iPhone 13'], acceptDownloads: true });
     await ctxD.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pD = await ctxD.newPage();
     await pD.goto(B + '/index.html');
@@ -2909,7 +3037,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        carried the id `menu-q`, so that half of the condition had never once
        been true. It reads plausibly because `pick-q` genuinely is both an id
        and a data-act, which is how the two namespaces got confused. */
-    const ctxG = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxG = await freshContext(br, { ...devices['iPhone 13'] });
     const pG = await ctxG.newPage();
     const gErrs = []; pG.on('pageerror', e => gErrs.push(e.message));
     await ctxG.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -3046,7 +3174,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
 
        A control is found again the way `openSheet` already finds the one it
        must return to: by its action plus whatever says WHICH one. */
-    const ctxF = await br.newContext();      // desktop context: a real keyboard
+    const ctxF = await freshContext(br, );      // desktop context: a real keyboard
     const pF = await ctxF.newPage();
     const fErrs = []; pF.on('pageerror', e => fErrs.push(e.message));
     await ctxF.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -3193,7 +3321,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        never ran. Losing the caret is a shrug; a convenience that can take
        down a render is not. Caught by `tests/sec.js`'s escaping guard
        before it shipped, which is exactly what that guard is for. */
-    const ctxT = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxT.route('**/*.onrender.com/**', r => r.abort('failed'));
     await ctxT.addInitScript(() => {
       localStorage.setItem('kt.recipes', JSON.stringify([{
@@ -3245,7 +3373,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        An empty state says what is MISSING and what to do about it. How it
        came to be missing is the flag machinery's job (`R82`), and that
        speaks from what was recorded rather than from a guess. */
-    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxN.route('**/*.onrender.com/**', r => r.abort('failed'));
     await ctxN.addInitScript(() => {
       localStorage.setItem('kt.recipes', JSON.stringify([
@@ -3322,7 +3450,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        The check below is two-way on purpose: the day a recipe without a
        count enters the book, a help that says nothing about it fails just
        as loudly. */
-    const ctxH = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxH = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxH.route('**/*.onrender.com/**', r => r.abort('failed'));
     const pH = await ctxH.newPage();
     const hErrs = []; pH.on('pageerror', e => hErrs.push(e.message));
@@ -3417,7 +3545,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
                                 ...readme.matchAll(/\*\*"([^"]+)"\*\*/g)].map(m => m[1]))];
     chk('the walkthrough names controls in bold quotes', quoted.length >= 3, quoted.join(' | '));
 
-    const ctxD = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxD = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxD.route('**/*.onrender.com/**', r => r.abort('failed'));
     /* A photo and a local change, because two of the controls the doc names
        only exist once there is something to download or undo — which is
@@ -3549,7 +3677,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        are checked here instead, against the buttons the app actually
        draws. A help page describing controls that are not there would be
        worse than one that said nothing. */
-    const ctxH = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxH = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pH = await ctxH.newPage();
     const hErrs = []; pH.on('pageerror', e => hErrs.push(e.message));
     await pH.goto(B + '/index.html#help');
@@ -3675,7 +3803,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        There is no field for the reader to fix it with either: `source` is
        written by the import paths and is not on the Edit form. */
     const sourceFor = async (source) => {
-      const ctx2 = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx2 = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
       await ctx2.addInitScript((src) => {
         localStorage.setItem('kt.recipes', JSON.stringify([{
@@ -3724,7 +3852,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        still somewhere the reader can reach. It is: the copy that leaves the
        phone carries it in full. Checked, rather than asserted in a comment. */
     {
-      const ctx3 = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx3 = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx3.route('**/*.onrender.com/**', r => r.abort('failed'));
       await ctx3.addInitScript(() => {
         localStorage.setItem('kt.recipes', JSON.stringify([{

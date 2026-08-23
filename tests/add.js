@@ -1,10 +1,11 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0,fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx=await br.newContext({...devices['iPhone 13']});
+  const ctx=await freshContext(br, {...devices['iPhone 13']});
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -174,7 +175,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   console.log('\n== Two cards, one recipe (task 066) ==');
   /* A stub recogniser stands in for Tesseract (the real one runs in
      tests/ocr-live.js); what's under test is the multi-photo flow. */
-  const ctx2 = await br.newContext({...devices['iPhone 13']});
+  const ctx2 = await freshContext(br, {...devices['iPhone 13']});
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx2.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -384,7 +385,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        a draft or a book left over from the last one is not the thing under
        test. */
     const typeIn = async (servesValue) => {
-      const ctxA = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const ctxA = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
       const pA = await ctxA.newPage();
       pA.on('pageerror', e => aErrs.push(e.message));
       await pA.goto(B + '/index.html#add');
@@ -470,7 +471,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        assumed*, and if the category being saved is no longer Dinner the
        reader plainly changed it. If it is still Dinner, they either agreed or
        never looked, and nothing here can tell those apart — so it stands. */
-    const ctxR = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxR = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pR = await ctxR.newPage();
     const rErrs = []; pR.on('pageerror', e => rErrs.push(e.message));
 
@@ -571,7 +572,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        screen reader heard it; the eye got nothing at all. The reverse of
        `S12`'s rule, and the wrong way round for a line that just vanished
        from where the reader was looking. */
-    const ctxM = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxM = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxM.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     const pM = await ctxM.newPage();
     const mErrs = []; pM.on('pageerror', (e) => mErrs.push(e.message));
@@ -631,7 +632,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
        order manufactured out of a phone that had room. `any` is a phone
        that is genuinely full: nothing more fits at all. */
     const noRoom = async (killIdb, mode) => {
-      const ctxQ = await br.newContext({ ...devices['iPhone 13'] });
+      const ctxQ = await freshContext(br, { ...devices['iPhone 13'] });
       await ctxQ.route('**/*.onrender.com/**', (r) => r.abort('failed'));
       await ctxQ.addInitScript((opt) => {
         const kill = opt.kill, mode = opt.mode;
