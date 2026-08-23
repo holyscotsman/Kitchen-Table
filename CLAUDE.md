@@ -2625,10 +2625,48 @@ promise `tests/package.json`'s own description makes. It does change
 `tests/package-lock.json`, which is the CI Playwright cache key, so the
 next run re-downloads Chromium once.
 
+### The one tag box that did not read commas
+
+`R165`. Every tag input in this app splits on commas, and the app has
+taught its readers so: the hint under each one says *"Separate with
+commas."* The rename box did its own `trim().replace(/\s+/g, " ")`, which
+is `parseTags` **minus the split**.
+
+Measured, end to end:
+
+| | |
+|---|---|
+| rename `italian` → `italian, quick` | stored as **one** tag, `italian, quick` |
+| the Manage tags screen | lists it as a single chip among the real ones |
+| Edit mode's tags field | shows `italian, quick` — indistinguishable from two tags |
+| change the **title** and nothing else, save | tags become `["italian", "quick"]` |
+
+So a rename mints a compound pseudo-tag, and the next ordinary edit of an
+**unrelated field** silently turns it into two. That is `R119`'s rule —
+*editing must not quietly rewrite a field nobody touched* — on the tags,
+and a near-duplicate generator sitting inside the machinery built to stop
+near-duplicates (`067`–`069`). The recipe's filter membership changes with
+it: before the edit it matches neither `italian` nor `quick`, after it
+matches both.
+
+**Refused rather than split**, and that is the judgement call. Making
+"Rename" mean *replace with several* needs its own merge story and its own
+confirm — a feature, and Jason's call. One name is what the label (*"New
+name for …"*) promises, and **Add tags** is the control for the other
+thing, so the sentence names it.
+
+**The refusal keeps what was typed on screen**, which is `R120`'s rule:
+the box stays open with `italian, quick` still in it, so the reader can
+fix the name rather than start again. The mutation that clears it fails by
+name.
+
+Clearing the box, or typing the same name back, stays **silent** — `R147`
+settled that: nothing was typed, so there is nothing to say.
+
 ### Verified
 
-The suite after the video arc: **1817 functional checks** across eleven
-suites (kt 368, feat 92, add 127, relay 21, quick 81, polish 368, sec 62,
+The suite after the video arc: **1823 functional checks** across eleven
+suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

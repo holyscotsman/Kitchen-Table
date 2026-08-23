@@ -2292,7 +2292,32 @@
   }
 
   function renameTag(oldTag, nextRaw) {
-    var next = String(nextRaw || "").trim().replace(/\s+/g, " ");
+    /* `R165` — read the way every other tag input in this app is read.
+       This box did its own `trim().replace(/\s+/g, " ")`, which is
+       `parseTags` minus the comma split — and the app has taught its
+       readers that commas separate tags, because the hint under every
+       other tags field says "Separate with commas".
+
+       Measured: renaming "italian" to "italian, quick" stored ONE tag
+       called `italian, quick`, listed as a single chip among the real
+       ones. Edit mode then shows the field as `italian, quick`, which is
+       indistinguishable from two tags — and saving a change to the TITLE
+       and nothing else re-reads it through `parseTags` and turns it into
+       two. `R119`'s rule ("editing must not quietly rewrite a field
+       nobody touched") on the tags, and a near-duplicate generator inside
+       the machinery built to stop near-duplicates (`067`–`069`).
+
+       Refused rather than split, because "Rename" meaning "replace with
+       several" needs its own merge story and its own confirm — that is a
+       feature and Jason's call, recorded in DECISIONS. One name is what
+       the label ("New name for …") promises, and Add tags is the control
+       for the other thing, so the sentence names it. */
+    var names = parseTags(nextRaw);
+    if (names.length > 1) {
+      return { refused: "One name at a time — use Add tags to put a recipe " +
+        "under several." };
+    }
+    var next = names.length ? names[0] : "";
     if (!next || next === oldTag) return null;
     /* Same letters, new casing is a plain rename; a different existing tag
        (any casing) is a merge and says so before it happens. */
@@ -6632,6 +6657,10 @@
     }
     if (act === "tag-rename-apply") {
       var renamed = renameTag(key, S.tagEditVal);
+      /* A refusal leaves the box open with what was typed still in it —
+         `R120`'s rule, that the reader is shown what was kept. Clearing it
+         would take their words away and make them start again. */
+      if (renamed && renamed.refused) { setNotice(renamed.refused); return; }
       S.tagEditing = ""; S.tagEditVal = "";
       render();
       /* `S11` — every renamed recipe goes to the family too, or nobody is
