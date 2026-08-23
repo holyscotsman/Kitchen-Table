@@ -118,6 +118,36 @@ const TYPES = { html:'text/html', js:'text/javascript', css:'text/css', json:'ap
   chk('an ingredient ticks off',
     await p.evaluate(() => document.querySelectorAll('.bodygrid__ing [aria-pressed="true"]').length) === 1);
 
+  console.log('\n== An address it cannot read (R148) ==');
+  {
+    /* The worst thing this app has done to a reader, and it needed no bad
+       data at all: `parseHash` decoded with `decodeURIComponent`, which
+       throws on a malformed escape, and the throw landed in the boot
+       chain's catch — so the whole book became "The recipes could not be
+       loaded (URI malformed). Check the connection and reload." on a
+       connection that was fine, with a reload that reproduced it forever.
+       `#menu?q=50%` did it to the shipped book.
+
+       Checked here as well as locally because this is the one the family
+       can actually be handed: an address typed, bookmarked, or mangled by
+       a messaging app on the way. about:blank first, so this is a real
+       boot rather than a same-document fragment change — the boot path is
+       where the false sentence came from. */
+    await p.goto('about:blank');
+    await p.goto(LIVE + '#menu?q=50%', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p.waitForTimeout(2000);
+    const held = await p.evaluate(() => ({
+      len: (document.getElementById('app') || { innerHTML: '' }).innerHTML.length,
+      cards: document.querySelectorAll('.rcard').length,
+      empty: ((document.querySelector('.emptystate') || {}).textContent || '').slice(0, 90)
+    }));
+    chk('a bare % in the address still draws the book',
+      held.len > 1000 && !/could not be loaded/.test(held.empty),
+      held.len + ' chars :: ' + held.empty);
+    chk('and nothing tells the reader to check their connection',
+      !/Check the connection/.test(held.empty), held.empty);
+  }
+
   console.log('\n== Nothing is broken underneath ==');
   chk('the deploy carries a version stamp',
     /v\d+\.\d+/.test(await p.evaluate(() => document.body.innerText)),
