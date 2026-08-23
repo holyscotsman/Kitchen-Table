@@ -674,6 +674,130 @@ const { runJob, computeFps } = lib('pipeline');
     try { extract.draftFromResult({ is_recipe: false, not_recipe_reason: 'it is a cat video' }, 'u', 'youtube'); }
     catch (e) { notRecipe = e; }
     chk('not-a-recipe throws the friendly refusal', notRecipe && notRecipe.notRecipe && /cat video/.test(notRecipe.message));
+
+    /* `R152` — a title the extraction could not find used to become the
+       literal string "Untitled recipe", silently, with no flag.
+
+       Every other guess in this function is disclosed: an unusable course
+       falls to Dinner AND is flagged, a list past 60 lines is truncated AND
+       flagged. Both of the device-side importers do the same for a missing
+       title — the link path leaves it empty and flags "Title — none was
+       found on the page; add one.", the photo path leaves it empty and flags
+       "Title — none was obvious; add one." — so this was the one path
+       guessing a NAME without saying so. `R121`'s rule: one situation has
+       one wording.
+
+       And the placeholder is the app's display word for a nameless recipe
+       (`R116`), which `startDraft` deliberately keeps out of stored data so
+       Save cannot bake it in. Baking it in here does at the server what
+       `R116` forbids at the phone: a recipe saved unchanged would be titled
+       "Untitled recipe" in the family's book, indistinguishable on every
+       screen from one that has no name at all.
+
+       Leaving it empty is safe because `saveNewRecipe` already refuses to
+       save a recipe with no title — the same stop the other two paths rely
+       on. */
+    const noTitle = extract.draftFromResult(
+      Object.assign({}, parsed, { title: '   ' }), 'u', 'youtube');
+    chk('a title the video never gave is left empty, not invented',
+      noTitle.title === '', JSON.stringify(noTitle.title));
+    chk('and it is flagged, the way every other guess here is',
+      noTitle.flagged.some(f => /^Title — /.test(f)),
+      JSON.stringify(noTitle.flagged.slice(0, 3)));
+    /* The floor that keeps disclosure from becoming noise on every import —
+       `R123`'s reason for caring whether a flag is answerable. */
+    chk('and a title the video did give is not flagged',
+      !d.flagged.some(f => /^Title — /.test(f)),
+      JSON.stringify(d.flagged));
+
+    /* `R153` — `R152`'s sibling, one field over, and this one had a false
+       sentence standing over it. CLAUDE.md states as fact that "every import
+       path that cannot read a count defaults to 4 and flags it — 'Servings —
+       no count was found; 4 was assumed.'" The link path does (app.js), the
+       Add screen does (`R121` made it), and the video path did not: a count
+       the model never gave, or gave as something that is not an integer,
+       became a confident 4 with nothing beside it.
+
+       Measured before the fix: absent → 4 unflagged, "four" → 4 unflagged.
+       The sentence is the app's own, character for character, because
+       `R121`'s rule is that one situation has one wording — and because
+       `R122`/`R123` answer a flag by the field it names. */
+    for (const [label, servings] of [['absent', undefined], ['not a number', 'four']]) {
+      const noServe = extract.draftFromResult(
+        Object.assign({}, parsed, { servings }), 'u', 'youtube');
+      chk('a count the video never gave defaults to 4 and says so (' + label + ')',
+        noServe.servings === 4 &&
+        noServe.flagged.some(f => f === 'Servings — no count was found; 4 was assumed.'),
+        noServe.servings + ' :: ' + JSON.stringify(noServe.flagged.slice(0, 3)));
+    }
+    chk('and a count the video did give is not flagged',
+      !d.flagged.some(f => /^Servings — /.test(f)), JSON.stringify(d.flagged));
+    /* An integer outside 1–40 is CLAMPED and stays silent, which is not an
+       oversight: the link and photo paths clamp a parsed count the same
+       silent way, and `R119`'s rule that a clamp is *said* applies to a
+       number a reader typed a moment ago, not to a guess nobody made. */
+    const wild = extract.draftFromResult(
+      Object.assign({}, parsed, { servings: 500 }), 'u', 'youtube');
+    chk('an out-of-range count is clamped silently, as the other paths clamp',
+      wild.servings === 40 && !wild.flagged.some(f => /^Servings — /.test(f)),
+      wild.servings + ' :: ' + JSON.stringify(wild.flagged.slice(0, 2)));
+
+    /* And the two writers are held to each other rather than each to a copy
+       of the sentence — `R115`'s rule for `validateRecipe` and
+       `db/migrate.js`, which guard the same field for the same reason and
+       must not disagree about it. There are now three places that assume a
+       count: the link importer, the Add screen, and this server. A flag the
+       app words differently from the server is two situations wearing one
+       name, which is the thing `R121` set out to stop. */
+    /* `R154` — the third field in the same function with the same fault, and
+       the one with the most to lose. Both device-side importers say when a
+       list came back empty: the link path flags "Ingredients — none were
+       found; check the original page.", the photo path "Ingredients — none
+       were picked up." The video path said nothing at all.
+
+       Measured before the fix: ingredients [] and steps [] produced a draft
+       with both lists empty and ZERO flags — a review screen with blank
+       boxes and no reason given. And `saveNewRecipe` only refuses an empty
+       TITLE, so that draft is saveable: a recipe in the family's book with
+       nothing in it, arrived at silently.
+
+       The wording is this path's own rather than a copy. The two existing
+       ones already differ, because the advice differs — "check the original
+       page" means nothing for a photograph — so what carries across is the
+       `Field — ` shape that `R122`/`R123` answer by, not the sentence. */
+    for (const [label, over, field] of [
+      ['ingredients', { ingredients: [] }, 'Ingredients'],
+      ['steps', { steps: [] }, 'Steps'],
+      ['blank strings', { ingredients: ['  ', ''] }, 'Ingredients']
+    ]) {
+      /* The model's own flags are cleared first, or this measures nothing:
+         the shared fixture already carries "Ingredients — mumbled", which
+         starts with the very prefix being looked for, so two of these three
+         cases passed before the fix on text that was always there. Caught by
+         watching which of them failed — the same trap as `R145`, met in a
+         fixture this time rather than a document. */
+      const bare = extract.draftFromResult(
+        Object.assign({}, parsed, { flagged: [] }, over), 'u', 'youtube');
+      chk('an empty ' + label + ' list is said out loud',
+        bare.flagged.some(f => f.indexOf(field + ' — ') === 0),
+        JSON.stringify(bare.flagged.slice(0, 3)));
+    }
+    /* The floor, so disclosure does not become noise on a good import. */
+    chk('and a video that gave both lists is flagged about neither',
+      !d.flagged.some(f => /^(Ingredients|Steps) — /.test(f) &&
+        /none were/.test(f)),
+      JSON.stringify(d.flagged));
+
+    const appSrcS = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const exSrcS = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'backend', 'lib', 'extract.js'), 'utf8');
+    const SENTENCE = 'Servings — no count was found; 4 was assumed.';
+    chk('the app and the server use one sentence for one situation',
+      (appSrcS.split(SENTENCE).length - 1) >= 2 &&
+      exSrcS.indexOf(SENTENCE) > -1,
+      'app=' + (appSrcS.split(SENTENCE).length - 1) +
+      ' server=' + (exSrcS.indexOf(SENTENCE) > -1));
   }
 
   /* ---- the whole pipeline, tools faked, network stubbed ---- */
@@ -1388,6 +1512,80 @@ const { runJob, computeFps } = lib('pipeline');
     chk('the flag is read only on the write route',
       (src.match(/searchParams\.get\("more"\)/g) || []).length === 1,
       'more must not steer anything else');
+  }
+
+  console.log('\n== The setup note tells the truth about KT_DB (R151) ==');
+  {
+    /* `KT_DB` lives in two unrelated places — Render's Environment tab, so
+       the import server can read the database, and a GitHub Actions secret,
+       so the nightly `db-sync` can turn it back into `recipes.json`. Setting
+       the first implies nothing about the second, and doing only half is
+       worse than doing neither: with `KT_WRITE_KEY` set and the Actions
+       secret missing, every edit a phone shares lands in the database and
+       stops there — saved, reported saved, invisible to the family.
+       `db-sync.yml`'s own warning exists because that went unnoticed for a
+       fortnight.
+
+       Measured on 2026-08-23: the secret is not set. Twenty-two scheduled
+       runs, every one reporting success, every one a no-op — which is the
+       designed behaviour of the warning, not a bug in it.
+
+       The note is now in `backend/README.md`. This holds it to naming things
+       that really exist: a reader following "how to tell in ten seconds"
+       must be told field names the server actually reports and summary text
+       the workflow actually writes, or the instructions send them looking
+       for something that isn't there. `R126`'s rule — the labels a page
+       names are checked against what the app draws. */
+    const fsR = require('fs'), pathR = require('path');
+    const root = pathR.join(__dirname, '..');
+    const rd = (f) => fsR.readFileSync(pathR.join(root, f), 'utf8');
+    const readme = rd('backend/README.md');
+    const sync = rd('.github/workflows/db-sync.yml');
+    const server = rd('backend/server.js');
+
+    /* Scoped to the section that does the telling, not to the file. The
+       first version asked whether the phrase appeared ANYWHERE, and the
+       rotation note further down has always mentioned the Actions secret in
+       passing — so deleting it from the new section left the check green.
+       `R145` wrote this lesson down exactly once before, about requiring a
+       document to name `tests/screens.js` somewhere; met again here, and
+       recorded rather than quietly fixed. */
+    const note = (readme.split(/\n(?=## )/)
+      .find((sec) => /^## `KT_DB` has two homes/.test(sec)) || '');
+    chk('the note exists and is a section of its own',
+      note.length > 400, note.length + ' chars');
+    chk('the note names both homes of KT_DB',
+      /Render's `KT_DB`/.test(note) && /Actions secret `KT_DB`/.test(note),
+      'render=' + /Render's `KT_DB`/.test(note) +
+      ' actions=' + /Actions secret `KT_DB`/.test(note));
+    chk('and says which one has to come first',
+      /before — or at the same time as — `KT_WRITE_KEY`/.test(note),
+      'the ordering constraint must be stated in the section itself');
+
+    /* The two ways to check, bound to what really emits them. */
+    ['accepts_changes', 'publishes_on_change', 'missing'].forEach((f) => {
+      chk('health field `' + f + '` is named in the note and reported by the server',
+        readme.indexOf(f) > -1 && server.indexOf(f) > -1,
+        'readme=' + (readme.indexOf(f) > -1) + ' server=' + (server.indexOf(f) > -1));
+    });
+    /* Whitespace collapsed before matching, because prose wraps and this
+       phrase happens to break across a line in the README. `R149` had just
+       finished writing that lesson down — a line-sensitive matcher misses a
+       claim that is plainly there — and this check walked straight into it
+       anyway, which is why it is recorded rather than quietly fixed. */
+    const flat = (t) => t.replace(/\s+/g, ' ');
+    const warned = 'Skipped: \\`KT_DB\\` secret is not set';
+    chk('and the summary line the note tells a reader to look for is the one the workflow writes',
+      flat(sync).indexOf(flat(warned)) > -1 &&
+      flat(readme).indexOf('Skipped: `KT_DB` secret is not set') > -1,
+      'workflow=' + (flat(sync).indexOf(flat(warned)) > -1) +
+      ' readme=' + (flat(readme).indexOf('Skipped: `KT_DB` secret is not set') > -1));
+    /* A floor: a note that stopped explaining the hazard would pass the
+       string rules above while telling a reader nothing. */
+    chk('and it still explains why half the setup is the dangerous state',
+      /lands in the database and stops there/.test(readme) &&
+      /default branch/.test(readme),
+      readme.length + ' chars');
   }
 
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');

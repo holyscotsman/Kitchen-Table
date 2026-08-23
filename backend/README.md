@@ -66,7 +66,47 @@ you should see `{"ok":true,…}`.
 **After this branch merges to `main`:** Settings → Build & Deploy → change
 **Branch** to `main`, so the server follows the same code the site serves.
 
-**When rotating the Neon password** (do, since it was pasted in chat once):
+## `KT_DB` has two homes, and the order they are filled in matters
+
+This is the one part of the setup where doing half of it is worse than doing
+none, so it is written out rather than left to be inferred from the two lists
+above.
+
+- **Render's `KT_DB`** lets the import server read and write the database.
+- **The GitHub Actions secret `KT_DB`** (repo Settings → Secrets and
+  variables → Actions) is what lets the nightly `db-sync` turn the database
+  back into `recipes.json` and commit it. It is a *separate* value to set,
+  in a different place, and nothing about setting the Render one implies it.
+
+**Set the Actions secret before — or at the same time as — `KT_WRITE_KEY`.**
+With `KT_WRITE_KEY` set and the Actions secret missing, every edit a phone
+shares lands in the database and stops there: saved, reported saved, and
+invisible to the family for as long as it takes somebody to notice. That is
+not hypothetical — `db-sync.yml`'s own warning exists because exactly this
+went unnoticed for a fortnight while video imports piled up.
+
+**How to tell, in ten seconds, without guessing:**
+
+- `https://kitchen-table-5tp6.onrender.com/api/health` — `accepts_changes`
+  is `KT_WRITE_KEY`; `publishes_on_change` is `KT_GH_TOKEN`; anything still
+  missing is named in `missing`.
+- Actions tab → **db-sync** → the most recent run. A run that never read the
+  database still reports **success** — that is the point of the warning, not
+  a bug — so open the run and look at its summary. "⚠️ Skipped: `KT_DB`
+  secret is not set" and a *Compare database and file* step that finishes in
+  under a second both mean the secret is missing.
+
+**And a hazard while the repository's default branch is not `main`.**
+Scheduled workflows run on the default branch, so `db-sync` checks out that
+branch and commits `recipes.json` to it. The working branch gets
+force-pushed to realign after every squash-merge, which would silently
+destroy a sync commit that landed in between. Setting the default branch to
+`main` (Settings → General → Default branch) removes it, and is the same
+change the Render **Branch** note above asks for.
+
+## Rotating the Neon password
+
+Do — it was pasted in chat once:
 Neon console → reset password, then update the value in two places — this
 service's `KT_DB` env var, and the GitHub Actions secret `KT_DB`
 (repo Settings → Secrets and variables → Actions) used by the nightly sync.

@@ -106,7 +106,7 @@ function draftFromResult(parsed, url, platform) {
     throw e;
   }
   const d = {
-    title: String(parsed.title || "").trim().slice(0, 300) || "Untitled recipe",
+    title: String(parsed.title || "").trim().slice(0, 300),
     category: CATS.includes(parsed.category) ? parsed.category : "Dinner",
     servings: Number.isInteger(parsed.servings)
       ? Math.min(40, Math.max(1, parsed.servings)) : 4,
@@ -117,15 +117,66 @@ function draftFromResult(parsed, url, platform) {
   for (const f of flags.slice(0, 20)) {
     if (typeof f === "string" && f.trim()) d.flagged.push(f.trim().slice(0, 400));
   }
+  /* `R152` — this used to fall back to the literal string "Untitled recipe",
+   * silently. Every other guess in this function is disclosed (the course
+   * below, the 60-line truncation further down), and both device-side
+   * importers already leave a missing title EMPTY and flag it — the link
+   * path says "none was found on the page", the photo path "none was
+   * obvious". This was the one path guessing a NAME without saying so, and
+   * `R121`'s rule is that one situation has one wording.
+   *
+   * The placeholder was the wrong thing to reach for besides: it is the
+   * app's DISPLAY word for a nameless recipe (`R116`), which `startDraft`
+   * keeps out of stored data on purpose so Save cannot bake it in. Saved
+   * unchanged it would put a recipe called "Untitled recipe" in the family's
+   * book, indistinguishable on every screen from one with no name at all.
+   * Empty is safe: `saveNewRecipe` refuses to save a recipe without a title,
+   * which is the same stop the other two paths rely on. */
+  if (!d.title) {
+    d.flagged.push("Title — none was found in the video; add one.");
+  }
+  /* `R153` — the same fault as the title, one field over, and this one had a
+   * false sentence standing over it: CLAUDE.md states that "every import
+   * path that cannot read a count defaults to 4 and flags it". The link path
+   * does, the Add screen does (`R121` made it), and this one did not — a
+   * count the model never gave became a confident 4 with nothing beside it.
+   *
+   * The sentence is the app's own, character for character: `R121`'s rule is
+   * that one situation has one wording, and `R122`/`R123` answer a flag by
+   * the field it names, so the wording is machinery rather than prose.
+   *
+   * An integer outside 1–40 is clamped and stays silent on purpose. The link
+   * and photo paths clamp a parsed count the same silent way, and `R119`'s
+   * rule that a clamp must be SAID is about a number a reader typed a moment
+   * ago — not about a guess nobody made. */
+  if (!Number.isInteger(parsed.servings)) {
+    d.flagged.push("Servings — no count was found; 4 was assumed.");
+  }
   if (!CATS.includes(parsed.category)) {
     d.flagged.push("Course — the extraction didn’t pick a valid course; set to Dinner.");
   }
   for (const k of ["ingredients", "steps"]) {
     const list = Array.isArray(parsed[k]) ? parsed[k] : [];
     d[k] = list.slice(0, 60).map(s => String(s).trim().slice(0, 500)).filter(Boolean);
+    const field = k === "ingredients" ? "Ingredients" : "Steps";
     if (list.length > 60) {
-      d.flagged.push((k === "ingredients" ? "Ingredients" : "Steps") +
+      d.flagged.push(field +
         " — the video produced more than 60 lines; only the first 60 were kept.");
+    }
+    /* `R154` — the third field in this function with `R152`'s fault, and the
+     * one with the most to lose. Both device-side importers say when a list
+     * came back empty; this one said nothing, so a video that yielded
+     * neither produced a draft with blank boxes and no reason given — and
+     * `saveNewRecipe` only refuses an empty TITLE, so that draft is
+     * saveable: a recipe in the family's book with nothing in it, arrived at
+     * in silence.
+     *
+     * The wording is this path's own rather than a copy of either. The two
+     * existing ones already differ because the advice does — "check the
+     * original page" means nothing for a photograph — so what carries across
+     * is the `Field — ` shape `R122`/`R123` answer by, not the sentence. */
+    if (!d[k].length) {
+      d.flagged.push(field + " — none were picked up from the video.");
     }
   }
   for (const k of ["prepTime", "cookTime", "notes"]) {

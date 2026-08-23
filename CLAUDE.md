@@ -1957,11 +1957,173 @@ from. Proven to bite by pointing `KT_LIVE` at a local copy with `decodeSafe`
 reverted — both checks fail there, with the 157-character screen in the
 message. Live 14 → 16, and off CI, so it costs the gate nothing.
 
+### Half of this setup is worse than none of it, and nothing said so
+
+`R151`. `R150` ended by asking the deployed book a question; this one asks
+the deployment itself, and the answer was worth writing down.
+
+Measured on 2026-08-23, from primary sources rather than inferred:
+`/api/health` reports `accepts_changes: false` and
+`publishes_on_change: false` — so `KT_WRITE_KEY` and `KT_GH_TOKEN` are unset
+— and the db-sync run log contains, in as many words, `KT_DB:` followed by
+nothing and the workflow's own warning that *"the database was never read."*
+**Twenty-two scheduled runs, every one reporting success, every one a
+no-op** — which is the designed behaviour of that warning rather than a bug
+in it, and exactly why it was written.
+
+Nothing is broken today, and only because all three are off together. The
+danger is the half-configured state: with `KT_WRITE_KEY` set and the Actions
+secret missing, every edit a phone shares lands in the database and stops
+there — saved, reported saved, and invisible to the family. `db-sync.yml`'s
+warning exists because that went unnoticed for a fortnight once.
+
+So the ordering is now written where the person doing the setup will be
+standing: **the Actions secret goes in before — or with — `KT_WRITE_KEY`.**
+`KT_DB` has two unrelated homes, Render's Environment tab and a GitHub
+Actions secret, and setting the first implies nothing about the second; the
+README said both, in two different lists, and never that they are two.
+
+**And a hazard that only appears once the secret is set.** Scheduled
+workflows run on the **default branch**, which is this project's working
+branch and not `main`. So `db-sync` would commit `recipes.json` there — the
+branch that gets force-pushed to realign after every squash-merge, which
+would silently destroy a sync commit that landed in between. Recorded and
+recommended rather than done: changing a repository's default branch is
+Jason's call, and it is the same change the Render **Branch** note already
+asks for.
+
+The check binds the prose to what actually emits it, which is `R126`'s rule
+about the help page applied to a setup note: every health field the note
+tells a reader to look at must be one the server really reports, and the
+summary line it quotes must be the one the workflow really writes. Rename
+`accepts_changes` in `server.js`, or reword the workflow's skip message, and
+the instructions fail by name instead of quietly sending somebody hunting
+for something that is not there.
+
+**Three of this round's own checks needed correcting, each caught by a
+mutation, and all three are recorded rather than quietly fixed.** The first
+matched a quoted phrase literally, and the README wraps mid-phrase — the
+layout-sensitivity `R149` had finished writing up one round earlier, walked
+straight into. The second asked whether the file mentioned the Actions
+secret *anywhere*, and the rotation note further down always had, so
+deleting it from the new section left the check green: `R145`'s lesson,
+met again. The third was not a check fault at all but a document one — the
+new section's slice ran to the next `##` and swallowed the rotation
+paragraph, which is what kept feeding it the phrase. Giving that paragraph
+its own heading fixed the boundary and the document at once.
+
+### The one import path that guessed a name and never said so
+
+`R152`. Every guess `draftFromResult` makes is disclosed: a course the model
+could not pick falls to Dinner **and is flagged**, a list past sixty lines is
+truncated **and flagged**. A title it could not find became the literal
+string *"Untitled recipe"* — silently, with nothing beside it.
+
+Both device-side importers already had the answer and had had it for a long
+time. The link path leaves a missing title **empty** and flags *"Title —
+none was found on the page; add one."*; the photo path leaves it empty and
+flags *"Title — none was obvious; add one."* So the video importer was the
+one path in the app that guessed a **name** without saying so, which is
+exactly the shape `R121` settled for the servings count: one situation has
+one wording.
+
+**And the placeholder was the wrong thing to reach for.** *"Untitled
+recipe"* is the app's own **display** word for a nameless recipe (`R116`),
+and `startDraft` deliberately keeps it out of stored data so Save cannot
+bake it in. Writing it into a draft does at the server what `R116` forbids
+at the phone: saved unchanged, the family's book gets a recipe actually
+called *Untitled recipe*, indistinguishable on every screen from one that
+has no name at all — which is precisely the state that word exists to
+describe.
+
+Empty is safe, and safe for a reason already in the code rather than a new
+one: `saveNewRecipe` refuses to save a recipe with no title (*"Give the
+recipe a title before saving."*, focusing the field), which is the same stop
+the link and photo paths have always relied on.
+
+The `Title — ` prefix is load-bearing rather than decorative, and a mutation
+proves it: `R122` and `R123` answer a flag by the field it names, so a flag
+worded *"The video never gave a title"* would name nothing, could never be
+cleared, and would follow the recipe for good — `R122`'s permanent stale
+warning, arriving through the one door that had no flag at all.
+
+### The same fault one field over, with a false sentence standing over it
+
+`R153`, and it should have been found in the same breath as `R152`. That
+round fixed a title the video importer guessed without saying so; the field
+directly beneath it did the same thing, and this one had the contract
+claiming otherwise.
+
+CLAUDE.md's own `R121` section says, as a statement of fact, that *"every
+import path that cannot read a count defaults to 4 and flags it — 'Servings
+— no count was found; 4 was assumed.'"* The link path does. The Add screen
+does, because `R121` made it. **The video path did not.** Measured: a count
+the model never gave came out as a confident **4 with nothing beside it**,
+and so did one it gave as something that is not a number.
+
+So the sentence in the file that says *read me before writing any code* was
+false about a third of the paths it described — the same shape as `R149`,
+arrived at from the other direction. It is true now because the code
+changed, not because the sentence was softened.
+
+**The clamp stays silent, and that is a decision rather than an omission.**
+An integer outside 1–40 is brought into range without a word, exactly as the
+link and photo paths bring a parsed count into range without a word.
+`R119`'s rule that a clamp must be *said* is about a number a reader typed a
+moment ago and can still see; it does not transfer to a guess nobody made.
+Both halves are checked, so neither can drift into the other.
+
+**The wording is machinery, not prose**, and a mutation is what proves it:
+rewording the flag to *"Servings — the video never said; 4 was assumed."*
+reads better and fails by name, because `R122` and `R123` answer a flag by
+the field it names and the reader's Double-check chip (`082`) is keyed to
+the same shape. And since three places now assume a count, the app and the
+server are held to **one sentence** rather than each to a copy of it —
+`R115`'s rule for `validateRecipe` and `db/migrate.js`, which guard the same
+field for the same reason and must not disagree about it.
+
+### Every field this function could come up empty on, now says so
+
+`R154` finishes what `R152` started. Three rounds, three fields, one
+function — and the third is the one with the most to lose.
+
+`draftFromResult` flags what it truncates and what it substitutes for a bad
+course, and said nothing at all when a **list** came back empty. Both
+device-side importers already did: the link path flags *"Ingredients — none
+were found; check the original page."*, the photo path *"Ingredients — none
+were picked up."*
+
+Measured: `ingredients: []` and `steps: []` produced a draft with both lists
+empty and **zero flags** — a review screen of blank boxes with no reason
+given. And `saveNewRecipe` refuses only an empty **title**, so that draft is
+saveable: a recipe in the family's book with nothing in it, arrived at in
+silence. The app has a *"No ingredients listed"* panel for that state
+(task `071`) because four handoff recipes genuinely came that way; landing
+there from an import is a different thing entirely.
+
+**The wording is this path's own rather than a copy of either**, and that is
+the point worth keeping. The two existing sentences already differ, because
+the advice differs — *"check the original page"* means nothing for a
+photograph. What carries across between paths is the `Field — ` **shape**
+that `R122` and `R123` answer by, not the sentence; `R153`'s servings flag is
+identical across three writers because there the situation and the remedy
+are identical, and this one is not. One rule, applied honestly in both
+directions.
+
+**And a check of mine measured nothing until I watched which case failed.**
+The shared fixture already carries a model flag reading *"Ingredients —
+mumbled"*, which begins with the exact prefix the check looks for, so two of
+its three cases passed before the fix on text that was always there — only
+the steps case failed, and that discrepancy is what exposed it. `R145`'s
+trap, met in a fixture rather than a document. The model's own flags are
+cleared before the assertion now, so what is measured is what this function
+added.
+
 ### Verified
 
-The suite after the video arc: **1717 functional checks** across eleven
+The suite after the video arc: **1737 functional checks** across eleven
 suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
-plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
