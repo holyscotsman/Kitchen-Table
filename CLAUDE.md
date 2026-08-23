@@ -2413,10 +2413,72 @@ Then with a `.catch(() => {})` behind a wait for a selector that does not
 exist, which is a wait that cannot fail. It closes Edit mode and waits for
 the form to detach, with nothing swallowing it.
 
+### The one field the app rewrites, and never mentioned
+
+`R161`, and `R160`'s lesson at the boundary next door, found the same day.
+`R65`'s comment has said it plainly since it was written:
+
+> course is exactly the field the app itself rewrites, since
+> `normalizeRecipe` defaults anything it doesn't recognise to Dinner.
+
+That round gave the reader a control to correct it with. **Nothing ever
+told them there was anything to correct.** Measured, on a recipe
+hand-edited in `recipes.json` — which is hand-editable *by design*, and
+which `db-sync` rewrites nightly with nobody watching:
+
+| stored course | the recipe page reads | says why |
+|---|---|---|
+| `Baking` | BAKING | — |
+| `baking` | **DINNER** | no |
+| ` Baking ` | **DINNER** | no |
+| `BAKING` | **DINNER** | no |
+| `side` | **DINNER** | no |
+| `Supper` | **DINNER** | no |
+
+Two faults in one line. **Casing is not a different course** — and `side`
+is the sharper one, because `CAT_ALIASES` exists precisely so an older name
+still resolves, and it was matched by exact key. `canonCat` folds case and
+whitespace across both tables now, so all four spellings of Baking are
+Baking and `side` is Sides.
+
+**And a course that really is not one of the ten is a substitution, so it
+says so.** Every sibling substitution in this app is loud: `settleIds`
+writes a flag onto a recipe whose id it moved, and every import path flags
+a course it had to guess (`R73`). This was the quiet exception, on the one
+field a reader cannot see was changed. A missing course gets the imports'
+own sentence — one situation, one wording (`R121`) — while a course that
+was *given* and is not one of ours gets its own, naming what was there,
+because *"none was given"* would be false and a reader cannot fix a value
+they are not shown (`R154`'s rule: the `Field — ` shape carries between
+paths, the words do not). Both are answerable by editing the course, which
+is `R160`'s fix one hour old and already load-bearing.
+
+Flagged rather than refused, deliberately. The app is downstream of a file
+edited by hand and served to phones before any check runs, so it is
+tolerant here; `validateRecipe` and `db/migrate.js` both refuse an unknown
+course **by name**, and still do. `R148` settled that asymmetry for ids and
+it holds for courses.
+
+**Two floors, and the first version of the second one could not fail.** A
+course that is already right must be left entirely alone, flag and all —
+the over-eager version puts a warning on all 48 recipes and is pinned by
+name. The book-scale floor first read `recipes.json` and checked its
+categories were valid: true, a *precondition* rather than a guarantee, and
+it passes happily while the app rewrites every one of them. It opens a real
+recipe filed somewhere other than Dinner and reads what the reader would.
+
+**And the third round running to trip over the same two harness traps**, so
+the note went where it will actually be read — `tests/ctx.js`, the one file
+every suite opens. A `goto` to the hash the page is already on is not a
+navigation and renders nothing; `addInitScript` accumulates, so a second
+fixture never replaces the first. Together they made one course's answer
+stand for four cases: BAKING four times running, three of them passing for
+entirely the wrong reason.
+
 ### Verified
 
-The suite after the video arc: **1785 functional checks** across eleven
-suites (kt 348, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1796 functional checks** across eleven
+suites (kt 359, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

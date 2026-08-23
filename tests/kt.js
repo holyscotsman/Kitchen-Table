@@ -1907,6 +1907,120 @@ const browserContextWithReduce = (br) =>
     await ctxN.close();
   }
 
+  console.log('\n== The course the app rewrites, and never mentioned (R161) ==');
+  {
+    /* `R65`'s comment says it outright, and has since it was written:
+       "course is exactly the field the app itself rewrites, since
+       normalizeRecipe defaults anything it doesn't recognise to Dinner."
+       It gave the reader a control to correct that with. Nothing ever told
+       them there was anything to correct.
+
+       `recipes.json` is hand-editable by design and db-sync rewrites it
+       nightly with nobody watching, so this is where a course actually goes
+       wrong. Measured before the fix, every row silent:
+
+         "Baking" → BAKING     " Baking " → DINNER    "side"   → DINNER
+         "baking" → DINNER     "BAKING"   → DINNER    "Supper" → DINNER
+
+       Two different faults in one line. Casing is not a different course —
+       and "side" is the sharper one, since `CAT_ALIASES` exists precisely
+       so an older name still resolves and was matched by exact key. A
+       course that really is not one of the ten is a substitution, and every
+       sibling substitution here is loud: `settleIds` flags a moved id, and
+       every import path flags a guessed course (`R73`). */
+    const kErrs = [];
+    /* A context of its own per course, and both halves of that matter.
+       `addInitScript` ACCUMULATES — every call adds another script that runs
+       on every later load — and a `goto` to the hash the page is already on
+       is not a navigation at all, so it renders nothing. Together they made
+       the first case's answer stand for all six: measured as BAKING four
+       times running, three of them passing for entirely the wrong reason.
+       The same not-a-navigation trap `R159` and `R160` each hit; the third
+       time is what put the note in `tests/ctx.js`. */
+    const asCourse = async (cat) => {
+      const ctxK = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pK = await ctxK.newPage();
+      pK.on('pageerror', e => kErrs.push(e.message));
+      await pK.addInitScript((r) =>
+        localStorage.setItem('kt.recipes', JSON.stringify([r])),
+        { id: 'course-161', title: 'Hand Edited Loaf', category: cat,
+          contributor: 'Joan', servings: 4,
+          ingredients: ['500g flour'], steps: ['Bake it.'] });
+      await pK.goto(B + '/index.html#course-161');
+      await pK.waitForSelector('.r-title', { timeout: 8000 });
+      const out = await pK.evaluate(() => {
+        const t = document.body.innerText;
+        return { dinner: /·\s*DINNER/i.test(t), shown: (t.match(/·\s*([A-Z]+)/) || [])[1] || '',
+                 says: (t.match(/Course — [^\n]*/) || [])[0] || '' };
+      });
+      await ctxK.close();
+      return out;
+    };
+
+    for (const [given, want] of [['baking', 'BAKING'], [' Baking ', 'BAKING'],
+                                 ['BAKING', 'BAKING'], ['side', 'SIDES']]) {
+      const got = await asCourse(given);
+      chk('a course written ' + JSON.stringify(given) + ' is the course it names',
+        got.shown === want && got.says === '', JSON.stringify(got));
+    }
+
+    /* A course that really is not one of the ten: substituted, and SAID —
+       naming what was there, because "none was given" would be false and a
+       reader cannot fix a value they are not shown. */
+    const supper = await asCourse('Supper');
+    chk('a course this book does not have still lands on Dinner',
+      supper.dinner, JSON.stringify(supper));
+    chk('and says so, naming what was actually there',
+      /^Course — .*Supper.*isn.t one of this book.s courses/.test(supper.says),
+      JSON.stringify(supper.says));
+
+    /* No course at all is the import paths' situation, so it gets their
+       sentence — one situation, one wording (`R121`). */
+    const none = await asCourse('');
+    chk('and a recipe with no course at all gets the sentence the imports use',
+      none.dinner && /^Course — none was given/.test(none.says), JSON.stringify(none));
+
+    /* THE FLOOR, and the reason this is a substitution rather than a
+       refusal: a course that is already right must be left entirely alone,
+       flag included. A version that flagged unconditionally passes every
+       check above and puts a warning on all 48 recipes in the book. */
+    const fine = await asCourse('Baking');
+    chk('while a course that was already right is left alone, flag and all',
+      fine.shown === 'BAKING' && fine.says === '', JSON.stringify(fine));
+
+    /* The same floor at book scale, on the real book rather than a fixture,
+       and asked of the APP rather than of the file. The first version of
+       this read `recipes.json` and checked its categories were all valid —
+       true, and a precondition rather than a guarantee: it passes happily
+       while the app rewrites every one of them. So it opens a real recipe
+       whose course is NOT Dinner and reads what the reader would. */
+    const ctxA = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pA = await ctxA.newPage();
+    pA.on('pageerror', e => kErrs.push(e.message));
+    await pA.goto(B + '/index.html#menu');
+    await pA.waitForSelector('.rcard', { timeout: 8000 });
+    const real = await pA.evaluate(async () => {
+      const l = await (await fetch('recipes.json')).json();
+      const r = l.find((x) => x.category && x.category !== 'Dinner');
+      return r ? { id: r.id, cat: r.category } : null;
+    });
+    chk('the shipped book really has a recipe filed somewhere other than Dinner',
+      !!real, JSON.stringify(real));
+    await pA.goto(B + '/index.html#' + real.id);
+    await pA.waitForSelector('.r-title', { timeout: 8000 });
+    const realShown = await pA.evaluate(() => {
+      const t = document.body.innerText;
+      return { shown: (t.match(/·\s*([A-Z]+)/) || [])[1] || '',
+               says: (t.match(/Course — [^\n]*/) || [])[0] || '' };
+    });
+    chk('and the app leaves its course exactly where the book put it',
+      realShown.shown === real.cat.toUpperCase() && realShown.says === '',
+      JSON.stringify([real, realShown]));
+    await ctxA.close();
+
+    chk('nothing threw', kErrs.length === 0, kErrs.join(' | '));
+  }
+
   console.log('\n== One badly-shaped recipe must not take the book down (R62) ==');
   {
     /* The overlay and recipes.json are both hand-editable by design — the
