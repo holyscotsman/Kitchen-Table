@@ -2196,10 +2196,52 @@ blind toggle **closed** it and the next wait timed out. The app was right and
 the check was wrong; a test that assumes a control's state instead of reading
 it is the same fault as a check that matches text that was already there.
 
+### Escaping is the wrong tool for one attribute
+
+`R157`, and a guarantee rather than a fix — the property held, and the round
+is about pinning it where breaking it would be reasonable.
+
+`R54` proves every attribute the app writes passes through `esc()`. For one
+attribute that is not the right test: `esc()` neutralises quotes, and
+`javascript:alert(1)` needs none. Put a recipe's own text into an `href` and
+the escaping is beside the point.
+
+The invariant, verified from both sides. Every `href` the app writes is a
+`#` fragment — a literal, or `menuHash()`, which returns one. The only
+`.href =` in the file is the `blob:` URL `downloadBlob` makes for itself.
+There is no `window.open` and no `location.href =`. Behaviourally, a recipe
+carrying `source: "javascript:window.__pwned=1"` renders as inert text in a
+`<p>` and `#app` holds no off-page link at all.
+
+**Why pin something that is already true.** The plausible way to break it is
+a change somebody would make for good reasons. `R128` settled that a
+recipe's source is deliberately not tappable — but on presentation grounds,
+that a 120-character URL is a wall at this size and is not a tap target.
+Someone could reopen that on its merits and never meet the other half:
+`source` has four writers, one of them a hand-edited `recipes.json`, and
+`esc()` would not save it. This is the opposite of the reduced-motion sweep
+`R150` reverted, which a blanket `!important` had made unfalsifiable.
+
+**And the check that could not catch the one thing it was written for.**
+The first version scanned `href=["']([^"']*)` and skipped any empty capture.
+An href built entirely by concatenation — `href="' + esc(from) + '"`, which
+is exactly the shape of the mutation that makes the source tappable —
+produces an empty literal run, so it was excused. The mutation walked
+straight past the check written to catch it. It reads the text that
+*follows* the quote now, the way `R54`'s neighbouring block already read
+concatenation, and both the tappable source and a plain off-page link fail
+by name with the offending text in the message.
+
+That is the fifth check of mine this session that could not do its job, and
+they have one shape: **it assumed rather than read.** A fixture already
+carrying the string, a control already in the state it wanted to set, a
+matcher that expected the layout it happened to see, and now a scan that
+expected the quoting it happened to have.
+
 ### Verified
 
-The suite after the video arc: **1749 functional checks** across eleven
-suites (kt 342, feat 85, add 115, relay 21, quick 76, polish 368, sec 56,
+The suite after the video arc: **1755 functional checks** across eleven
+suites (kt 342, feat 85, add 115, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
