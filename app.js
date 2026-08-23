@@ -4351,7 +4351,16 @@
      purpose — a false "duplicate" on every casserole would teach people to
      ignore the warning. */
   function findDuplicate(d) {
-    function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, "").trim(); }
+    /* `R156` — folded, not stripped. This deleted every non-ASCII character
+       outright, so "Crème Brûlée" normalised to "crme brle" and shared not
+       one token with a hand-typed "Creme Brulee": overlap 0.00, and the
+       warning that exists to catch exactly that never appeared. It needs
+       EVERY word accented to go wrong — "Jalapeño Poppers" still scores 0.50
+       on its second word — so it is narrow, and the warning is advisory
+       either way ("Save anyway" is one tap). Worth the one word because the
+       app has `fold` precisely so that accents do not matter, and this was
+       the only comparison in it that did not use them. */
+    function norm(s) { return fold(String(s || "")).replace(/[^a-z0-9 ]+/g, "").trim(); }
     function tokens(s) { return norm(s).split(/\s+/).filter(Boolean); }
     function overlap(a, b) {
       if (!a.length || !b.length) return 0;

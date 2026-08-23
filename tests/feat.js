@@ -275,6 +275,34 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
     (await countFor('chicken')) === (await countFor('  chicken  ')) &&
     (await countFor('chicken')) > 5,
     String(await countFor('chicken')));
+
+  /* `R156` — and the address survives it. `R155` changed what a two-word `q`
+     MEANS, and a filtered list being shareable and bookmarkable is a
+     documented feature (README: "a filtered list can be shared, bookmarked").
+     Verified by hand when `R155` shipped and checked by nothing, which is the
+     half that rots. Both orders, because that is the change under it. */
+  const twoWord = await countFor('bacon potato');
+  chk('typing two words writes them into the address',
+    (await p.evaluate(() => location.hash)) === '#menu?q=bacon%20potato',
+    await p.evaluate(() => location.hash));
+  for (const [hash, label] of [['#menu?q=bacon%20potato', 'as typed'],
+                               ['#menu?q=potato%20bacon', 'the other way round']]) {
+    await p.goto('about:blank');
+    await p.goto(B + '/index.html' + hash);
+    await new Promise(r=>setTimeout(r,700));
+    chk('a shared two-word address restores the same list (' + label + ')',
+      (await p.locator('.rcard').count()) === twoWord && twoWord > 0,
+      (await p.locator('.rcard').count()) + ' vs ' + twoWord);
+    chk('and puts the words back in the search box (' + label + ')',
+      (await p.evaluate(() => (document.getElementById('menu-search')||{}).value || '')).split(/\s+/).sort().join(' ') === 'bacon potato',
+      await p.evaluate(() => (document.getElementById('menu-search')||{}).value || '(no field)'));
+  }
+  /* Back to a plain Menu for whatever follows. Deliberately NOT toggling the
+     search open: arriving at a `?q=` address opens it already (the README
+     promises exactly that — "arriving with one opens the search box with the
+     words in it"), so a blind toggle here CLOSED it and the next
+     waitForSelector timed out. The app was right and this line was wrong. */
+  await p.goto(B + '/index.html#menu'); await p.waitForSelector('.rcard');
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
   console.log('\n== A removed recipe left its photo behind (R71) ==');

@@ -170,6 +170,45 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   await p.click('[data-act="add-save-anyway"]'); await p.waitForTimeout(500);
   chk('save anyway saves', /#scottish-tablet-2$/.test(p.url()), p.url());
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
+
+  /* `R156` — the warning compares titles after stripping every character
+     that is not a-z0-9, which DELETED accents rather than folding them.
+     "Crème Brûlée" normalised to "crme brle" and shared not one token with a
+     hand-typed "Creme Brulee": overlap 0.00, no warning, two copies in the
+     book. It needs every word accented to go wrong — "Jalapeño Poppers"
+     still scores 0.50 on its second word — so it is narrow, and the warning
+     is advisory either way. Worth one word because the app carries `fold`
+     precisely so accents do not matter, and this was the only comparison in
+     it that did not use it. */
+  await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
+  await p.evaluate(async()=>{
+    const l = await (await fetch('recipes.json')).json();
+    l[0].title = 'Crème Brûlée';
+    localStorage.setItem('kt.recipes', JSON.stringify(l));
+  });
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
+  await p.click('[data-key="review"]'); await p.waitForSelector('#a-title');
+  await p.fill('#a-title','Creme Brulee');
+  await p.click('[data-act="add-save"]'); await p.waitForTimeout(400);
+  /* Asserted the way the checks above assert it — still on #add, with the
+     warning naming the recipe. Reading a panel COUNT was the first version
+     and it detected the fault only sideways: under the mutation the recipe
+     saves, and the count it reported (2) came from the flag panels on the
+     recipe page it had navigated to, not from a warning at all. */
+  chk('an accented title is recognised as the same recipe',
+    p.url().endsWith('#add') &&
+    /Cr[eè]me/.test(await p.locator('.panel--flag').first().textContent()),
+    p.url());
+  /* The floor: folding must not make everything look like everything. */
+  await p.evaluate(()=>{try{sessionStorage.removeItem('kt.addDraft')}catch(e){}});
+  await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
+  await p.click('[data-key="review"]'); await p.waitForSelector('#a-title');
+  await p.fill('#a-title','Utterly Unrelated Pie');
+  await p.fill('#a-ing-0','1 cup flour');
+  await p.click('[data-act="add-save"]'); await p.waitForTimeout(500);
+  chk('and an unrelated title still saves without a warning',
+    /#utterly-unrelated-pie$/.test(p.url()), p.url());
+  await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
   await p.goto(B+'/index.html#add'); await p.reload(); await p.waitForSelector('.pathbtn');
 
   console.log('\n== Two cards, one recipe (task 066) ==');
