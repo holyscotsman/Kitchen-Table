@@ -7,13 +7,14 @@
  * text clipped by an ancestor that hides overflow.
  */
 const { chromium } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0, fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx = await br.newContext({ viewport: { width: 320, height: 900 } });
+  const ctx = await freshContext(br, { viewport: { width: 320, height: 900 } });
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));

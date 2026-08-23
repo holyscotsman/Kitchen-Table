@@ -1,4 +1,5 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const { SCREENS, PRINTS, seedInit, openScreen } = require('./screens');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 const CONTRAST = `(() => {
@@ -31,7 +32,7 @@ const CONTRAST = `(() => {
   for(const theme of ['dark','light']){
     /* `R131` — the one list, shared with the two sweeps in kt.js. */
     for(const [name,hash,extra,seed,net] of SCREENS){
-      const ctx=await br.newContext({...devices['iPhone 13']});
+      const ctx=await freshContext(br, {...devices['iPhone 13']});
       /* Hermetic: the kitchen server is never poked from CI — the app's
          ready-list fetch on #add fails silently, exactly like offline. */
       await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -86,7 +87,7 @@ const CONTRAST = `(() => {
        bug `R113` fixed, and an opener with no proof that the state it
        wanted ever appeared. */
     for(const [name,hash,extra,seed,net] of SCREENS.filter(e=>PRINTS.has(e[0]))){
-      const ctx=await br.newContext({viewport:{width:820,height:1160}});
+      const ctx=await freshContext(br, {viewport:{width:820,height:1160}});
       await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
       if(net){
         await ctx.route(net.url, async r => {

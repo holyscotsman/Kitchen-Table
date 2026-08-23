@@ -2,6 +2,7 @@
  * Same harness idiom as every other suite: hermetic, one command, exit 1 on red.
  */
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass = 0, fail = 0;
 const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
@@ -9,7 +10,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(String(e.message)));
@@ -265,7 +266,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        One reader for the whole app now: a line is summed only when it is a
        single plain amount with nothing left behind, and everything else is
        listed as written, scaled, and says what it kept. */
-    const ctxS = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxS = await freshContext(br, { ...devices['iPhone 13'] });
     const pS = await ctxS.newPage();
     const sErrs = []; pS.on('pageerror', e => sErrs.push(e.message));
     /* Two meals, planned straight into storage so the search box and the
@@ -347,7 +348,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        sheet offered a stepper for it, which moved that number while the
        shopping list went on using the recipe's amounts exactly as written,
        because a multiplier with no base is 1. */
-    const ctxC = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxC = await freshContext(br, { ...devices['iPhone 13'] });
     const pC = await ctxC.newPage();
     const cErrs = []; pC.on('pageerror', e => cErrs.push(e.message));
     await pC.goto(B + '/index.html');
@@ -456,7 +457,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        minced garlic" and "cloves minced garlic" are different units and
        cannot be added, and "large egg" / "medium egg" are not units at all
        — just the first word of the line, where the parser looks. */
-    const ctxU = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxU = await freshContext(br, { ...devices['iPhone 13'] });
     const pU = await ctxU.newPage();
     const uErrs = []; pU.on('pageerror', e => uErrs.push(e.message));
     await pU.goto(B + '/index.html');
@@ -554,7 +555,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        swallows a quota error, and the same "it worked" sentence follows it —
        so on a full phone the week says a meal is planned, draws it in the
        day, and loses it on the next load. */
-    const ctxP = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxP = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pP = await ctxP.newPage();
     const errsP = []; pP.on('pageerror', e => errsP.push(e.message));
     await pP.goto(B + '/index.html#plan');
@@ -610,7 +611,7 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
        cannot be right in both. The suites had the same assumption in their
        own seeding and now compute the day the way the app does. */
     for (const zone of ['Pacific/Kiritimati', 'Pacific/Niue']) {
-      const ctxZ = await br.newContext({ ...devices['iPhone 13'], timezoneId: zone });
+      const ctxZ = await freshContext(br, { ...devices['iPhone 13'], timezoneId: zone });
       const pZ = await ctxZ.newPage();
       const zErrs = []; pZ.on('pageerror', e => zErrs.push(e.message));
       await pZ.goto(B + '/index.html#plan');

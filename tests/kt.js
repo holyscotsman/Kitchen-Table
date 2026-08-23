@@ -1,14 +1,15 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const { SCREENS, seedInit, openScreen } = require('./screens');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0, fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
 const browserContextWithReduce = (br) =>
-  br.newContext({ ...devices['iPhone 13'], reducedMotion: 'reduce' });
+  freshContext(br, { ...devices['iPhone 13'], reducedMotion: 'reduce' });
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
   const p = await ctx.newPage();
   const errs=[];
   p.on('pageerror', e=>errs.push('pageerror: '+e.message));
@@ -1101,7 +1102,7 @@ const browserContextWithReduce = (br) =>
       flagged: ['Servings: no count was found; 4 was assumed.',
                 'Title - none was obvious; add one.',
                 'Steps – none were picked up.'] };
-    const ctxC = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxC = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pC = await ctxC.newPage();
     const cErrs = []; pC.on('pageerror', e => cErrs.push(e.message));
     await pC.addInitScript((r) =>
@@ -1147,7 +1148,7 @@ const browserContextWithReduce = (br) =>
     /* Its own context: the page above has a book in memory that a render
        writes back over any seed poked into storage underneath it — the same
        cross-contamination `R122`'s and `R123`'s harnesses each hit. */
-    const ctxP = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxP = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pP = await ctxP.newPage();
     pP.on('pageerror', e => cErrs.push(e.message));
     await pP.addInitScript((r) => localStorage.setItem('kt.recipes', JSON.stringify([r])),
@@ -1176,7 +1177,7 @@ const browserContextWithReduce = (br) =>
        "Steps, answered" and a real warning disappears — the mutation that
        dropped the separator passed every other check here, which is how
        this gap was found. */
-    const ctxW = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxW = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pW = await ctxW.newPage();
     pW.on('pageerror', e => cErrs.push(e.message));
     await pW.addInitScript((r) => localStorage.setItem('kt.recipes', JSON.stringify([r])),
@@ -1235,7 +1236,7 @@ const browserContextWithReduce = (br) =>
                 'Title — none was obvious; add one.',
                 'Ingredients — none were picked up.',
                 'The photos couldn’t be kept on this phone (quota)'] };
-    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pF = await ctxF.newPage();
     const fErrs = []; pF.on('pageerror', e => fErrs.push(e.message));
 
@@ -1347,7 +1348,7 @@ const browserContextWithReduce = (br) =>
     const TIDY = { id: 'tidy-120', title: 'Real Title', category: 'Dinner',
       contributor: 'Joan', servings: 4,
       ingredients: ['1 cup flour'], steps: ['Bake it.'] };
-    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pT = await ctxT.newPage();
     const tErrs = []; pT.on('pageerror', e => tErrs.push(e.message));
     await pT.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), [TIDY]);
@@ -1434,7 +1435,7 @@ const browserContextWithReduce = (br) =>
     const BIG = { id: 'big-119', title: 'Church Hall Stew', category: 'Dinner',
       contributor: 'Joan', servings: 200,
       ingredients: ['20 kg beef'], steps: ['Simmer for hours.'] };
-    const ctxV = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxV = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pV = await ctxV.newPage();
     const vErrs = []; pV.on('pageerror', e => vErrs.push(e.message));
     await pV.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), [BIG]);
@@ -1515,7 +1516,7 @@ const browserContextWithReduce = (br) =>
       contributor: 'Joan', servings: 4, prepTime: '10 min',
       ingredients: ['2 eggs'], steps: ['Whisk.'] };
 
-    const ctxS = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxS = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pS = await ctxS.newPage();
     const sErrs = []; pS.on('pageerror', e => sErrs.push(e.message));
     await pS.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
@@ -1597,7 +1598,7 @@ const browserContextWithReduce = (br) =>
        by design, so a shipped recipe is not in the book once this seed is. */
     const WHOLE = { id: 'whole-r117', title: 'Whole Recipe', category: 'Dinner',
       contributor: 'Joan', servings: 4, ingredients: ['2 eggs'], steps: ['Whisk.'] };
-    const ctxR = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxR = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pR = await ctxR.newPage();
     const rErrs = []; pR.on('pageerror', e => rErrs.push(e.message));
     await pR.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
@@ -1674,7 +1675,7 @@ const browserContextWithReduce = (br) =>
     const NAMED = { id: 'ok-two', title: 'Alpha Recipe', category: 'Dinner',
       contributor: 'Joan', servings: 4, ingredients: ['a'], steps: ['b'] };
 
-    const ctxN = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pN = await ctxN.newPage();
     const nErrs = []; pN.on('pageerror', e => nErrs.push(e.message));
     await pN.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)),
@@ -1825,7 +1826,7 @@ const browserContextWithReduce = (br) =>
        page silently falls back to the front screen with no explanation.
        Every other storage boundary in this app is coerced (`R21` the plan,
        `R40` the dismissed imports); this one, holding the recipes, was not. */
-    const ctxB = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxB = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pB = await ctxB.newPage();
     const bErrs = []; pB.on('pageerror', e => bErrs.push(e.message));
     const GOOD = { id: 'ok-one', title: 'Fine Recipe', category: 'Dinner',
@@ -1879,7 +1880,7 @@ const browserContextWithReduce = (br) =>
     /* The other source, and the one nobody is watching: the published file
        itself, regenerated nightly by db-sync. Same shape, same promise. */
     const bErrs2 = [];
-    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     await ctxF.route('**/recipes.json', route => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify([GOOD, BENT])
@@ -1999,7 +2000,7 @@ const browserContextWithReduce = (br) =>
       contributor: 'Joan', servings: 4,
       ingredients: ['1 cup ' + t], steps: ['Cook ' + t] });
 
-    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pT = await ctxT.newPage();
     const tErrs = []; pT.on('pageerror', e => tErrs.push(e.message));
     pT.on('dialog', d => d.accept());
@@ -2054,7 +2055,7 @@ const browserContextWithReduce = (br) =>
 
     /* The published file is the copy that is actually hand-edited, so it
        gets the same promise. */
-    const ctxF = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     await ctxF.route('**/recipes.json', route => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify([mk('First Twin'), mk('Second Twin')])
@@ -2070,7 +2071,7 @@ const browserContextWithReduce = (br) =>
 
     /* And nothing is renamed that did not need to be — the real book keeps
        every id it shipped with, which is what the hash routes depend on. */
-    const ctxN = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxN = await freshContext(br, { ...devices['iPhone 13'] });
     const pN = await ctxN.newPage();
     await pN.goto(B + '/index.html#menu');
     await pN.waitForSelector('.rcard');
@@ -2426,7 +2427,7 @@ const browserContextWithReduce = (br) =>
   let inspected = 0;
   for (const entry of SCREENS) {
     const scr = entry[0], seed = entry[3], net = entry[4];
-    const ctxA = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxA = await freshContext(br, { ...devices['iPhone 13'] });
     /* Hermetic: the kitchen server is never poked from CI. */
     await ctxA.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     if (net) {
@@ -2553,7 +2554,7 @@ const browserContextWithReduce = (br) =>
        Measured with the restore removed: typing "chicken" leaves "c",
        focus on <body> — which on iOS means the keyboard drops away after
        the first letter — and all 763 checks stayed green. */
-    const ctxT = await br.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const ctxT = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
     const pT = await ctxT.newPage();
     const errsT = []; pT.on('pageerror', e => errsT.push(e.message));
     const field = (sel) => pT.evaluate((s) => {
@@ -2710,7 +2711,7 @@ const browserContextWithReduce = (br) =>
     const SEED = [mk('menu-of-the-week', 'Menu Of The Week'), mk('menuboard', 'Menuboard'),
       mk('plan', 'Plan'), mk('add', 'Add'), mk('help', 'Help'), mk('main', 'Main'),
       mk('ordinary', 'Ordinary')];
-    const ctxR = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxR = await freshContext(br, { ...devices['iPhone 13'] });
     await ctxR.route('**/*.onrender.com/**', (r) => r.abort('failed'));
     await ctxR.addInitScript((rs) => localStorage.setItem('kt.recipes', JSON.stringify(rs)), SEED);
     const pR = await ctxR.newPage();

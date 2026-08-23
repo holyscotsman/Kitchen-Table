@@ -1,10 +1,11 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0,fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
 (async()=>{
   const br=await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx=await br.newContext({...devices['iPhone 13']});
+  const ctx=await freshContext(br, {...devices['iPhone 13']});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.on('dialog',d=>d.accept());
@@ -56,7 +57,7 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   chk('contributor shows Joan', (await p.locator('.menubody').textContent()).includes('Joan'));
 
   console.log('\n== Desktop still one per line ==');
-  const d=await br.newContext({viewport:{width:1280,height:900}});
+  const d=await freshContext(br, {viewport:{width:1280,height:900}});
   const dp=await d.newPage();
   await dp.goto(B+'/index.html#menu'); await dp.waitForSelector('.rcard');
   chk('one column at 1280px too', await dp.evaluate(()=>getComputedStyle(document.querySelector('.cardgrid')).gridTemplateColumns.split(' ').length)===1);

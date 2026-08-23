@@ -8,6 +8,7 @@
  * hold and say so.
  */
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0, fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
@@ -27,7 +28,7 @@ const hostile = JSON.stringify({
 
 (async () => {
   const br = await chromium.launch(process.env.KT_CHROMIUM ? { executablePath: process.env.KT_CHROMIUM } : {});
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
   /* Hermetic: the kitchen server is never poked from CI — the app's
      ready-list fetch on #add fails silently, exactly like offline. */
   await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -214,7 +215,7 @@ const hostile = JSON.stringify({
     /* The slash is deliberate: this id has to be wrong in both ways at once
        — markup when it is drawn, a second path segment when it is fetched. */
     const BOOM = (n) => 'j' + n + '/x"><img src=x onerror="window.__k' + n + '=1">';
-    const ctxK = await br.newContext({ ...devices['iPhone 13'] });
+    const ctxK = await freshContext(br, { ...devices['iPhone 13'] });
     const now = new Date().toISOString();
     const asked = [];
     await ctxK.route(API + '/**', (route) => {

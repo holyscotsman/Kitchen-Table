@@ -1,4 +1,5 @@
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass=0,fail=0;
 const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log('  FAIL '+n+(e?' :: '+e:'')));
@@ -13,7 +14,7 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
 
   console.log('\n== First relay dead, second works ==');
   {
-    const ctx=await br.newContext({...devices['iPhone 13']});
+    const ctx=await freshContext(br, {...devices['iPhone 13']});
     /* Hermetic: the kitchen server is never poked from CI — the app's
        ready-list fetch on #add fails silently, exactly like offline. */
     await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -43,7 +44,7 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
 
   console.log('\n== Text relay fallback ==');
   {
-    const ctx=await br.newContext({...devices['iPhone 13']});
+    const ctx=await freshContext(br, {...devices['iPhone 13']});
     /* Hermetic: the kitchen server is never poked from CI — the app's
        ready-list fetch on #add fails silently, exactly like offline. */
     await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -69,7 +70,7 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
 
   console.log('\n== Everything down: honest failure + paste still works ==');
   {
-    const ctx=await br.newContext({...devices['iPhone 13']});
+    const ctx=await freshContext(br, {...devices['iPhone 13']});
     /* Hermetic: the kitchen server is never poked from CI — the app's
        ready-list fetch on #add fails silently, exactly like offline. */
     await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
@@ -105,7 +106,7 @@ const PAGE = `<html><head><script type="application/ld+json">${LD}<\/script></he
        the app's two network paths out of the Add screen. Nothing checked
        either one, and a relay chain walks up to four services per attempt,
        every one of them a third party the reader was told about once. */
-    const ctx = await br.newContext({ ...devices['iPhone 13'] });
+    const ctx = await freshContext(br, { ...devices['iPhone 13'] });
     await ctx.route('**/*.onrender.com/**', r => r.abort('failed'));
     const p = await ctx.newPage();
     let asked = 0;

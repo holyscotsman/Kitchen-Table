@@ -4,6 +4,7 @@
  * touches the network, Render, or a real video.
  */
 const { chromium, devices } = require('playwright');
+const { freshContext } = require('./ctx');
 const B = process.env.KT_BASE || 'http://127.0.0.1:8899';
 let pass = 0, fail = 0;
 const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
@@ -76,7 +77,7 @@ function stubKitchen(ctx, opts) {
 }
 
 async function freshPage(br, opts) {
-  const ctx = await br.newContext({ ...devices['iPhone 13'] });
+  const ctx = await freshContext(br, { ...devices['iPhone 13'] });
   const stub = stubKitchen(ctx, opts);
   const p = await ctx.newPage();
   p.errs = [];
@@ -490,7 +491,7 @@ async function freshPage(br, opts) {
       ['an empty body', {}]
     ];
     for (const [what, body] of SHAPES) {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       const polled = [];
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
@@ -580,7 +581,7 @@ async function freshPage(br, opts) {
         { jobs: [{ id: { n: 1 }, title: [1, 2], platform: 9, created_at: 'soon' }] }]
     ];
     for (const [what, body] of SHAPES) {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
         if (u.pathname === '/api/import/jobs') {
@@ -622,7 +623,7 @@ async function freshPage(br, opts) {
        That turns a future schema change into an empty waiting list with no
        explanation. A job the server says is ready gets shown. */
     {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', (route) => {
         const u = new URL(route.request().url());
         const body = u.pathname === '/api/import/jobs' &&
@@ -838,7 +839,7 @@ async function freshPage(br, opts) {
        and this is checked from BOTH sides: a claim that is right only half
        the time is what got us here. */
     const helpWith = async (key) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       if (key) await ctx.addInitScript(k =>
         localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);
@@ -909,7 +910,7 @@ async function freshPage(br, opts) {
        Read from the dialog itself rather than from the source, because what
        matters is the sentence a person is actually shown. */
     const askedWith = async (key) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       await ctx.addInitScript((k) => {
         /* The undo only appears once this phone has local changes. */
@@ -1300,7 +1301,7 @@ async function freshPage(br, opts) {
        family leaves it live for them AND loses their own copy, so they
        cannot even open it to put it right. */
     const removeAsk = async (key, recipeId) => {
-      const ctx = await br.newContext({ ...devices['iPhone 13'] });
+      const ctx = await freshContext(br, { ...devices['iPhone 13'] });
       await ctx.route(API + '/**', r => r.abort('failed'));
       if (key) await ctx.addInitScript(k =>
         localStorage.setItem('kt.kitchenKey', JSON.stringify(k)), key);

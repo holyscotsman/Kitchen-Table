@@ -1612,10 +1612,52 @@ tells a contributor where to add a screen — the fourth time this session a
 mutation has found a check of mine hollow, and the fourth recorded rather
 than quietly fixed.
 
+### The hermetic promise was kept by hand in ninety places
+
+`R146`. This file has said since the video arc that the suites run
+*"hermetically — the suites stub the kitchen server and abort the Render
+origin, so CI never wakes the real one."* That was kept one
+`ctx.route(...)` at a time, per context, and counting what hand-keeping had
+produced:
+
+| suite | contexts | Render aborts |
+|---|---|---|
+| `tests/kt.js` | 19 | **2** |
+| `tests/polish.js` | 36 | 21 |
+| `tests/plan.js` | 6 | **0** |
+| `tests/quick.js` | 2 | **0** |
+
+**What is measured**: a context made the way `kt.js`'s typing sweep made one
+*reaches for* the family's real Render origin on `#add` — four requests per
+`freshAdd` cycle, three cycles in that one sweep, because `onRoute` asks the
+kitchen for the waiting and failed import lists.
+
+**What is not measured, and was claimed anyway before being corrected**:
+whether a CI runner *answers* them. The sandbox this was measured in has no
+route to that host, so an aborted request and an unreachable one look
+identical from here — and `page.on('request')` fires **before routing and
+before any network attempt**, which is exactly how the wrong claim was made.
+A runner has open egress, so they very likely would be answered; *very
+likely* is why this is written down rather than asserted. The 30-second
+`.pathbtn` timeout that failed the suite on `d76fb31` stays **unexplained**
+rather than pinned on it.
+
+Reaching for a third party at all, from suites that claim to be hermetic, is
+the fault worth fixing either way. `tests/ctx.js` is one maker — 92 contexts
+across twelve suites come through it — so a new context cannot be born
+without the rule, which is `R131`'s answer to five drifting screen lists
+applied to the drift underneath the suites themselves. The two suites whose
+whole job is to touch something real, `live.js` and `ocr-live.js`, are
+excused by name with their reasons, in `R114`'s shape.
+
+The abort is at the **origin**, not a path: a suite that wants to answer for
+the kitchen points `kt.importApi` at its own stub host and routes that, which
+never meets this rule. `video.js` already did.
+
 ### Verified
 
-The suite after the video arc: **1676 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 341, sec 56,
+The suite after the video arc: **1680 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 345, sec 56,
 plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
