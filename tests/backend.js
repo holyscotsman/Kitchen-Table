@@ -674,6 +674,41 @@ const { runJob, computeFps } = lib('pipeline');
     try { extract.draftFromResult({ is_recipe: false, not_recipe_reason: 'it is a cat video' }, 'u', 'youtube'); }
     catch (e) { notRecipe = e; }
     chk('not-a-recipe throws the friendly refusal', notRecipe && notRecipe.notRecipe && /cat video/.test(notRecipe.message));
+
+    /* `R152` — a title the extraction could not find used to become the
+       literal string "Untitled recipe", silently, with no flag.
+
+       Every other guess in this function is disclosed: an unusable course
+       falls to Dinner AND is flagged, a list past 60 lines is truncated AND
+       flagged. Both of the device-side importers do the same for a missing
+       title — the link path leaves it empty and flags "Title — none was
+       found on the page; add one.", the photo path leaves it empty and flags
+       "Title — none was obvious; add one." — so this was the one path
+       guessing a NAME without saying so. `R121`'s rule: one situation has
+       one wording.
+
+       And the placeholder is the app's display word for a nameless recipe
+       (`R116`), which `startDraft` deliberately keeps out of stored data so
+       Save cannot bake it in. Baking it in here does at the server what
+       `R116` forbids at the phone: a recipe saved unchanged would be titled
+       "Untitled recipe" in the family's book, indistinguishable on every
+       screen from one that has no name at all.
+
+       Leaving it empty is safe because `saveNewRecipe` already refuses to
+       save a recipe with no title — the same stop the other two paths rely
+       on. */
+    const noTitle = extract.draftFromResult(
+      Object.assign({}, parsed, { title: '   ' }), 'u', 'youtube');
+    chk('a title the video never gave is left empty, not invented',
+      noTitle.title === '', JSON.stringify(noTitle.title));
+    chk('and it is flagged, the way every other guess here is',
+      noTitle.flagged.some(f => /^Title — /.test(f)),
+      JSON.stringify(noTitle.flagged.slice(0, 3)));
+    /* The floor that keeps disclosure from becoming noise on every import —
+       `R123`'s reason for caring whether a flag is answerable. */
+    chk('and a title the video did give is not flagged',
+      !d.flagged.some(f => /^Title — /.test(f)),
+      JSON.stringify(d.flagged));
   }
 
   /* ---- the whole pipeline, tools faked, network stubbed ---- */

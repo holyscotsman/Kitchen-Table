@@ -2012,11 +2012,46 @@ new section's slice ran to the next `##` and swallowed the rotation
 paragraph, which is what kept feeding it the phrase. Giving that paragraph
 its own heading fixed the boundary and the document at once.
 
+### The one import path that guessed a name and never said so
+
+`R152`. Every guess `draftFromResult` makes is disclosed: a course the model
+could not pick falls to Dinner **and is flagged**, a list past sixty lines is
+truncated **and flagged**. A title it could not find became the literal
+string *"Untitled recipe"* — silently, with nothing beside it.
+
+Both device-side importers already had the answer and had had it for a long
+time. The link path leaves a missing title **empty** and flags *"Title —
+none was found on the page; add one."*; the photo path leaves it empty and
+flags *"Title — none was obvious; add one."* So the video importer was the
+one path in the app that guessed a **name** without saying so, which is
+exactly the shape `R121` settled for the servings count: one situation has
+one wording.
+
+**And the placeholder was the wrong thing to reach for.** *"Untitled
+recipe"* is the app's own **display** word for a nameless recipe (`R116`),
+and `startDraft` deliberately keeps it out of stored data so Save cannot
+bake it in. Writing it into a draft does at the server what `R116` forbids
+at the phone: saved unchanged, the family's book gets a recipe actually
+called *Untitled recipe*, indistinguishable on every screen from one that
+has no name at all — which is precisely the state that word exists to
+describe.
+
+Empty is safe, and safe for a reason already in the code rather than a new
+one: `saveNewRecipe` refuses to save a recipe with no title (*"Give the
+recipe a title before saving."*, focusing the field), which is the same stop
+the link and photo paths have always relied on.
+
+The `Title — ` prefix is load-bearing rather than decorative, and a mutation
+proves it: `R122` and `R123` answer a flag by the field it names, so a flag
+worded *"The video never gave a title"* would name nothing, could never be
+cleared, and would follow the recipe for good — `R122`'s permanent stale
+warning, arriving through the one door that had no flag at all.
+
 ### Verified
 
-The suite after the video arc: **1725 functional checks** across eleven
+The suite after the video arc: **1728 functional checks** across eleven
 suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
-plan 79, video 276, backend 304, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 307, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

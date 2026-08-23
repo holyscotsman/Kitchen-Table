@@ -106,7 +106,7 @@ function draftFromResult(parsed, url, platform) {
     throw e;
   }
   const d = {
-    title: String(parsed.title || "").trim().slice(0, 300) || "Untitled recipe",
+    title: String(parsed.title || "").trim().slice(0, 300),
     category: CATS.includes(parsed.category) ? parsed.category : "Dinner",
     servings: Number.isInteger(parsed.servings)
       ? Math.min(40, Math.max(1, parsed.servings)) : 4,
@@ -116,6 +116,24 @@ function draftFromResult(parsed, url, platform) {
   const flags = Array.isArray(parsed.flagged) ? parsed.flagged : [];
   for (const f of flags.slice(0, 20)) {
     if (typeof f === "string" && f.trim()) d.flagged.push(f.trim().slice(0, 400));
+  }
+  /* `R152` — this used to fall back to the literal string "Untitled recipe",
+   * silently. Every other guess in this function is disclosed (the course
+   * below, the 60-line truncation further down), and both device-side
+   * importers already leave a missing title EMPTY and flag it — the link
+   * path says "none was found on the page", the photo path "none was
+   * obvious". This was the one path guessing a NAME without saying so, and
+   * `R121`'s rule is that one situation has one wording.
+   *
+   * The placeholder was the wrong thing to reach for besides: it is the
+   * app's DISPLAY word for a nameless recipe (`R116`), which `startDraft`
+   * keeps out of stored data on purpose so Save cannot bake it in. Saved
+   * unchanged it would put a recipe called "Untitled recipe" in the family's
+   * book, indistinguishable on every screen from one with no name at all.
+   * Empty is safe: `saveNewRecipe` refuses to save a recipe without a title,
+   * which is the same stop the other two paths rely on. */
+  if (!d.title) {
+    d.flagged.push("Title — none was found in the video; add one.");
   }
   if (!CATS.includes(parsed.category)) {
     d.flagged.push("Course — the extraction didn’t pick a valid course; set to Dinner.");
