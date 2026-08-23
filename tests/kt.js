@@ -412,6 +412,63 @@ const browserContextWithReduce = (br) =>
       await p.getAttribute('[data-act="open-text"]', 'aria-label'));
   }
 
+  console.log('\n== The floor the stepper knew about and the button did not (R169) ==');
+  {
+    /* `EASY_MIN_FS`'s comment says it plainly: "Easy Read never drops the
+       reader below this step. The A−/A+ stepper still works above it."
+       `stepFs` has always honoured that. The two A− buttons hardcoded 0 —
+       `effectiveFs() === 0 ? " disabled" : ""` — which with Easy Read on is
+       never true, so at the floor the button stayed ENABLED and did
+       nothing. Measured: three presses running, the size unmoved at 29px,
+       the button live the whole time; the same button at the plain floor
+       has always been disabled.
+
+       A control that looks pressable and is inert is the fault this app
+       bans elsewhere ("zero hover-only affordances" — the iPhone has no
+       hover), and it lands in the mode the reader this book was built for
+       is most likely to be using. */
+    const seen = [];
+    for (const [easy, idx, label] of [
+      [false, '0', 'plain at the floor'],
+      [false, '2', 'plain above it'],
+      [true, '0', 'Easy Read at the floor'],
+      [true, '3', 'Easy Read above it'],
+      [true, '4', 'Easy Read at the ceiling']]) {
+      /* One context each: `addInitScript` accumulates (see tests/ctx.js). */
+      const ctxF = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+      const pF = await ctxF.newPage();
+      await pF.addInitScript((o) => {
+        if (o.easy) localStorage.setItem('kt.easyRead', 'true');
+        localStorage.setItem('kt.fsIndex', o.idx);
+      }, { easy, idx });
+      await pF.goto(B + '/index.html#menu');
+      await pF.waitForSelector('.rcard');
+      await pF.click('[data-act="open-text"]');
+      await pF.waitForSelector('[data-act="fs-"]');
+      seen.push(Object.assign({ label }, await pF.evaluate(() => ({
+        minus: document.querySelector('[data-act="fs-"]').disabled,
+        plus: document.querySelector('[data-act="fs+"]').disabled,
+        px: parseInt((document.querySelector('.fsrow__value') || {}).textContent, 10)
+      }))));
+      await ctxF.close();
+    }
+    const at = (l) => seen.find((x) => x.label === l);
+    chk('A− is disabled at the Easy Read floor, as it is at the plain one',
+      at('Easy Read at the floor').minus === true &&
+      at('plain at the floor').minus === true, JSON.stringify(seen));
+    /* THE FLOOR: disabling it must not disable the stepper generally. */
+    chk('and live everywhere above the floor, in both modes',
+      at('plain above it').minus === false &&
+      at('Easy Read above it').minus === false, JSON.stringify(seen));
+    chk('while A+ is disabled only at the ceiling',
+      at('Easy Read at the ceiling').plus === true &&
+      at('Easy Read at the floor').plus === false, JSON.stringify(seen));
+    /* And what the floor is FOR: Easy Read's bottom is higher than plain's. */
+    chk('Easy Read\'s floor is a bigger size than the plain floor',
+      at('Easy Read at the floor').px > at('plain at the floor').px,
+      at('plain at the floor').px + ' -> ' + at('Easy Read at the floor').px);
+  }
+
   console.log('\n== A notice is said once, for the action that earned it (R36) ==');
   {
     /* Criterion 16. Every state change here is a full re-render, so a

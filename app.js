@@ -583,9 +583,16 @@
     render();
   }
 
+  /* The step the stepper cannot go below. `R169` — `stepFs` has always known
+     it; the two A− buttons hardcoded 0, so with Easy Read on the floor was
+     `EASY_MIN_FS` and the button was never disabled. Measured: at the floor
+     it stayed enabled and did nothing, three presses running, while the
+     same button at the plain floor is disabled. One reader, so the stepper
+     and the buttons cannot disagree about where the bottom is. */
+  function fsFloor() { return S.easyRead ? EASY_MIN_FS : 0; }
+
   function stepFs(delta) {
-    var floor = S.easyRead ? EASY_MIN_FS : 0;
-    var next = Math.min(FS.length - 1, Math.max(floor, effectiveFs() + delta));
+    var next = Math.min(FS.length - 1, Math.max(fsFloor(), effectiveFs() + delta));
     if (next === S.fsIndex) return;
     S.fsIndex = next;
     save(K.fs, next);
@@ -2221,7 +2228,7 @@
       "</div>" +
       '<div class="fsrow">' +
       '<button type="button" class="fsbig press" data-act="fs-" ' +
-      'aria-label="Smaller text"' + (effectiveFs() === 0 ? " disabled" : "") +
+      'aria-label="Smaller text"' + (effectiveFs() === fsFloor() ? " disabled" : "") +
       ">A−</button>" +
       '<span class="fsrow__value">' + px + "px</span>" +
       '<button type="button" class="fsbig press" data-act="fs+" ' +
@@ -2444,7 +2451,7 @@
          '<div class="rhead__tools">' + themeBtn() +
          '<div class="fsgroup">' +
          '<button type="button" data-act="fs-" aria-label="Smaller text"' +
-         (effectiveFs() === 0 ? " disabled" : "") + ">A−</button>" +
+         (effectiveFs() === fsFloor() ? " disabled" : "") + ">A−</button>" +
          '<button type="button" data-act="fs+" aria-label="Larger text"' +
          (effectiveFs() === FS.length - 1 ? " disabled" : "") + ">A+</button>" +
          "</div></div></div></header>";

@@ -2777,10 +2777,55 @@ other. That is `R149`'s rule about an exemption outliving what earned it.
 empty sweep would pass vacuously and the mutation that empties it fails by
 name — and the exemption must still be carrying something.
 
+### The floor the stepper knew about and the button did not
+
+`R169`. `EASY_MIN_FS`'s own comment says it plainly: *"Easy Read never
+drops the reader below this step. The A−/A+ stepper still works above
+it."* `stepFs` has always honoured that. The **two A− buttons hardcoded
+zero** — `effectiveFs() === 0 ? " disabled" : ""` — which with Easy Read
+on is never true.
+
+Measured: at the Easy Read floor the button stayed **enabled and did
+nothing**, three presses running, the size unmoved at 29px. The same
+button at the plain floor has always been disabled. A control that looks
+pressable and is inert is the fault this app bans elsewhere — *"zero
+hover-only affordances"*, because the iPhone has no hover — and it landed
+in the mode the reader this book was built for is most likely to be using.
+
+`fsFloor()` is the one reader now, so the stepper and the buttons cannot
+disagree about where the bottom is.
+
+**And a scout that was killed by measuring it twice**, recorded because
+the first number was alarming and wrong.
+
+The contrast audit reads `color` against the background and **never
+consults `opacity`**, so anything painted at partial strength is scored at
+full strength. A first scan — five screens × two themes × two modes —
+reported **533 text elements below full opacity, 407 of them below their
+AA threshold as painted**, including *enabled* recipe-card titles at
+11.16 audited against 2.96 painted. That reads like a serious hole in the
+guarantee.
+
+It was **entirely the card stagger caught mid-flight**. The scan sampled
+250 ms after load, while cards were still fading in. Re-measured after the
+animations settle: **zero**. Nothing in this app rests below full opacity.
+
+So the audit's opacity gap is **latent, not live**. Closing it would
+immediately flag disabled controls — which WCAG exempts by name as
+incidental text in an inactive component — so it would need an exemption
+written for it and would buy no detection at all today. Not shipped, and
+recorded instead: `R150`'s ruling about a check that costs time and cannot
+fail.
+
+One more thing worth keeping: the obvious fix for the sampling — awaiting
+`getAnimations().map(a => a.finished)` — **hung the probe**, because that
+promise never settles for an infinite animation. A fixed settle is the
+blunt instrument that works.
+
 ### Verified
 
-The suite after the video arc: **1843 functional checks** across eleven
-suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 382, sec 62,
+The suite after the video arc: **1847 functional checks** across eleven
+suites (kt 372, feat 98, add 127, relay 21, quick 81, polish 382, sec 62,
 plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
