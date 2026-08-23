@@ -367,6 +367,11 @@
 
     textOpen: false,
     servEdit: false,
+    /* `R147` — what the reader typed into it, so a clamp can be said
+       when the field is committed rather than on every keystroke. */
+    servTyped: null,
+    /* The count to put back if the typing is cancelled (`R147`). */
+    servBefore: null,
     needsLook: false, // "needs a look" filter: flags, or nothing to cook from   // the servings number is being typed rather than stepped
 
     /* Add / Import flow */
@@ -6551,6 +6556,10 @@
     if (!r) return;
 
     if (act === "serv-edit") {
+      /* `R147` — what to put back if the reader presses Escape. Typing
+         changes `S.serves` as it goes (the field does not re-render), so
+         without this a cancel would leave whatever was half-typed. */
+      S.servBefore = S.serves;
       S.servEdit = true;
       render();
       var si = document.getElementById("serv-input");
@@ -6642,9 +6651,32 @@
 
     if (act === "serv-set") {
       /* Typing does not re-render — the quantities settle when the number
-         is committed, on Enter or on leaving the field. */
-      var typed = parseInt(el.value, 10);
-      if (typed >= 1 && typed <= 40) S.serves = typed;
+         is committed, on Enter or on leaving the field.
+
+         `R147` — a number outside the range used to be DROPPED IN SILENCE,
+         so the reader watched what they typed snap back with no reason
+         given. Every other path in the app that meets one clamps it and
+         SAYS SO (`R119` in Edit, `R121` on the Add screen), in the wording
+         below; `R121`'s rule is that one situation has one wording. And
+         since `R141` this very screen speaks when the count changes, so a
+         rescale announced and a refused rescale said nothing at all.
+
+         An empty field is not a number and is left alone: nothing was
+         typed, so there is nothing to tell anyone about. It needs no guard
+         of its own — `parseInt("")` is `NaN` and the one below catches it.
+         There WAS a separate `if (!raw) return;` here until mutating it
+         away changed nothing any check could see, which is the definition
+         of a line that is not doing anything. */
+      var raw = String(el.value == null ? "" : el.value).trim();
+      var typed = parseInt(raw, 10);
+      if (!isFinite(typed)) return;
+      var kept = Math.min(40, Math.max(1, typed));
+      var moved = S.serves !== kept;
+      S.serves = kept;
+      S.pulseScale = S.pulseScale || moved;
+      /* Said when the field is committed, not on every keystroke: typing
+         "100" passes through 1 and 10 on the way. */
+      S.servTyped = typed;
       return;
     }
     if (act === "kitchen-key") {
@@ -6728,13 +6760,35 @@
   /* Committing the typed servings, and the search key that had nothing
      behind it: on a phone the keyboard's blue Go key is the obvious way to
      say "that one" — it used to do nothing at all. */
+  /* `R147` — leaving the field is where the clamp gets said, because that
+     is when the reader has finished asking. Escape is a cancel, so it says
+     nothing; Enter and focusout are both "I meant that". */
+  function commitServings(said) {
+    S.servEdit = false;
+    var typed = S.servTyped;
+    S.servTyped = null;
+    if (!said) {
+      /* Escape means cancel, the way it does for every sheet (`R80`). */
+      if (S.servBefore !== null) S.serves = S.servBefore;
+      S.servBefore = null;
+      render();
+      return;
+    }
+    S.servBefore = null;
+    if (typed !== null && typed !== S.serves) {
+      setNotice("This book keeps serving counts up to 40, so " + typed +
+        " was used as " + S.serves + ".");
+      return;
+    }
+    render();
+  }
+
   document.addEventListener("keydown", function (ev) {
     var t = ev.target;
     if (!t) return;
     if (ev.key === "Enter" && t.id === "serv-input") {
       ev.preventDefault();
-      S.servEdit = false;
-      render();
+      commitServings(true);
       return;
     }
     /* Enter means "I have finished typing". On a phone the Return key is
@@ -6765,8 +6819,7 @@
     }
     if (ev.key === "Escape" && t.id === "serv-input") {
       ev.preventDefault();
-      S.servEdit = false;
-      render();
+      commitServings(false);
       return;
     }
   });
@@ -6775,8 +6828,7 @@
      make a number they can already see take effect. */
   document.addEventListener("focusout", function (ev) {
     if (ev.target && ev.target.id === "serv-input" && S.servEdit) {
-      S.servEdit = false;
-      render();
+      commitServings(true);
     }
   });
 

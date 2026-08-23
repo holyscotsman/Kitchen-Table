@@ -2689,6 +2689,104 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await p.waitForSelector('.rcard');
   }
 
+  console.log('\n== The one number the app refuses without saying so (R147) ==');
+  {
+    /* `data-act="serv-set"` is the recipe screen's own way in: tap the
+       servings number and type one, because "stepping from 4 to 40 is
+       thirty-six taps, which is not a serving stepper, it is a punishment".
+       It is also one of the controls no suite has ever named.
+
+       Measured. Typing 12 works. Typing **100**, or **0**, or clearing the
+       field, is DISCARDED IN SILENCE: the number snaps back to what it was,
+       the quantities never move, and nothing is said or announced.
+
+       The data is safe — `R120`'s rule holds, the field shows what was kept
+       — but the app has already settled what to say here, twice:
+
+         `R119`  Edit form, typed past the limit → clamped AND SAID
+                 "This book keeps serving counts up to 40, so 300 was saved
+                  as 40."
+         `R121`  the Add screen → the same sentence, because "one situation
+                 has one wording".
+
+       And `R141` taught this very screen to speak when the count changes.
+       So a rescale announces and a REFUSED rescale says nothing at all,
+       which leaves the reader watching their number vanish with no reason
+       given. Clamping honours what they reached for; the sentence is the
+       app's own, word for word.
+
+       Emptying the field is deliberately still silent: nothing was typed,
+       so there is nothing to tell them about. */
+    await p.goto(B + '/index.html#bacon-ranch-chicken-casserole');
+    await p.reload();
+    await p.waitForSelector('.servcard__value');
+    const card = () => p.locator('.servcard__value').first().innerText();
+    const qty = () => p.locator('.checkrow__text').first().innerText();
+    /* Every notice-ish line, not the first one: the recipe screen puts
+       "Tap to check off as you go" in a `.hint` well above the notice slot,
+       so `querySelector('.notice, .hint')` reads the wrong sentence and the
+       check fails for the wrong reason. Measured that way once. */
+    const said = () => p.evaluate(() => Array.from(
+      document.querySelectorAll('.notice, .hint'))
+      .map((n) => n.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    const typeCount = async (text) => {
+      await p.click('[data-act="serv-edit"]');
+      await p.waitForSelector('#serv-input');
+      await p.fill('#serv-input', text);
+      await p.press('#serv-input', 'Enter');
+      await p.waitForTimeout(400);
+    };
+
+    const q0 = await qty();
+    await typeCount('12');
+    chk('typing a count in range rescales the recipe',
+      /12/.test(await card()) && (await qty()) !== q0,
+      JSON.stringify([await card(), await qty()]));
+
+    const q12 = await qty();
+    await typeCount('100');
+    chk('a count past the limit is kept at the limit, not thrown away',
+      /\b40\b/.test(await card()), await card());
+    chk('and the amounts move with it',
+      (await qty()) !== q12, JSON.stringify([q12, await qty()]));
+    chk('and the reader is told, in the words the rest of the app uses',
+      /serving counts up to 40/i.test(await said()), await said());
+
+    await typeCount('0');
+    chk('a count below the limit is kept at the limit too',
+      /\b1\b/.test(await card()), await card());
+    chk('and that is said as well', /serving counts/i.test(await said()), await said());
+
+    /* Nothing typed is nothing to say. */
+    const before = await card();
+    await p.click('[data-act="serv-edit"]');
+    await p.waitForSelector('#serv-input');
+    await p.fill('#serv-input', '');
+    await p.evaluate(() => document.getElementById('serv-input').blur());
+    await p.waitForTimeout(400);
+    chk('while clearing the field changes nothing and says nothing',
+      (await card()) === before, JSON.stringify([before, await card()]));
+
+    /* And Escape means cancel, the way it does for every sheet (`R80`).
+       Typing changes the count as it goes, because the field deliberately
+       does not re-render, so a cancel has to put the old one back. */
+    const kept = await card();
+    /* The notice from the clamp two steps up is still on screen — a notice
+       lives until something replaces it. So the question is not whether the
+       word appears anywhere, it is whether Escape CHANGED anything. Asserting
+       the absence of the word failed for exactly that reason once. */
+    const noticeBefore = await said();
+    await p.click('[data-act="serv-edit"]');
+    await p.waitForSelector('#serv-input');
+    await p.fill('#serv-input', '33');
+    await p.press('#serv-input', 'Escape');
+    await p.waitForTimeout(400);
+    chk('pressing Escape puts the count back rather than keeping the typing',
+      (await card()) === kept, JSON.stringify([kept, await card()]));
+    chk('and says nothing new, because nothing was asked for',
+      (await said()) === noticeBefore, JSON.stringify([noticeBefore, await said()]));
+  }
+
   console.log('\n== R141 — the rescale the app knows is easy to miss ==');
   {
     /* The ingredient list carries this comment, in the app's own words:
