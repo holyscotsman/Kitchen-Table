@@ -63,6 +63,46 @@
     Side: "Sides", Dessert: "Desserts", Snack: "Snacks", Drink: "Drinks"
   };
 
+  /* One reader for a course name, and a tolerant one — `R160`'s lesson at
+     the boundary next door, found the same day.
+
+     `recipes.json` is hand-editable **by design** (download, edit, commit)
+     and `db-sync` rewrites it nightly with nobody watching, so a course
+     arrives sooner or later as "baking", " Baking " or "BAKING". Every one
+     of those used to miss both tables and land on Dinner. So did "side",
+     which is the sharper one: `CAT_ALIASES` exists precisely so an older
+     name still resolves, and it was matched by exact key. Casing is not a
+     different course. */
+  var CAT_LOOKUP = {};
+  CATS.forEach(function (c) { CAT_LOOKUP[c.toLowerCase()] = c; });
+  Object.keys(CAT_ALIASES).forEach(function (k) {
+    CAT_LOOKUP[k.toLowerCase()] = CAT_ALIASES[k];
+  });
+
+  function canonCat(v) {
+    var k = String(v === undefined || v === null ? "" : v).trim().toLowerCase();
+    return CAT_LOOKUP[k] || "";
+  }
+
+  /* One sentence for the one field, used by every import path so they read
+     alike beside the servings flag they sit next to — and since `R161` by
+     the storage boundary too, which had been making the same substitution
+     without a word. Lives here rather than beside the import paths because
+     `normalizeRecipe` is the earliest thing that needs it. */
+  var COURSE_GUESS = "Course — none was given; Dinner was assumed. " +
+    "Change it above if it belongs somewhere else.";
+
+  /* The other half of the same substitution: a course WAS given and is not
+     one of this book's ten. Its own sentence rather than a copy of the one
+     above, for `R154`'s reason — the `Field — ` shape is what `R122` and
+     `R123` answer by, and it is the shape that has to carry, not the
+     words. Naming what was there is the whole point: "none was given" would
+     be false, and a reader cannot fix a value they are not shown. */
+  function courseUnknown(had) {
+    return "Course — “" + String(had).trim().slice(0, 60) + "” isn’t one of " +
+      "this book’s courses, so Dinner was assumed.";
+  }
+
   /* Everyone with a section, whether or not they have recipes yet. Joan holds
      the whole collection today; the rest are here so there is somewhere to put
      a recipe when they contribute one. Jessica joined 2026-08-02. */
@@ -1102,8 +1142,6 @@
     var out = {};
     Object.keys(r).forEach(function (k) { out[k] = r[k]; });
     if (WHO_ALIASES[out.contributor]) out.contributor = WHO_ALIASES[out.contributor];
-    if (CAT_ALIASES[out.category]) out.category = CAT_ALIASES[out.category];
-    if (CATS.indexOf(out.category) === -1) out.category = "Dinner";
     /* `R62` — the lists, coerced at the boundary like every other stored
        shape in this app (`R21` the plan, `R40` the dismissed imports).
        Both `recipes.json` and the overlay are hand-editable by design: the
@@ -1122,6 +1160,31 @@
        what someone had written. A comma string is how they are typed. */
     if (out.tags !== undefined && out.tags !== null && !Array.isArray(out.tags)) {
       out.tags = parseTags(out.tags);
+    }
+    /* `R161` — the course, resolved if it can be and SAID if it cannot.
+       `R65`'s comment already put it plainly: "course is exactly the field
+       the app itself rewrites, since normalizeRecipe defaults anything it
+       doesn't recognise to Dinner." It gave the reader a control to correct
+       it with and never told them there was anything to correct — measured,
+       a recipe hand-edited to "Supper" reads JOAN · DINNER with nothing
+       said, and so does one hand-edited to "baking".
+
+       Every sibling substitution in this app is loud: `settleIds` writes a
+       flag when it moves a recipe's id, and every import path flags a
+       course it had to guess (`R73`). This one was the quiet exception, on
+       the one field the reader cannot see was changed. Flagged rather than
+       refused, because this is the app and the app is downstream of a file
+       edited by hand and served to phones before any check runs — the two
+       server boundaries refuse an unknown course by name, and still do. */
+    var cat = canonCat(out.category);
+    if (cat) {
+      out.category = cat;
+    } else {
+      var had = String(out.category === undefined || out.category === null
+        ? "" : out.category).trim();
+      out.category = "Dinner";
+      out.flagged = (Array.isArray(out.flagged) ? out.flagged.slice() : [])
+        .concat(had ? courseUnknown(had) : COURSE_GUESS);
     }
     /* Servings is divided by and stepped, so "4" must not stay a string:
        "4" + 1 is "41". Anything that isn't a sensible count is dropped
@@ -5301,11 +5364,6 @@
     if (/bake|bread|scone|muffin/.test(v)) return "Baking";
     return "";
   }
-
-  /* One sentence for the one field, used by every import path so they read
-     alike beside the servings flag they sit next to. */
-  var COURSE_GUESS = "Course — none was given; Dinner was assumed. " +
-    "Change it above if it belongs somewhere else.";
 
   /* ---- from a photo: in-browser OCR, lazily loaded ---- */
 
