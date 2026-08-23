@@ -2163,10 +2163,43 @@ planner's picker all go through `matchesQuery` — which is what keeps
 `README.md`'s *"same search as everywhere else"* true rather than quietly
 making it false.
 
+### The one comparison that did not fold, and the address nothing checked
+
+`R156`, two small things `R155` left behind.
+
+**The duplicate warning deleted accents instead of folding them.**
+`findDuplicate` normalises a title by stripping everything that is not
+`a-z0-9`, so *"Crème Brûlée"* became `crme brle` and shared **not one token**
+with a hand-typed *"Creme Brulee"*: overlap 0.00, no warning, two copies in
+the book.
+
+It is narrow and says so. It needs **every** word accented to go wrong —
+*"Jalapeño Poppers"* still scores 0.50 on its second word and is flagged —
+no shipped recipe has an accented title, and the warning is advisory in any
+case, since it never blocks and "Save anyway" is one tap. Worth the one word
+because the app carries `fold` precisely so that accents do not matter
+(`README.md`: *"accents don't matter — 'creme' finds crème"*), and this was
+the only comparison in it that did not use them. The floor is that folding
+must not make everything look like everything: an unrelated title still
+saves without a warning.
+
+**And the address `R155` changed the meaning of.** A filtered list being
+shareable and bookmarkable is a documented feature, and `R155` changed what a
+two-word `q` *means* — so the round-trip was verified by hand and checked by
+nothing, which is the half that rots. It is checked now in both orders: the
+list is restored identically and the words go back into the search box.
+
+**One of those checks was wrong in a way worth keeping.** Restoring the Menu
+afterwards, it clicked the search toggle blind — but arriving at a `?q=`
+address opens the search box already, exactly as the README promises, so the
+blind toggle **closed** it and the next wait timed out. The app was right and
+the check was wrong; a test that assumes a control's state instead of reading
+it is the same fault as a check that matches text that was already there.
+
 ### Verified
 
-The suite after the video arc: **1742 functional checks** across eleven
-suites (kt 342, feat 80, add 113, relay 21, quick 76, polish 368, sec 56,
+The suite after the video arc: **1749 functional checks** across eleven
+suites (kt 342, feat 85, add 115, relay 21, quick 76, polish 368, sec 56,
 plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
