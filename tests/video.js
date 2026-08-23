@@ -1658,6 +1658,54 @@ async function freshPage(br, opts) {
       [].concat(waiting.errs, quiet2.errs, many.errs).join(' | '));
   }
 
+  console.log('\n== The disabling that stops a second paid job (R143) ==');
+  {
+    /* `R142` found an indicator that was never a guard on the write path,
+       so this round went looking for the same fault on the path that spends
+       money — and did not find it. `S.addBusy` is read in only two places
+       and neither is a guard, but the SUBMIT BUTTON reads it in the render
+       and disables itself, which stops the second tap just as well and is
+       the visible way to do it.
+
+       What was missing is the check. A job is yt-dlp, then Groq Whisper,
+       then a `claude-opus-5` call — `backend/lib/budget.js` exists because
+       those cost money, and a duplicate also spends one of the family's
+       forty imports a day and leaves two drafts for one video. The only
+       thing standing between a double tap and that was one attribute, and
+       nothing in any suite looked at it.
+
+       Measured before this was written: with the write held open, the
+       button is present and `disabled`, and a click on it times out rather
+       than posting. Both halves matter — present, so the reader can still
+       see where they are, and disabled, so the tap costs nothing. */
+    const { ctx, p, stub } = await freshPage(br, { postDelayMs: 9000 });
+    await p.goto(B + '/index.html#add');
+    await p.waitForSelector('.pathbtn');
+    await p.click('.pathbtn[data-key="video"]');
+    await p.waitForSelector('#a-vurl');
+    chk('the Start button is live before anything is sent',
+      !(await p.locator('[data-act="video-submit"]').isDisabled()));
+    await p.fill('#a-vurl', 'https://youtu.be/abc12345678');
+    await p.click('[data-act="video-submit"]');
+    await p.waitForTimeout(600);
+
+    chk('while the kitchen is being reached the busy line says so',
+      /sending the link/i.test(await p.evaluate(() =>
+        (document.querySelector('.notice') || {}).textContent || '')));
+    chk('the button is still there, so the reader can see where they are',
+      await p.locator('[data-act="video-submit"]').count() === 1);
+    chk('but it is disabled, which is what stops a second paid job',
+      await p.locator('[data-act="video-submit"]').isDisabled());
+    let tapped = 'landed';
+    try { await p.click('[data-act="video-submit"]', { timeout: 2500 }); }
+    catch (e) { tapped = 'refused'; }
+    chk('so a second tap cannot land at all', tapped === 'refused', tapped);
+    chk('and one link is one job', stub.posts.length === 1,
+      JSON.stringify(stub.posts.map(x => x.url)));
+    chk('nothing threw', p.errs.length === 0, p.errs.join(' | '));
+    await ctx.close();
+  }
+
   console.log('\n== Two taps on Save must not be two writes (R142) ==');
   {
     /* Render's free tier sleeps, so a write can hang for the best part of
