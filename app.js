@@ -943,12 +943,48 @@
   /* 088 — say which field matched, so a tag hit doesn't look like a mistake.
      Returns "" (no match) or the field name, title first since a title hit
      needs no explanation. */
-  function matchField(r, q) {
+  function matchFieldOne(r, q) {
     if (!q) return "title";
     if (fieldMatches(titleOf(r), q)) return "title";
     if (tagsOf(r).some(function (t) { return fieldMatches(t, q); })) return "tag";
     if ((r.ingredients || []).some(function (i) { return fieldMatches(i, q); })) return "ingredient";
     return "";
+  }
+
+  /* `R155` — the query used to be ONE term, so two words only matched when
+     they sat next to each other in that order. Measured on the shipped book:
+     "potato bacon" found Potato Bacon Soup and "bacon potato" found nothing;
+     "cordon bleu" 1 and "bleu cordon" 0; "air fryer" 11 and "fryer air" 0.
+
+     A reader typing the words in the order they happened to think of them
+     was told "no recipes match" — which is false, the recipe is right there,
+     and it is the same shape as every other sentence this app has had to
+     stop telling. The README specifies the folding and the one forgiven
+     typo and says nothing about order, so this was emergent rather than
+     anybody's decision.
+
+     Terms are AND-ed, which is what the Filter sheet already does with tags
+     (`picking Italian and Vegetarian means both`), so every result still
+     contains every word that was typed and nothing widens. Each term keeps
+     the behaviour it always had — substring first, then one forgiven typo on
+     five letters or more — so a single-word search is unchanged.
+
+     The note names a field the card cannot show: only when NO term hit the
+     title, since a title hit needs no explanation (088's rule). */
+  function queryTerms(q) {
+    return String(q || "").split(/\s+/).filter(Boolean);
+  }
+
+  function matchField(r, q) {
+    var terms = queryTerms(q);
+    if (!terms.length) return "title";
+    var note = "";
+    for (var i = 0; i < terms.length; i++) {
+      var f = matchFieldOne(r, terms[i]);
+      if (!f) return "";
+      if (f !== "title" && !note) note = f;
+    }
+    return note || "title";
   }
 
   function matchesQuery(r, q) {

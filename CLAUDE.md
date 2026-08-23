@@ -2119,10 +2119,54 @@ trap, met in a fixture rather than a document. The model's own flags are
 cleared before the assertion now, so what is measured is what this function
 added.
 
+### Two words in the wrong order found nothing at all
+
+`R155`. The search treated the whole query as **one term**: `fieldMatches`
+asks whether the text contains it, then whether any single word is within one
+typo of it. A word never contains a space, so a two-word query could only
+ever match as a contiguous phrase, in the order it was typed.
+
+Measured on the shipped book:
+
+| typed | found | | typed | found |
+|---|---|---|---|---|
+| `potato bacon` | 1 | | `bacon potato` | **0** |
+| `cordon bleu` | 1 | | `bleu cordon` | **0** |
+| `chicken casserole` | 2 | | `casserole chicken` | **0** |
+| `air fryer` | 11 | | `fryer air` | **0** |
+
+A reader who typed the two words in whichever order they thought of them was
+told **"no recipes match"**, which is false — the recipe is right there. It
+is the same shape as every other sentence this app has had to stop telling,
+and it costs most exactly where this book is read: on a phone, by someone
+who would rather type two words than scroll forty-eight cards.
+
+Nothing chose this. `README.md` specifies the folding and the one forgiven
+typo and says nothing about order, so it was emergent — the behaviour of one
+`indexOf` nobody had asked a two-word question.
+
+Terms are AND-ed now, which is what the Filter sheet already does with tags
+(*"picking Italian and Vegetarian means both"*), so every result still
+contains every word that was typed and **nothing widens**. Each term keeps
+the behaviour it always had — substring first, then one forgiven typo on five
+letters or more — so a single-word search is unchanged, and that is a check
+rather than a claim.
+
+**The obvious wrong fix is OR, and the floor is what catches it.** With
+terms OR-ed, `chicken zzzzqqq` returns all forty-eight and the pre-existing
+*"garbage still finds nothing"* check fails too — a search that stops
+narrowing is worse than one that misses, because the reader cannot tell it
+has stopped working.
+
+One change covers all three places that search — Main, the Menu, and the week
+planner's picker all go through `matchesQuery` — which is what keeps
+`README.md`'s *"same search as everywhere else"* true rather than quietly
+making it false.
+
 ### Verified
 
-The suite after the video arc: **1737 functional checks** across eleven
-suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
+The suite after the video arc: **1742 functional checks** across eleven
+suites (kt 342, feat 80, add 113, relay 21, quick 76, polish 368, sec 56,
 plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

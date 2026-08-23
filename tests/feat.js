@@ -238,6 +238,43 @@ const JPG='/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP///////////////////////////////////
   chk('one-letter typo still finds chicken', await p.locator('.rcard').count()>0);
   await p.fill('#menu-search','zzzzqqq'); await new Promise(r=>setTimeout(r,250));
   chk('garbage still finds nothing', await p.locator('.rcard').count()===0);
+
+  /* `R155` — the query was one term, so two words only matched when they sat
+     next to each other IN THAT ORDER. Measured on the shipped book:
+     "potato bacon" found Potato Bacon Soup and "bacon potato" found nothing;
+     "cordon bleu" 1 and "bleu cordon" 0; "air fryer" 11 and "fryer air" 0.
+
+     A reader typing the words in the order they happened to think of them
+     was told "no recipes match", which is false — the recipe is right there.
+     The README specifies folding and one forgiven typo and says nothing
+     about order, so this was emergent rather than anybody's decision.
+
+     Terms are AND-ed now, which is what the Filter sheet already does with
+     tags, and every result still contains every word that was typed. */
+  const countFor = async (q) => {
+    await p.fill('#menu-search', q);
+    await new Promise(r=>setTimeout(r,250));
+    return p.locator('.rcard').count();
+  };
+  for (const [a, b] of [['potato bacon','bacon potato'],
+                        ['cordon bleu','bleu cordon'],
+                        ['chicken casserole','casserole chicken']]) {
+    const fwd = await countFor(a), rev = await countFor(b);
+    chk('word order does not decide whether "' + a + '" finds anything',
+      fwd > 0 && rev === fwd, a + '=' + fwd + ' vs ' + b + '=' + rev);
+  }
+  /* Both halves: AND-ing must still NARROW. A query whose second word
+     matches nothing has to come back empty rather than falling back to the
+     first word's results. */
+  chk('and a second word that matches nothing still narrows to nothing',
+    (await countFor('chicken zzzzqqq')) === 0,
+    String(await countFor('chicken zzzzqqq')));
+  /* And the single-term behaviour every other check here relies on is
+     unchanged — the floor under the whole change. */
+  chk('one word still behaves exactly as before',
+    (await countFor('chicken')) === (await countFor('  chicken  ')) &&
+    (await countFor('chicken')) > 5,
+    String(await countFor('chicken')));
   await p.evaluate(()=>localStorage.removeItem('kt.recipes'));
 
   console.log('\n== A removed recipe left its photo behind (R71) ==');
