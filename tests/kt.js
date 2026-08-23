@@ -1357,6 +1357,79 @@ const browserContextWithReduce = (br) =>
     await ctxC.close();
   }
 
+  console.log('\n== R177 — two lists that must agree, and the word that made them disagree ==');
+  {
+    /* `fieldOfFlag` gates on `FLAG_FIELDS`; `viewRecipe` kept the chip
+       buckets as a literal `{ title: [], servings: [], ingredients: [],
+       steps: [] }` beside it. Two hand-kept copies of one list, and a field
+       in the first with no slot in the second means
+       `fieldFlags[k].push(f)` on `undefined`.
+
+       The one-word change that does it is one somebody would make for good
+       reasons: `R161` introduced Course flags, `082` says a flag surfaces
+       beside its field, and `saveDraft`'s `answered` table already lists
+       `course` — so adding it to `FLAG_FIELDS` looks like completing the
+       set. Measured with exactly that, on one recipe carrying a Course
+       flag: `#app` fell from 4207 characters to 196 and the screen read
+
+         The recipes could not be loaded (Cannot read properties of
+         undefined (reading 'push')). Check the connection and reload.
+
+       with `pageerror` EMPTY, because the throw lands in the boot chain's
+       catch. `R148`'s exact failure one door over — a perfect connection, a
+       sentence about the connection, and a reload that reproduces it for
+       ever. `R157`'s bar for pinning something that holds today: the
+       plausible way to break it is a change made for good reasons. */
+    const srcF = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    chk('(floor) FLAG_FIELDS is still the list a flag\'s field is gated on',
+      /FLAG_FIELDS\.indexOf\(flagField\(f\)\)/.test(srcF));
+    chk('the chip buckets are built from FLAG_FIELDS, not typed out beside it',
+      /var fieldFlags = \{\};\s*\n\s*FLAG_FIELDS\.forEach/.test(srcF),
+      'fieldFlags is not derived from FLAG_FIELDS');
+
+    /* The asymmetry, held to being a decision rather than an oversight:
+       editing the category DOES take a Course flag down, and Course still
+       earns no chip, because viewer mode has no Course field for one to sit
+       beside — only the meta line. Adding it is a design question, and this
+       fails by name when somebody does, rather than the page falling over. */
+    chk('a Course flag is answerable by editing the category',
+      /course: updated\.category !== r\.category/.test(srcF));
+    chk('and course is deliberately not a chip field',
+      !/FLAG_FIELDS = \[[^\]]*course/.test(srcF));
+
+    /* And the behaviour the two lists exist for: one flag per field, four
+       chips, and the Course flag shown in the panel with the rest. */
+    const ctxFF = await freshContext(br, { ...devices['iPhone 13'] });
+    await ctxFF.addInitScript(() => {
+      localStorage.setItem('kt.recipes', JSON.stringify([{
+        id: 'five-flags', title: 'Five Flags', category: 'Dinner', servings: 4,
+        contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.'],
+        flagged: [
+          'Title — none was found on the page; add one.',
+          'Servings — no count was found; 4 was assumed.',
+          'Ingredients — none were picked up.',
+          'Steps — none were picked up.',
+          'Course — the book records this as \u201cSupper\u201d, which is not one of its ten; filed under Dinner.'
+        ]
+      }]));
+    });
+    const pFF = await ctxFF.newPage();
+    const ffErrs = []; pFF.on('pageerror', (e) => ffErrs.push(e.message));
+    await pFF.goto(B + '/index.html#five-flags');
+    await pFF.waitForSelector('.r-title');
+    chk('a recipe carrying a flag for every field still renders',
+      (await pFF.evaluate(() => document.getElementById('app').innerHTML.length)) > 2000,
+      String(await pFF.evaluate(() => document.getElementById('app').innerHTML.length)));
+    chk('four fields draw a chip', await pFF.locator('.fieldflag').count() === 4,
+      String(await pFF.locator('.fieldflag').count()));
+    chk('and the Course flag is still shown, in the panel with the rest',
+      /Supper/.test(await pFF.locator('#flag-panel').textContent()));
+    chk('nothing threw', ffErrs.length === 0, ffErrs.join(' | '));
+    await pFF.evaluate(() => localStorage.clear());
+    await ctxFF.close();
+  }
+
   console.log('\n== A flag that has been dealt with must stop saying it has not (R122) ==');
   {
     /* `082` gave every flag the name of its field — "Servings — …",
