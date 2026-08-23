@@ -249,6 +249,60 @@ const { runJob, computeFps } = lib('pipeline');
     chk('over the limit refuses', lim.hit('a', t0 + 3) === false);
     chk('addresses are independent', lim.hit('b', t0 + 4) === true);
     chk('the window forgives', lim.hit('a', t0 + 60001) === true);
+
+    /* `R176` — the sweep's own comment claimed the map could not grow, and
+       it only ever deleted what had EXPIRED. True of scanner noise spread
+       over time; false of 2000 distinct callers inside one window, which is
+       a distributed attempt rather than noise. Measured against the app's
+       real 60-second limiter before the fix: 2600 → 3000 → 3001, the map
+       still growing, with a full scan on every subsequent request that
+       deleted not one entry — a slow leak plus an O(n) cost per request on
+       a 512MB free tier. */
+    const flood = makeLimiter(120, 60000);
+    const f0 = 2000000;
+    for (let i = 0; i < 2600; i++) flood.hit('ip-' + i, f0 + i);
+    chk('(floor) the flood really is inside one window',
+      2600 < 60000, '2600 callers over 2600ms of a 60s window');
+    chk('a flood of live callers cannot grow the map without bound',
+      flood.size() <= 2000, 'map size ' + flood.size());
+    for (let i = 0; i < 600; i++) flood.hit('later-' + i, f0 + 3000 + i);
+    chk('and it stays bounded as more arrive', flood.size() <= 2000,
+      'map size ' + flood.size());
+
+    /* The floor under that: eviction must not fire early, or the limiter
+       would forget legitimate callers long before it is under pressure. */
+    const calm = makeLimiter(120, 60000);
+    for (let i = 0; i < 500; i++) calm.hit('c-' + i, f0 + i);
+    chk('(floor) a quiet server keeps every caller it has seen',
+      calm.size() === 500, 'map size ' + calm.size());
+    chk('and a caller under pressure is still counted, not merely forgotten',
+      calm.hit('c-0', f0 + 900) === true && calm.size() === 500,
+      'map size ' + calm.size());
+
+    /* And the older half of the sweep still does its job: when entries HAVE
+       expired, those are what go, and a LIVE bucket keeps its count rather
+       than being forgiven along with them. A small limit makes that
+       observable — a survivor is over its limit on the next hit, a bucket
+       that was evicted would come back fresh and be allowed.
+
+       (The first version of this check asserted a map size and measured
+       nothing: both branches leave the map in the same range, so it read
+       FAIL for arithmetic reasons and would have read PASS for no reason.) */
+    const aged = makeLimiter(2, 60000);
+    /* `keeper` is seen FIRST, so it is first in insertion order — and then
+       rolls its window over, so it is also the freshest thing in the map. A
+       Map keeps a re-`set` key in its original place, which is what makes
+       this fixture able to tell the two branches apart: expiry-first keeps
+       `keeper` and takes the stale ones; oldest-inserted-first takes
+       `keeper`. Without that the check passed under either, which is how
+       the first version of it read PASS while measuring nothing. */
+    aged.hit('keeper', f0);
+    for (let i = 0; i < 1500; i++) aged.hit('stale-' + i, f0 + 1 + i);
+    aged.hit('keeper', f0 + 70000);
+    aged.hit('keeper', f0 + 70001);
+    for (let i = 0; i < 600; i++) aged.hit('new-' + i, f0 + 70002 + i);
+    chk('the expired buckets are what the sweep takes, not the live ones',
+      aged.hit('keeper', f0 + 70700) === false, 'map size ' + aged.size());
   }
 
   console.log('\n== R8: the failed-jobs listing is bounded, not a query API ==');

@@ -3155,11 +3155,56 @@ is `-1` and not `0`, because this is a destination rather than a tab stop
 and an extra stop on every flagged recipe would be a cost with no reader
 behind it — the mutation that makes it `0` fails by name.
 
+### The map that could not grow unbounded, and did
+
+`R176`. `backend/lib/ratelimit.js` sweeps its per-caller map when it passes
+2000 entries, under a comment that reads *"The map cannot grow unbounded off
+scanner noise."* The sweep deletes only what has **expired**, so the sentence
+is true of noise spread over time and false of a flood **inside** one window.
+
+Measured against the app's own limiter — `makeLimiter(120, 60000)`, the one
+`server.js` consults on every request — with 2600 distinct callers in a
+2.6-second span:
+
+| | map size |
+|---|---|
+| after 2600 callers | **2600** |
+| after 400 more | **3000** |
+| after 200 more requests | **3001** |
+
+Nothing was ever freed, and the sweep ran on **every** one of those
+requests, walking the whole map to delete nothing: a slow leak and an O(n)
+cost per request, on a 512MB free tier. Two hundred requests took 11ms at
+n=3000 and 0ms once bounded.
+
+So the expiry sweep keeps its place and a second one stands behind it: when
+the first frees nothing, the **longest-standing** buckets go anyway. Map
+iteration is insertion order, so those are the callers first seen — **not**
+strictly the least recently active, since a bucket that rolls over is
+re-`set` and keeps its original place. Saying that is better than implying
+an LRU this is not.
+
+Forgiving a live caller is the right way to fail here, and it costs the
+family nothing: what money can be spent is walled by the day cap counted in
+the database, which `server.js` checks *before* it consults any of these
+buckets. The request in hand is still counted either way — `e` is held
+locally.
+
+**The check that distinguishes the two branches had to be built for it.**
+The first version asserted a map size, and both branches leave the map in
+the same range — it read FAIL for an arithmetic reason and would have read
+PASS for no reason. The fixture now sees `keeper` **first**, so it is first
+in insertion order, and then rolls its window over, so it is also the
+freshest thing in the map. Expiry-first keeps it; oldest-inserted-first
+takes it. Three mutations fail by name, and the one that restores the
+shipped sweep reports the growth in its own message: *map size 2600*, then
+*3200*.
+
 ### Verified
 
-The suite after the video arc: **1894 functional checks** across eleven
+The suite after the video arc: **1900 functional checks** across eleven
 suites (kt 372, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
-plan 95, video 285, backend 328, zoom 15), plus `R127`'s nine-check SQL
+plan 95, video 285, backend 334, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the
