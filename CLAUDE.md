@@ -2748,10 +2748,39 @@ sheet whose opener survives still hands the caret back to it; the mutation
 that always falls back fails by name and takes two pre-existing `R80`
 checks with it.
 
+### Every address the app writes leads somewhere
+
+`R168`, and the guarantee `R167` earned. That round found a link whose
+address led nowhere — `#main-content`, which `parseHash` read as a recipe
+id and answered with *"That recipe isn't here."* The obvious next question
+is whether it had siblings.
+
+**It did not.** Walking every screen and harvesting every `a[href^="#"]`
+found **67 distinct addresses**, and the only one that landed on the
+not-found page was the skip link itself. The rest of the app's addressing
+is sound; this is what keeps it that way.
+
+**Asked as a predicate rather than by booting sixty-seven times.** An
+address this app writes is the front screen, one of its own five screens
+(with or without a query), or the id of a recipe in the book. Anything
+else is a link to nowhere, which is exactly what `R167` was — and a
+predicate costs one comparison each where a boot costs a page load.
+
+`#main-content` is exempt **by name and with its reason**: since `R167`
+the skip link is not a navigation at all — the click is intercepted and
+the hash never changes — and its `href` stays because that is what a skip
+link is. The exemption is held to still being one, so if that link ever
+became a real address again it would have to lead somewhere like every
+other. That is `R149`'s rule about an exemption outliving what earned it.
+
+**Two floors.** The harvest must actually collect the app's addresses — an
+empty sweep would pass vacuously and the mutation that empties it fails by
+name — and the exemption must still be carrying something.
+
 ### Verified
 
-The suite after the video arc: **1839 functional checks** across eleven
-suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 378, sec 62,
+The suite after the video arc: **1843 functional checks** across eleven
+suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 382, sec 62,
 plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

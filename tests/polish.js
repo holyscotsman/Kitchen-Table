@@ -3325,6 +3325,76 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxS.close();
   }
 
+  console.log('\n== R168 — every address the app writes leads somewhere ==');
+  {
+    /* `R167` found a link whose address led nowhere: `#main-content`, which
+       `parseHash` read as a recipe id and answered with "That recipe isn't
+       here." Walking every in-app address afterwards found **67 distinct
+       ones and no other**, so that bug had no siblings — this is the
+       guarantee that keeps it that way.
+
+       Asked as a predicate rather than by booting 67 times: an address this
+       app writes is either the front screen, one of its own screens (with
+       or without a query), or the id of a recipe in the book. Anything else
+       is a link to nowhere, which is what `R167` was. */
+    const ctxL = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pL = await ctxL.newPage();
+    const lErrs = []; pL.on('pageerror', (e) => lErrs.push(e.message));
+
+    await pL.goto(B + '/index.html#menu');
+    await pL.waitForSelector('.rcard');
+    const ids = await pL.evaluate(async () =>
+      (await (await fetch('recipes.json')).json()).map((r) => r.id));
+    const someId = ids[0];
+
+    /* `#main-content` is exempt BY NAME AND REASON: since `R167` the skip
+       link is not a navigation at all — the click is intercepted and the
+       hash never changes. Its href stays because that is what a skip link
+       is. If it ever became a real address again, it would have to lead
+       somewhere like every other one. */
+    const EXEMPT = { '#main-content': 'the skip link — intercepted, never navigated (R167)' };
+
+    const screens = ['', '#menu', '#plan', '#help', '#add', '#' + someId,
+      '#menu?who=Joan', '#menu?cat=Baking'];
+    const found = new Map();
+    for (const sc of screens) {
+      await pL.goto('about:blank');
+      await pL.goto(B + '/index.html' + sc);
+      await pL.waitForSelector('#main-content', { timeout: 8000 }).catch(() => {});
+      await pL.waitForTimeout(200);
+      for (const l of await pL.evaluate(() =>
+        [].slice.call(document.querySelectorAll('a[href^="#"]')).map((a) => ({
+          href: a.getAttribute('href'),
+          what: a.getAttribute('data-act') || (a.textContent || '').trim().slice(0, 24)
+        })))) {
+        if (!found.has(l.href)) found.set(l.href, { what: l.what, from: sc || 'main' });
+      }
+    }
+    /* A floor: a harvest that found nothing would pass vacuously. */
+    chk('the sweep really collected the app\'s addresses', found.size >= 40,
+      String(found.size));
+
+    const ROUTE_WORDS = ['main', 'menu', 'add', 'plan', 'help'];
+    const nowhere = [];
+    for (const [href, info] of found) {
+      if (EXEMPT[href]) continue;
+      const raw = decodeURIComponent(href.slice(1).split('?')[0]);
+      if (raw === '' || ROUTE_WORDS.indexOf(raw) > -1 || ids.indexOf(raw) > -1) continue;
+      nowhere.push(href + ' (' + info.what + ', from ' + info.from + ')');
+    }
+    chk('every address the app writes is a screen or a recipe in the book',
+      nowhere.length === 0, nowhere.join(' | '));
+    /* And the exemption is held to still being one: if the skip link ever
+       became a real navigation again, this check must stop excusing it. */
+    chk('and the one exemption is still not a navigation',
+      await pL.evaluate(() => {
+        const a = document.querySelector('.skip-link');
+        return !!(a && a.getAttribute('data-act') === 'skip');
+      }));
+    chk('nothing threw', lErrs.length === 0, lErrs.join(' | '));
+    await ctxL.close();
+  }
+
   console.log('\n== R78 — a number field can show its own number ==');
   {
     /* Found by looking at a screenshot of edit mode. The Serves box between
