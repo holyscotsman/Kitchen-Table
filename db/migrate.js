@@ -16,6 +16,7 @@ const path = require('path');
 /* One list of the app's own addresses, shared with the wire validator so
    the two boundaries cannot disagree about which words are taken (`R132`). */
 const { ROUTE_WORDS } = require('../backend/lib/validate');
+const { envStr } = require('../backend/lib/env');
 
 const CATS = ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Sides',
   'Snacks', 'Baking', 'Desserts', 'Cocktails', 'Drinks'];
@@ -82,14 +83,15 @@ function validate(list) {
 }
 
 async function main() {
-  if (!process.env.KT_DB) die('set KT_DB to the Postgres connection string');
+  const url = envStr('KT_DB');
+  if (!url) die('set KT_DB to the Postgres connection string');
   const file = path.join(__dirname, '..', 'recipes.json');
   const list = JSON.parse(fs.readFileSync(file, 'utf8'));
 
   const { emptyIng } = validate(list);
 
   const { neon } = require('@neondatabase/serverless');
-  const sql = neon(process.env.KT_DB);
+  const sql = neon(url);
 
   /* Schema first — idempotent by construction. */
   const ddl = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');

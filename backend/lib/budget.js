@@ -17,7 +17,9 @@
  */
 "use strict";
 
-const ENV_CAP = parseInt(process.env.KT_DAY_CAP, 10);
+const { envStr } = require("./env");
+
+const ENV_CAP = parseInt(envStr("KT_DAY_CAP"), 10);
 const DAY_CAP = ENV_CAP > 0 ? ENV_CAP : 40;
 
 /* null = go ahead. A string = the sentence to hand back, which must leave
@@ -57,7 +59,7 @@ function dayCapMessage(usedToday, cap) {
  *
  * Deliberately generous: a household shares one address, so this has to sit
  * well above what a family does in a day and only bite on abuse. */
-const ENV_CALLER = parseInt(process.env.KT_CALLER_DAY_CAP, 10);
+const ENV_CALLER = parseInt(envStr("KT_CALLER_DAY_CAP"), 10);
 const CALLER_DAY_CAP = ENV_CALLER > 0 ? ENV_CALLER : 15;
 
 /* Same contract as dayCapMessage: null = go ahead, a string = the sentence.

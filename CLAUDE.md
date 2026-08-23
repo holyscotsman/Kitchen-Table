@@ -2238,11 +2238,77 @@ carrying the string, a control already in the state it wanted to set, a
 matcher that expected the layout it happened to see, and now a scan that
 expected the quoting it happened to have.
 
+### The dashboard would have looked perfect and worked nowhere
+
+`R158`. The phone settled this question a long time ago and settled it
+twice: the family passphrase is trimmed where it is typed
+(`el.value.trim()`) and trimmed again every time it is read back. The
+server read every environment value **raw** — `process.env.KT_WRITE_KEY ||
+""` — and the two ends have to agree about what the passphrase *is*.
+
+A value pasted into Render's Environment tab, or into a GitHub Actions
+secret, arrives with a trailing newline or a trailing space more often than
+anyone would like. It is the ordinary way a pasted secret is mangled, and
+it is invisible in the dashboard. Read raw, here is what each one costs:
+
+| | what a stray newline does |
+|---|---|
+| `KT_WRITE_KEY` | every phone's **correct** passphrase refused, forever, with the sentence written for a *wrong* key — while `/api/health` reports `accepts_changes: true` and does not list it as missing |
+| `YT_API_KEY` | Google answers 400 *"API key not valid"* to every salvage, so a robot-blocked YouTube import never recovers; health again says the key is there |
+| `GROQ_API_KEY`, `KT_GH_TOKEN`, `ANTHROPIC_API_KEY` | the request does not go out at all — Node refuses to write a header value containing a newline |
+
+The first row is `R151`'s hazard arriving through a different door: **the
+half-configured state, reported as configured.** That round wrote the
+setup ordering down precisely because a `KT_WRITE_KEY` set without its
+Actions secret means every shared edit lands in the database and stops
+there, saved and invisible. This is the same silence one step earlier —
+the edit never even reaches the database, and every phone is told its
+passphrase is wrong.
+
+**One reader, and no exemption list.** `backend/lib/env.js` is the only
+place `process.env` is touched across `backend/` and `db/` — nineteen
+sites in seven files, and `R124`'s lesson is that a rule kept in seven
+places is a rule that drifts. The numbers come through it too
+(`parseInt(envStr("PORT"), 10)`), so there is no second rule about which
+reads need it. A twentieth read fails by name, and two floors sit under
+that scan because one that walked no files would pass vacuously.
+
+`ANTHROPIC_API_KEY` needed one extra line and is worth naming: the SDK
+reads that variable out of the environment **itself**, so trimming it in
+`server.js` and then letting the client find its own would have undone the
+fix silently. The trimmed value is passed in.
+
+**And the salvage key came out of the URL.** `salvageYouTube` put it in the
+query string, and `why` — which lands in a job row's public debug field,
+readable at `/api/import/jobs/:id` with no login and an id anyone can count
+to — was kept clean by a `scrub` that split on the **raw** key while the
+URL carried `encodeURIComponent(apiKey)`. Measured: a key holding
+`+`, `/` or `=` leaked in escaped form. Unreachable with a real Google key,
+which is 39 URL-safe characters — but the file's own comment states the
+posture it was failing at: *"the key must never ride along, however an
+error message chooses to phrase itself."*
+
+Fixed structurally rather than by widening the scrub alone. Google reads
+`X-goog-api-key` as readily as `?key=` — **measured against the live
+endpoint** rather than assumed: with that header a bad key comes back *"API
+key not valid"*, while with no key at all the answer is a 403 about
+unregistered callers. Out of the URL, the secret is not in the string an
+error message is most likely to quote back, which is a better guarantee
+than remembering to take it out again. The scrub stays and now covers both
+forms, because a message quoting a URL quotes the escaped one and nobody
+should have to work out per message which form it could be carrying.
+
+**The two mechanisms are pinned separately, on purpose.** With both in
+place, reverting either one alone still produces no leak — which is what
+defence in depth is for, and also how a single check over the pair would
+have been a check that cannot fail. The header move and the widened scrub
+each have their own, and each mutation fails by name.
+
 ### Verified
 
-The suite after the video arc: **1755 functional checks** across eleven
+The suite after the video arc: **1767 functional checks** across eleven
 suites (kt 342, feat 85, add 115, relay 21, quick 76, polish 368, sec 62,
-plan 79, video 276, backend 316, zoom 15), plus `R127`'s nine-check SQL
+plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

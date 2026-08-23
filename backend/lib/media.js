@@ -7,13 +7,14 @@
 const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { envStr } = require("./env");
 
 /* yt-dlp and ffmpeg are found in this order: an env override, the bin/
  * directory get-tools.sh fills on Render's native runtime, then PATH (the
  * Docker image installs them system-wide). */
 function resolveTool(name) {
   const envKey = name.toUpperCase().replace(/-/g, "") + "_PATH"; // YTDLP_PATH, FFMPEG_PATH
-  if (process.env[envKey]) return process.env[envKey];
+  if (envStr(envKey)) return envStr(envKey);
   const local = path.join(__dirname, "..", "bin", name);
   if (fs.existsSync(local)) return local;
   return name;
@@ -127,10 +128,10 @@ function isBotCheck(stderr) {
  * client-rotation fallback below still applies. */
 const PLUGIN_DIR = path.join(__dirname, "..", "bin", "plugins");
 const POT_ZIP = path.join(PLUGIN_DIR, "bgutil-ytdlp-pot-provider.zip");
-const POT_BASE = "http://127.0.0.1:" + (process.env.KT_POT_PORT || 4416);
+const POT_BASE = "http://127.0.0.1:" + (envStr("KT_POT_PORT") || "4416");
 
 function potArgs() {
-  if (process.env.KT_NO_POT || !fs.existsSync(POT_ZIP)) return [];
+  if (envStr("KT_NO_POT") || !fs.existsSync(POT_ZIP)) return [];
   return ["--plugin-dirs", PLUGIN_DIR,
     "--extractor-args", "youtubepot-bgutilhttp:base_url=" + POT_BASE];
 }
