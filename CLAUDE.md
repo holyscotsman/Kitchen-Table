@@ -13,12 +13,12 @@ scale. If a color you need is not in `tokens.css`, that is a question to ask —
 
 Ground truth, in priority order:
 1. `tokens.css` — the actual values. Use it.
-2. `design/components.md` and `design/a11y-criteria.md` — the component
+2. `design/styleguide.html` — every colour, size and component on one page,
+   drawn from `tokens.css` itself. **Open it in a browser** before arguing
+   about a value; its own subtitle is "The build must match this page."
+3. `design/components.md` and `design/a11y-criteria.md` — the component
    vocabulary and the accessibility bar the build is held to.
-3. `README.md` — the full spec for layout, behavior, and accessibility.
-(The original handoff's `styleguide.html`, `screenshots/`, and `*.dc.html`
-design references were never committed to this repo; the `design/` documents
-above are the operative record of the same intent.)
+4. `README.md` — the full spec for layout, behavior, and accessibility.
 
 The four load-bearing colors, so there is no ambiguity:
 
@@ -54,10 +54,30 @@ has the `contributor` field added and `servings` normalized to integers.
 
 ## About the original handoff references
 
-The handoff folder carried proprietary design references (`*.dc.html`
-templates, `styleguide.html`, `screenshots/`). They were read during the
-build for exact sizes, spacing, and state logic, but were never committed
-here. Where anything ever disagreed, `tokens.css` won — and still does.
+They are in `design/`, and until `R149` this file said twice that they were
+not — which is the worst place in the project for a wrong sentence, because
+the line above it tells you to read this file before writing any code, and
+a reference you are told does not exist is one nobody opens.
+
+What is actually there, and what each is good for:
+
+- **`styleguide.html`** — the one to open. Every colour, size and component,
+  rendered from `tokens.css`. `R149` fixed the two links that stopped it:
+  they were relative to the handoff folder, so in this repo it 404ed on
+  `tokens.css` and rendered black on transparent in **Times New Roman**, on
+  the reference page for a project whose second rule is that there is no
+  serif anywhere. It now reads the repo's own `tokens.css` and its own
+  self-hosted Atkinson, so it needs no network and cannot drift from the
+  build's palette.
+- **`Home.dc.html`, `Main.dc.html`, `Recipe.dc.html`** — design-tool
+  templates, not pages. They carry `{{ … }}` placeholders and reach for a
+  `support.js` runtime that is not in the repo, so they cannot be opened in a
+  browser; they are **source to read** for exact sizes, spacing
+  and state logic, which is what they were read for during the build.
+- **`screenshots/`** — four PNGs of the intended Main, Menu and Recipe
+  screens in both themes.
+
+Where anything ever disagreed, `tokens.css` won — and still does.
 
 ## Definition of done
 
@@ -1787,10 +1807,109 @@ past it. The rule only has an effect on a string that both throws **and**
 carries a whole character, so that is the string the check uses now, and the
 mutation fails by name.
 
+### The ground truth this file said was not here
+
+`R149`, and `R145` asked one level down from it. That round read
+`design/a11y-criteria.md` and found two sentences that had stopped being
+true. It never asked whether the ground truth **this file describes** is the
+ground truth the repo **holds**.
+
+It is not. CLAUDE.md said twice — in the rule block at the top and in a
+section of its own — that the handoff's `styleguide.html`, `screenshots/`
+and `*.dc.html` references *"were never committed to this repo"*. All eight
+of those files are tracked in git, and have been since the commit that
+brought the handoff in.
+
+**It came out of this loop.** `R5` was a cleanup round whose commit message
+states its job plainly: *"CLAUDE.md's ground-truth list points only at files
+that exist in this repo."* It went looking for phantom files, found these,
+and got them backwards — and in the same edit it **deleted a live
+instruction**:
+
+> **Do read them** to extract exact values: sizes, spacing, the order of
+> elements, the state logic, the quantity-scaling algorithm. They are the
+> most precise record of intended behavior.
+
+That is the guidance every round since has been missing, removed by a round
+that set out to strike references to files that are not there and struck a
+reference to files that are.
+
+That is the worst place in the project for a wrong sentence. The first line
+of this file is **"Read this file before writing any code"**, and a
+reference somebody is told does not exist is a reference nobody opens. Every
+round after `R5` that argued a size or a spacing from `tokens.css` alone did
+so having been told the page that draws all of them was not here.
+
+**And the one that could be opened could not render.** `styleguide.html`
+links `tokens.css` relative to the folder it came from, where the two sat
+side by side. In this repo `tokens.css` is at the root, so the page 404ed
+on it. Measured: every token **unset**, body transparent with black
+text, and the whole thing in **Times New Roman** — a serif, on the reference
+page for a project whose second rule is *"One font: Atkinson Hyperlegible.
+No serif anywhere"*, a rule that exists because the reader has low vision.
+Its own subtitle reads *"Every color, size and component in the app. The
+build must match this page."*
+
+Two links fixed. The token path is a **correction** rather than a change:
+the two files were siblings in the handoff, so this restores what the page
+was written to do rather than editing what its author wrote — the deference
+`tokens.css` is owed does not extend to a link broken by where the file was
+put. The font is a **change**, and a deliberate one: it was fetched from
+Google, as the app's was until `049` self-hosted it, and it comes from the
+repo's own copy now for that same reason. A reference that renders in a
+different font from the build is a reference that misleads, and this one
+needs no network at all.
+
+**The `.dc.html` files are templates, and saying so is the point.** They
+carry `{{ … }}` placeholders and reach for a `support.js` runtime that is
+not in the repo, so they cannot be opened in a browser — they are
+source to *read* for exact sizes and state logic, which is what they were
+read for during the build. "Not here" and "here, but not a page you open"
+are different facts, and only one of them is true.
+
+**`DESIGN.md` said it too, and there it did more damage.** That file is the
+original handoff, kept unedited on purpose, with an editorial preamble at the
+top listing what has changed since. The handoff's own text says *"Open
+`styleguide.html` in a browser and match it. Compare against
+`screenshots/`."* — and the preamble overruled it with *"neither was ever
+committed"*. So this project wrote a correction to the handoff that was
+itself wrong, and used it to strike out an instruction that was right. Five
+hundred lines further down, the handoff's own file table still said *"Open in
+a browser — rendered reference for every color and component"*, so the
+document disagreed with itself. Only the preamble row is changed: the body
+stays unedited, which is the whole point of keeping it.
+
+**And the check had to survive its own record.** The first version read the
+whole of each document, and the paragraph you are reading tripped it within
+minutes of being written — it quotes the sentence it corrected, which is what
+a record is for. `R138` met this exactly once before, with a comment quoting
+the code its own scan looked for. So the rule is scoped to what a reader is
+**told**: CLAUDE.md is two documents in one file, the contract above
+`## Build state` and the log of rounds below it, and the harm was entirely in
+the contract — the half whose first line says to read it before writing any
+code. The log is past-tense by construction and has to be able to quote what
+it fixed. A floor holds the split to a real boundary, since a renamed heading
+would otherwise make it read everything or nothing.
+
+The detector reads a **window** around the claim rather than a paragraph or a
+line, and that is not fussiness: the original wrapped `` `*.dc.html` `` onto
+one line and *"were never committed to this repo"* onto the next, while a
+markdown table has no blank line between its rows — so a line split misses
+CLAUDE.md's version and a paragraph split swallows DESIGN.md's whole table.
+A window is indifferent to how the text happens to be laid out, which is the
+only thing that matters here.
+
+The check is `R114`'s shape on both halves: a file the repo holds is never
+described as absent — scoped to the paragraphs that name these files, so an
+unrelated sentence about something genuinely uncommitted is not this bug —
+and every local thing the style guide links to exists, with no third party,
+with the three templates exempted **by name and reason** and each held to
+still carrying `{{`, so an exemption cannot outlive what earned it.
+
 ### Verified
 
-The suite after the video arc: **1708 functional checks** across eleven
-suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 359, sec 56,
+The suite after the video arc: **1717 functional checks** across eleven
+suites (kt 342, feat 75, add 113, relay 21, quick 76, polish 368, sec 56,
 plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

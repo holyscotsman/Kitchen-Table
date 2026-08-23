@@ -10,7 +10,7 @@
 > |---|---|
 > | six categories — Dinner, Breakfast, Side, Dessert, Snack, Drink | **ten**, and `recipes.json` was migrated (`CLAUDE.md`, "Categories are now ten") |
 > | contributors Mom, Me, Jennifer | **Joan, Jason, Jennifer, Lindsay, Siobhan, Jessica** — and every one of the 48 recipes is Joan's |
-> | *"Open `styleguide.html`"*, *"Compare against `screenshots/`"* | neither was ever committed; `design/components.md` and `design/a11y-criteria.md` are the operative record |
+> | *"Open `styleguide.html`"*, *"Compare against `screenshots/`"* | **both still stand.** They are in `design/`, and the styleguide renders from `tokens.css` itself. `design/components.md` and `design/a11y-criteria.md` sit alongside them, not instead of them. (This row said otherwise until `R149`; see CLAUDE.md, "The ground truth this file said was not here") |
 > | sort by "Quickest first" / "Who it's from" | three sorts: Recently added, A–Z, Course |
 >
 > Everything the palette and the font ask for below still stands, unchanged.

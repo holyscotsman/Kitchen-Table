@@ -4,9 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kitchen Table — style guide</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css">
+<!-- `R149` — the tokens link was relative to the handoff folder, where
+     tokens.css sat beside this file. In the repo it is at the root, so this
+     page 404ed on it and rendered with every token unset, black on
+     transparent, in Times New Roman: a serif, on the reference page for a
+     project whose second rule is that there is no serif anywhere.
+
+     The font was fetched from Google, as the app's was until `049`
+     self-hosted it; it comes from the repo's own copy now for that same
+     reason. A reference that renders in a different font from the build is
+     a reference that misleads, and this one needs no network at all. -->
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="stylesheet" href="../tokens.css">
 <style>
   .wrap { max-width: 1080px; margin: 0 auto; padding: 40px var(--pad) 80px; }
   h1 { font-size: 40px; font-weight: 700; letter-spacing: -.03em; margin: 0 0 6px; }
