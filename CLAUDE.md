@@ -3020,11 +3020,49 @@ there is a `.hint` ahead of it in document order, so the looser selector
 returned the list's own caption, *"As written, not summed:"*. `R166`'s copy
 is safe only because that block never opens the fold.
 
+### Two defences against a twin, and the one path that met neither
+
+`R173`, and the completion of `R170`. Tags enter this book three ways, and
+until now only two of them were guarded:
+
+| | what it does about the book's spelling |
+|---|---|
+| **Tag mode's Add tags** | **imposes** it — `067`: *"bulk tagging must not mint near-duplicates"* |
+| **typing into a tags field** | **offers** it, since `R170` |
+| **a video import** | nothing at all |
+
+So a model answering `scottish` against a book that already says `Scottish`
+minted exactly the twin the other two exist to prevent — and the extractor's
+own prompt steers it that way, since its one worked example of a tag is
+`air fryer`, lower case, beside a book whose cuisines are all title case.
+It is the one path where tags enter the book **without a person choosing
+them**, which is what makes imposing right here and offering right there:
+there is nobody to offer it to.
+
+**`canonTags` is one reader, not a third copy.** `bulk-apply` had carried
+three lines of its own since `067`; they are the same three lines, so they
+are now the same function (`R124`). It dedupes, which the inline version did
+not need and this one does: a model answering `["italian","Italian"]` would
+otherwise put *Italian, Italian* in front of the reader.
+
+**The placement is the decision, and it has its own check.** The obvious
+home is `normalizeDraft`, which is the boundary for everything the kitchen
+server says (`R87`). It is also the **restore** path (task `084`) — and a
+restored draft's tags are the reader's own words coming back from a refresh.
+Rewriting those is precisely what `R170` decided not to do, so the fold
+lives in `openVideoDraft`, where the words are the model's. A reader who
+types `scottish` into the review screen and refreshes gets `scottish` back;
+the mutation that moves the fold up one level fails by name.
+
+No flag, for `R162`'s reason: `scottish` → `Scottish` is the same tag,
+spelled the way the book spells it, exactly as `joan` → `Joan` is the same
+person. The reader sees the field before Save either way.
+
 ### Verified
 
-The suite after the video arc: **1871 functional checks** across eleven
+The suite after the video arc: **1876 functional checks** across eleven
 suites (kt 372, feat 98, add 136, relay 21, quick 84, polish 384, sec 62,
-plan 95, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
+plan 95, video 281, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

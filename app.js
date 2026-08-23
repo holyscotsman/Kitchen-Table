@@ -1501,6 +1501,35 @@
     return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); });
   }
 
+  /* The book's own spelling for a tag it already has, folded. Free-form
+     casing is kept — `weeknight` typed in lower case stays that way — but a
+     DIFFERENT spelling of a tag the book already carries resolves to the
+     book's, because two spellings of one tag are two chips, two addresses
+     and two filters (`R170` measured exactly that).
+
+     `bulk-apply` has done this since `067` — its comment says "bulk tagging
+     must not mint near-duplicates" — with three lines of its own. `R173`
+     makes it one reader rather than two copies (`R124`), and gives the video
+     importer the same one.
+
+     It dedupes, because folding can collide: a model answering
+     `["italian","Italian"]` would otherwise put `Italian, Italian` in front
+     of the reader. */
+  function canonTags(list) {
+    var canon = {};
+    allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
+    var seen = {};
+    var out = [];
+    (list || []).forEach(function (raw) {
+      var t = canon[String(raw).toLowerCase()] || String(raw);
+      var k = t.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push(t);
+    });
+    return out;
+  }
+
   function parseTags(text) {
     var seen = {};
     var out = [];
@@ -5126,6 +5155,18 @@
     var rj = (job && job.result_json && typeof job.result_json === "object")
       ? job.result_json : {};
     var d = normalizeDraft(rj);
+    /* `R173` — the one path where tags enter the book without a person
+       choosing them. Bulk tagging imposes the book's spelling (`067`) and
+       typing is offered it (`R170`); a video draft met neither, so a model
+       answering `italian` against a book holding `Italian` minted the twin
+       both of those exist to prevent — and the model is steered that way by
+       the extractor's own prompt, whose example tag is `air fryer`.
+
+       Here rather than in `normalizeDraft`, deliberately: that function is
+       also the RESTORE path (task `084`), and a restored draft's tags are
+       the reader's own words coming back from a refresh. Rewriting those
+       would be exactly what `R170` decided not to do. */
+    d.tags = canonTags(parseTags(d.tags)).join(", ");
     d.videoJobId = job.id;
     S.videoJob = null;
     S.videoReady = S.videoReady.filter(function (j) { return j.id !== job.id; });
@@ -6779,10 +6820,8 @@
       if (!toAdd.length) { closeSheet("tagSheetOpen"); return; }
       /* A typed tag that matches an existing one in any casing becomes the
          existing form — bulk tagging must not mint near-duplicates (067's
-         rule, enforced here too). */
-      var canon = {};
-      allTags().forEach(function (t) { canon[t.toLowerCase()] = t; });
-      toAdd = toAdd.map(function (t) { return canon[t.toLowerCase()] || t; });
+         rule, enforced here too). Through the one reader since `R173`. */
+      toAdd = canonTags(toAdd);
       var tagged = [];
       writeRecipes(function (list) { return list.map(function (r) {
         if (!S.tagSel[r.id]) return r;

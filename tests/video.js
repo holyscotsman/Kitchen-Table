@@ -2166,6 +2166,57 @@ async function freshPage(br, opts) {
     await removed.ctx.close();
   }
 
+  console.log('\n== R173: a video draft met neither of the two tag defences ==');
+  {
+    /* Tags enter this book three ways. Bulk tagging IMPOSES the book's
+       spelling (`067`: "bulk tagging must not mint near-duplicates"); typing
+       is OFFERED it (`R170`); a video draft met neither, so a model
+       answering `scottish` against a book that already says `Scottish`
+       minted the twin both of those exist to prevent. The extractor's own
+       prompt steers it that way — its example tag is `air fryer`, lower
+       case, beside a book whose cuisines are all title case.
+
+       The tag is taken FROM `recipes.json` so this cannot go stale when the
+       content changes, with a floor in case the book is ever untagged. */
+    const shipped = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'recipes.json'), 'utf8'));
+    const counts = {};
+    shipped.forEach(r => (r.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    const known = Object.keys(counts).filter(t => t !== t.toLowerCase())
+      .sort((a, b) => counts[b] - counts[a])[0];
+    chk('(floor) the shipped book holds a tag that is not all lower case',
+      !!known, JSON.stringify(Object.keys(counts)));
+
+    const { ctx, p } = await freshPage(br, {
+      polls: [{ id: 7, status: 'ready_for_review', result_json:
+        Object.assign({}, READY_RESULT, { tags: [known.toLowerCase(), 'weeknight'] }) }]
+    });
+    await p.goto(B + '/index.html#add');
+    await p.click('.pathbtn[data-key="video"]');
+    await p.fill('#a-vurl', 'https://youtu.be/vid1');
+    await p.click('[data-act="video-submit"]');
+    await p.waitForSelector('#a-tags', { timeout: 15000 });
+    const got = await p.inputValue('#a-tags');
+    chk('a tag the book already has arrives spelled the way the book spells it',
+      got.indexOf(known) > -1 && got.indexOf(known.toLowerCase() + ',') !== 0, got + ' want ' + known);
+    chk('(floor) and one the book has never seen is left exactly as written',
+      /\bweeknight\b/.test(got) && !/Weeknight/.test(got), got);
+
+    /* The distinction that decides WHERE the fix goes. `normalizeDraft` is
+       also the restore path (task `084`), and a restored draft's tags are
+       the reader's own words coming back from a refresh — rewriting those is
+       exactly what `R170` decided not to do. */
+    await p.fill('#a-tags', known.toLowerCase() + ', weeknight');
+    await p.waitForTimeout(600);
+    await p.reload();
+    await p.waitForSelector('#a-tags');
+    chk('but a reader’s own casing survives a refresh untouched',
+      (await p.inputValue('#a-tags')).indexOf(known.toLowerCase()) === 0,
+      await p.inputValue('#a-tags'));
+    chk('nothing threw', p.errs.length === 0, p.errs.join(' | '));
+    await ctx.close();
+  }
+
   console.log('\nvideo: ' + pass + ' passed, ' + fail + ' failed');
   await br.close();
   process.exit(fail ? 1 : 0);
