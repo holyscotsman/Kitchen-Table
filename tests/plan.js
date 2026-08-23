@@ -662,6 +662,84 @@ const chk = (n, c, e = '') => c ? (pass++, console.log('  PASS ' + n))
     }
   }
 
+  console.log('\n== Planning a meal spoke; taking one off did not (R166) ==');
+  {
+    /* `plan-remove` was named by no suite at all — 79 checks about the
+       planner and not one of them removed a meal.
+
+       Planning says `titleOf(pr) + " planned for " + prettyDate(date)`,
+       through `setNotice`, which both draws it and announces it. Taking one
+       off said nothing, so THAT sentence stayed where it was. Measured
+       before the fix, after the meal was gone:
+
+         spoken:  "Air Fryer Chops planned for Monday 17."
+         visible: "Air Fryer Chops planned for Monday 17."
+
+       Not silence — a sentence that had stopped being true, in the app's
+       own words, about the thing the reader had just undone. `R141`'s
+       finding on the other side of the same feature. */
+    const ctxM = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pM = await ctxM.newPage();
+    const mErrs = []; pM.on('pageerror', (e) => mErrs.push(e.message));
+    const notice = () => pM.evaluate(() => {
+      const n = document.querySelector('.notice, .hint');
+      return n ? n.textContent.trim() : '';
+    });
+
+    await pM.goto(B + '/index.html#plan');
+    await pM.waitForSelector('[data-act="plan-pick"]');
+    await pM.click('[data-act="plan-pick"] >> nth=0');
+    await pM.waitForSelector('[data-act="plan-assign"]');
+    await pM.click('[data-act="plan-assign"] >> nth=0');
+    await pM.waitForSelector('[data-act="plan-meal"]');
+    const planned = await notice();
+    chk('planning a meal says so, naming the recipe and the day',
+      /planned for/.test(planned) && planned.length > 20, planned);
+
+    /* Removing is done from the meal sheet: tap the card, then the danger
+       button inside it. */
+    await pM.click('[data-act="plan-meal"] >> nth=0');
+    await pM.waitForSelector('[data-act="plan-remove"]');
+    await pM.click('[data-act="plan-remove"]');
+    await pM.waitForSelector('[data-act="plan-meal"]', { state: 'detached' });
+    const removed = await notice();
+    chk('and taking it off says so too', /taken off/.test(removed), removed);
+    /* THE FLOOR, and the whole point: the sentence must have CHANGED. The
+       bug was not silence — it was the planning sentence still standing. */
+    chk('and the sentence is no longer the one about planning it',
+      removed !== planned && !/planned for/.test(removed), removed);
+    chk('the meal really is off the week',
+      (await pM.evaluate(() => JSON.parse(localStorage.getItem('kt.plan') || '[]').length)) === 0,
+      await pM.evaluate(() => localStorage.getItem('kt.plan')));
+
+    /* And a slot the plan outlived (`127`) keeps the name it was planned
+       under — the removal button sits on exactly that card. */
+    await pM.evaluate(() => {
+      /* Local date parts, like the app's own `isoDate` — `toISOString` is a
+         UTC instant and moves the day for anyone west of it (`R113`). */
+      const d = new Date();
+      const iso = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+      localStorage.setItem('kt.plan', JSON.stringify([{
+        id: 'p-gone-166', date: iso, slot: 'dinner',
+        recipeId: 'no-such-recipe-166', titleThen: 'A Recipe Since Removed',
+        servings: 4
+      }]));
+    });
+    /* A reload, not a goto: the plan is read into memory at boot, so writing
+       storage under a running page changes nothing on screen. */
+    await pM.reload();
+    await pM.waitForSelector('.mealcard--gone [data-act="plan-remove"]');
+    await pM.click('.mealcard--gone [data-act="plan-remove"]');
+    await pM.waitForTimeout(400);
+    chk('a slot whose recipe is gone is named by what it was planned under',
+      /A Recipe Since Removed taken off/.test(await notice()), await notice());
+    chk('nothing threw', mErrs.length === 0, mErrs.join(' | '));
+    await pM.evaluate(() => localStorage.clear());
+    await ctxM.close();
+  }
+
   console.log('\n== Print view (129) ==');
   await p.emulateMedia({ media: 'print' });
   const printState = await p.evaluate(() => ({

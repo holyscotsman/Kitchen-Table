@@ -2663,11 +2663,48 @@ name.
 Clearing the box, or typing the same name back, stays **silent** — `R147`
 settled that: nothing was typed, so there is nothing to say.
 
+### Planning a meal spoke; taking one off did not
+
+`R166`, and `R141`'s finding on the other side of the same feature.
+`plan-remove` was named by **no suite at all** — 79 checks about the
+planner and not one of them removed a meal.
+
+Planning a meal calls `setNotice(titleOf(pr) + " planned for " +
+prettyDate(date))`, which both draws the sentence and announces it. Taking
+one off called nothing — so *that* sentence stayed exactly where it was.
+Measured, after the meal was gone:
+
+| | |
+|---|---|
+| spoken | *"Air Fryer Chops planned for Monday 17."* |
+| visible | *"Air Fryer Chops planned for Monday 17."* |
+
+**Not silence — a sentence that had stopped being true**, in the app's own
+words, about the very thing the reader had just undone. It now reads
+*"Air Fryer Chops taken off Monday 17."*, which is the planning sentence's
+own shape (`R121`: one situation, one wording).
+
+**The name comes from the same two rules the card beside it uses.** A
+recipe still in the book is named through `titleOf` (`R138`); a slot the
+plan outlived keeps the name it was planned under (`127`). The mutation
+that drops the second says *"Untitled recipe taken off Sunday 23"* —
+`R116`'s placeholder in a sentence where the real name was sitting right
+there — and fails by name.
+
+**And one thing measured and deliberately not fixed here**, because it is a
+different mechanism: after the removal the caret lands on `<body>`.
+`restoreSheetFocus` looks up the control that opened the sheet and, finding
+it gone — the meal card removed itself — quietly does nothing. That is
+`R80`'s contract with a hole in it for *any* sheet whose opener
+disappears, not just this one, and closing it properly means giving every
+screen's `#main-content` a `tabindex="-1"`, which also repairs the skip
+link that already points there. Its own round, next.
+
 ### Verified
 
-The suite after the video arc: **1823 functional checks** across eleven
+The suite after the video arc: **1829 functional checks** across eleven
 suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 368, sec 62,
-plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
+plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
 because a gate that quietly does nothing is worse than no gate — plus the

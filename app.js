@@ -6615,9 +6615,29 @@
       return;
     }
     if (act === "plan-remove") {
+      /* `R166` — say it, the way planning one is said.
+         `setNotice(titleOf(pr) + " planned for " + prettyDate(…))` runs when
+         a meal goes onto the week. Taking one off said nothing at all — so
+         the notice from the planning stayed on screen, and after the meal
+         was gone it still read "Air Fryer Chops planned for Monday 17."
+         Measured: not silence, a sentence that had stopped being true, in
+         the app's own words, about the thing the reader had just undone.
+         `R141`'s finding on the other side of the same feature. */
+      var gone = null;
+      for (var pi = 0; pi < S.plan.length; pi++) {
+        if (S.plan[pi].id === key) { gone = S.plan[pi]; break; }
+      }
       writePlan(function (list) {
         return list.filter(function (e) { return e.id !== key; });
       });
+      if (gone) {
+        /* A recipe still in the book is named through `titleOf` (`R138`);
+           one the plan outlived keeps the name it was planned under
+           (`127`). */
+        var gr = byId(gone.recipeId);
+        setNotice((gr ? titleOf(gr) : gone.titleThen) +
+          " taken off " + prettyDate(gone.date) + ".");
+      }
       if (S.mealOpen) { S.mealFor = null; closeSheet("mealOpen"); } else render();
       return;
     }
