@@ -1320,6 +1320,31 @@
     return raw;
   }
 
+  /* A photo attached on the Add screen is staged under `__new__`, because a
+     recipe's id does not exist until its title does; `saveAdd` moves it
+     across. `R159` — the staged photo's lifetime is the DRAFT's lifetime,
+     and nothing used to say so. The draft lives in `sessionStorage` and the
+     photo lives in IndexedDB, which are different lifetimes, so a photo
+     outlived the draft it was picked for and was then offered to whatever
+     was typed next. Measured, in two taps: attach a photo of Joan's
+     shortbread card, press the button that says **Start over**, choose
+     "Type it in", type a soup — and the card is the soup's picture, saved
+     under the soup's id, ready for "Download photos" to hand the family a
+     file with the wrong name in it. Called wherever the draft is thrown
+     away: `add-back` (in-session) and `restoreAddDraft` with nothing to
+     restore (the session that picked it is gone — `R136`'s rule that an
+     entry stops being true when the copy it describes is gone). Not on
+     ordinary navigation: a detour to check a recipe deliberately lands back
+     in the half-finished import, photo included. */
+  function discardStagedPhoto() {
+    /* Only when there is one. On the localStorage path `removeImage`
+       serialises and writes the WHOLE map, so an unguarded call would spend
+       a write on every arrival at the Add screen — on exactly the phones
+       with the smallest quota, which are the reason the "no room" message
+       exists. Asked the same way `photoFieldHtml` asks it. */
+    if (pagesOf("__new__").length) removeImage("__new__");
+  }
+
   function removeImage(id) {
     delete IMG[id];
     if (imgDb) { idbDelete(id); return; }
@@ -6081,11 +6106,12 @@
   }
 
   function restoreAddDraft() {
+    var restored = false;
     try {
       var raw = sessionStorage.getItem(K.addDraft);
-      if (!raw) return;
-      var d = JSON.parse(raw);
+      var d = raw ? JSON.parse(raw) : null;
       if (d && (d.draft || d.url || d.paste || d.videoJob)) {
+        restored = true;
         S.addStep = d.step || "choose";
         S.addDraft = d.draft ? normalizeDraft(d.draft) : null;
         S.addUrl = d.url || "";
@@ -6099,6 +6125,11 @@
         }
       }
     } catch (e) {}
+    /* `R159` — nothing to restore means the draft that picked the staged
+       photo is gone: a closed tab takes `sessionStorage` with it while
+       IndexedDB keeps the picture, which is how a photo survived into a
+       session that had never heard of it. */
+    if (!restored) discardStagedPhoto();
   }
 
   function clearAddDraft() {
@@ -6594,6 +6625,10 @@
       /* Backing out of the wait screen abandons the watching, not the job —
          it finishes server-side and appears in the waiting list. */
       stopVideoPoll();
+      /* On the review screen this button says "Start over", and until
+         `R159` it did not: the staged photo stayed and was handed to the
+         next thing typed. */
+      discardStagedPhoto();
       S.videoJob = null;
       S.addStep = "choose";
       S.addError = "";
