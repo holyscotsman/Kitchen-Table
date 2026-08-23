@@ -889,7 +889,15 @@
     return m ? m[1].toLowerCase() : "";
   }
 
-  /* The fields a flag can name AND a reader can answer by editing. */
+  /* The fields a flag can name AND a reader can answer by editing.
+     `course` is deliberately NOT here, and the asymmetry is a decision:
+     `saveDraft`'s `answered` table does list it, so editing the category
+     takes a Course flag down (`R161`'s flag is answerable) — but viewer
+     mode has no Course FIELD for a chip to sit beside, only the meta line,
+     and `082` puts a chip beside a field. The Course flag is shown in the
+     "Worth double-checking" panel like any other, so the reader is told
+     either way. Putting a chip on the meta line is a design question, not a
+     corollary of this list. */
   var FLAG_FIELDS = ["title", "servings", "ingredients", "steps"];
 
   function metaLine(parts) {
@@ -2496,7 +2504,25 @@
     var mult = S.serves && r.servings ? S.serves / r.servings : 1;
     var h = "";
 
-    var fieldFlags = { title: [], servings: [], ingredients: [], steps: [] };
+    /* `R177` — built FROM `FLAG_FIELDS` rather than typed out beside it.
+       The two lists have to agree, and when they were written twice they
+       could not be held to it: `fieldOfFlag` gates on `FLAG_FIELDS`, this
+       object was a literal, and a field in the first with no slot in the
+       second means `fieldFlags[k].push(f)` on `undefined`.
+
+       The one-word change that does it is one somebody would make for good
+       reasons — `R161` introduced Course flags, `082` says a flag surfaces
+       beside its field, and `saveDraft`'s `answered` table already lists
+       `course`, so adding it here looks like completing the set. Measured
+       with `course` in `FLAG_FIELDS` and one recipe carrying such a flag:
+       `#app` fell from 4207 characters to 196 and the screen read *"The
+       recipes could not be loaded (Cannot read properties of undefined
+       (reading 'push')). Check the connection and reload."* — `pageerror`
+       empty, because the throw lands in the boot chain's catch. `R148`'s
+       exact failure, one door over: a perfect connection, a sentence about
+       the connection, and a reload that reproduces it for ever. */
+    var fieldFlags = {};
+    FLAG_FIELDS.forEach(function (k) { fieldFlags[k] = []; });
     (r.flagged || []).forEach(function (f) {
       var k = fieldOfFlag(f);
       if (k) fieldFlags[k].push(f);

@@ -3200,10 +3200,50 @@ takes it. Three mutations fail by name, and the one that restores the
 shipped sweep reports the growth in its own message: *map size 2600*, then
 *3200*.
 
+### Two lists that had to agree, and the one word that made them disagree
+
+`R177`, and a guarantee rather than a fix — the property holds today, and
+the round is about pinning it where breaking it would be entirely
+reasonable (`R157`'s bar).
+
+`fieldOfFlag` gates a flag's field on **`FLAG_FIELDS`**. `viewRecipe` kept
+the chip buckets as a **literal** beside it — `{ title: [], servings: [],
+ingredients: [], steps: [] }`. Two hand-kept copies of one list, and a field
+in the first with no slot in the second means `fieldFlags[k].push(f)` on
+`undefined`.
+
+**The one-word change that does it is one somebody would make for good
+reasons.** `R161` introduced Course flags; `082` says a flag surfaces beside
+its field; and `saveDraft`'s `answered` table **already lists `course`**. So
+adding `course` to `FLAG_FIELDS` looks like completing the set. Measured
+with exactly that, on one recipe carrying a Course flag:
+
+> The recipes could not be loaded (Cannot read properties of undefined
+> (reading 'push')). Check the connection and reload.
+
+`#app` fell from **4207 characters to 196**, and `pageerror` stayed
+**empty**, because the throw lands in the boot chain's catch. That is
+`R148`'s exact failure one door over — a perfect connection, a sentence
+about the connection, and a reload that reproduces it for ever.
+
+The buckets are built **from `FLAG_FIELDS`** now, so the two cannot
+disagree, and the same mutation renders the recipe normally instead of
+taking the page down.
+
+**The asymmetry is a decision, and is held to being one.** `answered`
+includes `course` — editing the category takes a Course flag down, so
+`R161`'s flag is answerable — while `FLAG_FIELDS` does not, because viewer
+mode has no Course *field* for a chip to sit beside, only the meta line, and
+`082` puts a chip beside a field. The Course flag still appears in the
+*Worth double-checking* panel like any other, so the reader is told either
+way. Putting a chip on the meta line is a design question and Jason's call,
+not a corollary of this list — and it now **fails by name** when somebody
+makes it, rather than the page falling over.
+
 ### Verified
 
-The suite after the video arc: **1900 functional checks** across eleven
-suites (kt 372, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
+The suite after the video arc: **1908 functional checks** across eleven
+suites (kt 380, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
 plan 95, video 285, backend 334, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
