@@ -48,15 +48,32 @@ function parseApiSnippet(json) {
  * carries no recipe), or the next failure is guesswork again. */
 async function salvageYouTube(fetchFn, apiKey, videoId) {
   /* `why` ends up in the job row's public debug field — the key must never
-   * ride along, however an error message chooses to phrase itself. */
-  const scrub = (s) => apiKey ? String(s).split(apiKey).join("[key]") : String(s);
+   * ride along, however an error message chooses to phrase itself. Both
+   * forms, because a message that quotes a URL quotes the escaped one, and
+   * deciding per message which form it could be carrying is exactly the
+   * reasoning nobody should have to redo (`R158`). */
+  const scrub = (s) => {
+    let out = String(s);
+    if (!apiKey) return out;
+    for (const form of new Set([apiKey, encodeURIComponent(apiKey)])) {
+      out = out.split(form).join("[key]");
+    }
+    return out;
+  };
   if (!apiKey) return { meta: null, why: "no YT_API_KEY set" };
   if (!videoId) return { meta: null, why: "no video id in the link" };
   try {
+    /* The key goes in the header, not the query (`R158`). Google reads
+     * both — measured against the live endpoint: with this header a bad
+     * key is refused as "API key not valid", while with no key at all the
+     * answer is a 403 about unregistered callers. Keeping it out of the
+     * URL means the one string an error message is most likely to quote
+     * back does not contain the secret in the first place, which is a
+     * better guarantee than remembering to take it out again. */
     const res = await fetchFn(
       "https://www.googleapis.com/youtube/v3/videos?part=snippet%2CcontentDetails&id=" +
-      encodeURIComponent(videoId) + "&key=" + encodeURIComponent(apiKey),
-      { signal: AbortSignal.timeout(15000) });
+      encodeURIComponent(videoId),
+      { headers: { "X-goog-api-key": apiKey }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) {
       let detail = "";
       try { detail = (await res.text()).slice(0, 300); } catch (e) {}

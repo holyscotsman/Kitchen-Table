@@ -104,6 +104,17 @@ destroy a sync commit that landed in between. Setting the default branch to
 `main` (Settings → General → Default branch) removes it, and is the same
 change the Render **Branch** note above asks for.
 
+## Whitespace around a pasted value
+
+Every environment variable this server reads is trimmed (`backend/lib/env.js`),
+so a value that arrives from the clipboard with a trailing newline or space —
+the ordinary way a pasted secret gets mangled — still works. That was worth
+fixing rather than warning about: read raw, a `KT_WRITE_KEY` with a stray
+newline refuses every phone's correct passphrase forever, with the sentence
+written for a *wrong* one, while `/api/health` goes on reporting
+`accepts_changes: true`. It is the same half-configured shape as the section
+above, and just as quiet.
+
 ## Rotating the Neon password
 
 Do — it was pasted in chat once:

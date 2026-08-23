@@ -7,9 +7,10 @@
 
 const fs = require("fs");
 const path = require("path");
+const { envStr } = require("./env");
 
 function connString() {
-  return process.env.KT_DB || process.env.DATABASE_URL || "";
+  return envStr("KT_DB") || envStr("DATABASE_URL");
 }
 
 function getSql() {

@@ -29,8 +29,9 @@ const { makePublisher } = require("./lib/publish");
 const { makeWriteGate } = require("./lib/writegate");
 const { runJob } = require("./lib/pipeline");
 const { freeRecipeId } = require("./lib/ids");
+const { envStr } = require("./lib/env");
 
-const PORT = parseInt(process.env.PORT, 10) || 8787;
+const PORT = parseInt(envStr("PORT"), 10) || 8787;
 const MAX_QUEUE = 8;
 
 /* Boot without the database rather than crash-looping the deploy: a service
@@ -43,16 +44,18 @@ catch (e) { console.error("boot: " + e.message + " Imports are off until it is s
 const queue = serialQueue();
 
 let anthropic = null;
-if (process.env.ANTHROPIC_API_KEY) {
+if (envStr("ANTHROPIC_API_KEY")) {
   const Anthropic = require("@anthropic-ai/sdk");
-  anthropic = new Anthropic({ maxRetries: 2 });
+  /* Passed rather than left to the SDK, which would read the raw variable
+     back out of the environment and undo the trim (`R158`). */
+  anthropic = new Anthropic({ apiKey: envStr("ANTHROPIC_API_KEY"), maxRetries: 2 });
 }
 
 const ctx = {
   sql,
   anthropic,
-  groqKey: process.env.GROQ_API_KEY || "",
-  ytKey: process.env.YT_API_KEY || "",
+  groqKey: envStr("GROQ_API_KEY"),
+  ytKey: envStr("YT_API_KEY"),
   uptimeS: () => process.uptime()
 };
 
@@ -64,11 +67,11 @@ const ctx = {
 let potUp = false;
 function startPotServer() {
   const main = path.join(__dirname, "potserver", "server", "build", "main.js");
-  if (process.env.KT_NO_POT || !fs.existsSync(main)) return;
+  if (envStr("KT_NO_POT") || !fs.existsSync(main)) return;
   let tries = 0;
   (function up() {
     const cp = spawn(process.execPath,
-      [main, "--port", String(process.env.KT_POT_PORT || 4416)],
+      [main, "--port", envStr("KT_POT_PORT") || "4416"],
       { stdio: ["ignore", "inherit", "inherit"] });
     potUp = true;
     cp.on("exit", (code) => {
@@ -345,15 +348,15 @@ async function acceptJob(req, res, id) {
 /* The write gate lives in lib/writegate.js so it can be proved rather than
  * trusted. Ten wrong answers an hour per caller; no key configured means no
  * writes from anybody, which is the safe direction for the unset state. */
-const writeGate = makeWriteGate(process.env.KT_WRITE_KEY || "",
+const writeGate = makeWriteGate(envStr("KT_WRITE_KEY"),
   makeLimiter(10, 60 * 60 * 1000));
 
 /* What turns a write into something everyone can see. See lib/publish.js:
  * a failed poke never fails the write, because the recipe is already in the
  * database and the nightly run will publish it either way. */
 const publisher = makePublisher({
-  token: process.env.KT_GH_TOKEN || "",
-  repo: process.env.KT_REPO || "holyscotsman/Kitchen-Table",
+  token: envStr("KT_GH_TOKEN"),
+  repo: envStr("KT_REPO") || "holyscotsman/Kitchen-Table",
   log: (m) => console.log(m)
 });
 

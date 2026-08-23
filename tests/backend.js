@@ -1588,6 +1588,119 @@ const { runJob, computeFps } = lib('pipeline');
       readme.length + ' chars');
   }
 
+  console.log('\n== R158: one reader for every environment value ==');
+  {
+    const { envStr } = lib('env');
+
+    /* The semantics first. A value pasted into Render's Environment tab or
+       into a GitHub Actions secret arrives with a trailing newline or space
+       more often than anyone would like; read raw, that is a secret that
+       looks perfect in the dashboard and works nowhere. */
+    process.env.KT_R158 = '  sourdough\n';
+    chk('a pasted value is trimmed', envStr('KT_R158') === 'sourdough');
+    process.env.KT_R158 = '   \n ';
+    chk('a variable holding only whitespace reads as unset', envStr('KT_R158') === '');
+    delete process.env.KT_R158;
+    chk('an unset variable reads as empty, never undefined', envStr('KT_R158') === '');
+
+    /* And the consequence that made this worth a round. The phone trims the
+       family passphrase where it is typed AND every time it is read back —
+       it settled this question twice — so a server that does not trim
+       disagrees with every phone about what the passphrase IS. Refused
+       forever, with the sentence written for a WRONG key, while
+       /api/health goes on reporting accepts_changes: true. `R151`'s
+       hazard: the half-configured state, reported as configured. */
+    const { makeWriteGate } = lib('writegate');
+    const { makeLimiter } = lib('ratelimit');
+    process.env.KT_R158 = 'sourdough\n';
+    const gate = makeWriteGate(envStr('KT_R158'), makeLimiter(10, 3600000));
+    delete process.env.KT_R158;
+    chk('a passphrase pasted with a newline still opens the write gate',
+      gate.configured === true &&
+      gate.refusalFor({ 'x-kitchen-key': 'sourdough' }, '1.2.3.4', 1) === null,
+      JSON.stringify(gate.refusalFor({ 'x-kitchen-key': 'sourdough' }, '1.2.3.4', 1)));
+    /* The floor under that: trimming must not turn the gate into one that
+       lets anything through. */
+    chk('and a wrong passphrase is still refused',
+      (gate.refusalFor({ 'x-kitchen-key': 'sourdoug' }, '5.6.7.8', 1) || {}).status === 401);
+
+    /* One reader rather than a .trim() at each site, for `R124`'s reason:
+       nineteen sites in seven files, and a rule kept in seven places is a
+       rule that drifts. No exemption list — every read comes through here,
+       the numbers included, so there is no second rule to remember. */
+    const roots = [path.join(__dirname, '..', 'backend'), path.join(__dirname, '..', 'db')];
+    const walk = (d, out) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) {
+          if (e.name === 'node_modules' || e.name === 'potserver' || e.name === 'bin') continue;
+          walk(path.join(d, e.name), out);
+        } else if (e.name.endsWith('.js')) out.push(path.join(d, e.name));
+      }
+      return out;
+    };
+    const files = roots.reduce((a, r) => walk(r, a), []);
+    const reader = path.join(__dirname, '..', 'backend', 'lib', 'env.js');
+    const raw = files.filter(f => f !== reader &&
+      /process\.env/.test(fs.readFileSync(f, 'utf8')));
+    chk('every environment read in backend/ and db/ comes through the one reader',
+      raw.length === 0, raw.map(f => path.relative(path.join(__dirname, '..'), f)).join(', '));
+    /* Two floors, because a scan that reads nothing passes vacuously: the
+       walk must find the files, and the reader must be the thing that
+       actually touches process.env. */
+    chk('and the scan really walked the server', files.length >= 15 &&
+      files.indexOf(path.join(__dirname, '..', 'backend', 'server.js')) > -1, files.length + ' files');
+    chk('and the one reader is the one place process.env is touched',
+      /process\.env/.test(fs.readFileSync(reader, 'utf8')));
+
+    /* The SDK reads ANTHROPIC_API_KEY out of the environment itself, which
+       would quietly undo the trim, so the trimmed value is passed in. */
+    const srv = fs.readFileSync(path.join(__dirname, '..', 'backend', 'server.js'), 'utf8');
+    chk('the extraction client is given the trimmed key rather than finding its own',
+      /new Anthropic\(\{\s*apiKey: envStr\("ANTHROPIC_API_KEY"\)/.test(srv));
+  }
+
+  console.log('\n== R158: the salvage key is not in the string errors quote ==');
+  {
+    const salvage = lib('salvage');
+    /* Two independent mechanisms, pinned independently on purpose — with
+       both in place neither can be reverted alone and produce a leak, so a
+       single check over the pair would be one that cannot fail.
+
+       First: Google reads the key from this header as readily as from the
+       query — measured against the live endpoint, where a bad key in the
+       header is refused as "API key not valid" while no key at all is a
+       403 about unregistered callers. Out of the URL, it cannot ride along
+       in a message that quotes the address being fetched, which is a
+       better guarantee than remembering to take it out again. */
+    const real = 'AIzaSyD-1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P';
+    let seen = null;
+    const spy = async (url, opts) => {
+      seen = { url, opts };
+      throw new Error('connect ECONNREFUSED for ' + url);
+    };
+    const r = await salvage.salvageYouTube(spy, real, 'abcdefghijk');
+    chk('the key is sent as a header, not a query parameter',
+      seen.url.indexOf('key=') === -1 && seen.opts.headers['X-goog-api-key'] === real, seen.url);
+    /* A floor under that move: the failure path still has to say something
+       a person can act on, and still must not carry the key. */
+    chk('and a failed salvage still reports the reason, without it',
+      r.meta === null && /unreachable/.test(r.why) && r.why.indexOf(real) === -1, r.why);
+
+    /* Second: the scrub, widened to both forms. A message that quotes a
+       URL quotes the ESCAPED key, and deciding per message which form it
+       could be carrying is the reasoning nobody should have to redo. This
+       is what the raw-only split missed. */
+    const awkward = 'abc+def/ghi=jkl';
+    const leaky = async () => {
+      throw new Error('boom key=' + encodeURIComponent(awkward) + ' and raw ' + awkward);
+    };
+    const r2 = await salvage.salvageYouTube(leaky, awkward, 'abcdefghijk');
+    chk('and the scrub covers the escaped form as well as the raw one',
+      r2.why.indexOf(awkward) === -1 &&
+      r2.why.indexOf(encodeURIComponent(awkward)) === -1 &&
+      (r2.why.match(/\[key\]/g) || []).length === 2, r2.why);
+  }
+
   console.log('\nbackend: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('SUITE CRASH:', e); process.exit(1); });

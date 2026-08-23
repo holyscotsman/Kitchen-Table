@@ -11,6 +11,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { envStr } = require('../backend/lib/env');
 
 const FIELD_ORDER = ['id', 'title', 'category', 'contributor', 'servings',
   'prepTime', 'cookTime', 'ingredients', 'steps', 'notes', 'flagged',
@@ -72,9 +73,10 @@ function refuseToWrite(list, currentText) {
 }
 
 async function main() {
-  if (!process.env.KT_DB) { console.error('set KT_DB'); process.exit(1); }
+  const url = envStr('KT_DB');
+  if (!url) { console.error('set KT_DB'); process.exit(1); }
   const { neon } = require('@neondatabase/serverless');
-  const sql = neon(process.env.KT_DB);
+  const sql = neon(url);
 
   const rows = await sql`
     select r.*, c.name as contributor,
