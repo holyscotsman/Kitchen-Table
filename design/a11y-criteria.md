@@ -17,8 +17,11 @@ a known gap, not a silent one.
 
 ## Enforced automatically — confirm the new surface is covered
 
-1. **Contrast.** Every new screen/state appears in the contrast audit's route
-   list (`tests/contrast.js`) and passes AA in dark, light, and Easy Read —
+1. **Contrast.** Every new screen/state appears in the **shared screen list**
+   (`tests/screens.js`) and passes AA in dark, light, and Easy Read — the
+   contrast audit walks that list rather than keeping one of its own, and so
+   do the four sweeps in `tests/kt.js`, since `R131` found five hand-typed
+   copies that had drifted to 32, 5, 6, 16 and 6 screens respectively —
    **and "state" means modes, not just screens** (`R85`): the Menu's tag and
    remove modes had never been in the list, and putting them there returned
    192 failures at 1.00:1, text exactly its own background colour, shipped.
@@ -95,9 +98,15 @@ a known gap, not a silent one.
    button and link has a name a screen reader can say; every input has a
    label (visually hidden is fine); nothing carries a positive `tabindex`;
    every decorative `<svg>` is hidden from the accessibility tree. Checked on
-   sixteen surfaces — the six screens plus every sheet, edit mode and the
-   review forms — in `tests/kt.js`, which also asserts it actually reached the
-   controls, so a state that failed to open can't read as a clean pass. These
+   every state in the shared list (`tests/screens.js`) — the six routes plus
+   every sheet, both Menu modes, edit mode and the review forms — in
+   `tests/kt.js`, which also asserts it actually reached the controls, so a
+   state that failed to open can't read as a clean pass. This named a fixed
+   count until `R145` — the very number `R131` had already called out as the
+   drift — which is what a ground-truth document nothing reads does to
+   itself: it understated its own guarantee, and a reviewer told that less is
+   covered than really is does the work twice. The count is not written down
+   any more, because the list it describes is meant to grow. These
    were reviewer items until the sweep proved cheap; a reviewer's attention is
    not a durable guarantee.
 

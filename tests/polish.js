@@ -2146,6 +2146,73 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       'resetLocal=' + bodyOf('resetLocal').length + ' keys=' + kKeys.length);
   }
 
+  console.log('\n== The ground-truth document nobody checked (R145) ==');
+  {
+    /* CLAUDE.md names the ground truth in priority order: `tokens.css`,
+       then `design/components.md` and `design/a11y-criteria.md`, then
+       `README.md`. The first is enforced by `R48` — no colour may exist
+       outside it — and the last is read by `tests/quick.js`. **Nothing in
+       any suite has ever read `design/`.**
+
+       So `R131` moved five hand-typed screen lists into `tests/screens.js`,
+       updated the code and CLAUDE.md, and left the criteria document saying
+       two things that had stopped being true:
+
+         - the contrast route list is in `tests/contrast.js` (it requires
+           `./screens` and holds no list of its own), so a contributor told
+           to add their screen there finds nothing to add it to;
+         - the accessible-name sweep covers "sixteen surfaces" — the exact
+           number `R131` called out as the drift, when it now walks the whole
+           shared list.
+
+       The second is the worse one: it UNDERSTATES the guarantee, so someone
+       reading it to learn what is already enforced is told less is covered
+       than really is. */
+    /* `doc` lives inside the doc-walk block further down, so this keeps
+       its own reader. */
+    const readRepo = (f) => require('fs').readFileSync(
+      require('path').join(__dirname, '..', f), 'utf8');
+    const crit = readRepo('design/a11y-criteria.md');
+    const named = (crit.match(/tests\/[a-z-]+\.js/g) || []);
+    const missing = [...new Set(named)].filter((f) => {
+      try { require('fs').accessSync(require('path').join(__dirname, '..', f)); return false; }
+      catch (e) { return true; }
+    });
+    chk('every suite the criteria document names exists',
+      missing.length === 0 && named.length >= 5, missing.join(', ') || named.length + ' named');
+
+    /* Where the shared list actually lives. `tests/contrast.js` consumes it
+       and defines nothing, so naming it is sending someone to the wrong
+       file. */
+    const contrastSrc = require('fs').readFileSync(
+      require('path').join(__dirname, 'contrast.js'), 'utf8');
+    chk('the shared screen list is not defined in the contrast suite',
+      /require\(['"]\.\/screens['"]\)/.test(contrastSrc) &&
+      !/^\s*const SCREENS\s*=/m.test(contrastSrc));
+    /* Scoped to the sentence that TELLS A CONTRIBUTOR WHERE TO ADD ONE, not
+       to the document as a whole: the first version only required the string
+       to appear somewhere, and putting the old pointer back in criterion 1
+       still passed because criterion 8 mentions the file too. Measured — the
+       mutation that matters most was the one that survived. */
+    const rule1 = (crit.split(/\n(?=\d+\. \*\*)/)
+      .find((sec) => /Every new screen\/state appears in/.test(sec)) || '');
+    chk('and the criterion that says where to add a screen names that file',
+      /tests\/screens\.js/.test(rule1) && !/tests\/contrast\.js/.test(rule1),
+      rule1.slice(0, 120) || 'the criterion was not found at all');
+
+    /* And no fixed count for a sweep whose whole point is that it grew.
+       "the six screens" is a different, still-true claim about the routes,
+       so this is scoped to the word the drift attached itself to. */
+    const counted = crit.match(/\b([a-z]+|\d+)\s+surfaces\b/gi) || [];
+    chk('and claims no fixed number of surfaces, which has drifted once already',
+      counted.length === 0, JSON.stringify(counted));
+    /* A floor: a document that stopped mentioning the sweep at all would
+       pass every check above. */
+    chk('while still describing the sweep it is talking about',
+      /accessible name|aria-label|accessibility tree/i.test(crit) && crit.length > 3000,
+      crit.length + ' chars');
+  }
+
   console.log('\n== A recipe from the book is named through titleOf (R138) ==');
   {
     /* `R116` gave the app one word for a nameless recipe — "Untitled

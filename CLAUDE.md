@@ -1578,10 +1578,44 @@ now points at the queue `S13` built — where the change is already waiting. The
 bulk write already ended with *"Send them again from the All recipes screen"*,
 so only its cause was wrong: naming the kitchen for the phone's own connection.
 
+### The ground-truth document nobody had ever read
+
+`R145`. CLAUDE.md names the ground truth in priority order: `tokens.css`,
+then `design/components.md` and `design/a11y-criteria.md`, then `README.md`.
+The first is enforced by `R48` — no colour may exist outside it — and the
+last is read by `tests/quick.js`. **Nothing in any suite had ever opened
+`design/`**: five documents, 413 lines, including the one that says what
+accessibility bar every feature is held to.
+
+So `R131` moved five hand-typed screen lists into `tests/screens.js`, updated
+the code and CLAUDE.md, and left the criteria document saying two things that
+had stopped being true:
+
+- **the contrast route list is in `tests/contrast.js`** — it holds no list at
+  all any more, it requires `./screens`, so a contributor told to add their
+  new screen there opens the file and finds nothing to add it to;
+- **the accessible-name sweep covers "sixteen surfaces"** — the exact number
+  `R131` had already named as the drift, when it now walks the whole shared
+  list.
+
+The second is the worse one, and it is the opposite of the usual fault: it
+**understates** the guarantee. Someone reading it to learn what is already
+enforced is told less is covered than really is, and does the work twice. The
+count is not written down any more, because the list it describes is meant to
+grow.
+
+**And the mutation that mattered most survived the first version of the
+check.** Requiring the document to name `tests/screens.js` *somewhere* passed
+happily with the old pointer put back in criterion 1, because criterion 8
+mentions the file too. The check is scoped to the sentence that actually
+tells a contributor where to add a screen — the fourth time this session a
+mutation has found a check of mine hollow, and the fourth recorded rather
+than quietly fixed.
+
 ### Verified
 
-The suite after the video arc: **1671 functional checks** across eleven
-suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 336, sec 56,
+The suite after the video arc: **1676 functional checks** across eleven
+suites (kt 328, feat 75, add 113, relay 21, quick 76, polish 341, sec 56,
 plan 79, video 276, backend 296, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
