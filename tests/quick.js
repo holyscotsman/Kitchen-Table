@@ -52,10 +52,20 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     /* The two inline scripts in index.html are the pre-paint theme and
        `R29`'s own last-resort message — the code that has to run when
        everything else has failed. A net written in syntax the engine cannot
-       parse is not a net. */
-    const html = fsA.readFileSync(pathA.join(root, 'index.html'), 'utf8');
-    const inline = (html.match(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/g) || [])
-      .map((t) => t.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, ''));
+       parse is not a net.
+
+       Read out of the DOM rather than out of the file with a regex. The
+       first version matched `<script…>…</script>` by hand and CodeQL flagged
+       it high severity (`js/bad-tag-filter`) within minutes of the push —
+       correctly, and the security label is the least of it: a hand-rolled
+       tag matcher that misses a script makes THIS CHECK pass on a file it
+       never read, which is the exact fault this round exists to stop. The
+       browser is a real HTML parser and is already open. */
+    await p.goto(B + '/index.html');
+    await p.waitForSelector('.main__title');
+    const inline = await p.evaluate(() =>
+      [].slice.call(document.querySelectorAll('script:not([src])'))
+        .map(function (el) { return el.textContent; }));
     chk('index.html really has inline scripts to check', inline.length >= 2,
       String(inline.length));
     const badInline = inline.map(es5).filter(Boolean);

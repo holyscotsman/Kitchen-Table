@@ -2608,6 +2608,16 @@ parser must actually refuse post-ES5 syntax. A wrong `ecmaVersion` would
 make every check in the block pass on anything at all, and the mutation
 that sets it to 2020 fails by name.
 
+**And this round's own check was wrong first, caught by CodeQL within
+minutes of the push.** The inline scripts were pulled out of `index.html`
+by a hand-rolled `<script…>…</script>` regex, which is `js/bad-tag-filter`
+— flagged **high severity**, and correctly. The security label is the
+least of it: a tag matcher that misses a script makes *this check* pass on
+a file it never read, which is the exact fault the round exists to stop.
+They are read out of the **DOM** now — the browser is a real HTML parser
+and `quick.js` already has one open. The mutation still fails by name, and
+a floor requires both scripts to have actually been found.
+
 One cost, stated plainly: this adds `acorn` to `tests/` — one package,
 no transitive dependencies. The app itself still has none, which is the
 promise `tests/package.json`'s own description makes. It does change
