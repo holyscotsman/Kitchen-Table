@@ -361,6 +361,67 @@ const hostile = JSON.stringify({
     chk('and the scan actually found the attributes', found.length > 40,
       String(found.length));
   }
+  console.log('\n== Every link the app writes stays on this page (R157) ==');
+  {
+    /* `R54` proves every attribute is escaped. Escaping is the wrong tool for
+       one of them: `esc()` neutralises quotes, and `javascript:alert(1)`
+       needs none — put a recipe's own text into an `href` and the escaping
+       is beside the point.
+
+       Nothing does that today, and this pins it. Every `href` the app writes
+       is a `#` fragment, either a literal or `menuHash()`; the only `.href =`
+       in the file is the blob URL `downloadBlob` makes for itself; there is
+       no `window.open` and no `location.href =`.
+
+       Worth pinning because the plausible way to break it is a change
+       somebody would make for good reasons. `R128` decided a recipe's
+       `source` is deliberately not tappable — but on presentation grounds,
+       that a 120-character URL is a wall at this size. Someone could reopen
+       that on its merits without meeting the other half: `source` is written
+       by four writers, one of them a hand-edited `recipes.json`. */
+    const srcL = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'app.js'), 'utf8');
+
+    /* Read the text that FOLLOWS `href="`, not just the literal run before
+       the quote closes. The first version of this captured `[^"']*` and
+       skipped anything empty — so `href="' + esc(from) + '"`, an href built
+       entirely by concatenation, produced an empty capture and was excused.
+       That is exactly the dangerous shape, and the mutation that makes a
+       recipe's `source` tappable walked straight past the check written to
+       catch it. `R54`'s neighbouring block reads concatenation on purpose;
+       this one now does too. */
+    const hrefs = [...srcL.matchAll(/href=["']([\s\S]{0,60})/g)].map(m => m[1]);
+    const okHref = (h) =>
+      h[0] === '#' ||                             // a literal fragment
+      /^'\s*\+\s*menuHash\(\)/.test(h);        // the one sanctioned builder
+    const offPage = hrefs.filter(h => !okHref(h));
+    chk('every href written into HTML is a fragment',
+      offPage.length === 0,
+      offPage.slice(0, 3).map(h => JSON.stringify(h.slice(0, 40))).join(' | '));
+    /* And the sanctioned builder really builds a fragment. */
+    chk('and the built one builds a fragment too',
+      /href="'\s*\+\s*menuHash\(\)/.test(srcL) && /return "#menu"/.test(srcL),
+      'menuHash must return a #menu address');
+    /* Floors: a changed quoting style would empty the scan, and a rule that
+       accepted everything would pass it. */
+    chk('and the scan actually found the links', hrefs.length > 10,
+      String(hrefs.length));
+    chk('and the rule rejects an off-page link when it sees one',
+      !okHref('https://example.com"') && !okHref("' + esc(from) + '\">"),
+      'the rule must not accept everything');
+
+    /* The DOM half — an href can also be set on an element. */
+    const assigns = [...srcL.matchAll(/\.href\s*=\s*([^;]{1,40})/g)].map(m => m[1].trim());
+    chk('the only href assigned to an element is the download blob',
+      assigns.length === 1 && assigns[0] === 'url' &&
+      /createObjectURL/.test(srcL.slice(srcL.indexOf('function downloadBlob'),
+                                        srcL.indexOf('function downloadBlob') + 400)),
+      JSON.stringify(assigns));
+    chk('and nothing navigates the browser somewhere else',
+      !/window\.open\s*\(/.test(srcL) && !/location\.href\s*=/.test(srcL),
+      'window.open / location.href =');
+  }
+
   console.log('\n== The exemptions check themselves now (R114) ==');
   {
     /* `R54`'s list above exempts `id`, `act` and `cls` as "literals passed
