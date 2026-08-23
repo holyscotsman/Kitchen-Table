@@ -590,6 +590,22 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     chk('and leaving the count alone keeps its flag too',
       untouched.flagged.some(f => /^Servings —/.test(f)), JSON.stringify(untouched.flagged));
 
+    /* `R160` — the same save, with the field names in the casing a model or
+       a hand-edited recipes.json might actually use. `addAnswered` was keyed
+       Title/Ingredients/Steps/Servings/Course while `flagField` handed back
+       the word exactly as written, so not one of these could be answered —
+       and every fixture in this block capitalises, which is why it never
+       showed here either. */
+    const lower = await saveReview({ flagged: [
+      'title — none was found on the page; add one.',
+      'ingredients — none were found; check the original page.',
+      'steps — none were found; check the original page.',
+      'servings — no count was found; 4 was assumed.'] }, [
+      ['#a-title', 'Lower Case Flags'], ['#a-ing-0', '2 eggs'],
+      ['#a-step-0', 'Whisk them.'], ['#a-serves', '6']]);
+    chk('a flag whose field name is lowercase is answered like any other',
+      lower.flagged.length === 0, JSON.stringify(lower.flagged));
+
     chk('nothing threw', rErrs.length === 0, rErrs.join(' | '));
     await ctxR.close();
   }

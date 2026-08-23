@@ -2354,10 +2354,69 @@ by name within minutes: its stub counts writes, and the extra one moved
 the refusal from save-time to attach-time. Guarded with `pagesOf`, the
 app's own way of asking whether a photo is staged.
 
+### The one reader read the word, and then looked it up as written
+
+`R160`, and the completion of `R124`. That round made one tolerant reader
+for a flag's field, because the shape is written by a **language model**
+and by a hand-edited `recipes.json`. It taught the reader four separators.
+It did not teach it a **normal form** — `flagField` handed back the word
+exactly as written, and both callers then looked it up in a table keyed
+`Title` / `Servings` / `Ingredients` / `Steps` / `Course`.
+
+Measured, on all four fields:
+
+| a flag reading… | chip beside the field | answered by editing it |
+|---|---|---|
+| `Servings — no count was found; 4 was assumed.` | yes | **yes** |
+| `servings — no count was found; 4 was assumed.` | yes | **no** |
+| `SERVINGS — no count was found; 4 was assumed.` | yes | **no** |
+| `title — none was found on the page; add one.` | yes | **no** |
+| `ingredients — none were picked up.` | yes | **no** |
+
+So a flag whose field name is not capitalised can never be taken down —
+`R122`'s permanent stale warning, in the reader built to stop it — and it
+wears a **Double-check chip** the whole time, because `fieldOfFlag`
+lowercases and `flagField` did not. The badge built to announce a problem
+outliving the problem is the same fault with a nicer face on it.
+
+**The suite hid it, and that is the part worth keeping.** `tests/kt.js`'s
+R124 block exists to prove the reader is tolerant, and all six of its
+fixtures capitalise the field name — colon, hyphen, en dash, prose, every
+axis but the one. A reader is only as tolerant as the questions it is
+asked.
+
+**And the two readers are now one parse.** `fieldOfFlag` carried its own
+expression, accepting an em dash only, with `082`'s keyword fallback
+behind it. It reads `flagField` first now. That is load-bearing rather
+than tidy, and a mutation proves it: the fallback is checked in a fixed
+order — servings, ingredients, steps, title — so on its own, a flag
+reading *"title — the ingredient list was cut"* chips beside
+**Ingredients**. The field a flag **names** has to beat the field it
+merely **mentions**.
+
+The keyword fallback itself stays exactly as `082` wrote it, and with it
+the one case where a chip cannot be cleared: a free-text flag that merely
+mentions a field earns a chip but is never an answerable claim, because
+`R124` settled that prose is not one. Both halves are deliberate, and both
+are now written down rather than discovered again.
+
+**Three of this round's own checks were wrong before they were right**,
+all in the same check and all recorded rather than quietly fixed. It asked
+whether the chips came down with the flags: first with a same-hash `goto`,
+which is not a navigation, so the page never re-rendered and sat in Edit
+mode where no chip is drawn at all — **0 chips, a pass for the wrong
+reason**, and the very mistake `R159` had documented one round earlier.
+Then with a reload, which re-runs the context's `addInitScript` and put
+the original four-flag fixture back — **4 chips, a failure for the wrong
+reason**, the harness cross-contamination that block already warns about.
+Then with a `.catch(() => {})` behind a wait for a selector that does not
+exist, which is a wait that cannot fail. It closes Edit mode and waits for
+the form to detach, with nothing swallowing it.
+
 ### Verified
 
-The suite after the video arc: **1778 functional checks** across eleven
-suites (kt 342, feat 85, add 126, relay 21, quick 76, polish 368, sec 62,
+The suite after the video arc: **1785 functional checks** across eleven
+suites (kt 348, feat 85, add 127, relay 21, quick 76, polish 368, sec 62,
 plan 79, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

@@ -802,10 +802,21 @@
    * itself. A word followed by a separator and a space is a field claim;
    * anything else is prose, and prose is never treated as an answerable
    * claim about a field. */
+  /* `R160` — and NORMALISED, which `R124` left undone. It returned the word
+     exactly as written while both callers looked it up in a table keyed
+     `Title`/`Servings`/`Ingredients`/`Steps`/`Course`, so a flag written
+     "servings — no count was found; 4 was assumed." missed the table
+     entirely and could never be answered: `R122`'s permanent stale warning,
+     in the reader built to stop it, wearing a Double-check chip the whole
+     time because `fieldOfFlag` lowercases and this did not. Measured on all
+     four fields. One reader has to mean one answer, casing included. */
   function flagField(f) {
     var m = /^([A-Za-z]+)\s*[—–:-]\s+/.exec(String(f || ""));
-    return m ? m[1] : "";
+    return m ? m[1].toLowerCase() : "";
   }
+
+  /* The fields a flag can name AND a reader can answer by editing. */
+  var FLAG_FIELDS = ["title", "servings", "ingredients", "steps"];
 
   function metaLine(parts) {
     return parts.filter(function (x) {
@@ -2257,9 +2268,16 @@
      everything committed before this convention) classify by keyword, so old
      data gains the chips too. */
   function fieldOfFlag(f) {
+    /* `R160` — the primary parse is `flagField`, the same one `R122` and
+       `R123` answer by, so a chip beside a field is one that editing that
+       field can take down. It used to carry its own expression, which
+       accepted an em dash only. The keyword fallback below stays exactly as
+       `082` wrote it: free-text flags predating the convention still earn a
+       chip, and those are the one case a chip cannot be cleared — deliberate
+       on both sides, since `R124` settled that prose is never an answerable
+       claim about a field. */
+    if (FLAG_FIELDS.indexOf(flagField(f)) > -1) return flagField(f);
     var s = String(f).toLowerCase();
-    var m = s.match(/^(title|servings|ingredients|steps)\s*—/);
-    if (m) return m[1];
     if (/serving/.test(s)) return "servings";
     if (/ingredient/.test(s)) return "ingredients";
     if (/\bsteps?\b/.test(s)) return "steps";
@@ -3373,12 +3391,13 @@
        dismissal for those is a different feature, not a corollary of this
        one. */
     if (updated.flagged && updated.flagged.length) {
+      /* Keyed lowercase, because `flagField` normalises (`R160`). */
       var answered = {
-        Title: updated.title !== r.title,
-        Servings: updated.servings !== r.servings,
-        Ingredients: ingMoved,
-        Steps: stepMoved,
-        Course: updated.category !== r.category
+        title: updated.title !== r.title,
+        servings: updated.servings !== r.servings,
+        ingredients: ingMoved,
+        steps: stepMoved,
+        course: updated.category !== r.category
       };
       var keptFlags = updated.flagged.filter(function (f) {
         return !answered[flagField(f)];
@@ -4477,17 +4496,17 @@
     var savedIng = d.ingredients.filter(function (x) { return x.trim(); });
     var savedSteps = d.steps.filter(function (x) { return x.trim(); });
     var addAnswered = {
-      Title: !!title,
-      Ingredients: savedIng.length > 0,
-      Steps: savedSteps.length > 0,
+      title: !!title,
+      ingredients: savedIng.length > 0,
+      steps: savedSteps.length > 0,
       /* Not "regenerated below", which is what the first attempt assumed and
          the suite caught: the block below can only tell a blank field from a
          filled one, and a draft that arrived holding an assumed 4 looks
          exactly like a reader typing 4. So the count takes the course's rule
          instead — the flag says *4 was assumed*, and a saved count that is
          no longer 4 is one the reader changed. */
-      Servings: (typedServ >= 1 ? Math.min(40, typedServ) : 4) !== 4,
-      Course: (CATS.indexOf(d.category) > -1 ? d.category : "Dinner") !== "Dinner"
+      servings: (typedServ >= 1 ? Math.min(40, typedServ) : 4) !== 4,
+      course: (CATS.indexOf(d.category) > -1 ? d.category : "Dinner") !== "Dinner"
     };
     var addFlags = (d.flagged || []).filter(function (f) {
       return !addAnswered[flagField(f)];
