@@ -10,6 +10,67 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
   const errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.on('dialog',d=>d.accept());
 
+  console.log('\n== The app must still parse on the phone it was built for (R164) ==');
+  {
+    /* `R29` named this failure mode and built the net for it, in its own
+       words: "if app.js itself never runs — truncated by a bad deploy, or
+       using syntax an older iPhone cannot parse — there is no catch and no
+       render, and the page reads 'Loading recipes…' for ever. On the phone
+       this book was built for, that looks like a broken phone rather than a
+       broken deploy, and there is nothing to do about it."
+
+       It built the last-resort message. Nothing ever kept the app off the
+       wire. `app.js` is ~7,000 lines of strictly ES5 syntax — no arrow
+       functions, no const/let, no template literals, no spread, no optional
+       chaining, no classes — which at that length is a discipline rather
+       than an accident, and one keystroke from being broken by a round that
+       would pass every browser anybody tests with.
+
+       SYNTAX, not library. A method the engine lacks (`padStart`, which
+       this file does use) throws on one line and the rest of the app still
+       runs; a syntax error kills the whole file before a single statement
+       executes, which is precisely the blank screen `R29` is about. */
+    const acorn = require('acorn');
+    const fsA = require('fs');
+    const pathA = require('path');
+    const root = pathA.join(__dirname, '..');
+    const es5 = (src) => {
+      try { acorn.parse(src, { ecmaVersion: 5 }); return ''; }
+      catch (e) { return e.message; }
+    };
+
+    /* THE FLOOR, first, because everything below is vacuous without it: the
+       parser has to actually be refusing newer syntax. A wrong ecmaVersion
+       would make every check here pass on anything. */
+    chk('the parser really does refuse post-ES5 syntax',
+      es5('const x = () => 1;') !== '' && es5('var x = 1;') === '',
+      es5('const x = () => 1;') || '(accepted ES6!)');
+
+    chk('app.js parses as ES5', es5(fsA.readFileSync(pathA.join(root, 'app.js'), 'utf8')) === '',
+      es5(fsA.readFileSync(pathA.join(root, 'app.js'), 'utf8')));
+
+    /* The two inline scripts in index.html are the pre-paint theme and
+       `R29`'s own last-resort message — the code that has to run when
+       everything else has failed. A net written in syntax the engine cannot
+       parse is not a net. */
+    const html = fsA.readFileSync(pathA.join(root, 'index.html'), 'utf8');
+    const inline = (html.match(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/g) || [])
+      .map((t) => t.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, ''));
+    chk('index.html really has inline scripts to check', inline.length >= 2,
+      String(inline.length));
+    const badInline = inline.map(es5).filter(Boolean);
+    chk('every inline script in index.html parses as ES5, R29\'s net included',
+      badInline.length === 0, badInline.join(' | '));
+
+    /* sw.js is exempt BY NAME AND REASON, and the exemption is held to being
+       real: a service worker only exists in an engine that already has ES6,
+       so it may use it — and if it ever stopped, this exemption would be
+       carrying nothing and should go (`R149`'s rule about an exemption
+       outliving what earned it). */
+    chk('sw.js is the one exemption, and it still needs to be one',
+      es5(fsA.readFileSync(pathA.join(root, 'sw.js'), 'utf8')) !== '');
+  }
+
   console.log('\n== Main: logo lockup + intro sentence ==');
   await p.goto(B+'/index.html'); await p.waitForSelector('.main__title');
   /* Jason moved the mark: it is a logo now — left of the name, and it works. */
