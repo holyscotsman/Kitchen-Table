@@ -2700,10 +2700,58 @@ disappears, not just this one, and closing it properly means giving every
 screen's `#main-content` a `tabindex="-1"`, which also repairs the skip
 link that already points there. Its own round, next.
 
+### The first control on every screen said Skip to content, and went to "That recipe isn't here"
+
+`R167`, and the half `R166` deferred turned out to be the smaller one.
+
+*"Skip to content"* is the first thing in the tab order on **every screen**,
+and it is the one affordance built specifically for somebody using a
+keyboard or a screen reader. It is written in `index.html` as
+`<a href="#main-content">` — which in a hash-routed app is not an anchor,
+it is an **address**. `parseHash` read `main-content` as a recipe id, found
+no such recipe, and rendered:
+
+> That recipe isn't here.
+
+Measured from the Menu, the week planner and the help page alike, with the
+caret left on `<body>` afterwards. The control that promises to take a
+reader to the content took them off the screen instead, and has since
+`index.html` was written.
+
+`R131`'s accessible-name sweep cannot see this. That sweep asks whether
+every control **has** a name; `R140` asked whether the name says what the
+control **does**; this is the third question — whether the control does
+what its name says.
+
+Three parts, one mechanism: **there is always somewhere for the caret to
+land, and the control that says it will take you there does.**
+
+- **The skip link is handled by the app's own delegated listener**
+  (`data-act="skip"`), so the hash never changes and the caret goes where
+  the words promise. The `href` stays, because that is what a skip link is
+  and what assistive tech expects. It also degrades the right way: if
+  `app.js` never runs (`R29`), the link does nothing rather than navigating
+  wrongly.
+- **`#main-content` gets `tabindex="-1"`** on all six screens — it had none,
+  so it could not receive the caret at all. Not `0`: that would add a
+  spurious tab stop to every screen, and the mutation fails by name.
+- **`restoreSheetFocus` falls back to `#main-content`** when the opener is
+  gone, which is `R80`'s contract with a hole in it for *any* sheet whose
+  opener removes itself — `R166` measured it on the week planner, where
+  deleting a meal deletes the card that opened the sheet. `preventScroll`
+  on that path only: scroll restoration is app-owned, so the caret moves
+  without yanking the reader back to the top of the week. The skip link
+  wants the scroll and does not pass it.
+
+**The floor is that the fallback must not replace the normal path.** A
+sheet whose opener survives still hands the caret back to it; the mutation
+that always falls back fails by name and takes two pre-existing `R80`
+checks with it.
+
 ### Verified
 
-The suite after the video arc: **1829 functional checks** across eleven
-suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 368, sec 62,
+The suite after the video arc: **1839 functional checks** across eleven
+suites (kt 368, feat 98, add 127, relay 21, quick 81, polish 378, sec 62,
 plan 85, video 276, backend 328, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

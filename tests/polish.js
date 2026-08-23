@@ -3236,6 +3236,95 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
       !st.open && !st.onTrigger, JSON.stringify(st));
   }
 
+  console.log('\n== R167 — the first control on every screen, and somewhere to land ==');
+  {
+    /* "Skip to content" is the first thing in the tab order on every screen,
+       and it is the one affordance built specifically for somebody using a
+       keyboard or a screen reader. In a hash-routed app `href="#main-content"`
+       is an ADDRESS, not an anchor: `parseHash` read `main-content` as a
+       recipe id, found no such recipe, and rendered
+
+           That recipe isn't here.
+
+       Measured from the Menu, the week planner and the help page alike, with
+       the caret left on `<body>` afterwards. `R131`'s accessible-name sweep
+       cannot see this — the link has a name, it simply did the wrong thing. */
+    const ctxS = await freshContext(br, { ...devices['iPhone 13'], serviceWorkers: 'block' });
+    const pS = await ctxS.newPage();
+    const sErrs = []; pS.on('pageerror', (e) => sErrs.push(e.message));
+
+    for (const start of ['#menu', '#plan', '#help']) {
+      await pS.goto(B + '/index.html' + start);
+      await pS.waitForSelector('#main-content');
+      const before = await pS.evaluate(() =>
+        (document.getElementById('main-content') || {}).className || '');
+      await pS.focus('.skip-link');
+      await pS.keyboard.press('Enter');
+      await pS.waitForTimeout(400);
+      const after = await pS.evaluate(() => ({
+        hash: location.hash,
+        screen: (document.getElementById('main-content') || {}).className || '(gone)',
+        onMain: document.activeElement === document.getElementById('main-content'),
+        text: document.body.innerText.slice(0, 120)
+      }));
+      chk('Skip to content keeps the reader on ' + start,
+        after.hash === start && after.screen === before &&
+        !/isn.t here/.test(after.text), JSON.stringify(after));
+      chk('and puts the caret on the content of ' + start,
+        after.onMain, JSON.stringify(after));
+    }
+
+    /* Focusable, and NOT a tab stop: tabindex="-1" exactly. A 0 here would
+       add a spurious stop to every screen. */
+    const tabindexes = [];
+    for (const start of ['#', '#menu', '#plan', '#help', '#add']) {
+      await pS.goto(B + '/index.html' + start);
+      await pS.waitForSelector('#main-content');
+      tabindexes.push(start + '=' + await pS.evaluate(() =>
+        document.getElementById('main-content').getAttribute('tabindex')));
+    }
+    chk('every screen\'s content is focusable without becoming a tab stop',
+      tabindexes.every((t) => t.endsWith('=-1')), tabindexes.join(' '));
+
+    /* A sheet whose opener REMOVES ITSELF: the meal card that opened the
+       meal sheet is gone by the time the sheet closes, so `restoreSheetFocus`
+       found nothing and quietly left the caret on `<body>` (`R166` measured
+       it; this is the half it deferred). */
+    await pS.goto(B + '/index.html#plan');
+    await pS.waitForSelector('[data-act="plan-pick"]');
+    await pS.click('[data-act="plan-pick"] >> nth=0');
+    await pS.waitForSelector('[data-act="plan-assign"]');
+    await pS.click('[data-act="plan-assign"] >> nth=0');
+    await pS.waitForSelector('[data-act="plan-meal"]');
+    await pS.click('[data-act="plan-meal"] >> nth=0');
+    await pS.waitForSelector('[data-act="plan-remove"]');
+    await pS.click('[data-act="plan-remove"]');
+    await pS.waitForSelector('[data-act="plan-meal"]', { state: 'detached' });
+    chk('a sheet whose opener removed itself still hands the caret somewhere',
+      await pS.evaluate(() =>
+        document.activeElement === document.getElementById('main-content')),
+      await pS.evaluate(() => document.activeElement === document.body
+        ? 'BODY' : (document.activeElement.id || document.activeElement.tagName)));
+
+    /* THE FLOOR: the fallback must not replace the normal path. A sheet whose
+       opener survives still hands the caret back to it (`R80`). */
+    await pS.goto(B + '/index.html#menu');
+    await pS.waitForSelector('[data-act="open-filter"]');
+    await pS.focus('[data-act="open-filter"]');
+    await pS.keyboard.press('Enter');
+    await pS.waitForSelector('#filter-sheet');
+    await pS.keyboard.press('Escape');
+    await pS.waitForTimeout(350);
+    chk('while a sheet whose opener survives still hands it back to the opener',
+      await pS.evaluate(() => {
+        const a = document.activeElement;
+        return !!(a && a.getAttribute && a.getAttribute('data-act') === 'open-filter');
+      }));
+    chk('nothing threw', sErrs.length === 0, sErrs.join(' | '));
+    await pS.evaluate(() => localStorage.clear());
+    await ctxS.close();
+  }
+
   console.log('\n== R78 — a number field can show its own number ==');
   {
     /* Found by looking at a screenshot of edit mode. The Serves box between

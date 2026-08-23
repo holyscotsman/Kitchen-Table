@@ -1617,7 +1617,7 @@
     var q = S.mainQ.trim().toLowerCase();
     var h = "";
 
-    h += '<div class="main" id="main-content">';
+    h += '<div class="main" id="main-content" tabindex="-1">';
     /* The mark sits with the name — a logo lockup on the left — and the one
        control (theme) keeps the right. The logo is a link home: pressing a
        logo should never do nothing. */
@@ -1882,7 +1882,7 @@
 
     var selCount = Object.keys(S.tagSel).filter(function (k) { return S.tagSel[k]; }).length;
 
-    h += '<div class="menubody" id="main-content">';
+    h += '<div class="menubody" id="main-content" tabindex="-1">';
     h += '<div class="countrow"><span>' + list.length +
          (list.length === 1 ? " recipe" : " recipes") +
          (S.removing ? " — tap a recipe to remove it" : "") +
@@ -2072,7 +2072,22 @@
   function restoreSheetFocus() {
     if (!sheetReturn) return;
     var back = document.querySelector(sheetReturn);
-    if (back) back.focus();
+    /* `R167` — and somewhere to land when the opener is gone.
+       This looked up the control that opened the sheet and, not finding it,
+       quietly did nothing: the caret stayed on `<body>`, which is nowhere.
+       That happens whenever a sheet's opener removes itself — measured on
+       the week planner, where deleting a meal deletes the card that opened
+       the sheet — so it is `R80`'s contract with a hole in it rather than
+       one screen's bug. `#main-content` is the app's own answer to "the
+       start of this screen": every screen has one and the skip link already
+       points at it.
+       `preventScroll` because scroll restoration is app-owned
+       (`history.scrollRestoration = "manual"`): the caret should move
+       without yanking the reader back to the top of the week. */
+    if (!back) back = document.getElementById("main-content");
+    if (back) {
+      try { back.focus({ preventScroll: true }); } catch (e) { back.focus(); }
+    }
     sheetReturn = null;
   }
 
@@ -2443,7 +2458,7 @@
          S.editing + '" data-act="toggle-edit" aria-label="Edit mode"></button>' +
          "</div></div>";
 
-    h += '<div class="recipe" id="main-content" style="font-size:' +
+    h += '<div class="recipe" id="main-content" tabindex="-1" style="font-size:' +
          FS[effectiveFs()] + 'px">';
 
     if (S.editing) {
@@ -3719,7 +3734,7 @@
          '<a class="backlink press" href="#">' + I.chevL() + "Home</a>" +
          '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
 
-    h += '<div class="help" id="main-content">';
+    h += '<div class="help" id="main-content" tabindex="-1">';
     h += '<h1 class="help__h1">How to use it</h1>';
     h += '<p class="help__lead">Everything here is a tap. Nothing you press ' +
          "can break the book — and anything you change on your own phone can " +
@@ -3926,7 +3941,7 @@
          '<a class="backlink press" href="#">' + I.chevL() + "Home</a>" +
          '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
 
-    h += '<div class="plan" id="main-content">';
+    h += '<div class="plan" id="main-content" tabindex="-1">';
     h += '<p class="eyebrow">Kitchen Table</p>';
     h += '<h1 class="mhead__h1">' + esc(planLabel(S.planWeekOffset)) + "</h1>";
 
@@ -4189,7 +4204,7 @@
          I.chevL() + "Menu</a>" +
          '<div class="rhead__tools">' + themeBtn() + "</div></div></header>";
 
-    h += '<div class="addscreen" id="main-content">';
+    h += '<div class="addscreen" id="main-content" tabindex="-1">';
     h += '<h1 class="addscreen__h1">Add a recipe</h1>';
 
     if (S.addError) {
@@ -6452,6 +6467,25 @@
     var idx = parseInt(el.getAttribute("data-i"), 10);
     var r = S.route.name === "recipe" ? byId(S.route.id) : null;
 
+    /* `R167` — the first control in the tab order on every screen, and until
+       now the one that took the reader somewhere else. In a hash-routed app
+       `href="#main-content"` is an address: `parseHash` read `main-content`
+       as a recipe id, found no such recipe, and rendered **"That recipe
+       isn't here."** — measured from the Menu, the week planner and the help
+       page alike, with the caret left on `<body>`. The one affordance built
+       for somebody using a keyboard or a screen reader, losing them the
+       screen they were on. `R131`'s accessible-name sweep cannot see this:
+       the link HAS a name, it simply did the wrong thing.
+
+       Handled here so the hash never changes, and the caret goes where the
+       words promise. Scrolling is wanted on this path — skipping TO the
+       content means arriving at it — so no `preventScroll`. */
+    if (act === "skip") {
+      ev.preventDefault();
+      var mc = document.getElementById("main-content");
+      if (mc) mc.focus();
+      return;
+    }
     if (act === "theme") { toggleTheme(); return; }
     if (act === "tag-sug") { applyTagSuggestion(el); return; }
     if (act === "to-flags") {
