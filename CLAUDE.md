@@ -3325,10 +3325,54 @@ navigation carries nothing, so what is announced must equal the screen title
 exactly. A looser test would pass for a version that appended anything it
 liked to every navigation.
 
+### The one irreversible action, and what it said afterwards
+
+`R180`. `R140` gave this row a name that says what it **does** — *"Remove
+&lt;name&gt; from this phone"*, the confirm's own words. Nobody had asked
+what it says once it has **done** it.
+
+Measured: press it, accept, and the row is gone —
+
+| | |
+|---|---|
+| spoken | *"Menu — Kitchen Table"* — the sentence from arriving, unchanged |
+| caret | **`<body>`**, because the button removed itself |
+
+Nothing tells the reader the removal happened, on the app's one
+irreversible action, and their place in a forty-eight row list is gone with
+it. It is the third question again — `R131` asks whether a control has a
+name, `R140` whether the name says what it does, `R167` whether it does what
+its name says — and this is what comes after: whether the reader is told it
+did.
+
+The sentence is the confirm's scope said the same way (`S10`: one action,
+one scope) and shaped like the planner's (`R166`: *"taken off Monday 17"*),
+with `R138`'s `titleOf` for the same reason the question uses it — this is
+the dialog that once asked `Remove "undefined" from this phone?`. The
+mutation that reverts the scope to *"from the collection"* — the vague
+wording `S10` retired precisely because a sharing phone reads it as
+everyone's book — fails by name.
+
+The caret goes to `#main-content`, which `R167` built for a control that
+removes itself and `R178` used for the two others on this same screen.
+Landing on the **next row** would save a reader removing several a walk back
+down, but which row is "next" after a re-render is a guess, and a
+predictable destination beats a clever one.
+
+**And the pattern this sits in, recorded rather than swept.** Six controls
+delete a row and then simply `render()`: this one, the ingredient/step line
+in Edit mode (`del`) and on the Add review screen (`adel`), the recipe's
+photo (`rm-photo`), an OCR source photo (`a-photo-rm`), and a dismissed
+failed import (`video-dismiss`). `amove`, sitting directly beside `adel`,
+**does** say where the line went — `R129` added that because the row
+vanishes off screen. The remaining five are a round of their own, and one
+shared helper rather than five sentences invented separately (`R124`); this
+one is taken first because it is the only one that cannot be undone.
+
 ### Verified
 
-The suite after the video arc: **1928 functional checks** across eleven
-suites (kt 392, feat 102, add 136, relay 21, quick 84, polish 402, sec 62,
+The suite after the video arc: **1936 functional checks** across eleven
+suites (kt 400, feat 102, add 136, relay 21, quick 84, polish 402, sec 62,
 plan 95, video 285, backend 334, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,

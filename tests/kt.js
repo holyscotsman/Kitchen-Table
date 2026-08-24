@@ -1357,6 +1357,78 @@ const browserContextWithReduce = (br) =>
     await ctxC.close();
   }
 
+  console.log('\n== R180 — the one irreversible action, and what it said afterwards ==');
+  {
+    /* `R140` gave this row a name that says what it DOES — "Remove <name>
+       from this phone", the same words as the confirm that finishes it.
+       Nobody asked what it says once it has done it.
+
+       Measured: press it, accept the confirm, and the row is gone — the
+       live region still holds whatever it held ("Menu — Kitchen Table"),
+       and the caret is on `<body>`, because the button removed itself.
+       Nothing tells the reader the removal happened, on the app's one
+       irreversible action, and their place in a forty-eight row list is
+       gone with it.
+
+       `R166` settled the sentence's shape for the planner ("taken off
+       Monday 17") and `S10` settled the scope wording — one action, one
+       scope, said the same way as the question that asked. `R167` built
+       `#main-content` for a control that removes itself, and `R178` used
+       it for the two on this same screen. */
+    const ctxR = await freshContext(br, { ...devices['iPhone 13'] });
+    const pR = await ctxR.newPage();
+    const rErrs = []; pR.on('pageerror', (e) => rErrs.push(e.message));
+    pR.on('dialog', (d) => d.accept());
+    const heardR = () => pR.evaluate(() => {
+      const l = document.querySelector('[aria-live]');
+      return l ? l.textContent.trim() : '';
+    });
+
+    await pR.goto(B + '/index.html#menu');
+    await pR.waitForSelector('.rcard');
+    const before = await pR.locator('.rcard, .rrow').count();
+    await pR.click('[data-act="toggle-remove"]');
+    await pR.waitForSelector('[data-act="remove"]');
+    const victimId = await pR.locator('[data-act="remove"]').first().getAttribute('data-id');
+    const victimName = await pR.evaluate(async (id) => {
+      const l = JSON.parse(localStorage.getItem('kt.recipes') || 'null') ||
+        (await (await fetch('recipes.json')).json());
+      return (l.find((r) => r.id === id) || {}).title;
+    }, victimId);
+    const arrived = await heardR();
+    chk('(floor) there is a sentence standing before the removal',
+      arrived.length > 0, arrived);
+
+    await pR.focus('[data-act="remove"][data-id="' + victimId + '"]');
+    await pR.keyboard.press('Enter');
+    await pR.waitForTimeout(600);
+    chk('(floor) the recipe really is gone',
+      (await pR.locator('.rcard, .rrow').count()) === before - 1,
+      (await pR.locator('.rcard, .rrow').count()) + ' of ' + before);
+    chk('removing a recipe says so, naming it',
+      (await heardR()).indexOf(victimName) === 0, await heardR() + ' want ' + victimName);
+    chk('and says the scope the confirm asked about',
+      /removed from this phone/.test(await heardR()), await heardR());
+    chk('and the sentence is no longer the one that was standing',
+      (await heardR()) !== arrived, await heardR());
+    chk('the caret lands on the content rather than <body>',
+      await pR.evaluate(() =>
+        document.activeElement === document.getElementById('main-content')),
+      await pR.evaluate(() => document.activeElement.tagName + '#' +
+        (document.activeElement.id || '-')));
+    chk('the eye gets it too', /removed from this phone/.test(
+      await pR.evaluate(() => {
+        const n = document.querySelector('.hint');
+        return n ? n.textContent : '';
+      })), await pR.evaluate(() => {
+        const n = document.querySelector('.hint');
+        return n ? n.textContent.trim() : '(none)';
+      }));
+    chk('nothing threw', rErrs.length === 0, rErrs.join(' | '));
+    await pR.evaluate(() => localStorage.clear());
+    await ctxR.close();
+  }
+
   console.log('\n== R178 — three ways back to the whole book, and what each one did ==');
   {
     /* The Filter sheet's footer promises the most and kept the least.
