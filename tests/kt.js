@@ -1357,6 +1357,109 @@ const browserContextWithReduce = (br) =>
     await ctxC.close();
   }
 
+  console.log('\n== R178 — three ways back to the whole book, and what each one did ==');
+  {
+    /* The Filter sheet's footer promises the most and kept the least.
+       Measured with `chicken` in the search and a course picked, pressing
+       **"Reset to all recipes"** left 14 of 48 on screen, `chicken` still in
+       the box and `?q=chicken` still in the address: it cleared the filters
+       and not the query, while its two siblings — "Clear" in the count row
+       and "Show all recipes" in the empty state — cleared both. The one
+       label making the strongest promise was the only one that did not keep
+       it (`R167`'s third question).
+
+       And none of the three said anything. Measured on an empty Menu:
+       press "Show all recipes", forty-eight cards appear, and the live
+       region still reads "Menu — Kitchen Table" — the sentence from
+       arriving, unchanged (`R166`). Two of the three also remove the very
+       button that was pressed, so the caret landed on `<body>`; `R167`
+       built `#main-content` for exactly that. */
+    const ctxA = await freshContext(br, { ...devices['iPhone 13'] });
+    const pA = await ctxA.newPage();
+    const aErrs = []; pA.on('pageerror', (e) => aErrs.push(e.message));
+    const cards = () => pA.locator('.rcard').count();
+    const spoken = () => pA.evaluate(() => {
+      const l = document.querySelector('[aria-live]');
+      return l ? l.textContent.trim() : '';
+    });
+    /* 1. The sheet's footer, with a search running behind it. */
+    await pA.goto(B + '/index.html#menu?q=chicken');
+    await pA.waitForSelector('.rcard');
+    /* Read after the first navigation, not before: on `about:blank` a
+       relative `fetch` has no base to resolve against. */
+    const whole = await pA.evaluate(async () =>
+      (await (await fetch('recipes.json')).json()).length);
+    const searched = await cards();
+    chk('(floor) the search really narrows the list, or the case is vacuous',
+      searched > 0 && searched < whole, searched + ' of ' + whole);
+    await pA.click('[data-act="open-filter"]');
+    await pA.waitForSelector('[data-act="reset-filters"]');
+    await pA.locator('.chip:has-text("Dinner")').first().click();
+    await pA.waitForTimeout(250);
+    chk('(floor) and the course narrows it further', (await cards()) < searched,
+      (await cards()) + ' of ' + searched);
+    await pA.click('[data-act="reset-filters"]');
+    await pA.waitForTimeout(400);
+    chk('"Reset to all recipes" resets to all the recipes',
+      (await cards()) === whole, (await cards()) + ' of ' + whole);
+    chk('and takes the search with it, box and address alike',
+      (await pA.evaluate(() => {
+        const i = document.querySelector('#menu-search');
+        return (i ? i.value : '') + '|' + location.hash;
+      })) === '|#menu',
+      await pA.evaluate(() => {
+        const i = document.querySelector('#menu-search');
+        return (i ? i.value : '(no box)') + '|' + location.hash;
+      }));
+    chk('and says so, with the book\'s own count',
+      (await spoken()) === 'Showing all ' + whole + ' recipes.', await spoken());
+
+    /* 2. The empty state's escape — the one a reader is offered when the
+          screen says nothing matches. */
+    await pA.goto(B + '/index.html#menu?q=zzzzqqqq');
+    await pA.waitForSelector('.emptystate');
+    const said0 = await spoken();
+    chk('(floor) nothing matches, and the arrival sentence is what stands',
+      (await cards()) === 0 && said0.length > 0, said0);
+    await pA.focus('[data-act="show-all"]');
+    await pA.keyboard.press('Enter');
+    await pA.waitForTimeout(400);
+    chk('"Show all recipes" shows all the recipes', (await cards()) === whole,
+      (await cards()) + ' of ' + whole);
+    chk('and the sentence changes, rather than standing where it was',
+      (await spoken()) !== said0 &&
+      (await spoken()) === 'Showing all ' + whole + ' recipes.', await spoken());
+    chk('and the caret lands on the content, not on <body>',
+      await pA.evaluate(() =>
+        document.activeElement === document.getElementById('main-content')),
+      await pA.evaluate(() => document.activeElement.tagName + '#' +
+        (document.activeElement.id || '-')));
+
+    /* 3. The count row's "Clear", which is only drawn while something is
+          filtered — so it, too, removes the button that was pressed. */
+    await pA.goto(B + '/index.html#menu?q=chicken');
+    await pA.waitForSelector('[data-act="clear-filters"]');
+    await pA.focus('[data-act="clear-filters"]');
+    await pA.keyboard.press('Enter');
+    await pA.waitForTimeout(400);
+    chk('"Clear" clears, says so, and keeps the caret on the screen',
+      (await cards()) === whole &&
+      (await spoken()) === 'Showing all ' + whole + ' recipes.' &&
+      (await pA.evaluate(() =>
+        document.activeElement === document.getElementById('main-content'))),
+      (await cards()) + ' | ' + (await spoken()));
+    chk('the eye gets it too, not only the ear',
+      /Showing all/.test(await pA.evaluate(() => {
+        const n = document.querySelector('.hint');
+        return n ? n.textContent : '';
+      })), await pA.evaluate(() => {
+        const n = document.querySelector('.hint');
+        return n ? n.textContent.trim() : '(none)';
+      }));
+    chk('nothing threw', aErrs.length === 0, aErrs.join(' | '));
+    await ctxA.close();
+  }
+
   console.log('\n== R177 — two lists that must agree, and the word that made them disagree ==');
   {
     /* `fieldOfFlag` gates on `FLAG_FIELDS`; `viewRecipe` kept the chip

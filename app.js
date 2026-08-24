@@ -6695,20 +6695,46 @@
        otherwise the list shows everything while the URL still says ?who=…,
        and a reload or a shared link quietly re-applies it. Same replaceState
        as applying them, so clearing doesn't leave a Back step behind either. */
-    if (act === "reset-filters") {
-      S.who = []; S.cats = []; S.tags = []; S.needsLook = false;
-      syncMenuHash();
-      return;
-    }
-    if (act === "clear-filters") {
+    /* `R178` — the three ways back to the whole book, which had three
+       different ideas of what that means and said nothing when they got
+       there.
+
+       The Filter sheet's footer promises the most and kept the least:
+       measured with `chicken` in the search and a course picked, pressing
+       **"Reset to all recipes"** left **14 of 48** on screen, `chicken`
+       still in the box and `?q=chicken` still in the address — because it
+       cleared the filters and not the query, while its two siblings
+       ("Clear" in the count row, "Show all recipes" in the empty state)
+       cleared both. The one label making the strongest promise was the only
+       one that did not keep it: `R167`'s third question — does the control
+       do what its name says. One intent, one behaviour (`R121`).
+
+       And none of the three said anything. Measured on an empty Menu: press
+       "Show all recipes", forty-eight cards appear, and the live region
+       still reads *"Menu — Kitchen Table"* — the sentence from arriving,
+       unchanged. `R166`'s finding, on the one control a reader is offered
+       when the screen says nothing matches. The count is taken from the
+       list rather than typed, so it cannot rot (`R170`).
+
+       `show-all` still closes the search box and its siblings do not, which
+       is deliberate: it is the escape on the EMPTY state, where the search
+       is usually what got the reader there. */
+    if (act === "reset-filters" || act === "clear-filters" || act === "show-all") {
       S.who = []; S.cats = []; S.tags = []; S.needsLook = false; S.menuQ = "";
+      if (act === "show-all") S.searchOpen = false;
+      S.notice = "Showing all " + S.recipes.length +
+        (S.recipes.length === 1 ? " recipe." : " recipes.");
       syncMenuHash();
-      return;
-    }
-    if (act === "show-all") {
-      S.who = []; S.cats = []; S.tags = []; S.needsLook = false; S.menuQ = "";
-      S.searchOpen = false;
-      syncMenuHash();
+      /* Two of the three remove the very button that was pressed — the
+         empty state is replaced by the list, and "Clear" is only drawn
+         while something is filtered — so the caret would land on `<body>`.
+         `R167` built `#main-content` for exactly that. The sheet's own
+         button survives and the reader is still inside the sheet, so it is
+         left where it is. */
+      if (act !== "reset-filters") {
+        var mcAll = document.getElementById("main-content");
+        if (mcAll) mcAll.focus({ preventScroll: true });
+      }
       return;
     }
     if (act === "toggle-remove") {
