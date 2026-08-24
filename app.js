@@ -2981,8 +2981,17 @@
     S.draft = null;
     S.saved = false;
     var still = byId(S.route.id);
-    if (S.route.name === "recipe" && !still) location.hash = "#menu";
-    else { render(); announce("Local changes undone."); }
+    if (S.route.name === "recipe" && !still) {
+      /* `R179` — the branch that most needs the sentence was the one branch
+         without it. A recipe added on this phone stops existing when the
+         overlay goes, so the reader is sent to the Menu — and heard only
+         "Menu — Kitchen Table", with no word about what they had just done,
+         on the control whose own comment says its sentence has to be the
+         most honest one in the app. `S.carry` is what `R121` built for a
+         message that has to outlive a navigation. */
+      S.carry = "Local changes undone.";
+      location.hash = "#menu";
+    } else { render(); announce("Local changes undone."); }
   }
 
   /* Shared by Edit mode and the Add review screen so the two field sets stay
@@ -6355,7 +6364,25 @@
         head.setAttribute("tabindex", "-1");
         head.focus({ preventScroll: true });
       }
-      announce(document.title);
+      /* `R179` — one announcement, and it carries what just happened.
+         `S.carry` exists so a sentence survives the navigation that follows
+         it: `R121`'s clamped serving count, `R130`'s photo that would not
+         fit. It did survive — for the EYE. This line then wrote the screen
+         title over it in the same tick, so the live region's final content
+         was the furniture and never the fact.
+
+         Measured: a recipe typed at 300 servings is stored at 40, and the
+         reader is SHOWN "This book keeps serving counts up to 40, so 300
+         was saved as 40." while being TOLD "Church Hall Pot — Kitchen
+         Table". `R130`'s is worse — a phone with no room says so on screen
+         and the ear hears only the recipe's name, which is exactly the
+         "arrived at a recipe with no picture and no reason" that round was
+         written to stop.
+
+         Where am I, then what happened: one sentence, `S12`'s rule, with
+         nothing dropped. `S.notice` holds the carried value here — it is
+         taken off `S.carry` at the top of this function. */
+      announce(S.notice ? document.title + ". " + S.notice : document.title);
     }
   }
 
