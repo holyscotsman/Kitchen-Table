@@ -3380,6 +3380,99 @@ const chk=(n,c,e='')=>c?(pass++,console.log('  PASS '+n)):(fail++,console.log(' 
     await ctxS.close();
   }
 
+  console.log('\n== R179 — a sentence built to survive a navigation, and never spoken ==');
+  {
+    /* `S.carry` exists so a message outlives the navigation that follows
+       it: `R121`'s clamped serving count, `R130`'s photo that would not
+       fit. It did outlive it — for the EYE. `onRoute` then wrote the screen
+       title over it in the same tick, so the live region's final content
+       was the furniture and never the fact.
+
+       Measured before the fix: a recipe typed at 300 servings is stored at
+       40, the reader is SHOWN "This book keeps serving counts up to 40, so
+       300 was saved as 40." and TOLD "Church Hall Pot — Kitchen Table".
+
+       And the panic button, whose own comment says its sentence has to be
+       the most honest one in the app: undoing local changes while looking
+       at a recipe that only existed on this phone sends the reader to the
+       Menu — the one branch that most needs telling was the one branch
+       that carried nothing, so they heard "Menu — Kitchen Table" and no
+       word about what they had just done. */
+    const ctxC = await freshContext(br, { ...devices['iPhone 13'] });
+    await ctxC.route('**/*.onrender.com/**', (r) => r.abort('failed'));
+    const pC = await ctxC.newPage();
+    const cErrs = []; pC.on('pageerror', (e) => cErrs.push(e.message));
+    const heard = () => pC.evaluate(() => {
+      const l = document.querySelector('[aria-live]');
+      return l ? l.textContent.trim() : '';
+    });
+    /* `.notice` alone: the recipe screen has a `.hint` ahead of it in
+       document order ("Tap to check off as you go"), so the looser selector
+       reads that instead — `R172`'s lesson. */
+    const shown = () => pC.evaluate(() => {
+      const n = document.querySelector('.notice');
+      return n ? n.textContent.trim() : '';
+    });
+
+    await pC.goto(B + '/index.html#add');
+    await pC.waitForSelector('.pathbtn');
+    await pC.click('[data-act="add-path"][data-key="review"]');
+    await pC.waitForSelector('#a-title');
+    await pC.fill('#a-title', 'Church Hall Pot');
+    await pC.fill('#a-serves', '300');
+    await pC.fill('#a-ing-0', '1 sack of potatoes');
+    await pC.fill('#a-step-0', 'Boil them all.');
+    await pC.click('[data-act="add-save"]');
+    await pC.waitForSelector('.r-title');
+    await pC.waitForTimeout(300);
+    chk('(floor) the count really was clamped, and shown',
+      /300 was saved as 40/.test(await shown()) &&
+      (await pC.evaluate(() => (JSON.parse(localStorage.getItem('kt.recipes') || '[]')
+        .find((r) => r.title === 'Church Hall Pot') || {}).servings)) === 40,
+      await shown());
+    chk('and the ear is told it too, not only the eye',
+      /300 was saved as 40/.test(await heard()), await heard());
+    chk('while still saying where the reader landed',
+      /Church Hall Pot/.test(await heard()), await heard());
+
+    /* The panic button's own branch. A recipe that exists only on this
+       phone stops existing when the overlay goes. */
+    await pC.evaluate(() => localStorage.clear());
+    await pC.evaluate(() => localStorage.setItem('kt.recipes', JSON.stringify([{
+      id: 'phone-only', title: 'Phone Only', category: 'Dinner', servings: 4,
+      contributor: 'Joan', ingredients: ['1 onion'], steps: ['Cook it.']
+    }])));
+    pC.on('dialog', (d) => d.accept());
+    await pC.goto(B + '/index.html#phone-only');
+    await pC.reload();
+    await pC.waitForSelector('.r-title');
+    await pC.click('[data-act="toggle-edit"]');
+    await pC.waitForSelector('[data-act="reset-local"]');
+    await pC.click('[data-act="reset-local"]');
+    await pC.waitForTimeout(700);
+    chk('(floor) the undo really did land the reader somewhere else',
+      (await pC.evaluate(() => location.hash)) === '#menu',
+      await pC.evaluate(() => location.hash));
+    chk('the undo says what it did, even when it moves the reader',
+      /Local changes undone/.test(await heard()), await heard());
+    chk('and still says where they are now',
+      /Menu/.test(await heard()), await heard());
+    /* The floor, and it must be a plain comparison rather than a clever
+       one: an ordinary navigation carries nothing, so what is announced has
+       to be exactly the screen title. A looser test here would pass for a
+       version that appended anything it liked to every navigation. */
+    await pC.goto(B + '/index.html#menu');
+    await pC.waitForSelector('.rcard');
+    await pC.goto(B + '/index.html#help');
+    await pC.waitForTimeout(400);
+    const plain = await heard();
+    chk('(floor) an ordinary navigation announces the title and nothing else',
+      plain === (await pC.title()) && plain.length > 4, plain + ' vs ' + (await pC.title()));
+    chk('nothing threw', cErrs.length === 0, cErrs.join(' | '));
+    await pC.evaluate(() => localStorage.clear());
+    await ctxC.close();
+  }
+
   console.log('\n== R175 — the Double-check chip, and where it takes you ==');
   {
     /* `082` puts a "Double-check" chip beside the field a flag names, and

@@ -3284,10 +3284,51 @@ resolve against — *"Failed to parse URL from recipes.json"*. Moved after the
 first navigation. The count is still read rather than typed, which is the
 half that matters.
 
+### A sentence built to survive a navigation, drawn and never spoken
+
+`R179`. `S.carry` exists for one reason: a message that has to outlive the
+navigation right behind it. `R121` built it for a clamped serving count;
+`R130` used it for a photo that would not fit. It worked — **for the eye**.
+
+`onRoute` takes the carried sentence into `S.notice`, renders (which
+announces it), and then, on any route change, writes `announce(document.title)`
+over it in the same tick. The live region's final content was the furniture
+and never the fact.
+
+Measured. Type a recipe serving **300** and save it:
+
+| | |
+|---|---|
+| stored | **40** |
+| shown | *"This book keeps serving counts up to 40, so 300 was saved as 40."* |
+| spoken | *"Church Hall Pot — Kitchen Table"* |
+
+`R130`'s case is the worse one, because that round exists to stop precisely
+what this reinstates: a phone with no room says so on screen, and the ear
+hears only the recipe's name — *"arrived at a recipe with no picture and no
+reason"*, in that round's own words.
+
+**Where am I, then what happened.** One announcement, which is `S12`'s rule,
+with nothing dropped: the title still says where the reader landed and the
+carried sentence follows it. Replacing the title instead would trade one
+silence for another, and the mutation that does it fails by name.
+
+**And the panic button's own branch.** `resetLocal` announces *"Local
+changes undone."* — except when the recipe on screen existed only on this
+phone, which is when it stops existing and the reader is sent to the Menu.
+That branch carried nothing, so the one press that most needs explaining was
+the one that got none, on the control whose own comment says its sentence
+has to be the most honest one in the app. It carries now.
+
+The floor is a plain comparison rather than a clever one: an ordinary
+navigation carries nothing, so what is announced must equal the screen title
+exactly. A looser test would pass for a version that appended anything it
+liked to every navigation.
+
 ### Verified
 
-The suite after the video arc: **1920 functional checks** across eleven
-suites (kt 392, feat 102, add 136, relay 21, quick 84, polish 394, sec 62,
+The suite after the video arc: **1928 functional checks** across eleven
+suites (kt 392, feat 102, add 136, relay 21, quick 84, polish 402, sec 62,
 plan 95, video 285, backend 334, zoom 15), plus `R127`'s nine-check SQL
 gate — CI runs the shipped write statement against a throwaway Postgres
 service container, and `KT_SQL_REQUIRED` turns a skip there into a failure,
