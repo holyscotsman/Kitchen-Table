@@ -7024,7 +7024,28 @@
            phone's copy of it, which stops being true the moment the copy
            does. */
         forgetSharedId(victim.id);
-        render();
+        /* `R180` — say it, and leave the reader somewhere.
+           `R140` gave this row a name that says what it DOES — "Remove
+           <name> from this phone", the confirm's own words — and nobody
+           asked what it says once it has done it. Measured: the row goes,
+           the live region still holds whatever it held ("Menu — Kitchen
+           Table"), and the caret is on `<body>`, because the button removed
+           itself. Nothing tells the reader the removal happened, on the
+           app's one irreversible action, and their place in a forty-eight
+           row list goes with it.
+
+           The sentence is the confirm's scope, said the same way (`S10`:
+           one action, one scope) and shaped like the planner's (`R166`:
+           "taken off Monday 17"), with `R138`'s `titleOf` for the same
+           reason the question uses it. The caret goes to `#main-content`,
+           which `R167` built for a control that removes itself and `R178`
+           used for the two others on this screen. Landing on the NEXT row
+           would save a reader removing several a walk back down, but which
+           row is "next" after a re-render is a guess, and a predictable
+           destination beats a clever one. */
+        setNotice(titleOf(victim) + " removed from this phone.");
+        var mcRm = document.getElementById("main-content");
+        if (mcRm) mcRm.focus({ preventScroll: true });
       }
       return;
     }
